@@ -5,7 +5,7 @@ Production Supabase: `hvqlkapynjfjikqithvd`
 Branch: `development/safe-pages-deploy-20260927`
 Current PR: `#2`
 Last updated: 2026-09-27
-State: **BLOCKED**
+State: **READY_FOR_MERGE**
 
 ## Work status
 
@@ -57,17 +57,17 @@ State: **BLOCKED**
 - Application routing uses `HashRouter`, suitable for GitHub Pages project-site navigation.
 - Vite base defaults to relative `./`, suitable for project-site assets.
 - Security advisor shows inherited warnings; no broad security rewrite is included in this deployment-only change.
-- Exact-head verification for PR #2: pending.
+- Exact-head verification for PR #2: Green — GitHub Actions run #9 (`36305169537`) succeeded on head `dd5f4b6fe8074f685f49ba0545939ac3e7f6c1b4`.
 
 ## Production gate
 
-- Merge to `main`: **BLOCKED** pending PR #2 exact-head verification.
+- Merge to `main`: **APPROVED** by user; re-verify after this worklog-only commit, then merge if Green.
 - GitHub Pages deployment: **BLOCKED** pending PR #2 merge and manual workflow dispatch.
 - Original Production project `azzdesuowpdcoflmyezn`: **DO NOT TOUCH**.
 
 ## Next action
 
-Harden `.github/workflows/deploy.yml` so all deployment jobs use the same locked clean-clone project URL/ref and the browser-safe publishable key, then run exact-head verification on PR #2. Do not merge until Green.
+Worklog updated after Green run #9. Re-run exact-head verification for this documentation-only commit; if Green, merge PR #2 to `main` under the user's explicit approval.
 
 ## Mandatory update protocol
 
