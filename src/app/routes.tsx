@@ -1,10 +1,12 @@
 import { Suspense, lazy, type ReactNode } from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useRoles } from '../context/RolesContext';
 import { Layout } from '../components/Layout';
 import { useCan, isAdminRole, type Permission } from '../lib/permissions';
-import { APP_ROUTES } from '@/core/navigation/routes';
+import { APP_ROUTES, type AppRoute } from '@/core/navigation/routes';
+import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
+import { moduleForPath, moduleForRoute, type OrganizationModuleKey } from '@/core/modules/module.config';
 
 const LoginPage = lazy(() => import('../features/auth/pages/LoginPage').then(m => ({ default: m.LoginPage })));
 const DashboardPage = lazy(() => import('../features/dashboard/pages/DashboardEnhancedPage').then(m => ({ default: m.DashboardEnhancedPage })));
@@ -68,10 +70,14 @@ function NoAccessPage() {
   return <div className="min-h-screen flex items-center justify-center bg-ui-page p-6"><div className="max-w-md rounded-2xl border border-ui-border bg-ui-surface p-6 text-center shadow-ui-sm"><h1 className="text-lg font-bold text-ui-text">لا توجد شاشة متاحة لهذا المستخدم</h1><p className="mt-2 text-sm text-ui-muted">يرجى مراجعة صلاحيات الدور وتعيين شاشة واحدة على الأقل.</p></div></div>;
 }
 
-function resolveLandingRoute(can: (permission: Permission) => boolean, role?: string | null): string | null {
-  if (can('dashboard.view')) return APP_ROUTES.dashboard;
-  if (role === 'cashier' && can('pos.view')) return APP_ROUTES.pos;
-  const candidates: Array<[Permission, string]> = [
+function resolveLandingRoute(
+  can: (permission: Permission) => boolean,
+  canAccessModule: (moduleKey: OrganizationModuleKey | null) => boolean,
+  role?: string | null,
+): string | null {
+  if (can('dashboard.view') && canAccessModule(moduleForRoute(APP_ROUTES.dashboard))) return APP_ROUTES.dashboard;
+  if (role === 'cashier' && can('pos.view') && canAccessModule(moduleForRoute(APP_ROUTES.pos))) return APP_ROUTES.pos;
+  const candidates: Array<[Permission, AppRoute]> = [
     ['pos.view', APP_ROUTES.pos], ['pos.kds_view', APP_ROUTES.kitchenDisplay], ['floor_plan.view', APP_ROUTES.floorPlan],
     ['approvals.review', APP_ROUTES.approvals], ['waste.view', APP_ROUTES.wasteCenter],
     ['products.view', APP_ROUTES.products], ['categories.view', APP_ROUTES.categories],
@@ -82,18 +88,24 @@ function resolveLandingRoute(can: (permission: Permission) => boolean, role?: st
     ['reports.view', APP_ROUTES.reports], ['reports.financial', APP_ROUTES.financialReports], ['accounts.view', APP_ROUTES.accounts],
     ['users.view', APP_ROUTES.users], ['roles.permissions.manage', APP_ROUTES.permissions], ['audit.view', APP_ROUTES.auditLog], ['branches.manage', APP_ROUTES.branches], ['settings.manage', APP_ROUTES.settings],
   ];
-  for (const [permission, route] of candidates) if (can(permission)) return route;
+  for (const [permission, route] of candidates) {
+    if (can(permission) && canAccessModule(moduleForRoute(route))) return route;
+  }
   return null;
 }
 
 function ProtectedRoute({ children, permission, permissionsAny, fullscreen, superAdminOnly = false, ownerOnly = false }: { children: ReactNode; permission?: Permission; permissionsAny?: Permission[]; fullscreen?: boolean; superAdminOnly?: boolean; ownerOnly?: boolean }) {
   const { session, loading, user } = useAuth();
   const { loading: rolesLoading } = useRoles();
+  const { loading: modulesLoading, canAccessModule } = useOrganizationModules();
+  const location = useLocation();
   const can = useCan();
-  if (loading || rolesLoading) return <PageLoader />;
+  if (loading || rolesLoading || modulesLoading) return <PageLoader />;
   if (!session) return <Navigate to={APP_ROUTES.login} replace />;
   if (!user) return <PageLoader />;
-  const landingRoute = resolveLandingRoute(can, user.role);
+  const landingRoute = resolveLandingRoute(can, canAccessModule, user.role);
+  const routeModule = moduleForPath(location.pathname);
+  if (!canAccessModule(routeModule)) return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
   if (superAdminOnly && user.role !== 'super_admin') return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
   if (ownerOnly && !isAdminRole(user.role)) return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
   if (permission && !can(permission)) return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
@@ -105,20 +117,22 @@ function ProtectedRoute({ children, permission, permissionsAny, fullscreen, supe
 function PublicRoute({ children }: { children: ReactNode }) {
   const { session, loading, user } = useAuth();
   const { loading: rolesLoading } = useRoles();
+  const { loading: modulesLoading, canAccessModule } = useOrganizationModules();
   const can = useCan();
-  if (loading || rolesLoading) return <PageLoader />;
-  if (session && user) { const landingRoute = resolveLandingRoute(can, user.role); return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />; }
+  if (loading || rolesLoading || modulesLoading) return <PageLoader />;
+  if (session && user) { const landingRoute = resolveLandingRoute(can, canAccessModule, user.role); return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />; }
   return <>{children}</>;
 }
 
 function DefaultRoute() {
   const { session, loading, user } = useAuth();
   const { loading: rolesLoading } = useRoles();
+  const { loading: modulesLoading, canAccessModule } = useOrganizationModules();
   const can = useCan();
-  if (loading || rolesLoading) return <PageLoader />;
+  if (loading || rolesLoading || modulesLoading) return <PageLoader />;
   if (!session) return <Navigate to={APP_ROUTES.login} replace />;
   if (!user) return <PageLoader />;
-  const landingRoute = resolveLandingRoute(can, user.role);
+  const landingRoute = resolveLandingRoute(can, canAccessModule, user.role);
   return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
 }
 
