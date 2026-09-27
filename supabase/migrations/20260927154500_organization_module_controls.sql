@@ -60,6 +60,44 @@ USING (
   OR public.user_can_access_organization(organization_id)
 );
 
+CREATE OR REPLACE FUNCTION public.user_can_access_organization(p_organization_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $function$
+  SELECT
+    public.is_super_admin()
+    OR EXISTS (
+      SELECT 1
+      FROM public.organization_members om
+      WHERE om.organization_id = p_organization_id
+        AND om.user_id = auth.uid()
+        AND om.is_active = true
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.users u
+      JOIN public.branches b ON b.id = u.branch_id
+      WHERE u.id = auth.uid()
+        AND u.is_active = true
+        AND b.organization_id = p_organization_id
+    )
+    OR EXISTS (
+      SELECT 1
+      FROM public.user_branch_access uba
+      JOIN public.branches b ON b.id = uba.branch_id
+      WHERE uba.user_id = auth.uid()
+        AND b.organization_id = p_organization_id
+    );
+$function$;
+
+REVOKE ALL ON FUNCTION public.user_can_access_organization(uuid) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.user_can_access_organization(uuid) FROM anon;
+GRANT EXECUTE ON FUNCTION public.user_can_access_organization(uuid) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.user_can_access_organization(uuid) TO service_role;
+
 CREATE OR REPLACE FUNCTION public.resolve_feature_access(
   p_tenant_id uuid DEFAULT NULL::uuid,
   p_branch_id uuid DEFAULT NULL::uuid,
@@ -200,7 +238,27 @@ BEGIN
     );
   END IF;
 
-  -- Existing branch overrides remain the most specific explicit switch.
+  -- Organization controls are authoritative. A disabled organization module
+  -- cannot be re-enabled accidentally by an older branch override.
+  SELECT ofo.enabled
+    INTO v_org_override
+  FROM public.organization_feature_overrides ofo
+  WHERE ofo.organization_id = v_tid
+    AND ofo.feature_id = v_feature_id;
+
+  IF FOUND AND v_org_override = false THEN
+    RETURN jsonb_build_object(
+      'allowed', false,
+      'feature_key', p_feature_key,
+      'organization_id', v_tid,
+      'branch_id', v_bid,
+      'limit_value', NULL,
+      'is_unlimited', true,
+      'source', 'organization_override'
+    );
+  END IF;
+
+  -- Branch overrides may narrow an enabled/default organization module.
   IF v_bid IS NOT NULL THEN
     SELECT bfo.enabled
       INTO v_branch_override
@@ -222,13 +280,7 @@ BEGIN
     END IF;
   END IF;
 
-  SELECT ofo.enabled
-    INTO v_org_override
-  FROM public.organization_feature_overrides ofo
-  WHERE ofo.organization_id = v_tid
-    AND ofo.feature_id = v_feature_id;
-
-  IF FOUND THEN
+  IF v_org_override IS NOT NULL THEN
     RETURN jsonb_build_object(
       'allowed', v_org_override,
       'feature_key', p_feature_key,
