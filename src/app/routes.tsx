@@ -14,6 +14,9 @@ const V2GatewayPage = lazy(() => import('../v2/pages/V2GatewayPage').then(m => (
 const OperationsCenterPage = lazy(() => import('../features/operations/pages/OperationsCenterPage').then(m => ({ default: m.OperationsCenterPage })));
 const InventoryCenterPage = lazy(() => import('../features/inventory/pages/InventoryCenterPage').then(m => ({ default: m.InventoryCenterPage })));
 const ProcurementCenterPage = lazy(() => import('../features/trade/pages/ProcurementCenterPage').then(m => ({ default: m.ProcurementCenterPage })));
+const PeopleCenterPage = lazy(() => import('../features/parties/pages/PeopleCenterPage').then(m => ({ default: m.PeopleCenterPage })));
+const FinanceCenterPage = lazy(() => import('../features/accounting/pages/FinanceCenterPage').then(m => ({ default: m.FinanceCenterPage })));
+const AdministrationCenterPage = lazy(() => import('../features/admin/pages/AdministrationCenterPage').then(m => ({ default: m.AdministrationCenterPage })));
 const PosWorkspacePage = lazy(() => import('../features/pos/pages/PosWorkspacePage').then(m => ({ default: m.PosWorkspacePage })));
 const ActiveOrdersPage = lazy(() => import('../features/pos/pages/ActiveOrdersPage').then(m => ({ default: m.ActiveOrdersPage })));
 const ProductsPage = lazy(() => import('../features/catalog/pages/ProductsPage').then(m => ({ default: m.ProductsPage })));
@@ -149,6 +152,9 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.operationsCenter} element={<ProtectedRoute permission="dashboard.view"><OperationsCenterPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.inventoryCenter} element={<ProtectedRoute permission="inventory.view"><InventoryCenterPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.procurementCenter} element={<ProtectedRoute permission="purchases.view"><ProcurementCenterPage /></ProtectedRoute>} />
+        <Route path={APP_ROUTES.peopleCenter} element={<ProtectedRoute permissionsAny={["customers.view", "suppliers.view"]}><PeopleCenterPage /></ProtectedRoute>} />
+        <Route path={APP_ROUTES.financeCenter} element={<ProtectedRoute permissionsAny={["accounts.view", "expenses.view", "sales.view", "shifts.view", "reports.view", "reports.financial", "reports.costing"]}><FinanceCenterPage /></ProtectedRoute>} />
+        <Route path={APP_ROUTES.administrationCenter} element={<ProtectedRoute permissionsAny={["branches.manage", "users.view", "roles.permissions.manage", "approvals.review", "audit.view", "settings.manage"]}><AdministrationCenterPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.manufacturingCenter} element={<Navigate to={APP_ROUTES.inventoryUnits} replace />} />
         <Route path={APP_ROUTES.pos} element={<ProtectedRoute permission="pos.view" fullscreen><PosWorkspacePage /></ProtectedRoute>} />
         <Route path={`${APP_ROUTES.pos}/:orderId`} element={<ProtectedRoute permission="pos.view" fullscreen><PosWorkspacePage /></ProtectedRoute>} />
