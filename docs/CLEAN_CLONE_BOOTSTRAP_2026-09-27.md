@@ -63,7 +63,11 @@ State: **BLOCKED**
 - Security advisor shows inherited warnings; no broad security rewrite is included in this deployment-only change.
 - PR #2 and post-merge verification are Green; GitHub Pages run #2 also completed successfully.
 - PR #3 first verification run #13 (`36311129600`) failed only because this mandatory log still declared the previous branch; application checks were skipped before running.
-- Mandatory worklog branch is now reconciled to PR #3; exact-head verification must run again before merge.
+- Mandatory worklog branch was reconciled to PR #3.
+- Exact-head verification run #14 (`36311198734`) succeeded on `a006bed69e728c40bea55b6d32a6744b4e5bdcbb`: verify, DB/integration/security-RLS, and browser-smoke all Green.
+- Follow-up Supabase log review showed Realtime `401` websocket attempts only during the initial bootstrap hour; later sampled hours had zero `401` websocket attempts.
+- Current REST request counts are low; no extra Realtime subscription is being introduced just to replace the existing bounded roles refresh.
+- Added a regression contract to keep dashboard audit INSERT events payload-driven instead of restoring a REST refetch per event.
 
 ## Production gate
 
@@ -73,7 +77,7 @@ State: **BLOCKED**
 
 ## Next action
 
-Run exact-head verification for PR #3 after this worklog reconciliation. If Green, keep PR #3 ready for user merge approval.
+Re-run exact-head verification after the zero-cost regression contract/worklog update. If Green, keep PR #3 blocked from merge until the user's explicit approval.
 
 ## Mandatory update protocol
 
