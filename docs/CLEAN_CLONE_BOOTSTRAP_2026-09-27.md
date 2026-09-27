@@ -5,7 +5,7 @@ Production Supabase: `hvqlkapynjfjikqithvd`
 Branch: `development/safe-pages-deploy-20260927`
 Current PR: `#2`
 Last updated: 2026-09-27
-State: **READY_FOR_MERGE**
+State: **BLOCKED**
 
 ## Work status
 
