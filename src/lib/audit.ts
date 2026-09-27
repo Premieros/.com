@@ -2,7 +2,11 @@ import { supabase } from './supabase';
 
 export async function logAudit(action: string, entity: string, entityId?: string, details?: Record<string, unknown>): Promise<void> {
   try {
-    const { data: { user } } = await supabase.auth.getUser();
+    // Audit metadata does not make authorization decisions. Reuse the locally
+    // persisted session instead of making a network auth round-trip for every
+    // business event; RLS still authorizes the insert on the server.
+    const { data: { session } } = await supabase.auth.getSession();
+    const user = session?.user ?? null;
     await supabase.from('audit_log').insert({
       user_id: user?.id || null,
       user_email: user?.email || null,

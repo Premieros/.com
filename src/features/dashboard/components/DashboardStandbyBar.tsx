@@ -216,6 +216,7 @@ export function DashboardStandbyBar({ canCreateSale }: { canCreateSale: boolean 
   const initialLoadRef = useRef(true);
   const seenIdsRef = useRef(new Set<string>());
   const readingRef = useRef(false);
+  const panelOpenRef = useRef(false);
 
   const lastReadKey = useMemo(() => storageKey(user?.id, branchFilter), [branchFilter, user?.id]);
 
@@ -223,6 +224,10 @@ export function DashboardStandbyBar({ canCreateSale }: { canCreateSale: boolean 
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    panelOpenRef.current = panelOpen;
+  }, [panelOpen]);
 
   useEffect(() => {
     initialLoadRef.current = true;
@@ -266,29 +271,50 @@ export function DashboardStandbyBar({ canCreateSale }: { canCreateSale: boolean 
       if (fresh.length > 0) {
         fresh.forEach((row) => seenIdsRef.current.add(row.id));
         setQueue((current) => [...current, ...fresh]);
-        if (!panelOpen) setUnread((value) => value + fresh.length);
+        if (!panelOpenRef.current) setUnread((value) => value + fresh.length);
       }
     } finally {
       readingRef.current = false;
     }
-  }, [branchFilter, canViewAudit, lastReadKey, panelOpen]);
+  }, [branchFilter, canViewAudit, lastReadKey]);
 
   useEffect(() => {
     void loadActivity();
     if (!canViewAudit) return;
 
     const channel = supabase.channel(`dashboard-standby-${user?.id || 'anonymous'}-${branchFilter || 'all'}`);
+
+    const consumeInsertedRow = (payload: { new?: unknown }) => {
+      const row = payload.new as AuditLog | undefined;
+      if (!row?.id || !row.created_at) {
+        // Unexpected payload shape: fall back to the canonical read path.
+        void loadActivity();
+        return;
+      }
+      if (seenIdsRef.current.has(row.id)) return;
+
+      seenIdsRef.current.add(row.id);
+      setRecent((current) => [row, ...current.filter((item) => item.id !== row.id)].slice(0, MAX_RECENT));
+
+      // The first canonical load establishes the read watermark. Until it
+      // finishes, let that load decide unread/queue state to avoid duplicates.
+      if (initialLoadRef.current) return;
+
+      setQueue((current) => [...current, row]);
+      if (!panelOpenRef.current) setUnread((value) => value + 1);
+    };
+
     if (branchFilter) {
       channel.on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'audit_log', filter: `branch_id=eq.${branchFilter}` },
-        () => void loadActivity(),
+        consumeInsertedRow,
       );
     } else {
       channel.on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'audit_log' },
-        () => void loadActivity(),
+        consumeInsertedRow,
       );
     }
     channel.subscribe((status) => {
