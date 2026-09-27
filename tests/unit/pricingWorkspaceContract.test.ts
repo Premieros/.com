@@ -11,14 +11,17 @@ const layout = readFileSync('src/components/Layout.tsx', 'utf8');
 const routes = readFileSync('src/app/routes.tsx', 'utf8');
 const routeDefs = readFileSync('src/core/navigation/routes.ts', 'utf8');
 const menu = readFileSync('src/core/navigation/menu.config.ts', 'utf8');
+const products = readFileSync('src/features/catalog/pages/ProductsPage.tsx', 'utf8');
 
 describe('pricing workspace contract', () => {
-  it('registers a permission-gated pricing route and menu item', () => {
+  it('registers a permission-gated pricing route and exposes it from Product settings', () => {
     expect(routeDefs).toContain("pricing: '/pricing'");
     expect(routes).toContain('APP_ROUTES.pricing');
     expect(routes).toContain('permission="products.view"><PricingPage');
-    expect(menu).toContain("id: 'pricing'");
-    expect(menu).toContain("permission: 'products.view'");
+    expect(menu).not.toContain("id: 'pricing'");
+    expect(products).toContain('products-tools');
+    expect(products).toContain('APP_ROUTES.pricing');
+    expect(products).toContain("ar: 'التسعير', en: 'Pricing'");
   });
 
   it('keeps pricing branch-scoped and permission-first', () => {
