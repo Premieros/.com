@@ -67,7 +67,7 @@ export function CenterGrid({ items, testIdPrefix, columns = 4 }: CenterGridProps
   const gridCols = columns === 2 ? 'sm:grid-cols-2' : columns === 3 ? 'sm:grid-cols-2 xl:grid-cols-3' : 'sm:grid-cols-2 xl:grid-cols-4';
   return (
     <div className={`grid gap-4 ${gridCols}`}>
-      {items.map((item) => (
+      {items.filter((item) => item.permission !== false).map((item) => (
         <CenterTile key={item.id} item={item} testIdPrefix={testIdPrefix} />
       ))}
     </div>
