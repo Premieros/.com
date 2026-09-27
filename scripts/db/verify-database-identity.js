@@ -1,3 +1,5 @@
+const EXPECTED_REPOSITORY = 'Premieros/.com'
+const BLOCKED_REPOSITORIES = new Set(['Premieros/johna-s'])
 const BLOCKED_PROJECT_REF = 'azzdesuowpdcoflmyezn'
 const EXPECTED_PROJECT_REF = 'hvqlkapynjfjikqithvd'
 const configuredRef = (process.env.SUPABASE_PROJECT_REF || EXPECTED_PROJECT_REF).trim()
@@ -6,6 +8,17 @@ const configuredUrl = (process.env.VITE_SUPABASE_URL || `https://${EXPECTED_PROJ
 function fail(message) {
   console.error(`DATABASE_IDENTITY_LOCK_FAILED: ${message}`)
   process.exit(1)
+}
+
+
+const configuredRepository = (process.env.GITHUB_REPOSITORY || EXPECTED_REPOSITORY).trim()
+
+if (BLOCKED_REPOSITORIES.has(configuredRepository)) {
+  fail(`Repository ${configuredRepository} is explicitly blocked for this project`)
+}
+
+if (configuredRepository !== EXPECTED_REPOSITORY) {
+  fail(`GITHUB_REPOSITORY must be ${EXPECTED_REPOSITORY}, received ${configuredRepository || '<empty>'}`)
 }
 
 if (configuredRef === BLOCKED_PROJECT_REF) {
@@ -46,4 +59,4 @@ if (dbUrl && !/localhost|127\.0\.0\.1/.test(dbUrl)) {
   }
 }
 
-console.log(`Database identity verified: ${configuredRef}`)
+console.log(`Project identity verified: ${EXPECTED_REPOSITORY} -> ${configuredRef}`)
