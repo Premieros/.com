@@ -2,9 +2,9 @@
 
 ## MANDATORY EXECUTION GATE — لا عمل بدون المرور بالسجل
 
-- Mandatory active work log: `docs/POS_TABLE_ORDER_BINDING_HOTFIX_2026-09-26.md`
-- Current active branch: `development/pos-table-order-binding-hotfix-20260926`
-- Current PR: `#384`
+- Mandatory active work log: `docs/CLEAN_CLONE_BOOTSTRAP_2026-09-27.md`
+- Current active branch: `development/clean-clone-bootstrap-20260927`
+- Current PR: `#1`
 - أي تعديل جديد في هذا المسار يجب أن يبدأ بقراءة السجل النشط وتحديث `Next action` قبل التنفيذ.
 - بعد كل مجموعة تغييرات يجب تحديث `Change ledger` بحالة الملفات/المنطق الذي تغير.
 - بعد أي قياس أو اختبار يجب تحديث `Verification ledger` بالنتيجة الفعلية ورقم Run إن وجد.
