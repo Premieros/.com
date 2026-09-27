@@ -15,6 +15,7 @@ concurrency:
 env:
   SUPABASE_PROJECT_REF: hvqlkapynjfjikqithvd
   VITE_SUPABASE_URL: https://hvqlkapynjfjikqithvd.supabase.co
+  VITE_SUPABASE_ANON_KEY: sb_publishable_9W6651rcdIsyBoegwGe_qw_MvCPRIPK
   VITE_WORK_AUTHORIZATION_GATE: "0"
 
 jobs:
@@ -35,8 +36,6 @@ jobs:
         run: node scripts/db/verify-database-identity.js
 
       - run: npm run build
-        env:
-          VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
 
       - uses: actions/upload-pages-artifact@v3
         with:
@@ -45,10 +44,6 @@ jobs:
   production-parity:
     needs: build
     runs-on: ubuntu-latest
-    env:
-      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
-      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
-      VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
