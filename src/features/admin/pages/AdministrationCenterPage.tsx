@@ -19,7 +19,7 @@ export function AdministrationCenterPage() {
     { id: 'data', ar: 'الاستيراد والتصدير', en: 'Import / Export', descriptionAr: 'إدخال وإخراج البيانات من مكان واحد.', descriptionEn: 'Import and export operational data.', route: APP_ROUTES.importExport, permission: can('settings.manage'), icon: ArrowLeftRight, accent: 'system' },
     { id: 'kitchen-stations', ar: 'محطات المطبخ', en: 'Kitchen Stations', descriptionAr: 'إعداد المحطات فقط دون تغيير مسار الطباعة أو الإرسال.', descriptionEn: 'Configure stations without changing print or dispatch runtime.', route: APP_ROUTES.kitchenStations, permission: can('settings.manage'), icon: Workflow, accent: 'system' },
     { id: 'settings', ar: 'الإعدادات', en: 'Settings', descriptionAr: 'إعدادات الفرع والضريبة واليوم المالي والمظهر.', descriptionEn: 'Branch, tax, business-day and appearance settings.', route: APP_ROUTES.settings, permission: can('settings.manage'), icon: Settings, accent: 'system' },
-  ].filter((item) => item.permission);
+  ];
 
   return (
     <div className="space-y-6">
