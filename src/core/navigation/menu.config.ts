@@ -2,7 +2,7 @@ import type { Permission } from '@/lib/permissions';
 import type { TranslationKey } from '@/lib/i18n';
 import { APP_ROUTES, type AppRoute } from './routes';
 
-export type MenuGroup = 'main' | 'catalog' | 'operations' | 'centers' | 'people' | 'finance' | 'admin';
+export type MenuGroup = 'main' | 'catalog' | 'centers' | 'admin';
 export type MenuIcon =
   | 'dashboard' | 'pos' | 'products' | 'pricing' | 'productModifiers' | 'categories' | 'components' | 'rawMaterials' | 'recipes' | 'inventory' | 'warehouses' | 'transfers'
   | 'inventoryLedger' | 'stockCounts' | 'inventoryBatches' | 'stockValuation' | 'lowStockAlerts' | 'inventoryUnits' | 'wasteCenter' | 'kitchenDisplay' | 'kitchenStations' | 'costingCenter' | 'branches' | 'purchases' | 'customers' | 'suppliers' | 'expenses'
@@ -22,7 +22,10 @@ export interface MenuItemConfig {
 }
 
 export const MENU_GROUPS: Record<MenuGroup, { ar: string; en: string }> = {
-  main: { ar: 'الرئيسية', en: 'Main' }, catalog: { ar: 'الكتالوج والمكونات', en: 'Catalog & Components' }, operations: { ar: 'العمليات', en: 'Operations' }, centers: { ar: 'مراكز الإدارة', en: 'Management Centers' }, people: { ar: 'الأطراف', en: 'People' }, finance: { ar: 'المالية', en: 'Finance' }, admin: { ar: 'الإدارة', en: 'Admin' },
+  main: { ar: 'الرئيسية', en: 'Main' },
+  centers: { ar: 'المراكز', en: 'Centers' },
+  catalog: { ar: 'المنتجات والخامات', en: 'Products & Materials' },
+  admin: { ar: 'الإدارة العليا', en: 'Administration' },
 };
 
 export const MENU_ITEMS: MenuItemConfig[] = [
