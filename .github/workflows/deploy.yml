@@ -13,8 +13,8 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
-  VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
+  SUPABASE_PROJECT_REF: hvqlkapynjfjikqithvd
+  VITE_SUPABASE_URL: https://hvqlkapynjfjikqithvd.supabase.co
   VITE_WORK_AUTHORIZATION_GATE: "0"
 
 jobs:
