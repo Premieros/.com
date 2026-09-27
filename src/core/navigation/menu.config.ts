@@ -22,7 +22,7 @@ export interface MenuItemConfig {
 }
 
 export const MENU_GROUPS: Record<MenuGroup, { ar: string; en: string }> = {
-  main: { ar: 'الرئيسية', en: 'Main' }, catalog: { ar: 'الكتالوج والوصفات', en: 'Catalog & Recipes' }, operations: { ar: 'العمليات', en: 'Operations' }, centers: { ar: 'مراكز الإدارة', en: 'Management Centers' }, people: { ar: 'الأطراف', en: 'People' }, finance: { ar: 'المالية', en: 'Finance' }, admin: { ar: 'الإدارة', en: 'Admin' },
+  main: { ar: 'الرئيسية', en: 'Main' }, catalog: { ar: 'الكتالوج والمكونات', en: 'Catalog & Components' }, operations: { ar: 'العمليات', en: 'Operations' }, centers: { ar: 'مراكز الإدارة', en: 'Management Centers' }, people: { ar: 'الأطراف', en: 'People' }, finance: { ar: 'المالية', en: 'Finance' }, admin: { ar: 'الإدارة', en: 'Admin' },
 };
 
 export const MENU_ITEMS: MenuItemConfig[] = [
@@ -34,12 +34,7 @@ export const MENU_ITEMS: MenuItemConfig[] = [
   { id: 'procurement-center', route: APP_ROUTES.procurementCenter, icon: 'purchases', labelKey: 'purchases', permission: 'purchases.view', group: 'centers' },
   { id: 'waste-center', route: APP_ROUTES.wasteCenter, icon: 'wasteCenter', labelKey: 'wasteCenter', permission: 'waste.view', group: 'centers' },
   { id: 'products', route: APP_ROUTES.products, icon: 'products', labelKey: 'products', permission: 'products.view', group: 'catalog' },
-  { id: 'pricing', route: APP_ROUTES.pricing, icon: 'pricing', labelKey: 'products', label: { ar: 'التسعير', en: 'Pricing' }, permission: 'products.view', group: 'catalog' },
-  { id: 'product-modifiers', route: APP_ROUTES.productModifiers, icon: 'productModifiers', labelKey: 'products', label: { ar: 'مجموعات الموديفاير', en: 'Modifier Groups' }, permission: 'products.modifiers.manage', group: 'catalog' },
-  { id: 'recipes', route: APP_ROUTES.recipes, icon: 'recipes', labelKey: 'recipes', permission: 'recipes.view', group: 'catalog' },
   { id: 'raw-materials', route: APP_ROUTES.rawMaterials, icon: 'rawMaterials', labelKey: 'rawMaterials', permission: 'raw_materials.view', group: 'catalog' },
-  { id: 'categories', route: APP_ROUTES.categories, icon: 'categories', labelKey: 'categories', permission: 'categories.view', group: 'catalog' },
-  { id: 'inventory-units', route: APP_ROUTES.inventoryUnits, icon: 'inventoryUnits', labelKey: 'inventoryUnits', label: { ar: 'مجموعات المكونات', en: 'Component Groups' }, permission: 'raw_materials.view', group: 'catalog' },
   { id: 'branches', route: APP_ROUTES.branches, icon: 'branches', labelKey: 'branches', permission: 'branches.manage', group: 'operations' },
   { id: 'import-export', route: APP_ROUTES.importExport, icon: 'importExport', labelKey: 'importExport', permission: 'settings.manage', group: 'operations' },
   { id: 'customers', route: APP_ROUTES.customers, icon: 'customers', labelKey: 'customers', permission: 'customers.view', group: 'people' },

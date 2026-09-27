@@ -311,8 +311,8 @@ export function PosWorkspacePage() {
         let catq = supabase.from('categories').select('*');
         let areaq = supabase.from('dining_areas').select('*');
         const productQuery = fixedBranch
-          ? supabase.from('products').select('*, category:categories(*)').eq('branch_id', fixedBranch).eq('is_active', true)
-          : supabase.from('products').select('*, category:categories(*)').eq('is_active', true).order('name');
+          ? supabase.from('products').select('*').eq('branch_id', fixedBranch).eq('is_active', true)
+          : supabase.from('products').select('*').eq('is_active', true).order('name');
         if (fixedBranch) {
           cusq = cusq.eq('branch_id', fixedBranch);
           catq = catq.eq('branch_id', fixedBranch);
@@ -639,6 +639,7 @@ export function PosWorkspacePage() {
       completing={pos.completing}
       canComplete={perms.canPay && !!effectiveBranch}
       canEditOrder={perms.canEditOrder}
+      canDirectDiscount={perms.canDiscount}
       onComplete={() => { if (perms.canPay) void pos.completeSale(); }}
       onBack={() => { pos.setCheckoutOpen(false); setMobileOrderOpen(true); }}
       currency={pos.effCurrency}
@@ -865,6 +866,8 @@ export function PosWorkspacePage() {
               currency={pos.effCurrency}
               hasBranch={!!effectiveBranch}
               canModifyOrder={canModifyCurrentOrder}
+              shiftChecked={shiftChecked}
+              shiftOpen={!!activeShift}
               onSearch={setSearch}
               onSelectCategory={setSelectedCategory}
               onAddToCart={pos.addToCart}

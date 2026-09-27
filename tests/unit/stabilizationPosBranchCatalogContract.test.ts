@@ -24,16 +24,19 @@ describe('stabilization contracts', () => {
     expect(migration).toContain("COALESCE(v_error,'')='INSUFFICIENT_RAW_MATERIAL_STOCK'");
   });
 
-  it('retires the legacy Components page and surfaces reusable modifier groups', () => {
+  it('retires the legacy Components page and surfaces reusable modifier groups from Products', () => {
     const routes = read('src/app/routes.tsx');
     const menu = read('src/core/navigation/menu.config.ts');
+    const products = read('src/features/catalog/pages/ProductsPage.tsx');
 
     expect(existsSync('src/features/catalog/pages/ComponentsPage.tsx')).toBe(false);
     expect(routes).not.toContain("import('../features/catalog/pages/ComponentsPage')");
     expect(routes).toContain('<Route path={APP_ROUTES.components} element={<Navigate to={APP_ROUTES.products} replace />} />');
     expect(menu).not.toContain("id: 'components'");
-    expect(menu).toContain("ar: 'مجموعات الموديفاير'");
-    expect(menu).toContain("en: 'Modifier Groups'");
+    expect(menu).not.toContain("id: 'product-modifiers'");
+    expect(menu).not.toContain("id: 'product-modifier-options'");
+    expect(products).toContain("ar: 'مجموعات الإضافات', en: 'Modifier groups'");
+    expect(products).toContain("ar: 'خيارات الإضافات', en: 'Modifier options'");
   });
 
   it('keeps mobile checkout visible through the explicit phone order sheet and safe area', () => {

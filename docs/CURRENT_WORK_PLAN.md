@@ -2,7 +2,7 @@
 
 ## MANDATORY EXECUTION GATE — لا عمل بدون المرور بالسجل
 
-- Mandatory active work log: `docs/ORGANIZATION_MODULES_2026-09-27.md`
+- Mandatory active work log: `docs/ORIGINAL_SYNC_2026-09-27.md`
 - Current writable repository: `Premieros/.com`
 - Current writable branch: `main`
 - Current Supabase project: `hvqlkapynjfjikqithvd`
@@ -105,3 +105,10 @@ Required before hosted migration:
 6. Add Super Admin organization module control UI.
 7. Add regression tests and run Full Verify.
 8. Apply hosted migration only after Green.
+
+
+## Current sync scope
+
+- Port verified post-fork changes from read-only `Premieros/johna-s` into the organization-aware `.com` architecture.
+- Preserve organization modules, project identity and Permission-First isolation.
+- No hosted migration until the sync PR is Full Verify Green.

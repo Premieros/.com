@@ -16,14 +16,15 @@ describe('catalog terminology and measurement-unit lock contract', () => {
 
   it('presents legacy manufactured rows as reusable component groups and forces type only on create', () => {
     const source = read('src/features/catalog/pages/InventoryUnitsPage.tsx');
-    const menu = read('src/core/navigation/menu.config.ts');
+    const products = read('src/features/catalog/pages/ProductsPage.tsx');
 
     expect(source).toContain("filters: [{ column: 'unit_type', value: 'manufactured' }]");
     expect(source).toContain(".update(payload).eq('id', editing.id)");
     expect(source).toContain("insert({ ...payload, unit_type: 'manufactured' as const })");
     expect(source).toContain("title={isAr ? 'مجموعات المكونات' : 'Component Groups'}");
     expect(source).not.toContain('<option value="ready">');
-    expect(menu).toContain("label: { ar: 'مجموعات المكونات', en: 'Component Groups' }");
+    expect(products).toContain("APP_ROUTES.inventoryUnits");
+    expect(products).toContain("ar: 'مجموعات المكونات', en: 'Component groups'");
   });
 
   it('shows immutable raw measurement units when composing reusable component groups', () => {
@@ -32,7 +33,7 @@ describe('catalog terminology and measurement-unit lock contract', () => {
     expect(source).toContain('measurement_unit:measurement_units!raw_materials_unit_id_fkey');
     expect(source).toContain('materialLabel(material)');
     expect(source).toContain("'لا يمكن استخدام خامة بدون وحدة قياس. حدد وحدة الخامة أولًا.'");
-    expect(source).toContain("const recipeBranchId = unit.branch_id || branchFilter || ''");
+    expect(source).toContain("const componentBranchId = unit.branch_id || branchFilter || ''");
   });
 
   it('keeps product creation free of product measurement units and links only reusable component groups', () => {
