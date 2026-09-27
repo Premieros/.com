@@ -1,4 +1,4 @@
-import { ArrowLeftRight, ClipboardCheck, FileBarChart, Layers3, Package, PackageSearch, Warehouse, Boxes } from 'lucide-react';
+import { ArrowLeftRight, ClipboardCheck, FileBarChart, Layers3, Package, PackageSearch, Trash2, Warehouse, Boxes } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { CenterGrid, type CenterTileItem } from '@/components/design/CenterTile';
 import { useLanguage } from '@/context/LanguageContext';
@@ -19,6 +19,7 @@ export function InventoryCenterPage() {
     { id: 'batches', ar: 'التشغيلات والصلاحية', en: 'Batches & Expiry', descriptionAr: 'متابعة التشغيلات وتواريخ الصلاحية.', descriptionEn: 'Track batches and expiry dates.', route: APP_ROUTES.inventoryBatches, permission: can('inventory.view'), icon: Layers3, accent: 'inventory' },
     { id: 'low-stock', ar: 'تنبيهات النقص', en: 'Low Stock Alerts', descriptionAr: 'الأصناف التي تحتاج إلى إعادة طلب.', descriptionEn: 'Items requiring replenishment.', route: APP_ROUTES.lowStockAlerts, permission: can('inventory.view'), icon: PackageSearch, accent: 'inventory' },
     { id: 'valuation', ar: 'تقييم المخزون', en: 'Stock Valuation', descriptionAr: 'قيمة المخزون وتكلفته حسب البيانات الحالية.', descriptionEn: 'Current inventory value and cost.', route: APP_ROUTES.stockValuation, permission: can('inventory.ledger.view'), icon: Package, accent: 'inventory' },
+    { id: 'waste', ar: 'الهالك', en: 'Waste', descriptionAr: 'تسجيل ومراجعة الهالك مع صلاحية مستقلة.', descriptionEn: 'Record and review waste with independent permission.', route: APP_ROUTES.wasteCenter, permission: can('waste.view'), icon: Trash2, accent: 'alert' },
   ];
 
   return (
