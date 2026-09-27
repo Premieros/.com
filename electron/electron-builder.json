@@ -1,0 +1,36 @@
+{
+  "appId": "com.premieros.printagent",
+  "productName": "Premier Print Agent",
+  "directories": {
+    "output": "electron/release"
+  },
+  "files": [
+    "electron/**/*",
+    "dist/**/*"
+  ],
+  "extraMetadata": {
+    "main": "electron/main.cjs"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      },
+      {
+        "target": "portable",
+        "arch": ["x64"]
+      }
+    ],
+    "requestedExecutionLevel": "asInvoker",
+    "artifactName": "Premier-Print-Agent-${version}-${arch}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Premier Print Agent"
+  },
+  "electronVersion": "38.1.0"
+}

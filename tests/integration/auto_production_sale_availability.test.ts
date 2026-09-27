@@ -1,0 +1,248 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { randomUUID } from 'node:crypto';
+import { getDbUrl, openDb } from './db';
+import type pg from 'pg';
+
+const dbUrl = getDbUrl();
+const skip = !dbUrl;
+
+describe.skipIf(skip)('automatic production from sale and ingredient-derived availability', () => {
+  let client: pg.Client;
+  const branchId = randomUUID();
+  const warehouseId = randomUUID();
+  const userId = randomUUID();
+  const rawId = randomUUID();
+  const unitId = randomUUID();
+  const productId = randomUUID();
+  const unconfiguredProductId = randomUUID();
+  const modifierGroupId = randomUUID();
+  const modifierOptionId = randomUUID();
+
+  const q = async <T = Record<string, unknown>>(sql: string, params: unknown[] = []): Promise<T[]> =>
+    (await client.query(sql, params)).rows as T[];
+
+  async function asAdmin<T>(fn: () => Promise<T>): Promise<T> {
+    await client.query(`SELECT set_config('app.user_id', $1, true)`, [userId]);
+    await client.query(`SET LOCAL ROLE service_role`);
+    try { return await fn(); }
+    finally {
+      await client.query('RESET ROLE').catch(() => {});
+      await client.query('RESET app.user_id').catch(() => {});
+    }
+  }
+
+  beforeAll(async () => {
+    client = openDb(dbUrl!);
+    await client.connect();
+    await client.query('BEGIN');
+    await client.query(`ALTER TABLE public.users DISABLE TRIGGER trg_users_role_guard`);
+    await client.query(`INSERT INTO public.branches (id, name) VALUES ($1, 'Auto Production Branch')`, [branchId]);
+    await client.query(
+      `INSERT INTO auth.users (id,email,role,aud,instance_id,raw_app_meta_data,raw_user_meta_data,created_at,updated_at)
+       VALUES ($1,$2,'authenticated','authenticated',gen_random_uuid(),'{}'::jsonb,'{}'::jsonb,now(),now())`,
+      [userId, `auto-prod-${userId}@example.test`],
+    );
+    await client.query(
+      `INSERT INTO public.users (id,email,full_name,role,branch_id,is_active)
+       VALUES ($1,$2,'Auto Production Super Admin','super_admin',$3,true)`,
+      [userId, `auto-prod-${userId}@example.test`, branchId],
+    );
+    await client.query(`INSERT INTO public.warehouses (id,name,branch_id,is_active) VALUES ($1,'Auto Production WH',$2,true)`, [warehouseId, branchId]);
+    await client.query(
+      `INSERT INTO public.raw_materials (id,code,name,min_stock,default_cost,is_active,branch_id)
+       VALUES ($1,$2,'Auto Raw',0,4,true,$3)`,
+      [rawId, `RM-${randomUUID()}`, branchId],
+    );
+    await client.query(`INSERT INTO public.raw_material_inventory (raw_material_id,branch_id,quantity,avg_cost) VALUES ($1,$2,5,4)`, [rawId, branchId]);
+    await client.query(
+      `INSERT INTO public.raw_material_batches (raw_material_id,branch_id,warehouse_id,batch_number,quantity,unit_cost,source_type)
+       VALUES ($1,$2,$3,$4,5,4,'opening')`,
+      [rawId, branchId, warehouseId, `OPEN-${randomUUID()}`],
+    );
+    await client.query(
+      `INSERT INTO public.inventory_units (id,code,name,unit_type,branch_id,cost_price,sale_price,is_active)
+       VALUES ($1,$2,'Auto Sauce','manufactured',$3,0,0,true)`,
+      [unitId, `UNIT-${randomUUID()}`, branchId],
+    );
+    await client.query(`INSERT INTO public.inventory_unit_recipes (unit_id,raw_material_id,quantity,wastage_percent) VALUES ($1,$2,1,0)`, [unitId, rawId]);
+    await client.query(
+      `INSERT INTO public.products (id,name,branch_id,product_type,sale_price,cost_price,is_active)
+       VALUES ($1,'Auto Burger',$2,'ready',20,0,true),($3,'Empty Box Product',$2,'ready',15,0,true)`,
+      [productId, branchId, unconfiguredProductId],
+    );
+    await client.query(`INSERT INTO public.product_unit_links (product_id,unit_id,quantity) VALUES ($1,$2,1)`, [productId, unitId]);
+    await client.query(
+      `INSERT INTO public.product_modifier_groups (id,branch_id,product_id,name,min_selections,max_selections,is_active)
+       VALUES ($1,$2,NULL,'Paid Extras',0,1,true)`,
+      [modifierGroupId, branchId],
+    );
+    await client.query(
+      `INSERT INTO public.product_modifier_group_products (group_id,product_id,branch_id) VALUES ($1,$2,$3)`,
+      [modifierGroupId, productId, branchId],
+    );
+    await client.query(
+      `INSERT INTO public.product_modifier_options (id,branch_id,group_id,name,price_delta,is_active)
+       VALUES ($1,$2,$3,'Empty Box Extra',5,true)`,
+      [modifierOptionId, branchId, modifierGroupId],
+    );
+    await client.query(`SELECT public.ensure_chart_of_accounts($1)`, [branchId]);
+    await client.query(`SELECT public.seed_account_mappings($1)`, [branchId]);
+    await client.query(`UPDATE public.settings SET tax_enabled=false`);
+  });
+
+  afterAll(async () => {
+    await client.query('ROLLBACK').catch(() => {});
+    await client.end().catch(() => {});
+  });
+
+  it('shows five sellable products from raw stock and auto-produces exactly the sold shortage', async () => {
+    await asAdmin(async () => {
+      const availBefore = await q<{ available_quantity: string }>(
+        `SELECT available_quantity::text FROM public.get_pos_product_availability($1,$2,100) WHERE product_id=$3`,
+        [branchId, warehouseId, productId],
+      );
+      expect(Number(availBefore[0].available_quantity)).toBe(5);
+
+      const sellability = await q<{ is_sellable: boolean; raw_shortage_only: boolean; availability_error: string | null }>(
+        `SELECT is_sellable,raw_shortage_only,availability_error
+         FROM public.get_pos_product_sellability($1,$2,100000)
+         WHERE product_id=$3`,
+        [branchId, warehouseId, productId],
+      );
+      expect(sellability).toEqual([{
+        is_sellable: true,
+        raw_shortage_only: true,
+        availability_error: null,
+      }]);
+
+      const sale = await q<{ r: { success: boolean; sale_id?: string; error?: string; detail?: string } }>(
+        `SELECT public.process_sale($1,$2,$3,NULL,NULL,40,0,'amount',0,0,40,40,'cash','completed',$4::jsonb,NULL,'takeaway',NULL,NULL,NULL) AS r`,
+        [
+          `AUTO-${Date.now()}-${randomUUID()}`,
+          branchId,
+          warehouseId,
+          JSON.stringify([{ product_id: productId, unit_name: 'piece', quantity: 2, unit_price: 20, discount_amount: 0, bonus_quantity: 0, total: 40 }]),
+        ],
+      );
+      expect(sale[0].r.success).toBe(true);
+      if (!sale[0].r.success) throw new Error(JSON.stringify(sale[0].r));
+
+      const rawAfter = await q<{ quantity: string }>(`SELECT quantity::text FROM public.raw_material_inventory WHERE raw_material_id=$1 AND branch_id=$2`, [rawId, branchId]);
+      expect(Number(rawAfter[0].quantity)).toBe(3);
+
+      const unitAfter = await q<{ quantity: string }>(
+        `SELECT COALESCE(SUM(quantity),0)::text AS quantity FROM public.inventory_unit_batches WHERE unit_id=$1 AND branch_id=$2 AND warehouse_id=$3`,
+        [unitId, branchId, warehouseId],
+      );
+      expect(Number(unitAfter[0].quantity)).toBe(0);
+
+      const productions = await q<{ count: number }>(
+        `SELECT count(*)::int AS count FROM public.inventory_unit_productions WHERE unit_id=$1 AND branch_id=$2 AND notes='AUTO_SALE_PRODUCTION'`,
+        [unitId, branchId],
+      );
+      expect(productions[0].count).toBe(1);
+    });
+  });
+
+  it('keeps selling beyond stock, records raw-material debt, then purchase stock offsets the debt', async () => {
+    await asAdmin(async () => {
+      const informationalCheck = await q<{ r: { success: boolean; error?: string } }>(
+        `SELECT public.check_product_availability($1,$2,$3,6) AS r`,
+        [productId, branchId, warehouseId],
+      );
+      expect(informationalCheck[0].r.success).toBe(false);
+      expect(informationalCheck[0].r.error).toBe('INSUFFICIENT_RAW_MATERIAL_STOCK');
+
+      const sale = await q<{ r: { success: boolean; sale_id?: string; error?: string; detail?: string } }>(
+        `SELECT public.process_sale($1,$2,$3,NULL,NULL,120,0,'amount',0,0,120,120,'cash','completed',$4::jsonb,NULL,'takeaway',NULL,NULL,NULL) AS r`,
+        [
+          `AUTO-NEG-${Date.now()}-${randomUUID()}`,
+          branchId,
+          warehouseId,
+          JSON.stringify([{ product_id: productId, unit_name: 'piece', quantity: 6, unit_price: 20, discount_amount: 0, bonus_quantity: 0, total: 120 }]),
+        ],
+      );
+      expect(sale[0].r.success).toBe(true);
+      if (!sale[0].r.success) throw new Error(JSON.stringify(sale[0].r));
+
+      const debt = await q<{ quantity: string }>(
+        `SELECT quantity::text FROM public.raw_material_inventory WHERE raw_material_id=$1 AND branch_id=$2`,
+        [rawId, branchId],
+      );
+      expect(Number(debt[0].quantity)).toBe(-3);
+
+      await q(
+        `SELECT public._raw_add($1,$2,$3,10,4,$4,current_date,NULL,'purchase','purchase',NULL,'TEST-PURCHASE',$5)`,
+        [rawId, branchId, warehouseId, `PUR-${randomUUID()}`, userId],
+      );
+
+      const recovered = await q<{ quantity: string }>(
+        `SELECT quantity::text FROM public.raw_material_inventory WHERE raw_material_id=$1 AND branch_id=$2`,
+        [rawId, branchId],
+      );
+      expect(Number(recovered[0].quantity)).toBe(7);
+    });
+  });
+
+  it('creates and deducts a raw material when an unconfigured product is sold', async () => {
+    await asAdmin(async () => {
+      const sale = await q<{ r: { success: boolean; error?: string; detail?: string } }>(
+        `SELECT public.process_sale($1,$2,$3,NULL,NULL,30,0,'amount',0,0,30,30,'cash','completed',$4::jsonb,NULL,'takeaway',NULL,NULL,NULL) AS r`,
+        [
+          `AUTO-FALLBACK-PROD-${Date.now()}-${randomUUID()}`,
+          branchId,
+          warehouseId,
+          JSON.stringify([{ product_id: unconfiguredProductId, unit_name: 'piece', quantity: 2, unit_price: 15, discount_amount: 0, bonus_quantity: 0, total: 30 }]),
+        ],
+      );
+      expect(sale[0].r.success).toBe(true);
+      if (!sale[0].r.success) throw new Error(JSON.stringify(sale[0].r));
+
+      const code = `AUTO-PROD-${unconfiguredProductId.replace(/-/g, '')}`;
+      const rows = await q<{ name: string; quantity: string; recipe_items: number }>(
+        `SELECT rm.name,
+                COALESCE(rmi.quantity,0)::text AS quantity,
+                (SELECT count(*)::int FROM public.recipes r JOIN public.recipe_items ri ON ri.recipe_id=r.id WHERE r.product_id=$1 AND r.branch_id=$2 AND ri.raw_material_id=rm.id) AS recipe_items
+         FROM public.raw_materials rm
+         LEFT JOIN public.raw_material_inventory rmi ON rmi.raw_material_id=rm.id AND rmi.branch_id=rm.branch_id
+         WHERE rm.code=$3 AND rm.branch_id=$2`,
+        [unconfiguredProductId, branchId, code],
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].name).toBe('Empty Box Product');
+      expect(Number(rows[0].quantity)).toBe(-2);
+      expect(rows[0].recipe_items).toBe(1);
+    });
+  });
+
+  it('creates and deducts a raw material for a priced modifier with no inventory effect', async () => {
+    await asAdmin(async () => {
+      const sale = await q<{ r: { success: boolean; error?: string; detail?: string } }>(
+        `SELECT public.process_sale($1,$2,$3,NULL,NULL,25,0,'amount',0,0,25,25,'cash','completed',$4::jsonb,NULL,'takeaway',NULL,NULL,NULL) AS r`,
+        [
+          `AUTO-FALLBACK-MOD-${Date.now()}-${randomUUID()}`,
+          branchId,
+          warehouseId,
+          JSON.stringify([{ product_id: productId, unit_name: 'piece', quantity: 1, unit_price: 25, discount_amount: 0, bonus_quantity: 0, total: 25, modifier_option_ids: [modifierOptionId] }]),
+        ],
+      );
+      expect(sale[0].r.success).toBe(true);
+      if (!sale[0].r.success) throw new Error(JSON.stringify(sale[0].r));
+
+      const code = `AUTO-MOD-${modifierOptionId.replace(/-/g, '')}`;
+      const rows = await q<{ name: string; quantity: string; effects: number }>(
+        `SELECT rm.name,
+                COALESCE(rmi.quantity,0)::text AS quantity,
+                (SELECT count(*)::int FROM public.product_modifier_inventory_effects e WHERE e.option_id=$1 AND e.raw_material_id=rm.id AND e.quantity_delta>0) AS effects
+         FROM public.raw_materials rm
+         LEFT JOIN public.raw_material_inventory rmi ON rmi.raw_material_id=rm.id AND rmi.branch_id=rm.branch_id
+         WHERE rm.code=$2 AND rm.branch_id=$3`,
+        [modifierOptionId, code, branchId],
+      );
+      expect(rows).toHaveLength(1);
+      expect(rows[0].name).toBe('Empty Box Extra');
+      expect(Number(rows[0].quantity)).toBe(-1);
+      expect(rows[0].effects).toBe(1);
+    });
+  });
+});

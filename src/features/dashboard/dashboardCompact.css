@@ -1,0 +1,70 @@
+.dashboard-compact-cleanup [data-testid='dashboard-surface'] > div > section[class*='bg-gradient-to-br'] {
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+  color: rgb(var(--ui-text)) !important;
+}
+
+.dashboard-compact-cleanup [data-testid='dashboard-surface'] > div > section[class*='bg-gradient-to-br'] > div:first-child > div:first-child {
+  display: none;
+}
+
+.dashboard-compact-cleanup [data-testid='dashboard-surface'] > div > section[class*='bg-gradient-to-br'] > div:first-child {
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.dashboard-compact-cleanup [data-testid='dashboard-surface'] > div > section[class*='bg-gradient-to-br'] > div:first-child > div:last-child {
+  border: 1px solid rgb(var(--ui-border));
+  background: rgb(var(--ui-surface));
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.dashboard-compact-cleanup [data-testid='dashboard-surface'] > div > section[class*='bg-gradient-to-br'] > div:first-child > div:last-child button,
+.dashboard-compact-cleanup [data-testid='dashboard-surface'] > div > section[class*='bg-gradient-to-br'] > div.mt-5 > button,
+.dashboard-compact-cleanup [data-testid='dashboard-surface'] > div > section[class*='bg-gradient-to-br'] > div.mt-5 > div > button {
+  border-color: rgb(var(--ui-border)) !important;
+  background: rgb(var(--ui-surface)) !important;
+  color: rgb(var(--ui-muted)) !important;
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.dashboard-compact-cleanup [data-testid='dashboard-surface'] > div > section[class*='bg-gradient-to-br'] > div:first-child > div:last-child button:hover,
+.dashboard-compact-cleanup [data-testid='dashboard-surface'] > div > section[class*='bg-gradient-to-br'] > div.mt-5 > button:hover,
+.dashboard-compact-cleanup [data-testid='dashboard-surface'] > div > section[class*='bg-gradient-to-br'] > div.mt-5 > div > button:hover {
+  background: rgb(var(--ui-page-alt)) !important;
+  color: rgb(var(--ui-primary)) !important;
+}
+
+.dashboard-compact-cleanup [data-testid='dashboard-surface'] > div > section[class*='bg-gradient-to-br'] > div.mt-5 {
+  margin-top: 0.75rem;
+  justify-content: flex-end;
+}
+
+
+@media (max-width: 639px) {
+
+  .dashboard-compact-cleanup [data-testid='dashboard-surface'] > div > section[class*='bg-gradient-to-br'] > div:first-child > div:last-child,
+  .dashboard-compact-cleanup [data-testid='dashboard-surface'] > div > section[class*='bg-gradient-to-br'] > div.mt-5 {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+
+.dashboard-standby-viewport {
+  contain: layout paint;
+  isolation: isolate;
+}
+
+.dashboard-standby-slide-layer {
+  will-change: transform;
+  backface-visibility: hidden;
+  transform-style: preserve-3d;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dashboard-standby-slide-layer {
+    transition-duration: 0.01ms !important;
+  }
+}
