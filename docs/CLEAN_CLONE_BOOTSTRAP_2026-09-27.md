@@ -2,8 +2,8 @@
 
 Repository: `Premieros/.com`
 Production Supabase: `hvqlkapynjfjikqithvd`
-Branch: `development/zero-cost-baseline-20260927`
-Current PR: `#3`
+Branch: `development/auto-pages-deploy-20260927`
+Current PR: `#4`
 Last updated: 2026-09-27
 State: **BLOCKED**
 
@@ -46,6 +46,10 @@ State: **BLOCKED**
 
 ## Change ledger
 
+- Created `development/auto-pages-deploy-20260927` from exact merged `main` `a7e9dd32bb621ed661becc6a89686675b71467e0`.
+- PR #4 changes GitHub Pages deployment to run automatically on pushes to `main` while preserving manual `workflow_dispatch` fallback.
+- No application, database, RLS, printing, KDS, routing, or send-to-kitchen behavior is changed.
+
 - PR #1 merged and locked application/CI identity to `hvqlkapynjfjikqithvd`.
 - First operational super admin has been bootstrapped without copying source-system operational data.
 - PR #2 merged and Pages deployment verified Green.
@@ -77,7 +81,7 @@ State: **BLOCKED**
 
 ## Next action
 
-Re-run exact-head verification after the zero-cost regression contract/worklog update. If Green, keep PR #3 blocked from merge until the user's explicit approval.
+Run exact-head verification for PR #4. If Green, merge only after explicit approval; after merge, confirm the automatic Pages workflow runs on the merged `main` commit.
 
 ## Mandatory update protocol
 
