@@ -50,11 +50,21 @@ State: **BLOCKED**
 - CI now fails when `GITHUB_REPOSITORY` is not exactly `Premieros/.com`.
 - Original repository `Premieros/johna-s` is explicitly blocked by the identity check.
 - Supabase project lock remains fixed to `hvqlkapynjfjikqithvd`; original project remains explicitly blocked.
+- Replaced stale `CURRENT_WORK_PLAN.md` identity with the new project fence only.
+- Added organization module registry and route-to-module mapping.
+- Added `OrganizationModulesProvider`; navigation and route guards now require module access in addition to normal Permission-First checks.
+- Added organization-level module override migration using the existing `features` registry; no parallel feature system was created.
+- Organization disable is authoritative over legacy branch overrides.
+- Extended organization access to valid primary-branch / `user_branch_access` scope so incomplete legacy membership rows do not lock legitimate branch users out.
+- Super Admin tenant listing now uses the protected aggregate RPC instead of three client-side aggregation queries.
+- Super Admin organization rows now expose a per-organization Modules control.
+- Added unit and integration regressions for project identity, module gating, Super Admin-only mutation, tenant isolation, and module-vs-permission separation.
 
 ## Verification ledger
 
 - Identity-lock commit: `cc86114039af1681e649a3df5f236d4e2ed021a9`.
-- Full Verify pending after organization-module implementation.
+- Full Verify pending on exact current `main` after organization-module implementation.
+- Hosted Supabase migration has NOT been applied.
 
 ## Production gate
 
