@@ -3,7 +3,7 @@
 Repository: `Premieros/.com`
 Production Supabase: `hvqlkapynjfjikqithvd`
 Branch: `development/ui-simplification-all-sections-20260927`
-Current PR: `#0`
+Current PR: `#6`
 Last updated: 2026-09-27 Africa/Cairo
 
 ## Work status
@@ -41,9 +41,10 @@ Goal: apply the simplified center-based navigation pattern across the remaining 
 ## Change ledger
 
 - Created isolated simplification branch from verified main.
-- Planned three unified centers: Finance, People, Administration.
-- Planned minimal sidebar: Main + operational centers + Products/Raw Materials + Super Admin special entry.
+- Added three unified centers: Finance, People, Administration.
+- Reduced the sidebar to Main + functional centers + Products/Raw Materials + Super Admin special entry.
 - Existing destination routes remain intact.
+- Center tiles now hide unauthorized destinations and respect organization module availability.
 
 ## Verification ledger
 
