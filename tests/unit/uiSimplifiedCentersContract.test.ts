@@ -25,7 +25,8 @@ describe('simplified center-based application navigation', () => {
 
   it('keeps center tiles permission-aware centrally', () => {
     const source = read('src/components/design/CenterTile.tsx');
-    expect(source).toContain("items.filter((item) => item.permission !== false)");
+    expect(source).toContain('item.permission !== false');
+    expect(source).toContain('canAccessModule(moduleForPath(item.route))');
   });
 
   it('does not alter printing or kitchen dispatch behavior', () => {
