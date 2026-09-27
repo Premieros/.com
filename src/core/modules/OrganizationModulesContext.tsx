@@ -108,10 +108,12 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
 
     if (error) {
       // During the code-before-migration deployment window, keep the existing
-      // application behavior. Any other runtime error retains the same
-      // compatibility posture; database RLS and permissions are still enforced.
-      setAccess(ALL_ENABLED);
-      setCompatibilityFallback(isMissingModuleRpcError(error) || true);
+      // application behavior. After the module RPC exists, transient failures
+      // retain the last known module state instead of broadening access.
+      if (isMissingModuleRpcError(error)) {
+        setAccess(ALL_ENABLED);
+        setCompatibilityFallback(true);
+      }
       setLoading(false);
       return;
     }
