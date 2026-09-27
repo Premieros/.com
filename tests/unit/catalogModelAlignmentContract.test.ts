@@ -16,7 +16,7 @@ describe('catalog model alignment contract', () => {
   it('does not expose Recipes as a live catalog menu destination', () => {
     const menu = read('src/core/navigation/menu.config.ts');
     expect(menu).not.toContain("id: 'recipes'");
-    expect(menu).toContain("catalog: { ar: 'الكتالوج والمكونات', en: 'Catalog & Components' }");
+    expect(menu).toContain("catalog: { ar: 'المنتجات والخامات', en: 'Products & Materials' }");
   });
 
   it('retires production import and presents direct product raws instead of recipes', () => {
