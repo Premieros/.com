@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-26T13:10:00.000Z",
+  "generated_at": "2026-09-27T13:08:50.890Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -578,6 +578,12 @@
       ]
     },
     {
+      "name": "get_organization_module_catalog",
+      "params": [
+        "organization_id"
+      ]
+    },
+    {
       "name": "get_party_statement",
       "params": [
         "branch_id",
@@ -1086,6 +1092,22 @@
       "name": "submit_stock_count",
       "params": [
         "stock_count_id"
+      ]
+    },
+    {
+      "name": "super_admin_set_organization_module",
+      "params": [
+        "enabled",
+        "feature_key",
+        "organization_id",
+        "reason"
+      ]
+    },
+    {
+      "name": "toggle_organization_status",
+      "params": [
+        "is_active",
+        "org_id"
       ]
     },
     {
