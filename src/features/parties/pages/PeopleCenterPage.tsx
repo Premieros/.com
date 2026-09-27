@@ -13,7 +13,7 @@ export function PeopleCenterPage() {
   const actions: CenterTileItem[] = [
     { id: 'customers', ar: 'العملاء', en: 'Customers', descriptionAr: 'إدارة العملاء والأرصدة والبيانات المرتبطة.', descriptionEn: 'Manage customers, balances and related data.', route: APP_ROUTES.customers, permission: can('customers.view'), icon: UsersRound, accent: 'primary' },
     { id: 'suppliers', ar: 'الموردون', en: 'Suppliers', descriptionAr: 'إدارة الموردين والكشوف والمستحقات.', descriptionEn: 'Manage suppliers, statements and obligations.', route: APP_ROUTES.suppliers, permission: can('suppliers.view'), icon: Truck, accent: 'purchase' },
-  ].filter((item) => item.permission);
+  ];
 
   return (
     <div className="space-y-6">
