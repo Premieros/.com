@@ -28,8 +28,8 @@ describe('mandatory active worklog gate', () => {
       expect(log).toContain(heading);
     }
 
-    expect(log).toContain('Repository: `Premieros/johna-s`');
-    expect(log).toContain('Production Supabase: `azzdesuowpdcoflmyezn`');
+    expect(log).toContain('Repository: `Premieros/.com`');
+    expect(log).toContain('Production Supabase: `hvqlkapynjfjikqithvd`');
     expect(log).toMatch(/^Branch:\s*`[^`]+`/m);
     expect(log).toMatch(/^Current PR:\s*`?#?\d+`?/m);
     expect(log).toMatch(/^Last updated:\s*.+$/m);
