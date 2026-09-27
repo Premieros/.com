@@ -24,6 +24,8 @@ import { CommandPalette, CommandPaletteTrigger } from './CommandPalette';
 import { OfflineStatusIndicator } from './OfflineStatusIndicator';
 import { PageUtilityControls } from './PageUtilityControls';
 import { ReturnContextBanner } from '@/core/guard/ReturnContextBanner';
+import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
+import { moduleForRoute } from '@/core/modules/module.config';
 
 const ICONS: Record<MenuIcon, ReactNode> = {
   dashboard: <LayoutDashboard className="h-5 w-5" />,
@@ -107,6 +109,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const canViewFloorPlan = can('floor_plan.view');
   const canOpenSettings = can('settings.manage');
   const { branches } = useBranches();
+  const { canAccessModule } = useOrganizationModules();
   const [, setActiveBranchId] = useActiveBranchId();
   const [branchMenuOpen, setBranchMenuOpen] = useState(false);
   const branchMenuRef = useRef<HTMLDivElement>(null);
@@ -139,9 +142,10 @@ export function Layout({ children }: { children: ReactNode }) {
       (!item.permission || can(item.permission)) &&
       (!item.permissionsAny || item.permissionsAny.some((permission) => can(permission))) &&
       (!item.superAdminOnly || user?.role === 'super_admin') &&
-      (!item.ownerOnly || isAdmin),
+      (!item.ownerOnly || isAdmin) &&
+      canAccessModule(moduleForRoute(item.route)),
     ),
-    [can, user?.role, isAdmin],
+    [can, user?.role, isAdmin, canAccessModule],
   );
   const grouped = useMemo(() => visibleItems.reduce<Record<MenuGroup, typeof visibleItems>>((acc, item) => {
     (acc[item.group] ??= []).push(item);
