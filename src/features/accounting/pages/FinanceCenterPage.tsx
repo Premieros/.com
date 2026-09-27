@@ -22,7 +22,7 @@ export function FinanceCenterPage() {
     { id: 'shifts', ar: 'الشفتات', en: 'Shifts', descriptionAr: 'مراجعة الورديات والإغلاق والتقارير المرتبطة.', descriptionEn: 'Review shifts, closing and related reports.', route: APP_ROUTES.shifts, permission: can('shifts.view'), icon: ClipboardList, accent: 'system' },
     { id: 'costing', ar: 'التكاليف', en: 'Costing', descriptionAr: 'تكلفة المنتجات والخامات وتحليل الهوامش.', descriptionEn: 'Product/raw cost and margin analysis.', route: APP_ROUTES.costingCenter, permission: can('reports.costing'), icon: Calculator, accent: 'finance' },
     { id: 'reports', ar: 'التقارير', en: 'Reports', descriptionAr: 'التقارير التشغيلية والمالية الموحدة.', descriptionEn: 'Unified operational and financial reporting.', route: APP_ROUTES.reports, permission: can('reports.view') || can('reports.financial'), icon: BarChart3, accent: 'finance' },
-  ].filter((item) => item.permission);
+  ];
 
   return (
     <div className="space-y-6">
