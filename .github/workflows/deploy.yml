@@ -1,8 +1,6 @@
 name: Deploy to GitHub Pages
 
 on:
-  push:
-    branches: [main, master]
   workflow_dispatch:
 
 permissions:
@@ -15,9 +13,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SUPABASE_PROJECT_REF: azzdesuowpdcoflmyezn
-  VITE_SUPABASE_URL: https://azzdesuowpdcoflmyezn.supabase.co
-  VITE_WORK_AUTHORIZATION_GATE: "1"
+  SUPABASE_PROJECT_REF: hvqlkapynjfjikqithvd
+  VITE_SUPABASE_URL: https://hvqlkapynjfjikqithvd.supabase.co
+  VITE_WORK_AUTHORIZATION_GATE: "0"
 
 jobs:
   build:
@@ -48,8 +46,8 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     env:
-      SUPABASE_PROJECT_REF: azzdesuowpdcoflmyezn
-      VITE_SUPABASE_URL: https://azzdesuowpdcoflmyezn.supabase.co
+      SUPABASE_PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+      VITE_SUPABASE_URL: ${{ vars.VITE_SUPABASE_URL }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
     steps:
       - uses: actions/checkout@v4
