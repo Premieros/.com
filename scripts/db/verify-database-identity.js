@@ -1,21 +1,22 @@
 const BLOCKED_PROJECT_REF = 'azzdesuowpdcoflmyezn'
-const configuredRef = (process.env.SUPABASE_PROJECT_REF || '').trim()
-const configuredUrl = (process.env.VITE_SUPABASE_URL || '').trim().replace(/\/$/, '')
+const EXPECTED_PROJECT_REF = 'hvqlkapynjfjikqithvd'
+const configuredRef = (process.env.SUPABASE_PROJECT_REF || EXPECTED_PROJECT_REF).trim()
+const configuredUrl = (process.env.VITE_SUPABASE_URL || `https://${EXPECTED_PROJECT_REF}.supabase.co`).trim().replace(/\/$/, '')
 
 function fail(message) {
   console.error(`DATABASE_IDENTITY_LOCK_FAILED: ${message}`)
   process.exit(1)
 }
 
-if (!configuredRef) {
-  fail('SUPABASE_PROJECT_REF is required for the clean clone')
-}
-
 if (configuredRef === BLOCKED_PROJECT_REF) {
   fail(`The original Production project ${BLOCKED_PROJECT_REF} is permanently blocked in this repository`)
 }
 
-const expectedUrl = `https://${configuredRef}.supabase.co`
+if (configuredRef !== EXPECTED_PROJECT_REF) {
+  fail(`SUPABASE_PROJECT_REF must be ${EXPECTED_PROJECT_REF}, received ${configuredRef || '<empty>'}`)
+}
+
+const expectedUrl = `https://${EXPECTED_PROJECT_REF}.supabase.co`
 if (!configuredUrl) {
   fail('VITE_SUPABASE_URL is required for the clean clone')
 }
