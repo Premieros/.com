@@ -150,6 +150,21 @@ describe('Phase 4 — feature discoverability', () => {
     expect(sourceHasRoute(source, 'rfqs')).toBe(true);
     expect(sourceHasRoute(source, 'receiving')).toBe(true);
   });
+
+  it('Finance, People and Administration keep their sub-pages discoverable from centers', () => {
+    const finance = read('src/features/accounting/pages/FinanceCenterPage.tsx');
+    const people = read('src/features/parties/pages/PeopleCenterPage.tsx');
+    const admin = read('src/features/admin/pages/AdministrationCenterPage.tsx');
+
+    for (const key of ['treasury', 'accounts', 'journal', 'payments', 'reconciliation', 'employeeReceivables', 'expenses', 'sales', 'shifts', 'costingCenter', 'reports']) {
+      expect(sourceHasRoute(finance, key), `FinanceCenter missing APP_ROUTES.${key}`).toBe(true);
+    }
+    expect(sourceHasRoute(people, 'customers')).toBe(true);
+    expect(sourceHasRoute(people, 'suppliers')).toBe(true);
+    for (const key of ['branches', 'users', 'permissions', 'approvals', 'auditLog', 'importExport', 'kitchenStations', 'settings']) {
+      expect(sourceHasRoute(admin, key), `AdministrationCenter missing APP_ROUTES.${key}`).toBe(true);
+    }
+  });
 });
 
 describe('Phase 4 — command palette', () => {
@@ -203,6 +218,9 @@ describe('Phase 4 — no duplicate destinations', () => {
       'src/features/trade/pages/ProcurementCenterPage.tsx',
       'src/features/operations/pages/OperationsCenterPage.tsx',
       'src/features/catalog/pages/ProductsPage.tsx',
+      'src/features/accounting/pages/FinanceCenterPage.tsx',
+      'src/features/parties/pages/PeopleCenterPage.tsx',
+      'src/features/admin/pages/AdministrationCenterPage.tsx',
     ];
     const centerSource = centerFiles.map((f) => read(f)).join('\n');
     const allDiscoverable = new Set([...menuRoutes]);
