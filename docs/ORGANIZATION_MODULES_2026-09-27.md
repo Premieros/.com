@@ -63,8 +63,12 @@ State: **BLOCKED**
 ## Verification ledger
 
 - Identity-lock commit: `cc86114039af1681e649a3df5f236d4e2ed021a9`.
-- Full Verify pending on exact current `main` after organization-module implementation.
-- Hosted Supabase migration has NOT been applied.
+- Full Verify #37 passed Green on `6bd63285b1cafd01489d0edbd405065a001e2b2f` for the organization-module implementation.
+- Hosted Supabase migration `organization_module_controls` was applied successfully to `hvqlkapynjfjikqithvd` only.
+- Performance advisor reported the new `updated_by` FK without a covering index; an append-only follow-up migration was added.
+- Full Verify #38 passed Green on `dc5d079b052fb70b5adfe6cf4ccb6b99e2a992d8` including DB, integration/RLS, and browser smoke.
+- Hosted Supabase migration `organization_module_updated_by_index` was then applied successfully to `hvqlkapynjfjikqithvd` only.
+- Post-apply verification confirmed both migrations are registered, the expected indexes exist, and organization override count remains 0.
 
 ## Production gate
 
