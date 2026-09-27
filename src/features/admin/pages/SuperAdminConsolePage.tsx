@@ -33,6 +33,7 @@ import { Input, Textarea, Select } from '@/components/Input';
 import { Modal } from '@/components/Modal';
 import { RolesTab } from './RolesTab';
 import { formatDate, formatDateTime } from '@/lib/format';
+import { ORGANIZATION_MODULE_KEYS, ORGANIZATION_MODULES, type OrganizationModuleKey } from '@/core/modules/module.config';
 
 interface TenantStats {
   organization_id: string;
@@ -69,6 +70,14 @@ interface AuditLogRow {
   details: unknown;
 }
 
+interface OrganizationModuleRow {
+  feature_key: OrganizationModuleKey;
+  feature_name: string;
+  category: string;
+  enabled: boolean;
+  source: string;
+}
+
 type SuperTab =
   | 'tenants'
   | 'system_controls'
@@ -97,6 +106,10 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
   // Tenants state
   const [tenants, setTenants] = useState<TenantStats[]>([]);
   const [loadingTenants, setLoadingTenants] = useState(false);
+  const [moduleOrg, setModuleOrg] = useState<TenantStats | null>(null);
+  const [organizationModules, setOrganizationModules] = useState<OrganizationModuleRow[]>([]);
+  const [loadingOrganizationModules, setLoadingOrganizationModules] = useState(false);
+  const [savingModuleKey, setSavingModuleKey] = useState<OrganizationModuleKey | null>(null);
 
   // System Controls state (Allow New User Creation)
   const [allowNewUserCreation, setAllowNewUserCreation] = useState<boolean>(true);
@@ -188,40 +201,43 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
   const loadTenants = useCallback(async () => {
     setLoadingTenants(true);
     try {
-      const [orgsRes, brRes, memRes] = await Promise.all([
-        supabase.from('organizations').select('*').order('created_at', { ascending: false }),
-        supabase.from('branches').select('id, name, is_active, organization_id'),
-        supabase.from('organization_members').select('organization_id, user_id, is_active'),
-      ]);
-
-      const orgs = orgsRes.data || [];
-      const brs = brRes.data || [];
-      const mems = memRes.data || [];
-
-      const stats: TenantStats[] = orgs.map((o) => {
-        const orgBranches = brs.filter((b) => b.organization_id === o.id);
-        const orgMembers = mems.filter((m) => m.organization_id === o.id && m.is_active);
-
-        return {
-          organization_id: o.id,
-          organization_name: o.name,
-          organization_slug: o.slug,
-          is_active: o.is_active ?? true,
-          created_at: o.created_at,
-          branch_count: orgBranches.length,
-          user_count: orgMembers.length,
-          total_branches: orgBranches.length,
-          active_branches: orgBranches.filter((b) => b.is_active).length,
-        };
-      });
-
-      setTenants(stats);
+      const { data, error } = await admin.getSuperAdminTenantStats();
+      if (error) throw error;
+      setTenants((data ?? []) as TenantStats[]);
     } catch {
-      // Ignored
+      setTenants([]);
     } finally {
       setLoadingTenants(false);
     }
   }, []);
+
+  const loadOrganizationModules = useCallback(async (organizationId: string) => {
+    setLoadingOrganizationModules(true);
+    try {
+      const { data, error } = await admin.getOrganizationModuleCatalog({
+        p_organization_id: organizationId,
+      });
+      if (error) throw error;
+      const rows = ((data ?? []) as Array<{
+        feature_key: string;
+        feature_name: string;
+        category: string;
+        enabled: boolean;
+        source: string;
+      }>)
+        .filter((row) => ORGANIZATION_MODULE_KEYS.includes(row.feature_key as OrganizationModuleKey))
+        .map((row) => ({
+          ...row,
+          feature_key: row.feature_key as OrganizationModuleKey,
+        }));
+      setOrganizationModules(rows);
+    } catch {
+      setOrganizationModules([]);
+      show(ar ? 'تعذر تحميل موديولات المؤسسة' : 'Failed to load organization modules', 'error');
+    } finally {
+      setLoadingOrganizationModules(false);
+    }
+  }, [ar, show]);
 
   // ─────────────────────────────────────────────────────────────
   // 3. Load Users & Audit Logs
@@ -323,12 +339,51 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
   // ─────────────────────────────────────────────────────────────
   const toggleOrgStatus = async (orgId: string, currentActive: boolean) => {
     try {
-      const { error } = await supabase.from('organizations').update({ is_active: !currentActive }).eq('id', orgId);
-      if (error) throw error;
+      const { data, error } = await admin.toggleOrganizationStatus({
+        p_org_id: orgId,
+        p_is_active: !currentActive,
+      });
+      if (error || data?.success === false) throw error ?? new Error(data?.error || 'UPDATE_FAILED');
       show(ar ? 'تم تحديث حالة المنظمة بنجاح' : 'Organization status updated', 'success');
       void loadTenants();
     } catch {
       show(ar ? 'فشل تحديث حالة المنظمة' : 'Failed to update organization status', 'error');
+    }
+  };
+
+  const openOrganizationModules = (tenant: TenantStats) => {
+    setModuleOrg(tenant);
+    setOrganizationModules([]);
+    void loadOrganizationModules(tenant.organization_id);
+  };
+
+  const handleOrganizationModuleToggle = async (row: OrganizationModuleRow) => {
+    if (!moduleOrg || savingModuleKey) return;
+    setSavingModuleKey(row.feature_key);
+    try {
+      const nextEnabled = !row.enabled;
+      const { data, error } = await admin.setOrganizationModule({
+        p_organization_id: moduleOrg.organization_id,
+        p_feature_key: row.feature_key,
+        p_enabled: nextEnabled,
+        p_reason: 'super_admin_console',
+      });
+      if (error || data?.success === false) throw error ?? new Error(data?.error || 'UPDATE_FAILED');
+      setOrganizationModules((current) => current.map((item) => (
+        item.feature_key === row.feature_key
+          ? { ...item, enabled: nextEnabled, source: 'organization_override' }
+          : item
+      )));
+      show(
+        nextEnabled
+          ? (ar ? 'تم تفعيل الموديول للمؤسسة' : 'Module enabled for organization')
+          : (ar ? 'تم تعطيل الموديول للمؤسسة' : 'Module disabled for organization'),
+        'success',
+      );
+    } catch {
+      show(ar ? 'فشل تحديث موديول المؤسسة' : 'Failed to update organization module', 'error');
+    } finally {
+      setSavingModuleKey(null);
     }
   };
 
@@ -597,13 +652,18 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
                       </td>
                       <td className="p-3 text-center text-ui-subtle">{formatDate(t.created_at, lang)}</td>
                       <td className="p-3 text-end">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => void toggleOrgStatus(t.organization_id, t.is_active)}
-                        >
-                          {t.is_active ? (ar ? 'تعطيل' : 'Disable') : (ar ? 'تفعيل' : 'Enable')}
-                        </Button>
+                        <div className="flex justify-end gap-2">
+                          <Button size="sm" variant="outline" onClick={() => openOrganizationModules(t)}>
+                            {ar ? 'الموديولات' : 'Modules'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => void toggleOrgStatus(t.organization_id, t.is_active)}
+                          >
+                            {t.is_active ? (ar ? 'تعطيل' : 'Disable') : (ar ? 'تفعيل' : 'Enable')}
+                          </Button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -1104,6 +1164,69 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
             )}
           </Card>
         </div>
+      )}
+
+      {moduleOrg && (
+        <Modal
+          isOpen={Boolean(moduleOrg)}
+          onClose={() => {
+            setModuleOrg(null);
+            setOrganizationModules([]);
+          }}
+          title={ar ? `موديولات المؤسسة — ${moduleOrg.organization_name}` : `Organization Modules — ${moduleOrg.organization_name}`}
+        >
+          <div className="space-y-4">
+            <div className="rounded-xl border border-ui-border bg-ui-page-alt p-3 text-xs text-ui-muted">
+              {ar
+                ? 'الموديول يحدد ما هو متاح للمؤسسة. بعد التفعيل يظل المستخدم محتاجًا للصلاحية المناسبة لكل شاشة أو عملية.'
+                : 'Modules define what is available to the organization. User permissions are still required for every screen and action.'}
+            </div>
+
+            {loadingOrganizationModules ? (
+              <div className="flex min-h-32 items-center justify-center">
+                <Loader2 className="h-5 w-5 animate-spin text-brand-600" />
+              </div>
+            ) : (
+              <div className="grid gap-2">
+                {organizationModules.map((row) => {
+                  const label = ORGANIZATION_MODULES[row.feature_key];
+                  const saving = savingModuleKey === row.feature_key;
+                  return (
+                    <div key={row.feature_key} className="flex items-center justify-between gap-3 rounded-xl border border-ui-border p-3">
+                      <div className="min-w-0">
+                        <div className="font-bold text-ui-text">
+                          {label ? label[ar ? 'ar' : 'en'] : row.feature_name}
+                        </div>
+                        <div className="text-[11px] text-ui-subtle">
+                          {row.feature_key} · {row.source === 'organization_override'
+                            ? (ar ? 'إعداد خاص بالمؤسسة' : 'Organization override')
+                            : (ar ? 'الوضع الافتراضي' : 'Default')}
+                        </div>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant={row.enabled ? 'primary' : 'outline'}
+                        disabled={Boolean(savingModuleKey)}
+                        onClick={() => void handleOrganizationModuleToggle(row)}
+                      >
+                        {saving
+                          ? <Loader2 className="h-4 w-4 animate-spin" />
+                          : row.enabled
+                            ? (ar ? 'مفعّل' : 'Enabled')
+                            : (ar ? 'معطّل' : 'Disabled')}
+                      </Button>
+                    </div>
+                  );
+                })}
+                {!organizationModules.length && (
+                  <div className="rounded-xl border border-dashed border-ui-border p-6 text-center text-sm text-ui-subtle">
+                    {ar ? 'لا توجد موديولات متاحة.' : 'No modules are available.'}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </Modal>
       )}
 
       {/* Edit User Modal */}
