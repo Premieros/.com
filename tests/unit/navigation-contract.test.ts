@@ -114,11 +114,19 @@ describe('Phase 4 — feature discoverability', () => {
     expect(MENU_ITEMS.find((i) => i.id === 'recipes')).toBeUndefined();
   });
 
-  it('Inventory Units is in the sidebar menu', () => {
-    const item = MENU_ITEMS.find((i) => i.id === 'inventory-units');
-    expect(item).toBeDefined();
-    expect(item!.route).toBe(APP_ROUTES.inventoryUnits);
-    expect(item!.permission).toBe('raw_materials.view');
+  it('keeps advanced catalog tools out of the sidebar and discoverable from Products', () => {
+    expect(MENU_ITEMS.find((i) => i.id === 'inventory-units')).toBeUndefined();
+    expect(MENU_ITEMS.find((i) => i.id === 'product-modifiers')).toBeUndefined();
+    expect(MENU_ITEMS.find((i) => i.id === 'product-modifier-options')).toBeUndefined();
+    expect(MENU_ITEMS.find((i) => i.id === 'categories')).toBeUndefined();
+    expect(MENU_ITEMS.find((i) => i.id === 'pricing')).toBeUndefined();
+
+    const source = read('src/features/catalog/pages/ProductsPage.tsx');
+    expect(sourceHasRoute(source, 'pricing')).toBe(true);
+    expect(sourceHasRoute(source, 'productModifiers')).toBe(true);
+    expect(sourceHasRoute(source, 'productModifierOptions')).toBe(true);
+    expect(sourceHasRoute(source, 'categories')).toBe(true);
+    expect(sourceHasRoute(source, 'inventoryUnits')).toBe(true);
   });
 
   it('Warehouses are accessible from Inventory Center', () => {
@@ -194,6 +202,7 @@ describe('Phase 4 — no duplicate destinations', () => {
       'src/features/inventory/pages/InventoryCenterPage.tsx',
       'src/features/trade/pages/ProcurementCenterPage.tsx',
       'src/features/operations/pages/OperationsCenterPage.tsx',
+      'src/features/catalog/pages/ProductsPage.tsx',
     ];
     const centerSource = centerFiles.map((f) => read(f)).join('\n');
     const allDiscoverable = new Set([...menuRoutes]);
