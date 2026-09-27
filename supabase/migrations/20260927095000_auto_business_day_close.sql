@@ -68,8 +68,11 @@ BEGIN
   FOR v_branch IN
     SELECT b.id AS branch_id
     FROM public.branches b
+    JOIN public.organizations o ON o.id=b.organization_id
     JOIN public.branch_settings bs ON bs.branch_id=b.id
-    WHERE COALESCE(bs.business_day_mode,'fixed_time')='fixed_time'
+    WHERE b.is_active=true
+      AND o.is_active=true
+      AND COALESCE(bs.business_day_mode,'fixed_time')='fixed_time'
     ORDER BY b.id
   LOOP
     BEGIN
