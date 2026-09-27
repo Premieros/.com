@@ -46,6 +46,15 @@ describe('dashboard standby activity bar contract', () => {
     expect(css).toContain('prefers-reduced-motion');
   });
 
+  it('consumes audit realtime inserts directly without a REST refetch per event', () => {
+    const standby = read('src/features/dashboard/components/DashboardStandbyBar.tsx');
+    expect(standby).toContain('const consumeInsertedRow');
+    expect(standby).toContain('const row = payload.new as AuditLog | undefined;');
+    expect(standby).toContain('setRecent((current) => [row, ...current.filter');
+    expect(standby).toContain('consumeInsertedRow,');
+    expect(standby).not.toContain("{ event: 'INSERT', schema: 'public', table: 'audit_log' },\n        () => void loadActivity(),");
+  });
+
   it('keeps the welcome readable and uses vivid high-contrast data colors', () => {
     const standby = read('src/features/dashboard/components/DashboardStandbyBar.tsx');
     expect(standby).toContain("user?.full_name");
