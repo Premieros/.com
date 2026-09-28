@@ -104,12 +104,12 @@ describe.skipIf(!dbUrl)('automatic fixed-time business-day close', () => {
       [ids.branchA],
     );
     expect(state.rows[0].business_date).not.toBe(dueDate);
-    const nextCutoff = await client.query<{ cutoff: string }>(
-      `SELECT private.business_day_fixed_cutoff($1,$2::date)::text AS cutoff`,
+    const stateStartCutoff = await client.query<{ cutoff: string }>(
+      `SELECT private.business_day_fixed_cutoff($1,($2::date - 1))::text AS cutoff`,
       [ids.branchA, state.rows[0].business_date],
     );
     expect(new Date(state.rows[0].started_at).getTime()).toBe(
-      new Date(nextCutoff.rows[0].cutoff).getTime(),
+      new Date(stateStartCutoff.rows[0].cutoff).getTime(),
     );
   });
 
