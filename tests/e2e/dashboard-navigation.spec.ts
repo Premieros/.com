@@ -95,9 +95,9 @@ const NAV_GROUP_BY_ROUTE: Record<string, string> = {
 };
 
 async function clickRouteLink(page: Page, route: string) {
-  const target = page.locator(`a[href="#${route}"]`).first();
+  const visibleTarget = () => page.locator(`a[href="#${route}"]:visible`).first();
 
-  if (!(await target.isVisible().catch(() => false))) {
+  if (!(await visibleTarget().isVisible().catch(() => false))) {
     const group = NAV_GROUP_BY_ROUTE[route];
     if (group) {
       const toggle = page.getByTestId(`nav-group-toggle-${group}`);
@@ -106,6 +106,7 @@ async function clickRouteLink(page: Page, route: string) {
     }
   }
 
+  const target = visibleTarget();
   await expect(target).toBeVisible();
   await target.click();
 }
