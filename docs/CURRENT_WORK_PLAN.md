@@ -2,9 +2,9 @@
 
 ## MANDATORY EXECUTION GATE — لا عمل بدون المرور بالسجل
 
-- Mandatory active work log: `docs/ORIGINAL_SYNC_2026-09-27.md`
+- Mandatory active work log: `docs/UI_SIMPLIFICATION_2026-09-27.md`
 - Current writable repository: `Premieros/.com`
-- Current writable branch: `main`
+- Current writable branch: `development/ui-simplification-all-sections-20260927`
 - Current Supabase project: `hvqlkapynjfjikqithvd`
 - Original reference repository `Premieros/johna-s`: READ ONLY.
 - Original Production Supabase `azzdesuowpdcoflmyezn`: BLOCKED.
@@ -112,3 +112,11 @@ Required before hosted migration:
 - Port verified post-fork changes from read-only `Premieros/johna-s` into the organization-aware `.com` architecture.
 - Preserve organization modules, project identity and Permission-First isolation.
 - No hosted migration until the sync PR is Full Verify Green.
+
+
+## ACTIVE — UI Simplification
+
+- Apply the product-style simplification pattern across remaining sections.
+- Keep one clear hub per functional family; keep deep links and permission checks intact.
+- Add Finance, People and Administration centers and remove their implementation-level sibling pages from the sidebar.
+- No database migration in this UI-only phase.

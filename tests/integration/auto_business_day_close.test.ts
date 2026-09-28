@@ -17,8 +17,10 @@ describe.skipIf(!dbUrl)('automatic fixed-time business-day close', () => {
     ids = await seedRlsFixture(client);
 
     const dateRow = await client.query<{ d: string }>(
-      `SELECT (((now() AT TIME ZONE 'Africa/Cairo')::date - 1))::text AS d`,
+      `SELECT (((now() AT TIME ZONE 'Africa/Cairo')::date - 2))::text AS d`,
     );
+    // Use a date guaranteed to be past the 02:30 Cairo cutoff even when CI
+    // runs shortly after local midnight. Using yesterday is time-window flaky.
     dueDate = dateRow.rows[0].d;
 
     await client.query(
@@ -102,8 +104,12 @@ describe.skipIf(!dbUrl)('automatic fixed-time business-day close', () => {
       [ids.branchA],
     );
     expect(state.rows[0].business_date).not.toBe(dueDate);
+    const stateStartCutoff = await client.query<{ cutoff: string }>(
+      `SELECT private.business_day_fixed_cutoff($1,($2::date - 1))::text AS cutoff`,
+      [ids.branchA, state.rows[0].business_date],
+    );
     expect(new Date(state.rows[0].started_at).getTime()).toBe(
-      new Date(cutoff.rows[0].cutoff).getTime(),
+      new Date(stateStartCutoff.rows[0].cutoff).getTime(),
     );
   });
 

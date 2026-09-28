@@ -7,10 +7,13 @@ const palette = readFileSync('src/components/CommandPalette.tsx', 'utf8');
 const routes = readFileSync('src/app/routes.tsx', 'utf8');
 
 describe('unified reports navigation permissions', () => {
-  it('exposes one reports menu destination for operational or financial permission', () => {
-    expect(menu).toContain("id: 'reports'");
-    expect(menu).toContain("permissionsAny: ['reports.view', 'reports.financial']");
+  it('keeps reports consolidated under the Finance Center', () => {
+    expect(menu).not.toContain("id: 'reports'");
     expect(menu).not.toContain("id: 'financial-reports'");
+    expect(menu).toContain("id: 'finance-center'");
+    const finance = readFileSync('src/features/accounting/pages/FinanceCenterPage.tsx', 'utf8');
+    expect(finance).toContain('APP_ROUTES.reports');
+    expect(finance).toContain("can('reports.view') || can('reports.financial')");
   });
 
   it('supports any-of permissions consistently in sidebar and command palette', () => {

@@ -89,15 +89,15 @@ async function loginAsE2EAdmin(page: Page) {
 }
 
 const NAV_GROUP_BY_ROUTE: Record<string, string> = {
-  '/branches': 'operations',
+  '/operations': 'centers',
   '/inventory-center': 'centers',
   '/pos': 'main',
 };
 
 async function clickRouteLink(page: Page, route: string) {
-  const target = page.locator(`a[href="#${route}"]`).first();
+  const visibleTarget = () => page.locator(`a[href="#${route}"]:visible`).first();
 
-  if (!(await target.isVisible().catch(() => false))) {
+  if (!(await visibleTarget().isVisible().catch(() => false))) {
     const group = NAV_GROUP_BY_ROUTE[route];
     if (group) {
       const toggle = page.getByTestId(`nav-group-toggle-${group}`);
@@ -106,6 +106,7 @@ async function clickRouteLink(page: Page, route: string) {
     }
   }
 
+  const target = visibleTarget();
   await expect(target).toBeVisible();
   await target.click();
 }
@@ -129,7 +130,7 @@ test.describe('dashboard and navigation actions', () => {
   });
 
   test('sidebar navigation actions keep stable route targets', async ({ page }) => {
-    const cases = ['/branches', '/inventory-center', '/pos'];
+    const cases = ['/operations', '/inventory-center', '/pos'];
     for (const route of cases) {
       await clickRouteLink(page, route);
       await expect(page).toHaveURL(new RegExp(`#${route}$`));

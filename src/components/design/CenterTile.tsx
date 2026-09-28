@@ -1,6 +1,8 @@
 import { useNavigate } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import type { LucideIcon } from 'lucide-react';
+import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
+import { moduleForPath } from '@/core/modules/module.config';
 
 export type CenterTileItem = {
   id: string;
@@ -64,10 +66,14 @@ type CenterGridProps = {
 };
 
 export function CenterGrid({ items, testIdPrefix, columns = 4 }: CenterGridProps) {
+  const { canAccessModule } = useOrganizationModules();
   const gridCols = columns === 2 ? 'sm:grid-cols-2' : columns === 3 ? 'sm:grid-cols-2 xl:grid-cols-3' : 'sm:grid-cols-2 xl:grid-cols-4';
+  const visibleItems = items.filter(
+    (item) => item.permission !== false && canAccessModule(moduleForPath(item.route)),
+  );
   return (
     <div className={`grid gap-4 ${gridCols}`}>
-      {items.map((item) => (
+      {visibleItems.map((item) => (
         <CenterTile key={item.id} item={item} testIdPrefix={testIdPrefix} />
       ))}
     </div>

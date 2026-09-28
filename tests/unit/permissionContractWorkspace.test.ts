@@ -40,8 +40,11 @@ describe('permission contract workspace wiring', () => {
     expect(routeDefs).toContain("permissions: '/permissions'");
     expect(routes).toContain('APP_ROUTES.permissions');
     expect(routes).toContain('permission="roles.permissions.manage"');
-    expect(menu).toContain("id: 'permissions'");
-    expect(menu).toContain("permission: 'roles.permissions.manage'");
+    expect(menu).not.toContain("id: 'permissions'");
+    expect(menu).toContain("id: 'administration-center'");
+    const adminCenter = read('src/features/admin/pages/AdministrationCenterPage.tsx');
+    expect(adminCenter).toContain('APP_ROUTES.permissions');
+    expect(adminCenter).toContain("can('roles.permissions.manage')");
   });
 
   it('builds role controls from operational contracts and server grant rules', () => {
