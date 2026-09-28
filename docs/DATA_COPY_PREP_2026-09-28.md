@@ -81,13 +81,46 @@ Do not blindly overwrite:
 - generated API/auth project settings
 - RLS/policies/functions/triggers from the source
 
+## Missing-table data classification
+
+- `supplier_opening_balances`: 0 source rows. Schema/feature parity should be ported, but there is no historical row payload to migrate today.
+- `raw_fifo_debt_price_estimates`: 1303 source rows — derived repair/estimate data.
+- `raw_fifo_price_fallback_plan`: 4222 source rows — derived repair plan data.
+- `raw_fifo_price_fallback_runs`: 1 source row — parent run record for the derived repair data.
+
+The three `raw_fifo_*price*` tables reference branches/raw materials/raw FIFO debts/inventory ledger and should be classified as `REBUILD_DERIVED` unless a later compatibility check proves the target runtime still requires their historical records. Do not let them block copying the authoritative operational ledgers.
+
+## Initial migration classes
+
+### KEEP_DESTINATION
+- organizations framework
+- organization_feature_overrides
+- schema_migrations
+- destination project configuration / organization-module bootstrap
+
+### COPY_WITH_MAPPING
+- branches (preserve source branch UUIDs, replace/map organization_id)
+- organization_members
+- treasury rows carrying organization_id
+- users / auth identity linkage
+- any tenant_id-bearing subscription/feature rows that are intentionally retained
+
+### REBUILD_DERIVED
+- raw_fifo_debt_price_estimates
+- raw_fifo_price_fallback_plan
+- raw_fifo_price_fallback_runs
+- other temporary repair/backfill planning tables after dependency review
+
+### COPY
+Authoritative branch-scoped master and transactional data after FK ordering is generated, including catalog, raw materials, suppliers/customers, inventory authoritative ledgers, purchases, orders, sales, payments, shifts, treasury/journal, and kitchen inventory effects where schema-compatible.
+
+### SKIP_RUNTIME
+Runtime/transient rows that must not wake old infrastructure in the new project will be explicitly identified before cutover (for example queued print/wake work).
+
 ## Next preparation step
 
-Create an exact table/column compatibility matrix and classify every table as:
-- COPY
-- COPY_WITH_MAPPING
-- REBUILD/DERIVED
-- KEEP_DESTINATION
-- SKIP_RUNTIME
-
-Then prepare the import order and validation queries. No production copy yet.
+1. Complete exact column compatibility for authoritative tables.
+2. Port the missing supplier-opening-balance schema/permission contract needed for future use.
+3. Generate FK-safe import order.
+4. Define transient/runtime exclusions.
+5. Prepare validation queries and stop before production copy.
