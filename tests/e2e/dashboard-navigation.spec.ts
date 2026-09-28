@@ -89,7 +89,7 @@ async function loginAsE2EAdmin(page: Page) {
 }
 
 const NAV_GROUP_BY_ROUTE: Record<string, string> = {
-  '/operations-center': 'centers',
+  '/operations': 'centers',
   '/inventory-center': 'centers',
   '/pos': 'main',
 };
@@ -129,7 +129,7 @@ test.describe('dashboard and navigation actions', () => {
   });
 
   test('sidebar navigation actions keep stable route targets', async ({ page }) => {
-    const cases = ['/operations-center', '/inventory-center', '/pos'];
+    const cases = ['/operations', '/inventory-center', '/pos'];
     for (const route of cases) {
       await clickRouteLink(page, route);
       await expect(page).toHaveURL(new RegExp(`#${route}$`));
