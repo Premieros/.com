@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-29T09:42:00.000Z",
+  "generated_at": "2026-09-29T11:45:00.000Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -1148,6 +1148,24 @@
       "name": "submit_stock_count",
       "params": [
         "stock_count_id"
+      ]
+    },
+    {
+      "name": "super_admin_create_organization_from_profile",
+      "params": [
+        "address",
+        "branch_name",
+        "business_profile",
+        "business_type",
+        "currency",
+        "enabled_modules",
+        "name",
+        "owner_email",
+        "owner_name",
+        "owner_password",
+        "phone",
+        "tax_enabled",
+        "tax_rate"
       ]
     },
     {
