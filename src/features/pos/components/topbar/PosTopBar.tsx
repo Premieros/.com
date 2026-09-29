@@ -9,6 +9,7 @@ import type { Branch } from '@/lib/types';
 import type { ActiveShiftInfo } from '../../hooks/usePosOrder';
 import { usePosPermissions } from '../../hooks/usePosPermissions';
 import { offlinePosManager } from '../../services/offlinePos';
+import type { OrganizationTerminology, PosLayoutPreset } from '@/core/organizations/organizationExperience';
 
 export type PosPanelId = 'orders' | 'tables' | 'kitchen' | null;
 
@@ -32,6 +33,8 @@ interface PosTopBarProps {
   onNewOrder: () => void;
   onExit: () => void;
   onOpenShiftModal?: () => void;
+  layout?: PosLayoutPreset;
+  terminology?: OrganizationTerminology;
 }
 
 export function PosTopBar({
@@ -46,6 +49,8 @@ export function PosTopBar({
   onNewOrder,
   onExit,
   onOpenShiftModal,
+  layout,
+  terminology,
 }: PosTopBarProps) {
   const { t, lang } = useLanguage();
   const { theme, toggleTheme } = useTheme();
@@ -107,7 +112,7 @@ export function PosTopBar({
     };
   }, [refreshPending, triggerSync]);
 
-  const canManageCurrentShift = shiftChecked && (activeShift ? perms.canCloseShift : perms.canOpenShift);
+  const canManageCurrentShift = (layout?.showShift ?? true) && shiftChecked && (activeShift ? perms.canCloseShift : perms.canOpenShift);
 
   const openShiftManagement = () => {
     if (!canManageCurrentShift) return;
@@ -155,7 +160,7 @@ export function PosTopBar({
             className="flex min-h-9 items-center gap-1.5 rounded-xl bg-ui-primary px-3 text-xs font-black text-ui-primary-fg shadow-ui-sm transition active:scale-95 hover:bg-ui-primary-hover"
           >
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">{isAr ? 'الطاولات / طلب جديد' : 'Tables / New order'}</span>
+            <span className="hidden sm:inline">{terminology?.newOrder || (isAr ? 'طلب جديد' : 'New order')}</span>
           </button>
         )}
       </div>
@@ -163,10 +168,10 @@ export function PosTopBar({
       <div className="flex-1" />
 
       <div data-testid="pos-top-counters" className="hidden items-center gap-1 lg:flex">
-        {counterButton('active-orders', 'الطلبات النشطة', 'Active orders', counts.activeOrders, <ListOrdered className="h-3.5 w-3.5" />, 'orders')}
-        {counterButton('delivery', 'الدليفري', 'Delivery', counts.deliveryOrders, <Truck className="h-3.5 w-3.5" />, 'orders')}
-        {counterButton('tables', 'الطاولات المشغولة', 'Occupied tables', counts.occupiedTables, <CalendarCheck className="h-3.5 w-3.5" />, 'tables')}
-        {perms.canViewKitchen && counterButton('kds', 'طلبات المطبخ', 'Kitchen queue', counts.kitchenOrders, <ChefHat className="h-3.5 w-3.5" />, 'kitchen')}
+        {counterButton('active-orders', terminology?.orders || 'الطلبات النشطة', 'Active orders', counts.activeOrders, <ListOrdered className="h-3.5 w-3.5" />, 'orders')}
+        {(layout?.showDelivery ?? true) && counterButton('delivery', 'الدليفري', 'Delivery', counts.deliveryOrders, <Truck className="h-3.5 w-3.5" />, 'orders')}
+        {(layout?.showTables ?? true) && counterButton('tables', 'الطاولات المشغولة', 'Occupied tables', counts.occupiedTables, <CalendarCheck className="h-3.5 w-3.5" />, 'tables')}
+        {(layout?.showKitchen ?? true) && perms.canViewKitchen && counterButton('kds', 'طلبات المطبخ', 'Kitchen queue', counts.kitchenOrders, <ChefHat className="h-3.5 w-3.5" />, 'kitchen')}
       </div>
 
       {pendingCount > 0 && (
@@ -228,7 +233,7 @@ export function PosTopBar({
               {t('activeOrders')}
               {counts.activeOrders > 0 && <span className="ms-auto rounded-full bg-ui-primary px-2 py-0.5 text-[10px] text-ui-primary-fg">{counts.activeOrders}</span>}
             </button>
-            <button
+            {(layout?.showTables ?? true) && <button
               data-testid="pos-more-tables"
               onClick={() => { onPanel('tables'); setMore(false); }}
               className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold hover:bg-ui-page-alt"
@@ -236,8 +241,8 @@ export function PosTopBar({
               <CalendarCheck className="h-4 w-4" />
               {isAr ? 'الطاولات' : 'Tables'}
               {counts.occupiedTables > 0 && <span className="ms-auto rounded-full bg-ui-warning px-2 py-0.5 text-[10px] text-white">{counts.occupiedTables}</span>}
-            </button>
-            {perms.canViewKitchen && (
+            </button>}
+            {(layout?.showKitchen ?? true) && perms.canViewKitchen && (
               <button
                 data-testid="pos-more-kitchen"
                 onClick={() => { onPanel('kitchen'); setMore(false); }}
