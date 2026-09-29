@@ -108,8 +108,8 @@ export function SystemHealthPage() {
       return;
     }
 
-    const blockedOffline = offline.filter((row) => row.status === 'blocked' || row.status === 'dead_letter').length;
-    const retryingOffline = offline.filter((row) => row.status === 'pending' || row.status === 'failed' || row.status === 'syncing').length;
+    const blockedOffline = offline.filter((row) => row.status === 'failed').length;
+    const retryingOffline = offline.filter((row) => row.status === 'pending' || row.status === 'syncing').length;
 
     const next: Check[] = [
       {
@@ -173,7 +173,7 @@ export function SystemHealthPage() {
         ar: 'عمليات Offline تحتاج تدخل',
         en: 'Offline items needing review',
         status: blockedOffline > 0 ? 'error' : 'ok',
-        detail: ar ? 'Blocked / dead-letter على هذا الجهاز' : 'Blocked / dead-letter on this device',
+        detail: ar ? 'عمليات فاشلة تحتاج مراجعة على هذا الجهاز' : 'Failed offline items needing review on this device',
         count: blockedOffline,
       },
       {
