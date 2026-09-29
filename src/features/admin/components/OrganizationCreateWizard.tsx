@@ -11,6 +11,7 @@ import {
   BUSINESS_PROFILE_PRESETS,
   type BusinessProfileKey,
 } from '@/core/organizations/businessProfiles';
+import { BUSINESS_RUNTIME_PROFILES } from '@/core/organizations/businessProfileRuntime';
 
 interface Props {
   open: boolean;
@@ -40,6 +41,7 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
   const [saving, setSaving] = useState(false);
 
   const preset = BUSINESS_PROFILE_PRESETS[businessType];
+  const runtimeProfile = BUSINESS_RUNTIME_PROFILES[businessType];
 
   const selectedModuleSet = useMemo(() => new Set(enabledModules), [enabledModules]);
 
@@ -100,6 +102,8 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
           preset_version: 1,
           terminology: preset.terminology,
           capabilities: preset.capabilities,
+          runtime_fields: runtimeProfile.fields,
+          record_types: runtimeProfile.records,
           preset_key: preset.key,
         },
         p_owner_name: form.ownerName.trim(),
