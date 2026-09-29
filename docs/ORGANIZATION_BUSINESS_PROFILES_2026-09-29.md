@@ -7,11 +7,11 @@ Production Supabase: `hvqlkapynjfjikqithvd`
 Source repository: `Premieros/johna-s` — READ ONLY
 Source Supabase: `azzdesuowpdcoflmyezn` — READ ONLY
 Last updated: 2026-09-29 Africa/Cairo
-State: **BLOCKED**
+State: **READY_FOR_REVIEW**
 
 ## Work status
 
-Implementation is active on PR #9. The feature is code-complete enough for CI, but merge and hosted Production migration remain blocked until exact-head Full Verify is Green and explicit approval is given.
+Implementation is complete on PR #9. Exact-head Fast Verify and Full Verify were Green before the approved hosted migration. The two PR #9 migrations were then applied to `hvqlkapynjfjikqithvd` only after explicit approval. Production contract parity is Green. The PR is ready for review/merge after final exact-head verification of this documentation-only state change.
 
 ## Guardrails
 
@@ -24,7 +24,6 @@ Implementation is active on PR #9. The feature is code-complete enough for CI, b
 - Unexpected HEAD = STOP_AND_RECONCILE.
 - Permission-First, RLS, organization isolation and branch isolation remain mandatory.
 - Super Admin is the only implicit platform-wide bypass.
-- No Production migration on `hvqlkapynjfjikqithvd` before exact-head Full Verify Green and explicit approval.
 - Printing / Print Agent / KDS internals / send_to_kitchen / shifts are not modified by this project.
 
 ## Baseline
@@ -34,52 +33,74 @@ Implementation is active on PR #9. The feature is code-complete enough for CI, b
 - Existing `organizations`, `branches`, `warehouses`, `branch_settings`, subscriptions, membership and feature override infrastructure are retained.
 - No parallel tenant/module system is introduced.
 
-## Root-cause ledger
-
-1. Super Admin could manage existing organizations but had no complete organization provisioning flow.
-2. Business type was not persisted on organizations.
-3. Organization module selection existed, but new organizations did not receive activity-specific module presets.
-4. Creating an organization did not atomically provision a first branch, warehouse, owner and organization membership.
-5. Activity-specific terminology/capability metadata did not exist.
-
 ## Change ledger
 
-- Added business profile presets in `src/core/organizations/businessProfiles.ts`.
-- Presets cover restaurant, food manufacturing, pharmacy, car showroom, tourism, retail, services and custom.
-- Presets define default modules, terminology, capabilities, tax and currency defaults.
-- Added append-only migration `20260929144000_organization_business_profiles.sql`.
+- Added business profile presets for restaurant, food manufacturing, pharmacy, car showroom, tourism, retail, services and custom.
+- Added Super Admin organization provisioning wizard with editable module presets.
+- Added `business_type` and `business_profile` to organizations.
 - Added Super Admin-only atomic RPC `super_admin_create_organization_from_profile`.
-- RPC provisions organization + first branch + warehouse + branch settings + trial + owner + membership + explicit organization module overrides.
-- Added `OrganizationCreateWizard` to Super Admin organization directory.
-- Wizard allows reviewing and changing modules before creation.
-- API contract updated for the new RPC.
-- Added regression contract test `organizationBusinessProfilesContract.test.ts`.
-- Hosted Production migration has NOT been applied.
+- Atomic provisioning creates organization + first branch + main warehouse + branch settings + 14-day trial + owner account + organization membership + explicit module overrides.
+- Added profile-driven runtime fields for products, customers and suppliers.
+- Added reusable `business_records` storage for bookings, appointments, vehicle reservations/handovers, traveler records, supplier bookings and production plans.
+- Added RLS and explicit authenticated/service-role grants for `business_records`.
+- Added Business Records workspace inside Operations Center without increasing sidebar item count.
+- Updated frontend API contract and regression tests.
 
 ## Verification ledger
 
-- Fast Verify and Full Verify started on HEAD `21d126ca9808ef8aa806e9a134e901195ae42526`.
-- Initial Full Verify stopped only at active-worklog structure gate.
-- API contract verification passed in Fast Verify before the documentation correction.
-- Worklog structure is being reconciled before rerunning verification.
+Exact feature HEAD before hosted migration:
+`c25c8afc2479f9e5f75fabfa136038b606b1caa1`
+
+Fast Verify:
+- scope ✅
+- app/typecheck/lint/unit/build ✅
+- DB canonical migrations/schema ✅
+- summary ✅
+
+Full Verify run `36571776863`:
+- verify ✅
+- DB integration/security/RLS ✅
+- Browser Smoke / Playwright ✅
+
+## Hosted Production migration ledger
+
+Target only:
+`hvqlkapynjfjikqithvd`
+
+Applied after explicit approval:
+1. `organization_business_profiles`
+   - source file: `20260929144000_organization_business_profiles.sql`
+2. `business_profile_runtime_storage`
+   - source file: `20260929154500_business_profile_runtime_storage.sql`
+
+Read-only verification after migration:
+- provisioning RPC exists ✅
+- organizations.business_type exists ✅
+- organizations.business_profile exists ✅
+- products/customers/suppliers.business_attributes exist ✅
+- business_records exists ✅
+- business_records RLS enabled ✅
+- full API contract missing tables: 0 ✅
+- full API contract missing RPCs: 0 ✅
+- production schema sentinel: true ✅
+
+Supabase advisors after migration reported no new business-profile-specific security finding. Existing legacy advisor findings remain outside PR #9 scope.
 
 ## Production gate
 
-- Hosted Production migration: **BLOCKED**.
-- No DDL has been applied to `hvqlkapynjfjikqithvd` for this feature.
-- No source database or source repository mutation is allowed.
-- Merge and hosted migration require exact-head Green verification and explicit approval.
+Hosted Production migration: **COMPLETE**
+Production contract parity: **GREEN**
+Source repository/source database mutation: **NONE**
 
 ## Next action
 
-1. Re-run verification after the worklog gate correction.
-2. Repair only target-side regressions.
-3. Stop at hosted Production migration gate after Green verification.
+1. Re-run Fast Verify and Full Verify on the documentation-only final HEAD.
+2. If Green, mark PR #9 Ready for Review.
+3. Stop before merge unless merge approval is given.
 
 ## Mandatory update protocol
 
 - Before every repository write, read the current branch HEAD.
 - Any unexpected HEAD movement means STOP_AND_RECONCILE.
-- Update this log after material scope or verification-state changes.
 - Keep the declared branch equal to the PR head branch.
-- Do not mark State unblocked until the full verification gate is satisfied.
+- Do not merge without an exact-head Green verification and explicit approval.
