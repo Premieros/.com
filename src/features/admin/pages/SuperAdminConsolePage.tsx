@@ -36,7 +36,7 @@ import { formatDate, formatDateTime } from '@/lib/format';
 import { ORGANIZATION_MODULE_KEYS, ORGANIZATION_MODULES, type OrganizationModuleKey } from '@/core/modules/module.config';
 import { OrganizationCreateWizard } from '@/features/admin/components/OrganizationCreateWizard';
 import { BUSINESS_PROFILE_KEYS, BUSINESS_PROFILE_PRESETS, type BusinessProfileKey } from '@/core/organizations/businessProfiles';
-import { ORGANIZATION_EXPERIENCE_PRESETS, resolveOrganizationExperience, type OrganizationTerminology, type PosLayoutKey } from '@/core/organizations/organizationExperience';
+import { ORGANIZATION_EXPERIENCE_PRESETS, resolveOrganizationExperience, type OrganizationTerminology, type OrganizationThemePreset, type PosLayoutKey } from '@/core/organizations/organizationExperience';
 
 interface TenantStats {
   organization_id: string;
@@ -117,6 +117,9 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
   const [organizationBusinessType, setOrganizationBusinessType] = useState<BusinessProfileKey>('custom');
   const [organizationProfileRaw, setOrganizationProfileRaw] = useState<Record<string, unknown>>({});
   const [organizationThemePreset, setOrganizationThemePreset] = useState<BusinessProfileKey>('custom');
+  const [organizationThemeDraft, setOrganizationThemeDraft] = useState<OrganizationThemePreset>(
+    ORGANIZATION_EXPERIENCE_PRESETS.custom.theme,
+  );
   const [organizationPosLayout, setOrganizationPosLayout] = useState<PosLayoutKey>('retail');
   const [organizationTerminology, setOrganizationTerminology] = useState<OrganizationTerminology>(
     ORGANIZATION_EXPERIENCE_PRESETS.custom.terminology,
@@ -270,12 +273,14 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
       setOrganizationBusinessType(businessType);
       setOrganizationProfileRaw(profile);
       setOrganizationThemePreset(themeKey);
+      setOrganizationThemeDraft(experience.theme);
       setOrganizationPosLayout(experience.posLayout.key);
       setOrganizationTerminology(experience.terminology);
     } catch {
       setOrganizationBusinessType('custom');
       setOrganizationProfileRaw({});
       setOrganizationThemePreset('custom');
+      setOrganizationThemeDraft(ORGANIZATION_EXPERIENCE_PRESETS.custom.theme);
       setOrganizationPosLayout(ORGANIZATION_EXPERIENCE_PRESETS.custom.posLayout.key);
       setOrganizationTerminology(ORGANIZATION_EXPERIENCE_PRESETS.custom.terminology);
       show(ar ? 'تعذر تحميل هوية المؤسسة' : 'Failed to load organization identity', 'error');
@@ -407,7 +412,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
     if (!moduleOrg || savingOrganizationExperience) return;
     setSavingOrganizationExperience(true);
     try {
-      const themeProfile = ORGANIZATION_EXPERIENCE_PRESETS[organizationThemePreset].theme;
+      const themeProfile = organizationThemeDraft;
       const layoutBase = ORGANIZATION_EXPERIENCE_PRESETS[organizationBusinessType].posLayout;
       const nextProfile = {
         ...organizationProfileRaw,
@@ -1273,7 +1278,11 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
                 <Select
                   label={ar ? 'ثيم المؤسسة' : 'Organization theme'}
                   value={organizationThemePreset}
-                  onChange={(e) => setOrganizationThemePreset(e.target.value as BusinessProfileKey)}
+                  onChange={(e) => {
+                    const key = e.target.value as BusinessProfileKey;
+                    setOrganizationThemePreset(key);
+                    setOrganizationThemeDraft(ORGANIZATION_EXPERIENCE_PRESETS[key].theme);
+                  }}
                 >
                   {BUSINESS_PROFILE_KEYS.map((key) => (
                     <option key={key} value={key}>
@@ -1295,6 +1304,58 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
                   <option value="service">{ar ? 'خدمات وحجوزات' : 'Services & booking'}</option>
                 </Select>
 
+                <Select
+                  label={ar ? 'الوضع الافتراضي' : 'Default mode'}
+                  value={organizationThemeDraft.mode}
+                  onChange={(e) => setOrganizationThemeDraft({ ...organizationThemeDraft, mode: e.target.value as 'light' | 'dark' })}
+                >
+                  <option value="light">{ar ? 'فاتح' : 'Light'}</option>
+                  <option value="dark">{ar ? 'داكن' : 'Dark'}</option>
+                </Select>
+
+                <Select
+                  label={ar ? 'شكل الحواف' : 'Corner style'}
+                  value={organizationThemeDraft.radius}
+                  onChange={(e) => setOrganizationThemeDraft({ ...organizationThemeDraft, radius: e.target.value as OrganizationThemePreset['radius'] })}
+                >
+                  <option value="soft">{ar ? 'ناعمة' : 'Soft'}</option>
+                  <option value="rounded">{ar ? 'مستديرة' : 'Rounded'}</option>
+                  <option value="compact">{ar ? 'مضغوطة' : 'Compact'}</option>
+                </Select>
+
+                <Input
+                  label={ar ? 'درجة اللون الرئيسي 0-360' : 'Brand hue 0-360'}
+                  type="number"
+                  min="0"
+                  max="360"
+                  value={organizationThemeDraft.brandHue}
+                  onChange={(e) => setOrganizationThemeDraft({ ...organizationThemeDraft, brandHue: Math.max(0, Math.min(360, Number(e.target.value) || 0)) })}
+                />
+                <Input
+                  label={ar ? 'تشبع اللون الرئيسي %' : 'Brand saturation %'}
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={organizationThemeDraft.brandSat}
+                  onChange={(e) => setOrganizationThemeDraft({ ...organizationThemeDraft, brandSat: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
+                />
+                <Input
+                  label={ar ? 'درجة لون الخلفية 0-360' : 'Surface hue 0-360'}
+                  type="number"
+                  min="0"
+                  max="360"
+                  value={organizationThemeDraft.surfaceHue}
+                  onChange={(e) => setOrganizationThemeDraft({ ...organizationThemeDraft, surfaceHue: Math.max(0, Math.min(360, Number(e.target.value) || 0)) })}
+                />
+                <Input
+                  label={ar ? 'تشبع الخلفية %' : 'Surface saturation %'}
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={organizationThemeDraft.surfaceSat}
+                  onChange={(e) => setOrganizationThemeDraft({ ...organizationThemeDraft, surfaceSat: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
+                />
+
                 <Input label={ar ? 'مسمى الصنف' : 'Item label'} value={organizationTerminology.item} onChange={(e) => setOrganizationTerminology({ ...organizationTerminology, item: e.target.value })} />
                 <Input label={ar ? 'مسمى الأصناف' : 'Items label'} value={organizationTerminology.items} onChange={(e) => setOrganizationTerminology({ ...organizationTerminology, items: e.target.value })} />
                 <Input label={ar ? 'مسمى العميل' : 'Customer label'} value={organizationTerminology.customer} onChange={(e) => setOrganizationTerminology({ ...organizationTerminology, customer: e.target.value })} />
@@ -1305,7 +1366,21 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
                 <Input label={ar ? 'مسمى طلب جديد' : 'New order label'} value={organizationTerminology.newOrder} onChange={(e) => setOrganizationTerminology({ ...organizationTerminology, newOrder: e.target.value })} />
               </div>
 
-              <div className="mt-3 flex justify-end">
+              <div className="mt-3 flex flex-wrap justify-end gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={savingOrganizationExperience}
+                  onClick={() => {
+                    const defaults = ORGANIZATION_EXPERIENCE_PRESETS[organizationBusinessType];
+                    setOrganizationThemePreset(organizationBusinessType);
+                    setOrganizationThemeDraft(defaults.theme);
+                    setOrganizationPosLayout(defaults.posLayout.key);
+                    setOrganizationTerminology(defaults.terminology);
+                  }}
+                >
+                  {ar ? 'إرجاع افتراضيات النشاط' : 'Reset business defaults'}
+                </Button>
                 <Button
                   size="sm"
                   disabled={savingOrganizationExperience}
