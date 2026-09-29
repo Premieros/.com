@@ -26,6 +26,7 @@ import { PageUtilityControls } from './PageUtilityControls';
 import { ReturnContextBanner } from '@/core/guard/ReturnContextBanner';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
 import { moduleForRoute } from '@/core/modules/module.config';
+import { useOrganizationExperience } from '@/core/organizations/OrganizationExperienceContext';
 
 const ICONS: Record<MenuIcon, ReactNode> = {
   dashboard: <LayoutDashboard className="h-5 w-5" />,
@@ -111,6 +112,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const canOpenSettings = can('settings.manage');
   const { branches } = useBranches();
   const { canAccessModule } = useOrganizationModules();
+  const { experience } = useOrganizationExperience();
+  const terminology = experience.terminology;
   const [, setActiveBranchId] = useActiveBranchId();
   const [branchMenuOpen, setBranchMenuOpen] = useState(false);
   const branchMenuRef = useRef<HTMLDivElement>(null);
@@ -120,6 +123,12 @@ export function Layout({ children }: { children: ReactNode }) {
   const branchLabel = activeBranch
     ? (lang === 'ar' ? activeBranch.name : activeBranch.name_en || activeBranch.name)
     : (ar ? 'اختر الفرع' : 'Select branch');
+  const menuLabel = (item: (typeof MENU_ITEMS)[number]) => {
+    if (item.id === 'products') return terminology.items;
+    if (item.id === 'people-center') return `${terminology.customers} / ${terminology.suppliers}`;
+    if (item.id === 'operations-center') return terminology.businessRecords;
+    return item.label ? item.label[ar ? 'ar' : 'en'] : item.labelKey ? t(item.labelKey) : item.id;
+  };
   const showBackButton = location.pathname !== APP_ROUTES.dashboard;
   const fullWidthContent = location.pathname === APP_ROUTES.dashboard;
 
@@ -419,7 +428,7 @@ export function Layout({ children }: { children: ReactNode }) {
                         className={({ isActive }) => `group flex min-h-[40px] items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-150 ${isActive ? 'bg-ui-primary text-ui-primary-fg shadow-[0_4px_12px_rgba(91,43,216,0.18)]' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary'}`}
                       >
                         {ICONS[item.icon]}
-                        <span className="flex-1 truncate">{item.label ? item.label[ar ? 'ar' : 'en'] : item.labelKey ? t(item.labelKey) : item.id}</span>
+                        <span className="flex-1 truncate">{menuLabel(item)}</span>
                       </NavLink>
                     ))}
                   </div>
@@ -467,7 +476,7 @@ export function Layout({ children }: { children: ReactNode }) {
           >
             <span className="flex h-6 items-center justify-center">{ICONS[item.icon]}</span>
             <span className="w-full truncate text-center">
-              {item.label ? item.label[ar ? 'ar' : 'en'] : item.labelKey ? t(item.labelKey) : item.id}
+              {menuLabel(item)}
             </span>
           </NavLink>
         ))}
