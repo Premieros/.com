@@ -9,8 +9,10 @@
 - Original reference repository `Premieros/johna-s`: READ ONLY.
 - Original Production Supabase `azzdesuowpdcoflmyezn`: READ ONLY / SOURCE ONLY.
 - السجل هو المرجع الإجباري للعمل؛ الذاكرة والمحادثة ليستا Source of Truth.
-- لا تعديل مباشر على `main` في مسار تجهيز نسخ البيانات.
+- لا تعديل مباشر على `main` في هذا المسار.
 - قبل كل write: تحقق من أحدث branch HEAD. أي HEAD غير متوقع = STOP_AND_RECONCILE.
+- CI يجب أن يفشل إذا كان السجل الإجباري ناقصًا أو لا يطابق الفرع النشط.
+- لا Merge ولا Production migration قبل Green CI والتحقق النهائي والموافقة الصريحة.
 
 ## FIXED IDENTITY FENCE
 
@@ -20,63 +22,51 @@
 - ممنوع أي write / migration / destructive SQL على المصدر.
 - Preserve Permission-First, RLS, organization isolation, branch isolation, and Super Admin implicit bypass only.
 
-## ACTIVE — DATA COPY PREPARATION
+## ACTIVE — DATA COPY FINALIZATION
 
 Goal:
-Prepare a safe data-only migration from `azzdesuowpdcoflmyezn` to `hvqlkapynjfjikqithvd` while preserving the organization-aware `.com` schema.
+Complete and verify the data-only migration from `azzdesuowpdcoflmyezn` to `hvqlkapynjfjikqithvd` while preserving the organization-aware `.com` schema and enforcing the approved cutoff at the end of 2026-09-28 Africa/Cairo.
 
-### Current verified source
-- 134 public tables.
-- 2 operational branches (Cleopatra, Smoha).
-- 33 public users / 34 auth users.
-- 508 products.
-- 803 raw materials.
-- 1213 orders.
-- 1151 sales.
-- 171 purchases.
+### Current status
 
-### Current verified destination
-- 131 public tables.
-- 1 bootstrap organization / branch.
-- 2 public users / 2 auth users.
-- Operational products/raw materials/orders/sales/purchases are still empty.
-
-### Known schema drift blocking blind copy
-Source-only tables:
-- `raw_fifo_debt_price_estimates`
-- `raw_fifo_price_fallback_plan`
-- `raw_fifo_price_fallback_runs`
-- `supplier_opening_balances`
-
-Destination-only table:
-- `organization_feature_overrides`
+- Data copy through cutoff: COMPLETE.
+- Final database validation: COMPLETE.
+- Source remained READ ONLY.
+- No checked post-cutoff operational rows remain in destination.
+- Financial aggregates through cutoff match source.
+- RLS remains enabled.
+- No USER triggers remain disabled.
+- User approved merge.
+- PR #7 remains blocked only until CI is Green.
 
 ### Data-copy rules
+
 - Do not dump/restore source schema over destination.
 - Do not overwrite destination organization/module infrastructure.
-- Preserve operational UUIDs where safe, especially branch and transaction identifiers.
-- Build explicit organization/branch/user mapping before import.
-- Auth migration must preserve UUID relationships; existing source sessions are not assumed valid in destination.
-- Classify every table before copy: COPY / COPY_WITH_MAPPING / REBUILD_DERIVED / KEEP_DESTINATION / SKIP_RUNTIME.
-- Run FK, row-count, financial, inventory, RLS, tenant isolation, and application verification before cutover.
-- No production copy until preparation is complete and explicitly approved.
+- Preserve operational UUIDs where safe.
+- Preserve the destination login/bootstrap identity mapping.
+- Map protected destination table IDs when source/destination UUIDs intentionally differ.
+- Exclude post-cutoff activity even when its UTC date is 2026-09-28.
+- Do not replace current cutoff state with later live-source FIFO/batch mutations.
 
-## VERIFICATION GATE BEFORE ANY DATA COPY
+## VERIFICATION GATE BEFORE MERGE
 
 Required:
-- exact schema compatibility matrix
-- explicit import order
-- source/destination organization mapping
-- auth/public.users mapping
-- branch UUID collision check
-- FK dependency validation
-- destination baseline snapshot/counts
-- rollback/cleanup plan for failed import
-- Full Verify Green on preparation branch if repository code/scripts are changed
+- mandatory active work log structurally complete
+- locked Supabase project identity correct
+- frontend API contract current
+- lint Green
+- typecheck Green
+- unit tests Green
+- build Green
+- DB verification Green
+- browser smoke Green where configured
+- PR head branch matches declared active branch
+- PR mergeable with no unexpected HEAD movement
 
 ## NEXT ACTION
 
-1. Complete table compatibility classification.
-2. Port only the missing schema elements needed by source data, without removing `.com` organization additions.
-3. Prepare data import order and validation SQL.
-4. Stop before executing the production copy and request explicit approval.
+1. Make PR #7 Ready for Review.
+2. Run CI on the corrected documentation HEAD.
+3. Merge only when required checks are Green.
+4. Verify merged state and merge commit on `main`.
