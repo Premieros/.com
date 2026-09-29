@@ -496,6 +496,7 @@ test.describe('POS organization layout profiles', () => {
 
     await addProduct(page);
     await expect(page.getByTestId('pos-action-send-kitchen')).toHaveCount(0);
+    await expect(page.getByTestId('pos-action-pay')).toBeVisible();
     await expect(page.getByText(/dine[- ]?in|صالة|داخل المطعم/i)).toHaveCount(0);
     await expect(page.locator('html')).toHaveAttribute('data-pos-layout', 'pharmacy');
     await expect(page.locator('body')).not.toHaveText(/Error Loading Data|خطأ في تحميل البيانات/i);
