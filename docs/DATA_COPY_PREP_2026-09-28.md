@@ -2,19 +2,35 @@
 
 Repository: `Premieros/.com`
 Branch: `development/data-copy-prep-20260928`
+Current PR: `#7`
+Production Supabase: `hvqlkapynjfjikqithvd`
 Source Supabase (READ ONLY): `azzdesuowpdcoflmyezn`
-Destination Supabase: `hvqlkapynjfjikqithvd`
-Started: 2026-09-28 Africa/Cairo
+Last updated: 2026-09-29 Africa/Cairo
 
 ## Work status
 
-**DATA COPY COMPLETE THROUGH 2026-09-28 23:59:59 Africa/Cairo. FINAL VALIDATION COMPLETE. MERGE APPROVED BY USER.**
+State: **BLOCKED**
 
-The authoritative cutoff is strictly before `2026-09-29 00:00:00 Africa/Cairo` (`2026-09-28 21:00:00+00`). Rows belonging to 2026-09-29 local time were removed from the destination during reconciliation.
+Block reason: merge is approved by the user but remains blocked until the PR verification workflow is Green.
 
-Final validated operating totals through cutoff include:
-- sales: 1244, total 1,058,504.32
-- purchases: 175, total 344,315.36
+Data copy itself is complete through **2026-09-28 23:59:59 Africa/Cairo**. The authoritative cutoff is strictly before `2026-09-29 00:00:00 Africa/Cairo` (`2026-09-28 21:00:00+00`).
+
+## Guardrails
+
+- Source `azzdesuowpdcoflmyezn` is READ ONLY.
+- No writes to `Premieros/johna-s`.
+- No direct writes to `main`.
+- Do not replace the destination schema.
+- Do not weaken RLS, permissions, or organization/branch isolation.
+- USER triggers may only be disabled inside controlled copy migrations and must be immediately re-enabled.
+- Do not copy rows after the approved cutoff.
+- Do not merge until CI is Green.
+
+## Baseline
+
+Final validated destination through cutoff:
+- sales: 1,244; total: 1,058,504.32
+- purchases: 175; total: 344,315.36
 - expenses: 94,931.29
 - customer payments: 289,649.00
 - supplier payments: 26,565.00
@@ -27,65 +43,58 @@ Final validated operating totals through cutoff include:
 - sale_print_events: 541 rows
 - shift_operations: 1,471 rows
 
-Final safety verification:
-- source remained READ ONLY
-- no writes to `Premieros/johna-s`
-- no post-cutoff operational rows remain in destination for orders/items/kitchen/sales/inventory/FIFO paths checked
-- no checked FK orphan remains
-- RLS remains enabled on checked operational/FIFO tables
-- no USER trigger remains disabled
-- financial aggregates match source through cutoff
-- observed post-cutoff batch quantity movement was intentionally not copied
+## Root-cause ledger
 
-## Goal
+- Post-cutoff rows appeared during live-source delta work because UTC 2026-09-28 timestamps can belong to 2026-09-29 in Cairo.
+- One post-cutoff Order Item at 00:30 Cairo remained after reconciliation and was removed after dependency verification.
+- Large hash differences in Orders/Sales are expected where source rows were updated after cutoff or destination table IDs were intentionally remapped.
+- 13 pre-cutoff Order Items had stale quantities/order linkage in destination; Kitchen Send history proved the correct pre-cutoff state.
+- inventory ledger cost differences were limited to FIFO repricing fields.
+- four raw-material batch quantity differences were exactly explained by post-cutoff consumption and therefore were not copied.
 
-Prepare and complete a safe data-only migration from the existing `johna-s` production database into the organization-aware `.com` database without replacing the `.com` schema, weakening RLS, or mutating the source.
+## Change ledger
 
-## Hard guards
+- Copied missing kitchen inventory events/effects through cutoff.
+- Copied sale item inventory effects through cutoff.
+- Reconciled inventory ledger and raw material batch IDs through cutoff.
+- Copied required FIFO runtime state: parent backfill runs, debts, settlements, rebase snapshots, and rebase settlement snapshots.
+- Copied historical kitchen voids, sale print events, and missing shift operations.
+- Corrected 13 pre-cutoff Order Items and corresponding Kitchen Sends using source pre-cutoff send history.
+- Removed all identified post-cutoff rows introduced during live delta work.
+- Preserved destination organization-aware bootstrap/schema and mapped table IDs where source/destination protected table UUIDs differ.
 
-- Source database is read-only for this work.
-- No destructive SQL on source.
-- Preserve source branch UUIDs where safe so historical branch foreign keys stay valid.
-- Map imported operational rows to the destination organization model.
-- Do not overwrite destination organization/module bootstrap infrastructure.
-- Auth/public.users mapping preserves historical UUID relationships while keeping the destination login bootstrap account.
-- RLS, permissions, and triggers must remain enabled after controlled copy migrations.
+## Verification ledger
 
-## Migration classes
+- Source remained READ ONLY.
+- No writes were made to `Premieros/johna-s`.
+- No post-cutoff operational rows remain in checked Orders / Items / Kitchen / Sales / Ledger / Batches / FIFO paths.
+- Checked FK orphan counts are zero.
+- RLS remains enabled on checked operational and FIFO tables.
+- No USER trigger remains disabled.
+- Financial aggregates match source through cutoff.
+- `sale_item_inventory_effects` and `order_kitchen_inventory_effects` match source IDs through cutoff.
+- `inventory_ledger` and `raw_material_batches` match row identity through cutoff.
+- FIFO debts and settlements match the cutoff state.
 
-### KEEP_DESTINATION
-- organizations framework
-- organization_feature_overrides
-- schema_migrations
-- destination project configuration / organization-module bootstrap
+## Production gate
 
-### COPY_WITH_MAPPING
-- branches where organization mapping is required
-- organization_members
-- users / auth identity linkage
-- tenant-bearing rows intentionally retained
+- Data copy: complete.
+- Final database validation: complete.
+- User merge approval: received.
+- GitHub PR: #7.
+- Merge remains blocked until CI is Green.
+- No additional Production migration is authorized by this merge step.
 
-### REBUILD_DERIVED / EXCLUDED FROM AUTHORITATIVE COPY
-- raw_fifo_debt_price_estimates
-- raw_fifo_price_fallback_plan
-- raw_fifo_price_fallback_runs
-- temporary repair/backfill planning data not required for runtime truth
+## Next action
 
-### COPY
-Authoritative branch-scoped master and transactional data in FK-safe order, including catalog, raw materials, suppliers/customers, inventory ledgers, purchases, orders, sales, payments, shifts, treasury/journal, kitchen inventory effects, FIFO runtime state, void and print history where required.
+1. Make PR #7 Ready for Review.
+2. Re-run/trigger verification on the corrected documentation commit.
+3. If CI is Green, merge PR #7 using expected HEAD protection.
+4. Verify PR merged and `main` contains the merge commit.
 
-## Final reconciliation notes
+## Mandatory update protocol
 
-- `sale_item_inventory_effects` and `order_kitchen_inventory_effects` matched source IDs through cutoff.
-- `inventory_ledger` and `raw_material_batches` matched row identity through cutoff.
-- Differences observed against the *current* live source were limited to later FIFO repricing and post-cutoff consumption; destination correctly retains the cutoff snapshot.
-- 13 pre-cutoff Order Items were reconciled from their pre-cutoff Kitchen Send history.
-- One Order Item at 2026-09-29 00:30 Cairo was removed from destination because it exceeded the approved cutoff.
-- FIFO runtime dependencies copied and verified: backfill runs needed as parents, debts, settlements, rebase snapshots, and rebase settlement snapshots.
-
-## Merge gate
-
-- User explicitly approved merge after final validation.
-- PR #7 must be marked ready for review.
-- CI must be Green before merge.
-- If CI fails, fix only the documented cause on this branch and re-run verification.
+- Before every repository write, verify branch and HEAD.
+- Any unexpected HEAD = STOP_AND_RECONCILE.
+- Keep this log as the mandatory source of truth.
+- Record any new blocker before changing Production state.
