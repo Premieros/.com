@@ -29,6 +29,8 @@ describe('organization no-code experience contract', () => {
     expect(provider).toContain('applyBrandColor');
     expect(provider).toContain('applySurfaceColor');
     expect(provider).toContain('dataset.posLayout');
+    expect(provider).toContain("setProperty('--ui-radius'");
+    expect(provider).toContain("setProperty('--ui-radius-2xl'");
   });
 
   it('lets Super Admin customize and reset existing organization identity', () => {
