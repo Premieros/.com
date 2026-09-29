@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-27T18:02:28.911Z",
+  "generated_at": "2026-09-29T09:42:00.000Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -470,6 +470,32 @@
       ]
     },
     {
+      "name": "get_current_raw_material_valuation",
+      "params": [
+        "branch_id"
+      ]
+    },
+    {
+      "name": "get_dashboard_sales_snapshot",
+      "params": [
+        "branch_id",
+        "current_from",
+        "current_to",
+        "granularity",
+        "previous_from",
+        "previous_to",
+        "timezone"
+      ]
+    },
+    {
+      "name": "get_day_closing_range_report",
+      "params": [
+        "branch_id",
+        "from_date",
+        "to_date"
+      ]
+    },
+    {
       "name": "get_day_closing_report",
       "params": [
         "branch_id",
@@ -621,6 +647,14 @@
       ]
     },
     {
+      "name": "get_raw_material_consumption_report",
+      "params": [
+        "branch_id",
+        "from_date",
+        "to_date"
+      ]
+    },
+    {
       "name": "get_raw_material_cost_history",
       "params": [
         "branch_id",
@@ -632,6 +666,14 @@
       "name": "get_raw_material_cost_valuation_overview",
       "params": [
         "branch_id"
+      ]
+    },
+    {
+      "name": "get_raw_material_financial_report",
+      "params": [
+        "branch_id",
+        "from_date",
+        "to_date"
       ]
     },
     {
@@ -651,6 +693,14 @@
         "status",
         "to",
         "warehouse_id"
+      ]
+    },
+    {
+      "name": "get_sales_component_reconciliation_report",
+      "params": [
+        "branch_id",
+        "from_date",
+        "to_date"
       ]
     },
     {
@@ -696,6 +746,12 @@
       "params": [
         "branch_id",
         "supplier_id"
+      ]
+    },
+    {
+      "name": "get_system_health_snapshot",
+      "params": [
+        "branch_id"
       ]
     },
     {
@@ -1282,13 +1338,11 @@
     "sale_payments",
     "sales",
     "settings",
-    "stock_transactions",
     "suppliers",
     "system_settings",
     "treasury_accounts",
     "users",
     "warehouses",
-    "waste_categories",
-    "waste_entries"
+    "waste_categories"
   ]
 }

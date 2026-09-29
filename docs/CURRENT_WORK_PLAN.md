@@ -2,9 +2,9 @@
 
 ## MANDATORY EXECUTION GATE — لا عمل بدون المرور بالسجل
 
-- Mandatory active work log: `docs/DATA_COPY_PREP_2026-09-28.md`
+- Mandatory active work log: `docs/SYNC_JOHNA_STABILITY_COSTING_2026-09-29.md`
 - Current writable repository: `Premieros/.com`
-- Current writable branch: `development/data-copy-prep-20260928`
+- Current writable branch: `development/sync-johna-stability-costing-20260929`
 - Current Supabase project: `hvqlkapynjfjikqithvd`
 - Original reference repository `Premieros/johna-s`: READ ONLY.
 - Original Production Supabase `azzdesuowpdcoflmyezn`: READ ONLY / SOURCE ONLY.
@@ -22,32 +22,22 @@
 - ممنوع أي write / migration / destructive SQL على المصدر.
 - Preserve Permission-First, RLS, organization isolation, branch isolation, and Super Admin implicit bypass only.
 
-## ACTIVE — DATA COPY FINALIZATION
+## ACTIVE — JOHNA STABILITY + COSTING SYNC
 
 Goal:
-Complete and verify the data-only migration from `azzdesuowpdcoflmyezn` to `hvqlkapynjfjikqithvd` while preserving the organization-aware `.com` schema and enforcing the approved cutoff at the end of 2026-09-28 Africa/Cairo.
+Port only already-merged and validated stability/costing changes from `Premieros/johna-s` into `Premieros/.com` without writing to the source project and without weakening the organization-aware target model.
 
-### Current status
+### Scope
+- source PR #401: bounded dashboard snapshot, system health, report-loader containment, internal trigger EXECUTE hardening
+- source PR #403: decimal numeric drafting and linked manufactured-group costing
+- source PR #404: theoretical costing from current recipe/raw-material source
+- source PR #402: explicitly excluded while Draft
 
-- Data copy through cutoff: COMPLETE.
-- Final database validation: COMPLETE.
-- Source remained READ ONLY.
-- No checked post-cutoff operational rows remain in destination.
-- Financial aggregates through cutoff match source.
-- RLS remains enabled.
-- No USER triggers remain disabled.
-- User approved merge.
-- PR #7 remains blocked only until CI is Green.
-
-### Data-copy rules
-
-- Do not dump/restore source schema over destination.
-- Do not overwrite destination organization/module infrastructure.
-- Preserve operational UUIDs where safe.
-- Preserve the destination login/bootstrap identity mapping.
-- Map protected destination table IDs when source/destination UUIDs intentionally differ.
-- Exclude post-cutoff activity even when its UTC date is 2026-09-28.
-- Do not replace current cutoff state with later live-source FIFO/batch mutations.
+### Status
+- implementation committed on PR #8 branch
+- source repository and source Supabase remain READ ONLY
+- CI verification pending
+- Production migration not applied
 
 ## VERIFICATION GATE BEFORE MERGE
 
@@ -59,14 +49,12 @@ Required:
 - typecheck Green
 - unit tests Green
 - build Green
-- DB verification Green
-- browser smoke Green where configured
-- PR head branch matches declared active branch
-- PR mergeable with no unexpected HEAD movement
+- DB integration/security Green
+- browser smoke Green
+- PR head matches declared branch
 
 ## NEXT ACTION
 
-1. Make PR #7 Ready for Review.
-2. Run CI on the corrected documentation HEAD.
-3. Merge only when required checks are Green.
-4. Verify merged state and merge commit on `main`.
+1. Run PR #8 CI.
+2. Repair only target-side regressions.
+3. Do not merge or migrate Production until Green verification and explicit approval.
