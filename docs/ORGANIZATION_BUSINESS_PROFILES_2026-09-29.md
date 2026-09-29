@@ -7,11 +7,11 @@ Production Supabase: `hvqlkapynjfjikqithvd`
 Source repository: `Premieros/johna-s` — READ ONLY
 Source Supabase: `azzdesuowpdcoflmyezn` — READ ONLY
 Last updated: 2026-09-29 Africa/Cairo
-State: **READY_FOR_REVIEW**
+State: **BLOCKED**
 
 ## Work status
 
-Implementation is complete on PR #9. Exact-head Fast Verify and Full Verify were Green before the approved hosted migration. The two PR #9 migrations were then applied to `hvqlkapynjfjikqithvd` only after explicit approval. Production contract parity is Green. The PR is ready for review/merge after final exact-head verification of this documentation-only state change.
+Implementation is complete on PR #9. Exact-head Fast Verify and Full Verify were Green before the approved hosted migration. The two PR #9 migrations were then applied to `hvqlkapynjfjikqithvd` only after explicit approval. Production contract parity is Green. State remains BLOCKED by policy until the final exact-head verification is Green and explicit merge approval is given.
 
 ## Guardrails
 
