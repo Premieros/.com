@@ -5,6 +5,9 @@ const presets = readFileSync('src/core/organizations/businessProfiles.ts', 'utf8
 const migration = readFileSync('supabase/migrations/20260929144000_organization_business_profiles.sql', 'utf8');
 const wizard = readFileSync('src/features/admin/components/OrganizationCreateWizard.tsx', 'utf8');
 const adminApi = readFileSync('src/api/domains/admin.ts', 'utf8');
+const runtime = readFileSync('src/core/organizations/businessProfileRuntime.ts', 'utf8');
+const runtimeMigration = readFileSync('supabase/migrations/20260929154500_business_profile_runtime_storage.sql', 'utf8');
+const businessRecordsPage = readFileSync('src/features/operations/pages/BusinessRecordsPage.tsx', 'utf8');
 
 describe('organization business profile provisioning contract', () => {
   it('ships the approved business presets', () => {
@@ -43,4 +46,15 @@ describe('organization business profile provisioning contract', () => {
     expect(wizard).toContain('terminology: preset.terminology');
     expect(adminApi).toContain('createOrganizationFromProfile');
   });
+  it('provides real runtime storage and screens for activity-specific needs', () => {
+    expect(runtime).toContain("key: 'vin'");
+    expect(runtime).toContain("key: 'booking'");
+    expect(runtime).toContain("key: 'appointment'");
+    expect(runtimeMigration).toContain('ADD COLUMN IF NOT EXISTS business_attributes jsonb');
+    expect(runtimeMigration).toContain('CREATE TABLE IF NOT EXISTS public.business_records');
+    expect(runtimeMigration).toContain('ALTER TABLE public.business_records ENABLE ROW LEVEL SECURITY');
+    expect(businessRecordsPage).toContain("from('business_records')");
+    expect(businessRecordsPage).toContain('record_types');
+  });
+
 });
