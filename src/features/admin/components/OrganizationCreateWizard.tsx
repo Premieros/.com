@@ -12,7 +12,7 @@ import {
   type BusinessProfileKey,
 } from '@/core/organizations/businessProfiles';
 import { BUSINESS_RUNTIME_PROFILES } from '@/core/organizations/businessProfileRuntime';
-import { ORGANIZATION_EXPERIENCE_PRESETS, type PosLayoutKey } from '@/core/organizations/organizationExperience';
+import { ORGANIZATION_EXPERIENCE_PRESETS, type OrganizationThemePreset, type PosLayoutKey } from '@/core/organizations/organizationExperience';
 
 interface Props {
   open: boolean;
@@ -28,6 +28,9 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
     BUSINESS_PROFILE_PRESETS.restaurant.enabledModules,
   );
   const [themePresetKey, setThemePresetKey] = useState<BusinessProfileKey>('restaurant');
+  const [themeDraft, setThemeDraft] = useState<OrganizationThemePreset>(
+    ORGANIZATION_EXPERIENCE_PRESETS.restaurant.theme,
+  );
   const [posLayoutKey, setPosLayoutKey] = useState<PosLayoutKey>(
     ORGANIZATION_EXPERIENCE_PRESETS.restaurant.posLayout.key,
   );
@@ -50,7 +53,7 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
 
   const preset = BUSINESS_PROFILE_PRESETS[businessType];
   const runtimeProfile = BUSINESS_RUNTIME_PROFILES[businessType];
-  const selectedTheme = ORGANIZATION_EXPERIENCE_PRESETS[themePresetKey].theme;
+  const selectedTheme = themeDraft;
   const defaultPosLayout = ORGANIZATION_EXPERIENCE_PRESETS[businessType].posLayout;
 
   const selectedModuleSet = useMemo(() => new Set(enabledModules), [enabledModules]);
@@ -60,6 +63,7 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
     setBusinessType(next);
     setEnabledModules([...nextPreset.enabledModules]);
     setThemePresetKey(next);
+    setThemeDraft(ORGANIZATION_EXPERIENCE_PRESETS[next].theme);
     setPosLayoutKey(ORGANIZATION_EXPERIENCE_PRESETS[next].posLayout.key);
     setTerminology(ORGANIZATION_EXPERIENCE_PRESETS[next].terminology);
     setForm((current) => ({
@@ -80,6 +84,7 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
     setBusinessType('restaurant');
     setEnabledModules([...BUSINESS_PROFILE_PRESETS.restaurant.enabledModules]);
     setThemePresetKey('restaurant');
+    setThemeDraft(ORGANIZATION_EXPERIENCE_PRESETS.restaurant.theme);
     setPosLayoutKey(ORGANIZATION_EXPERIENCE_PRESETS.restaurant.posLayout.key);
     setTerminology(ORGANIZATION_EXPERIENCE_PRESETS.restaurant.terminology);
     setForm({
@@ -229,7 +234,11 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
             <Select
               label={ar ? 'ثيم المؤسسة' : 'Organization theme'}
               value={themePresetKey}
-              onChange={(e) => setThemePresetKey(e.target.value as BusinessProfileKey)}
+              onChange={(e) => {
+                const key = e.target.value as BusinessProfileKey;
+                setThemePresetKey(key);
+                setThemeDraft(ORGANIZATION_EXPERIENCE_PRESETS[key].theme);
+              }}
             >
               {BUSINESS_PROFILE_KEYS.map((key) => (
                 <option key={key} value={key}>
@@ -250,6 +259,27 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
               <option value="vehicle">{ar ? 'معرض سيارات / حجز وبيع' : 'Vehicle showroom / reserve & sell'}</option>
               <option value="service">{ar ? 'خدمات وحجوزات' : 'Services & booking'}</option>
             </Select>
+            <Select
+              label={ar ? 'الوضع الافتراضي' : 'Default mode'}
+              value={themeDraft.mode}
+              onChange={(e) => setThemeDraft({ ...themeDraft, mode: e.target.value as 'light' | 'dark' })}
+            >
+              <option value="light">{ar ? 'فاتح' : 'Light'}</option>
+              <option value="dark">{ar ? 'داكن' : 'Dark'}</option>
+            </Select>
+            <Select
+              label={ar ? 'شكل الحواف' : 'Corner style'}
+              value={themeDraft.radius}
+              onChange={(e) => setThemeDraft({ ...themeDraft, radius: e.target.value as OrganizationThemePreset['radius'] })}
+            >
+              <option value="soft">{ar ? 'ناعمة' : 'Soft'}</option>
+              <option value="rounded">{ar ? 'مستديرة' : 'Rounded'}</option>
+              <option value="compact">{ar ? 'مضغوطة' : 'Compact'}</option>
+            </Select>
+            <Input label={ar ? 'درجة اللون الرئيسي 0-360' : 'Brand hue 0-360'} type="number" min="0" max="360" value={themeDraft.brandHue} onChange={(e) => setThemeDraft({ ...themeDraft, brandHue: Math.max(0, Math.min(360, Number(e.target.value) || 0)) })} />
+            <Input label={ar ? 'تشبع اللون الرئيسي %' : 'Brand saturation %'} type="number" min="0" max="100" value={themeDraft.brandSat} onChange={(e) => setThemeDraft({ ...themeDraft, brandSat: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} />
+            <Input label={ar ? 'درجة لون الخلفية 0-360' : 'Surface hue 0-360'} type="number" min="0" max="360" value={themeDraft.surfaceHue} onChange={(e) => setThemeDraft({ ...themeDraft, surfaceHue: Math.max(0, Math.min(360, Number(e.target.value) || 0)) })} />
+            <Input label={ar ? 'تشبع الخلفية %' : 'Surface saturation %'} type="number" min="0" max="100" value={themeDraft.surfaceSat} onChange={(e) => setThemeDraft({ ...themeDraft, surfaceSat: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })} />
 
             <Input label={ar ? 'مسمى الصنف' : 'Item label'} value={terminology.item} onChange={(e) => setTerminology({ ...terminology, item: e.target.value })} />
             <Input label={ar ? 'مسمى الأصناف' : 'Items label'} value={terminology.items} onChange={(e) => setTerminology({ ...terminology, items: e.target.value })} />
