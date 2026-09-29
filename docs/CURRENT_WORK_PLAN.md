@@ -11,6 +11,7 @@
 - السجل هو المرجع الإجباري للعمل؛ الذاكرة والمحادثة ليستا Source of Truth.
 - لا تعديل مباشر على `main`.
 - قبل كل write: تحقق من أحدث branch HEAD. أي HEAD غير متوقع = STOP_AND_RECONCILE.
+- CI يجب أن يفشل إذا كان السجل الإجباري ناقصًا أو لا يطابق الفرع النشط.
 - لا Merge ولا Production migration قبل Green CI والتحقق النهائي والموافقة الصريحة.
 
 ## FIXED IDENTITY FENCE
