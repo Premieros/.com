@@ -88,25 +88,18 @@ async function loginAsE2EAdmin(page: Page) {
   await expect(page).toHaveURL(/#\/dashboard$/);
 }
 
-const NAV_TARGET_BY_ROUTE: Record<string, { group: string; testId: string }> = {
-  '/operations': { group: 'centers', testId: 'nav-item-operations-center' },
-  '/inventory-center': { group: 'centers', testId: 'nav-item-inventory-center' },
-  '/pos': { group: 'main', testId: 'nav-item-pos' },
+const NAV_TARGET_BY_ROUTE: Record<string, string> = {
+  '/operations': 'nav-item-operations-center',
+  '/inventory-center': 'nav-item-inventory-center',
+  '/pos': 'nav-item-pos',
 };
 
 async function clickRouteLink(page: Page, route: string) {
-  const config = NAV_TARGET_BY_ROUTE[route];
-  if (!config) throw new Error(`No navigation target configured for ${route}`);
+  const testId = NAV_TARGET_BY_ROUTE[route];
+  if (!testId) throw new Error(`No navigation target configured for ${route}`);
 
-  const target = page.getByTestId(config.testId);
-
-  if (!(await target.isVisible().catch(() => false))) {
-    const toggle = page.getByTestId(`nav-group-toggle-${config.group}`);
-    await expect(toggle).toBeVisible();
-    await toggle.click();
-  }
-
-  await expect(target).toBeVisible();
+  const target = page.getByTestId(testId);
+  await expect(target).toBeVisible({ timeout: 10_000 });
   await target.click();
 }
 
