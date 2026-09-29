@@ -26,6 +26,7 @@ import { OrderTypePill } from './OrderTypePill';
 import { OrderStageBadge } from './OrderStageBadge';
 import { TransferItemModal } from '../tables/TransferItemModal';
 import { TransferItemsModal, type TransferItemLine } from '../tables/TransferItemsModal';
+import { useOrganizationExperience } from '@/core/organizations/OrganizationExperienceContext';
 
 interface CurrentOrderPanelProps {
   cart: CartItem[];
@@ -111,6 +112,17 @@ export function CurrentOrderPanel({
 }: CurrentOrderPanelProps) {
   const { t, lang } = useLanguage();
   const isAr = lang === 'ar';
+  const { experience } = useOrganizationExperience();
+  const terminology = experience.terminology;
+  const posLayout = experience.posLayout;
+  const allowedOrderTypes = useMemo(
+    () => ORDER_TYPES.filter((type) =>
+      (type !== 'dine_in' || posLayout.showTables)
+      && (type !== 'delivery' || posLayout.showDelivery)
+      && (type !== 'drive_thru' || posLayout.showDriveThru)
+    ),
+    [posLayout.showTables, posLayout.showDelivery, posLayout.showDriveThru],
+  );
   const resolvedPermissions = usePosPermissions();
   const perms = permissionOverride ?? resolvedPermissions;
   const [showDiscount, setShowDiscount] = useState(false);
@@ -213,10 +225,10 @@ export function CurrentOrderPanel({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <p className="truncate text-sm font-black text-ui-text">{activeOrderNumber ? `#${activeOrderNumber}` : t('newOrder')}</p>
+              <p className="truncate text-sm font-black text-ui-text">{activeOrderNumber ? `#${activeOrderNumber}` : terminology.newOrder}</p>
               <OrderStageBadge stage={stage} />
             </div>
-            <p className="text-[11px] font-bold text-ui-muted">{cart.length} {isAr ? 'صنف' : 'items'}</p>
+            <p className="text-[11px] font-bold text-ui-muted">{cart.length} {terminology.items}</p>
           </div>
         </div>
 
@@ -225,7 +237,7 @@ export function CurrentOrderPanel({
             <OrderTypePill type={orderType} />
           ) : (
             <div className="flex items-center gap-1 rounded-xl bg-ui-page-alt p-1">
-              {ORDER_TYPES.map((type) => (
+              {allowedOrderTypes.map((type) => (
                 <button
                   key={type}
                   type="button"
@@ -346,7 +358,7 @@ export function CurrentOrderPanel({
           <div data-testid="pos-empty-cart-state" className="rounded-2xl border border-dashed border-ui-border bg-ui-page-alt/60 px-4 py-5 text-center text-ui-subtle">
             <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-ui-surface"><ShoppingCart className="h-5 w-5 opacity-40" /></div>
             <p className="text-sm font-black text-ui-text">{t('emptyCart')}</p>
-            <p className="mt-1 text-[10px] font-bold">{isAr ? 'اختر منتجًا من القائمة لبدء الطلب' : 'Choose a product to start the order'}</p>
+            <p className="mt-1 text-[10px] font-bold">{isAr ? `اختر ${terminology.item} من القائمة لبدء ${terminology.order}` : `Choose an item to start ${terminology.order}`}</p>
             {onAddItem && perms.canEditOrder && (
               <button
                 type="button"
@@ -355,7 +367,7 @@ export function CurrentOrderPanel({
                 className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-ui-primary px-3 py-2 text-[11px] font-black text-ui-primary-fg shadow-ui-xs transition hover:bg-ui-primary-hover active:scale-95"
               >
                 <Plus className="h-3.5 w-3.5" />
-                {isAr ? 'إضافة صنف' : 'Add item'}
+                {isAr ? `إضافة ${terminology.item}` : `Add ${terminology.item}`}
               </button>
             )}
           </div>
