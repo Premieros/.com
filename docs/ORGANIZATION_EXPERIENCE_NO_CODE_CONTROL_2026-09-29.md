@@ -2,6 +2,7 @@
 
 Repository: `Premieros/.com`
 Branch: `development/organization-theme-pos-layout-20260929`
+Current PR: `#10`
 Production Supabase: `hvqlkapynjfjikqithvd`
 Source repository: `Premieros/johna-s` — READ ONLY
 Source Supabase: `azzdesuowpdcoflmyezn` — READ ONLY
@@ -152,20 +153,20 @@ Pending:
 - [ ] Ensure restaurant behavior remains unchanged by default.
 - [ ] Ensure non-restaurant POS cannot accidentally expose dine-in/table/KDS flows.
 - [ ] Make barcode-first layout focus/search behavior deterministic.
-- [ ] Add safe theme customization controls beyond preset selection only if existing CSS variables support them cleanly.
-- [ ] Add reset-to-business-default action in Super Admin.
-- [ ] Add regression contract tests for theme/terminology/POS layout.
+- [x] Added safe theme customization controls for mode, brand/surface hue+saturation, and corner style.
+- [x] Added reset-to-business-default action in Super Admin.
+- [x] Added regression contract test for theme/terminology/POS layout.
 - [ ] Add browser smoke coverage for restaurant vs non-restaurant layout visibility.
-- [ ] Update CURRENT_WORK_PLAN and keep this log current.
-- [ ] Open Draft PR.
+- [x] Updated CURRENT_WORK_PLAN and active work log.
+- [x] Opened Draft PR #10.
 - [ ] Fast Verify exact-head Green.
 - [ ] Full Verify exact-head Green: app + DB/security + Browser Smoke.
 - [ ] Stop before Production/merge gates unless explicitly approved.
 
 ## Verification ledger
 
-Not yet final. Current code HEAD before documentation update:
-`fde4f3ba84b2cc36d9e09d22415d083ca0d1a7dc`
+Not yet final. Current feature HEAD before this log update:
+`d2077f3fbda76b738280bda28b75cc2cee75504d`
 
 No hosted Production migration/data write has been performed for this phase.
 
