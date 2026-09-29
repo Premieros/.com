@@ -88,25 +88,24 @@ async function loginAsE2EAdmin(page: Page) {
   await expect(page).toHaveURL(/#\/dashboard$/);
 }
 
-const NAV_GROUP_BY_ROUTE: Record<string, string> = {
-  '/operations': 'centers',
-  '/inventory-center': 'centers',
-  '/pos': 'main',
+const NAV_TARGET_BY_ROUTE: Record<string, { group: string; testId: string }> = {
+  '/operations': { group: 'centers', testId: 'nav-item-operations-center' },
+  '/inventory-center': { group: 'centers', testId: 'nav-item-inventory-center' },
+  '/pos': { group: 'main', testId: 'nav-item-pos' },
 };
 
 async function clickRouteLink(page: Page, route: string) {
-  const visibleTarget = () => page.locator(`a[href="#${route}"]:visible`).first();
+  const config = NAV_TARGET_BY_ROUTE[route];
+  if (!config) throw new Error(`No navigation target configured for ${route}`);
 
-  if (!(await visibleTarget().isVisible().catch(() => false))) {
-    const group = NAV_GROUP_BY_ROUTE[route];
-    if (group) {
-      const toggle = page.getByTestId(`nav-group-toggle-${group}`);
-      await expect(toggle).toBeVisible();
-      await toggle.click();
-    }
+  const target = page.getByTestId(config.testId);
+
+  if (!(await target.isVisible().catch(() => false))) {
+    const toggle = page.getByTestId(`nav-group-toggle-${config.group}`);
+    await expect(toggle).toBeVisible();
+    await toggle.click();
   }
 
-  const target = visibleTarget();
   await expect(target).toBeVisible();
   await target.click();
 }
