@@ -8,6 +8,7 @@ const superAdmin = readFileSync('src/features/admin/pages/SuperAdminConsolePage.
 const posWorkspace = readFileSync('src/features/pos/pages/PosWorkspacePage.tsx', 'utf8');
 const posTopBar = readFileSync('src/features/pos/components/topbar/PosTopBar.tsx', 'utf8');
 const orderPanel = readFileSync('src/features/pos/components/order/CurrentOrderPanel.tsx', 'utf8');
+const orderHeader = readFileSync('src/features/pos/components/order/PosOrderHeaderBar.tsx', 'utf8');
 const layout = readFileSync('src/components/Layout.tsx', 'utf8');
 
 describe('organization no-code experience contract', () => {
@@ -60,6 +61,9 @@ describe('organization no-code experience contract', () => {
     expect(orderPanel).toContain("type !== 'dine_in' || posLayout.showTables");
     expect(orderPanel).toContain("type !== 'delivery' || posLayout.showDelivery");
     expect(orderPanel).toContain("type !== 'drive_thru' || posLayout.showDriveThru");
+    expect(orderHeader).toContain('const requiresKitchenSend = layout?.showKitchen ?? true');
+    expect(orderHeader).toContain('const canSendKitchen = perms.canSendKitchen && requiresKitchenSend');
+    expect(orderHeader).toContain('!requiresKitchenSend || hasSent');
   });
 
   it('applies organization terminology beyond POS navigation', () => {
