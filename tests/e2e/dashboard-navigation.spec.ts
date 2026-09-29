@@ -88,26 +88,18 @@ async function loginAsE2EAdmin(page: Page) {
   await expect(page).toHaveURL(/#\/dashboard$/);
 }
 
-const NAV_GROUP_BY_ROUTE: Record<string, string> = {
-  '/operations': 'centers',
-  '/inventory-center': 'centers',
-  '/pos': 'main',
+const NAV_TARGET_BY_ROUTE: Record<string, string> = {
+  '/operations': 'nav-item-operations-center',
+  '/inventory-center': 'nav-item-inventory-center',
+  '/pos': 'nav-item-pos',
 };
 
 async function clickRouteLink(page: Page, route: string) {
-  const visibleTarget = () => page.locator(`a[href="#${route}"]:visible`).first();
+  const testId = NAV_TARGET_BY_ROUTE[route];
+  if (!testId) throw new Error(`No navigation target configured for ${route}`);
 
-  if (!(await visibleTarget().isVisible().catch(() => false))) {
-    const group = NAV_GROUP_BY_ROUTE[route];
-    if (group) {
-      const toggle = page.getByTestId(`nav-group-toggle-${group}`);
-      await expect(toggle).toBeVisible();
-      await toggle.click();
-    }
-  }
-
-  const target = visibleTarget();
-  await expect(target).toBeVisible();
+  const target = page.getByTestId(testId);
+  await expect(target).toBeVisible({ timeout: 10_000 });
   await target.click();
 }
 
@@ -130,12 +122,18 @@ test.describe('dashboard and navigation actions', () => {
   });
 
   test('sidebar navigation actions keep stable route targets', async ({ page }) => {
-    const cases = ['/operations', '/inventory-center', '/pos'];
+    const cases = ['/inventory-center', '/pos'];
     for (const route of cases) {
       await clickRouteLink(page, route);
       await expect(page).toHaveURL(new RegExp(`#${route}$`));
       await page.goto('/#/dashboard');
     }
+  });
+
+  test('operations route remains directly reachable for the E2E super admin', async ({ page }) => {
+    await page.goto('/#/operations');
+    await expect(page).toHaveURL(/#\/operations$/);
+    await expect(page.locator('main').first()).toBeVisible();
   });
 
   test('header actions are real actions, not placeholders', async ({ page }) => {

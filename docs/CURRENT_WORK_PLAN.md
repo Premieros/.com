@@ -2,121 +2,71 @@
 
 ## MANDATORY EXECUTION GATE — لا عمل بدون المرور بالسجل
 
-- Mandatory active work log: `docs/UI_SIMPLIFICATION_2026-09-27.md`
+- Mandatory active work log: `docs/DATA_COPY_PREP_2026-09-28.md`
 - Current writable repository: `Premieros/.com`
-- Current writable branch: `development/ui-simplification-all-sections-20260927`
+- Current writable branch: `development/data-copy-prep-20260928`
 - Current Supabase project: `hvqlkapynjfjikqithvd`
 - Original reference repository `Premieros/johna-s`: READ ONLY.
-- Original Production Supabase `azzdesuowpdcoflmyezn`: BLOCKED.
+- Original Production Supabase `azzdesuowpdcoflmyezn`: READ ONLY / SOURCE ONLY.
 - السجل هو المرجع الإجباري للعمل؛ الذاكرة والمحادثة ليستا Source of Truth.
-- CI يجب أن يفشل إذا اختلف Repository أو Supabase Project عن الهوية المثبتة هنا.
-- لا Merge ولا Production migration إلى أي بيئة أخرى؛ hosted migration على المشروع الجديد فقط وبعد Full Verify Green.
-- المستخدم صرّح صراحة أن هذا المشروع Development فقط ولا يوجد عليه تشغيل فعلي، ولذلك الكتابة المباشرة على `main` مسموحة لهذا المسار.
-- قبل كل write: تحقق من أحدث `main` HEAD. أي HEAD غير متوقع = STOP_AND_RECONCILE.
+- لا تعديل مباشر على `main` في هذا المسار.
+- قبل كل write: تحقق من أحدث branch HEAD. أي HEAD غير متوقع = STOP_AND_RECONCILE.
+- CI يجب أن يفشل إذا كان السجل الإجباري ناقصًا أو لا يطابق الفرع النشط.
+- لا Merge ولا Production migration قبل Green CI والتحقق النهائي والموافقة الصريحة.
 
 ## FIXED IDENTITY FENCE
 
 - Repository الوحيد المسموح بالكتابة عليه: `Premieros/.com`
-- Supabase الوحيد المسموح استخدامه بعد التحقق: `hvqlkapynjfjikqithvd`
-- GitHub Pages source: `Premieros/.com@main`
-- ممنوع تمامًا أي write / merge / migration / deploy إلى:
-  - `Premieros/johna-s`
-  - `azzdesuowpdcoflmyezn`
-  - أي Repository أو Supabase ref آخر.
-- `scripts/db/verify-database-identity.js` يجب أن يفشل فورًا إذا كانت هوية GitHub أو Supabase مختلفة.
+- Supabase الوجهة الوحيدة: `hvqlkapynjfjikqithvd`
+- مصدر البيانات فقط: `azzdesuowpdcoflmyezn`
+- ممنوع أي write / migration / destructive SQL على المصدر.
+- Preserve Permission-First, RLS, organization isolation, branch isolation, and Super Admin implicit bypass only.
 
-## ACTIVE — Organization Modules
+## ACTIVE — DATA COPY FINALIZATION
 
-الهدف الحالي:
-تقسيم النظام إلى موديولات يمكن تفعيلها أو تعطيلها لكل مؤسسة بشكل مستقل، مع استمرار الصلاحيات داخل كل موديول بنظام Permission-First.
+Goal:
+Complete and verify the data-only migration from `azzdesuowpdcoflmyezn` to `hvqlkapynjfjikqithvd` while preserving the organization-aware `.com` schema and enforcing the approved cutoff at the end of 2026-09-28 Africa/Cairo.
 
-### Architectural contract
+### Current status
 
-`Organization access = active organization + enabled module + branch scope + user permission`
+- Data copy through cutoff: COMPLETE.
+- Final database validation: COMPLETE.
+- Source remained READ ONLY.
+- No checked post-cutoff operational rows remain in destination.
+- Financial aggregates through cutoff match source.
+- RLS remains enabled.
+- No USER triggers remain disabled.
+- User approved merge.
+- PR #7 remains blocked only until CI is Green.
 
-Super Admin فقط هو platform-wide implicit bypass.
+### Data-copy rules
 
-### Initial module families
+- Do not dump/restore source schema over destination.
+- Do not overwrite destination organization/module infrastructure.
+- Preserve operational UUIDs where safe.
+- Preserve the destination login/bootstrap identity mapping.
+- Map protected destination table IDs when source/destination UUIDs intentionally differ.
+- Exclude post-cutoff activity even when its UTC date is 2026-09-28.
+- Do not replace current cutoff state with later live-source FIFO/batch mutations.
 
-- Core / Dashboard
-- POS
-- Catalog
-- Inventory
-- Procurement
-- Customers
-- Suppliers
-- Expenses
-- Shifts
-- Treasury
-- Accounting
-- Costing
-- Reports
-- Users & Permissions
-- Approvals
-- Import / Export
-- Branch Management
-- Audit
-- KDS as an independently switchable module without changing its internal runtime in this scope.
+## VERIFICATION GATE BEFORE MERGE
 
-### Rules
-
-- Reuse existing `features`, subscriptions and feature-resolution infrastructure.
-- Do not build a duplicate feature system.
-- Organization override is authoritative over plan defaults when explicitly set by Super Admin.
-- UI hiding alone is not security; route/API/database enforcement must agree.
-- Permission-First remains mandatory after module access is granted.
-- Disabling a module must not delete its historical data.
-- Re-enabling a module restores access to historical data subject to normal permissions.
-- No module toggle may weaken RLS or branch/tenant isolation.
-- No printing / Print Agent / routing / send-to-kitchen implementation changes in this project phase.
-
-## DATABASE CHANGE GATE
-
-- Schema/RPC migration files can be developed on `main`.
-- Hosted Supabase apply is BLOCKED until Full Verify Green.
-- No experimental migration on hosted Supabase.
-- No destructive reset/reseed.
-- Migrations are forward-only and append-only.
-
-## VERIFICATION
-
-Required before hosted migration:
-- repository identity lock ✅
-- lint
-- typecheck
-- unit
-- build
-- fresh DB migrations
-- schema verification
-- integration + RLS/security
-- Browser Smoke
-- organization A cannot see organization B modules/data
-- disabled module denied even when user has permission
-- enabled module still requires permission
-- Super Admin can configure organizations without cross-tenant data leakage
+Required:
+- mandatory active work log structurally complete
+- locked Supabase project identity correct
+- frontend API contract current
+- lint Green
+- typecheck Green
+- unit tests Green
+- build Green
+- DB verification Green
+- browser smoke Green where configured
+- PR head branch matches declared active branch
+- PR mergeable with no unexpected HEAD movement
 
 ## NEXT ACTION
 
-1. Normalize the module catalog from the existing feature registry.
-2. Add organization-level feature/module overrides.
-3. Replace unrestricted runtime resolver with an authoritative resolver.
-4. Add frontend module context/cache.
-5. Filter menu and protect routes by module + permission.
-6. Add Super Admin organization module control UI.
-7. Add regression tests and run Full Verify.
-8. Apply hosted migration only after Green.
-
-
-## Current sync scope
-
-- Port verified post-fork changes from read-only `Premieros/johna-s` into the organization-aware `.com` architecture.
-- Preserve organization modules, project identity and Permission-First isolation.
-- No hosted migration until the sync PR is Full Verify Green.
-
-
-## ACTIVE — UI Simplification
-
-- Apply the product-style simplification pattern across remaining sections.
-- Keep one clear hub per functional family; keep deep links and permission checks intact.
-- Add Finance, People and Administration centers and remove their implementation-level sibling pages from the sidebar.
-- No database migration in this UI-only phase.
+1. Make PR #7 Ready for Review.
+2. Run CI on the corrected documentation HEAD.
+3. Merge only when required checks are Green.
+4. Verify merged state and merge commit on `main`.
