@@ -86,10 +86,24 @@ export function OrganizationExperienceProvider({ children }: { children: ReactNo
   useEffect(() => {
     applyBrandColor(experience.theme.brandHue, experience.theme.brandSat);
     applySurfaceColor(experience.theme.surfaceHue, experience.theme.surfaceSat);
-    document.documentElement.classList.toggle('dark', experience.theme.mode === 'dark');
-    document.documentElement.dataset.organizationTheme = experience.theme.key;
-    document.documentElement.dataset.organizationRadius = experience.theme.radius;
-    document.documentElement.dataset.posLayout = experience.posLayout.key;
+
+    const root = document.documentElement;
+    root.classList.toggle('dark', experience.theme.mode === 'dark');
+    root.dataset.organizationTheme = experience.theme.key;
+    root.dataset.organizationRadius = experience.theme.radius;
+    root.dataset.posLayout = experience.posLayout.key;
+
+    const radiusScale = experience.theme.radius === 'compact'
+      ? { sm: '4px', base: '8px', lg: '10px', xl: '12px', xxl: '14px' }
+      : experience.theme.radius === 'soft'
+        ? { sm: '10px', base: '14px', lg: '18px', xl: '22px', xxl: '28px' }
+        : { sm: '8px', base: '12px', lg: '16px', xl: '20px', xxl: '24px' };
+
+    root.style.setProperty('--ui-radius-sm', radiusScale.sm);
+    root.style.setProperty('--ui-radius', radiusScale.base);
+    root.style.setProperty('--ui-radius-lg', radiusScale.lg);
+    root.style.setProperty('--ui-radius-xl', radiusScale.xl);
+    root.style.setProperty('--ui-radius-2xl', radiusScale.xxl);
   }, [experience]);
 
   const value = useMemo(
