@@ -22,4 +22,5 @@ export const admin = {
   toggleOrganizationStatus(p: { p_org_id: string; p_is_active: boolean }): ApiResult<{ success?: boolean; error?: string }> { return rpc('toggle_organization_status', p); },
   getOrganizationModuleCatalog(p: { p_organization_id: string }): ApiResult<Array<{ feature_key: string; feature_name: string; category: string; enabled: boolean; source: string }>> { return rpc('get_organization_module_catalog', p); },
   setOrganizationModule(p: { p_organization_id: string; p_feature_key: string; p_enabled: boolean; p_reason?: string | null }): ApiResult<{ success?: boolean; error?: string; organization_id?: string; feature_key?: string; enabled?: boolean }> { return rpc('super_admin_set_organization_module', p); },
+  getSystemHealthSnapshot(p: { p_branch_id: string | null }): ApiResult<Record<string, unknown>> { return rpc('get_system_health_snapshot', p); },
 };
