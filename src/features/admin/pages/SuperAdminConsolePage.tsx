@@ -626,7 +626,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
                 <p className="text-xs text-ui-subtle">{ar ? 'قائمة بجميع المستأجرين والشركات المسجلة في النظام' : 'Manage multi-tenant accounts and their branch quotas'}</p>
               </div>
               <Button size="sm" onClick={() => setOrganizationCreateOpen(true)}>
-                <Plus className="w-4 h-4" />
+                <UserPlus className="w-4 h-4" />
                 {ar ? 'إضافة مؤسسة' : 'Add Organization'}
               </Button>
             </div>
