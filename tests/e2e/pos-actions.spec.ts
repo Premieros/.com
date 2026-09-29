@@ -490,7 +490,7 @@ test.describe('POS organization layout profiles', () => {
     await expect(page.getByTestId('pos-counter-tables')).toHaveCount(0);
     await expect(page.getByTestId('pos-counter-kds')).toHaveCount(0);
 
-    const search = page.getByTestId('pos-product-search');
+    const search = page.locator('[data-testid="pos-product-search"]:visible').first();
     await expect(search).toBeVisible();
     await expect(search).toBeFocused();
 
