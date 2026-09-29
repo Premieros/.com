@@ -13,6 +13,7 @@ import { Button } from '@/components/Button';
 import { Input, Select, Textarea } from '@/components/Input';
 import { Modal } from '@/components/Modal';
 import { BranchBadge } from '@/components/BranchBadge';
+import { BusinessAttributesFields } from '@/features/shared/BusinessAttributesFields';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { formatCurrency } from '@/lib/format';
 import { importFromExcel } from '@/lib/excel';
@@ -45,6 +46,7 @@ export function CustomersPage() {
   const { branches } = useBranches();
   const currency = effectiveSettings(branchFilter)?.currency || 'EGP';
   const [form, setForm] = useState({ name: '', name_en: '', phone: '', email: '', address: '', tax_number: '', balance: 0, notes: '', branch_id: '' });
+  const [businessAttributes, setBusinessAttributes] = useState<Record<string, unknown>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -69,12 +71,12 @@ export function CustomersPage() {
 
   const balanceFor = (customer: Customer) => Number(openBalances[customer.id] || 0);
   const filtered = items.filter((c) => !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search));
-  const openAdd = () => { setEditing(null); setForm({ name: '', name_en: '', phone: '', email: '', address: '', tax_number: '', balance: 0, notes: '', branch_id: branchFilter || '' }); setModalOpen(true); };
-  const openEdit = (c: Customer) => { setEditing(c); setForm({ name: c.name, name_en: c.name_en || '', phone: c.phone || '', email: c.email || '', address: c.address || '', tax_number: c.tax_number || '', balance: c.balance, notes: c.notes || '', branch_id: c.branch_id || branchFilter || '' }); setModalOpen(true); };
+  const openAdd = () => { setEditing(null); setBusinessAttributes({}); setForm({ name: '', name_en: '', phone: '', email: '', address: '', tax_number: '', balance: 0, notes: '', branch_id: branchFilter || '' }); setModalOpen(true); };
+  const openEdit = (c: Customer) => { setEditing(c); setBusinessAttributes(((c as Customer & { business_attributes?: Record<string, unknown> }).business_attributes) || {}); setForm({ name: c.name, name_en: c.name_en || '', phone: c.phone || '', email: c.email || '', address: c.address || '', tax_number: c.tax_number || '', balance: c.balance, notes: c.notes || '', branch_id: c.branch_id || branchFilter || '' }); setModalOpen(true); };
 
   const save = async () => {
     if (!form.name) { show(t('required'), 'error'); return; }
-    const payload = { ...form, branch_id: branchFilter || form.branch_id || null };
+    const payload = { ...form, branch_id: branchFilter || form.branch_id || null, business_attributes: businessAttributes };
     if (editing) {
       const { error } = await supabase.from('customers').update(payload).eq('id', editing.id);
       if (error) { show(error.message, 'error'); return; }
@@ -176,6 +178,7 @@ export function CustomersPage() {
             </Select>
           )}
           <Textarea label={t('notes')} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
+          <BusinessAttributesFields entity="customer" value={businessAttributes} onChange={setBusinessAttributes} />
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setModalOpen(false)}>{t('cancel')}</Button>
             <Button onClick={save}>{t('save')}</Button>
