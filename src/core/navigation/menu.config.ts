@@ -6,7 +6,7 @@ export type MenuGroup = 'main' | 'catalog' | 'centers' | 'admin';
 export type MenuIcon =
   | 'dashboard' | 'pos' | 'products' | 'pricing' | 'productModifiers' | 'categories' | 'components' | 'rawMaterials' | 'recipes' | 'inventory' | 'warehouses' | 'transfers'
   | 'inventoryLedger' | 'stockCounts' | 'inventoryBatches' | 'stockValuation' | 'lowStockAlerts' | 'inventoryUnits' | 'wasteCenter' | 'kitchenDisplay' | 'kitchenStations' | 'costingCenter' | 'branches' | 'purchases' | 'customers' | 'suppliers' | 'expenses'
-  | 'accounts' | 'payments' | 'journal' | 'treasury' | 'reconciliation' | 'financialReports' | 'sales' | 'shifts' | 'reports' | 'users' | 'auditLog' | 'settings' | 'superAdmin' | 'importExport' | 'businessRecords';
+  | 'accounts' | 'payments' | 'journal' | 'treasury' | 'reconciliation' | 'financialReports' | 'sales' | 'shifts' | 'reports' | 'users' | 'auditLog' | 'settings' | 'superAdmin' | 'importExport';
 
 export interface MenuItemConfig {
   id: string;
@@ -37,7 +37,6 @@ export const MENU_ITEMS: MenuItemConfig[] = [
   { id: 'inventory-center', route: APP_ROUTES.inventoryCenter, icon: 'inventory', labelKey: 'inventory', label: { ar: 'مركز المخزون', en: 'Inventory Center' }, permission: 'inventory.view', group: 'centers' },
   { id: 'procurement-center', route: APP_ROUTES.procurementCenter, icon: 'purchases', labelKey: 'purchases', label: { ar: 'مركز المشتريات', en: 'Procurement Center' }, permission: 'purchases.view', group: 'centers' },
   { id: 'people-center', route: APP_ROUTES.peopleCenter, icon: 'customers', labelKey: 'customers', label: { ar: 'مركز الأطراف', en: 'People Center' }, permissionsAny: ['customers.view', 'suppliers.view'], group: 'centers' },
-  { id: 'business-records', route: APP_ROUTES.businessRecords, icon: 'businessRecords', labelKey: 'customers', label: { ar: 'سجلات النشاط', en: 'Business Records' }, permissionsAny: ['customers.view', 'suppliers.view', 'products.view'], group: 'centers' },
   { id: 'finance-center', route: APP_ROUTES.financeCenter, icon: 'accounts', labelKey: 'reports', label: { ar: 'المركز المالي', en: 'Finance Center' }, permissionsAny: ['accounts.view', 'expenses.view', 'sales.view', 'shifts.view', 'reports.view', 'reports.financial', 'reports.costing'], group: 'centers' },
   { id: 'administration-center', route: APP_ROUTES.administrationCenter, icon: 'settings', labelKey: 'settings', label: { ar: 'مركز الإدارة', en: 'Administration Center' }, permissionsAny: ['branches.manage', 'users.view', 'roles.permissions.manage', 'approvals.review', 'audit.view', 'settings.manage'], group: 'centers' },
 
