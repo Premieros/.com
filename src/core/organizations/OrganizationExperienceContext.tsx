@@ -2,6 +2,9 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { supabase } from '@/api';
 import { applyBrandColor, applySurfaceColor } from '@/lib/brandColor';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
+import { useBranches } from '@/hooks/useBranches';
+import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useAuth } from '@/context/AuthContext';
 import type { BusinessProfileKey } from './businessProfiles';
 import {
   ORGANIZATION_EXPERIENCE_PRESETS,
@@ -19,6 +22,17 @@ const OrganizationExperienceContext = createContext<OrganizationExperienceContex
 
 export function OrganizationExperienceProvider({ children }: { children: ReactNode }) {
   const { organizationId } = useOrganizationModules();
+  const { branches } = useBranches();
+  const branchId = useBranchFilter();
+  const { user } = useAuth();
+  const branchOrganizationId = useMemo(() => {
+    const branch = branches.find((candidate) => candidate.id === branchId)
+      ?? branches.find((candidate) => candidate.id === user?.branch_id)
+      ?? branches[0]
+      ?? null;
+    return branch?.organization_id ?? null;
+  }, [branchId, branches, user?.branch_id]);
+  const effectiveOrganizationId = organizationId ?? branchOrganizationId;
   const [loading, setLoading] = useState(false);
   const [businessType, setBusinessType] = useState<BusinessProfileKey>('custom');
   const [experience, setExperience] = useState<OrganizationExperiencePreset>(
@@ -29,7 +43,7 @@ export function OrganizationExperienceProvider({ children }: { children: ReactNo
     let cancelled = false;
 
     const load = async () => {
-      if (!organizationId) {
+      if (!effectiveOrganizationId) {
         setBusinessType('custom');
         setExperience(ORGANIZATION_EXPERIENCE_PRESETS.custom);
         setLoading(false);
@@ -40,7 +54,7 @@ export function OrganizationExperienceProvider({ children }: { children: ReactNo
       const { data, error } = await supabase
         .from('organizations')
         .select('business_type,business_profile')
-        .eq('id', organizationId)
+        .eq('id', effectiveOrganizationId)
         .maybeSingle();
 
       if (cancelled) return;
@@ -67,7 +81,7 @@ export function OrganizationExperienceProvider({ children }: { children: ReactNo
     return () => {
       cancelled = true;
     };
-  }, [organizationId]);
+  }, [effectiveOrganizationId]);
 
   useEffect(() => {
     applyBrandColor(experience.theme.brandHue, experience.theme.brandSat);
