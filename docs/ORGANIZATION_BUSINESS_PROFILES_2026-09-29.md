@@ -33,6 +33,14 @@ Implementation is complete on PR #9. Exact-head Fast Verify and Full Verify were
 - Existing `organizations`, `branches`, `warehouses`, `branch_settings`, subscriptions, membership and feature override infrastructure are retained.
 - No parallel tenant/module system is introduced.
 
+## Root-cause ledger
+
+1. Super Admin previously managed existing organizations but could not provision a complete new organization.
+2. Business type and activity-specific profile data were not persisted at organization level.
+3. New organizations did not receive deterministic module presets by business type.
+4. First branch, warehouse, owner, membership and settings were not created atomically.
+5. Activity-specific fields and operational records were not available through the shared runtime.
+
 ## Change ledger
 
 - Added business profile presets for restaurant, food manufacturing, pharmacy, car showroom, tourism, retail, services and custom.
