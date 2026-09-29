@@ -18,6 +18,7 @@ import type { DiningTable, OrderType } from '@/lib/types';
 import type { KitchenStationDispatchSummary, OrderKitchenSend } from '../../types';
 import { orderTypeLabel } from '../../utils/format';
 import { usePosPermissions } from '../../hooks/usePosPermissions';
+import type { PosLayoutPreset, OrganizationTerminology } from '@/core/organizations/organizationExperience';
 
 interface PosOrderHeaderBarProps {
   orderNumber: string | null;
@@ -37,6 +38,8 @@ interface PosOrderHeaderBarProps {
   kitchenDispatch?: KitchenStationDispatchSummary | null;
   customerName?: string | null;
   operatorName?: string | null;
+  layout?: PosLayoutPreset;
+  terminology?: OrganizationTerminology;
   onOpenTransferModal?: () => void;
   onOpenCustomer: () => void;
   onHoldOrder: () => void;
@@ -63,6 +66,8 @@ export function PosOrderHeaderBar({
   kitchenDispatch,
   customerName,
   operatorName,
+  layout,
+  terminology,
   onOpenTransferModal,
   onOpenCustomer,
   onHoldOrder,
@@ -80,9 +85,12 @@ export function PosOrderHeaderBar({
     return isAr ? `منذ ${diff} دقيقة` : `${diff}m ago`;
   }, [createdAt, isAr]);
 
+  const requiresKitchenSend = layout?.showKitchen ?? true;
   const hasSent = kitchenSends.length > 0;
-  const canPrintSentReceipt = hasSent && canPrintReceipt;
+  const canPrintSentReceipt = (requiresKitchenSend ? hasSent : true) && canPrintReceipt;
   const kitchenActionBusy = kitchenSending || completing;
+  const canSendKitchen = perms.canSendKitchen && requiresKitchenSend;
+  const canPayNow = perms.canPay && itemsCount > 0 && (!requiresKitchenSend || hasSent);
 
   return (
     <div data-testid="pos-top-action-bar" className="flex flex-wrap items-center justify-between gap-2 border-b border-ui-border bg-ui-page px-3 py-2 text-xs select-none">
@@ -99,21 +107,21 @@ export function PosOrderHeaderBar({
           </div>
         )}
         <div className="flex items-center gap-1 text-ui-text font-black">
-          <span>{orderNumber ? `#${orderNumber}` : t('newOrder')}</span>
+          <span>{orderNumber ? `#${orderNumber}` : (terminology?.newOrder || t('newOrder'))}</span>
         </div>
         <span className="text-ui-muted">·</span>
-        <span className="text-ui-muted font-bold">{itemsCount} {isAr ? 'صنف' : 'items'}</span>
+        <span className="text-ui-muted font-bold">{itemsCount} {terminology?.items || (isAr ? 'صنف' : 'items')}</span>
         <span className="text-ui-muted">·</span>
         <span className="text-ui-text font-black tabular-nums">{formatCurrency(total, currency, lang)}</span>
         {elapsedText && <><span className="text-ui-muted">·</span><span className="flex items-center gap-1 text-ui-subtle font-semibold"><Clock className="h-3 w-3" />{elapsedText}</span></>}
         {operatorName && <><span className="text-ui-muted">·</span><span className="flex min-w-0 items-center gap-1 font-bold text-ui-muted"><User className="h-3 w-3 shrink-0" /><span className="max-w-[140px] truncate">{operatorName}</span></span></>}
-        {hasSent && (
+        {requiresKitchenSend && hasSent && (
           <span className={`flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-black border ${hasUnsentItems ? 'bg-amber-500/15 text-amber-700 border-amber-500/30 animate-pulse' : 'bg-sky-500/10 text-sky-600 border-sky-500/20'}`}>
             <ChefHat className="h-3 w-3" />
             {hasUnsentItems ? (isAr ? 'تعديلات جديدة' : 'New Additions') : (isAr ? 'تم الإرسال' : 'Sent to Kitchen')}
           </span>
         )}
-        {(kitchenDispatch?.status === 'partial' || kitchenDispatch?.status === 'failed') && (
+        {requiresKitchenSend && (kitchenDispatch?.status === 'partial' || kitchenDispatch?.status === 'failed') && (
           <span
             data-testid="pos-kitchen-dispatch-warning"
             className="flex items-center gap-1 rounded-lg border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-[10px] font-black text-red-700"
@@ -176,7 +184,7 @@ export function PosOrderHeaderBar({
           </button>
         )}
 
-        {perms.canSendKitchen && itemsCount > 0 && (
+        {canSendKitchen && itemsCount > 0 && (
           <button
             data-testid="pos-action-send-kitchen"
             type="button"
@@ -198,7 +206,7 @@ export function PosOrderHeaderBar({
           </button>
         )}
 
-        {perms.canPay && hasSent && itemsCount > 0 && (
+        {canPayNow && (
           <button
             data-testid="pos-action-pay"
             type="button"
