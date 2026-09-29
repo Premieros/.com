@@ -22,8 +22,8 @@ const OrganizationExperienceContext = createContext<OrganizationExperienceContex
 
 const DEFAULT_EXPERIENCE_CONTEXT: OrganizationExperienceContextValue = {
   loading: false,
-  businessType: 'custom',
-  experience: ORGANIZATION_EXPERIENCE_PRESETS.custom,
+  businessType: 'restaurant',
+  experience: ORGANIZATION_EXPERIENCE_PRESETS.restaurant,
 };
 
 export function OrganizationExperienceProvider({ children }: { children: ReactNode }) {
@@ -50,8 +50,8 @@ export function OrganizationExperienceProvider({ children }: { children: ReactNo
 
     const load = async () => {
       if (!effectiveOrganizationId) {
-        setBusinessType('custom');
-        setExperience(ORGANIZATION_EXPERIENCE_PRESETS.custom);
+        setBusinessType('restaurant');
+        setExperience(ORGANIZATION_EXPERIENCE_PRESETS.restaurant);
         setLoading(false);
         return;
       }
@@ -66,8 +66,8 @@ export function OrganizationExperienceProvider({ children }: { children: ReactNo
       if (cancelled) return;
 
       if (error || !data) {
-        setBusinessType('custom');
-        setExperience(ORGANIZATION_EXPERIENCE_PRESETS.custom);
+        setBusinessType('restaurant');
+        setExperience(ORGANIZATION_EXPERIENCE_PRESETS.restaurant);
         setLoading(false);
         return;
       }
