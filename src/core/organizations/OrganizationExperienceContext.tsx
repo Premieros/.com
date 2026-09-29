@@ -20,6 +20,12 @@ interface OrganizationExperienceContextValue {
 
 const OrganizationExperienceContext = createContext<OrganizationExperienceContextValue | undefined>(undefined);
 
+const DEFAULT_EXPERIENCE_CONTEXT: OrganizationExperienceContextValue = {
+  loading: false,
+  businessType: 'custom',
+  experience: ORGANIZATION_EXPERIENCE_PRESETS.custom,
+};
+
 export function OrganizationExperienceProvider({ children }: { children: ReactNode }) {
   const { organizationId } = useOrganizationModules();
   const { branches } = useBranches();
@@ -119,7 +125,5 @@ export function OrganizationExperienceProvider({ children }: { children: ReactNo
 }
 
 export function useOrganizationExperience(): OrganizationExperienceContextValue {
-  const ctx = useContext(OrganizationExperienceContext);
-  if (!ctx) throw new Error('useOrganizationExperience must be used within OrganizationExperienceProvider');
-  return ctx;
+  return useContext(OrganizationExperienceContext) ?? DEFAULT_EXPERIENCE_CONTEXT;
 }
