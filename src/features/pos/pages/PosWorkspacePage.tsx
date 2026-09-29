@@ -40,6 +40,7 @@ import { PosOrderHeaderBar } from '../components/order/PosOrderHeaderBar';
 import { TransferOrderModal } from '../components/tables/TransferOrderModal';
 import { orderOperatorName } from '../utils/operatorName';
 import { VoidItemModal } from '../components/order/VoidItemModal';
+import { useOrganizationExperience } from '@/core/organizations/OrganizationExperienceContext';
 
 const EMPTY_POS_STOCK_MAP: Record<string, number> = {};
 
@@ -64,6 +65,9 @@ export function PosWorkspacePage() {
   const { branches: sharedBranches } = useBranches();
   const { show } = useToast();
   const perms = usePosPermissions();
+  const { experience } = useOrganizationExperience();
+  const posLayout = experience.posLayout;
+  const terminology = experience.terminology;
   const {
     guardPos,
     startGuidance,
@@ -149,6 +153,14 @@ export function PosWorkspacePage() {
     stockMap: EMPTY_POS_STOCK_MAP,
   });
   const canModifyCurrentOrder = pos.activeOrderId ? perms.canEditOrder : perms.canCreateOrder;
+  const effectivePosPermissions = useMemo(() => ({
+    ...perms,
+    canSendKitchen: perms.canSendKitchen && posLayout.showKitchen,
+    canViewKitchen: perms.canViewKitchen && posLayout.showKitchen,
+    canPrintKitchen: perms.canPrintKitchen && posLayout.showKitchen,
+    canOpenShift: perms.canOpenShift && posLayout.showShift,
+    canCloseShift: perms.canCloseShift && posLayout.showShift,
+  }), [perms, posLayout.showKitchen, posLayout.showShift]);
 
   useEffect(() => {
     if (pos.receiptSaleId) setMobileOrderOpen(false);
@@ -157,11 +169,12 @@ export function PosWorkspacePage() {
   const live = useActiveOrders(effectiveBranch);
 
   useEffect(() => {
-    if (!effSettings?.pos_barcode_autofocus) return;
+    const shouldAutoFocusBarcode = posLayout.barcodeFirst || Boolean(effSettings?.pos_barcode_autofocus);
+    if (!shouldAutoFocusBarcode) return;
     if (panel || pos.checkoutOpen || mobileOrderOpen || configProduct || configItem || customerModalOpen || tableModalOpen || shiftModalOpen) return;
     const timer = setTimeout(() => barcodeRef.current?.focus(), 60);
     return () => clearTimeout(timer);
-  }, [effSettings?.pos_barcode_autofocus, panel, pos.checkoutOpen, mobileOrderOpen, configProduct, configItem, customerModalOpen, tableModalOpen, shiftModalOpen]);
+  }, [posLayout.barcodeFirst, effSettings?.pos_barcode_autofocus, panel, pos.checkoutOpen, mobileOrderOpen, configProduct, configItem, customerModalOpen, tableModalOpen, shiftModalOpen]);
 
   const { orders, tables, counts, ordersByTable, itemsByOrder, kitchenSendsByOrder, sentOrderItemIds, tableById } = live;
   const customerById = useMemo(() => Object.fromEntries(customers.map((c) => [c.id, c])), [customers]);
@@ -193,7 +206,7 @@ export function PosWorkspacePage() {
   }, [pos.activeOrderId, pos.kitchenSentItems, kitchenSendsByOrder, effectiveBranch, user?.id]);
 
   const hasUnsentItems = useMemo(() => {
-    if (pos.cart.length === 0) return false;
+    if (!posLayout.showKitchen || pos.cart.length === 0) return false;
     return pos.cart.some((cItem) => {
       const lineKey = cartLineKey(cItem);
       const orderItem = orderItemsForActive.find((oi) => orderItemLineKey(oi) === lineKey);
@@ -201,7 +214,7 @@ export function PosWorkspacePage() {
       const send = kitchenSendsForActive.find((row) => row.order_item_id === orderItem.id);
       return Number(send?.sent_quantity || 0) < cItem.quantity;
     });
-  }, [pos.cart, kitchenSendsByOrder, orderItemsForActive]);
+  }, [pos.cart, kitchenSendsByOrder, orderItemsForActive, posLayout.showKitchen]);
 
   const handlePay = useCallback(() => {
     if (!perms.canPay || !shiftChecked || pos.cart.length === 0) return;
@@ -692,7 +705,7 @@ export function PosWorkspacePage() {
       onConfigureItem={(item) => setConfigItem(item)}
       onOpenCustomerModal={() => setCustomerModalOpen(true)}
       onOpenTableModal={() => setTableModalOpen(true)}
-      perms={{ ...perms, canEditOrder: canModifyCurrentOrder }}
+      perms={{ ...effectivePosPermissions, canEditOrder: canModifyCurrentOrder }}
       onVoidItem={(item, sentQty) => {
         setVoidItem(item);
         setVoidSentQty(sentQty);
@@ -725,11 +738,20 @@ export function PosWorkspacePage() {
         shiftChecked={shiftChecked}
         activeShift={activeShift}
         onOpenShiftModal={() => setShiftModalOpen(true)}
+        layout={posLayout}
+        terminology={terminology}
         onNewOrder={() => {
           pos.resetWorkspace();
-          window.dispatchEvent(new Event('pos:show-tables-landing'));
-          setStartStep(null);
-          setPreselectedTableId(null);
+          if (posLayout.showTables) {
+            window.dispatchEvent(new Event('pos:show-tables-landing'));
+            setStartStep(null);
+            setPreselectedTableId(null);
+          } else {
+            pos.setOrderType('takeaway');
+            setStartStep(null);
+            setPreselectedTableId(null);
+            window.setTimeout(() => barcodeRef.current?.focus(), 30);
+          }
           setPanel(null);
           setMobileOrderOpen(false);
           if (orderIdParam) navigate('/pos');
@@ -771,7 +793,7 @@ export function PosWorkspacePage() {
       {/* Main Split-Screen Workspace */}
       <div data-testid="pos-main-workspace" className="flex min-h-0 flex-1 overflow-hidden">
         {/* Tables-first landing stays available on phones, tablets, and desktop. */}
-        <div data-testid="pos-tables-landing-shell" className="flex h-full shrink-0">
+        {posLayout.showTables && <div data-testid="pos-tables-landing-shell" className="flex h-full shrink-0">
           <PosTablesSidebar
             branchId={effectiveBranch}
             tables={tables}
@@ -812,10 +834,10 @@ export function PosWorkspacePage() {
             }}
             activeOrderType={pos.orderType}
           />
-        </div>
+        </div>}
 
         {/* Center: Product Browser with Fast Order Header Bar */}
-        <div data-testid="pos-catalog-shell" className="flex min-h-0 min-w-0 flex-1 flex-col bg-ui-page">
+        <div data-testid="pos-catalog-shell" data-pos-layout={posLayout.key} data-card-density={posLayout.productCardDensity} className="flex min-h-0 min-w-0 flex-1 flex-col bg-ui-page">
           <PosOrderHeaderBar
             orderNumber={pos.activeOrderNumber}
             orderId={pos.activeOrderId}
@@ -834,6 +856,8 @@ export function PosWorkspacePage() {
             kitchenDispatch={pos.kitchenDispatch}
             customerName={pos.customerId ? customerById[pos.customerId]?.name || null : null}
             operatorName={activeOrderOperatorName}
+            layout={posLayout}
+            terminology={terminology}
             onOpenTransferModal={() => {
               if (pos.activeTable && pos.activeOrderId) {
                 const currentOrd =
@@ -949,7 +973,7 @@ export function PosWorkspacePage() {
           className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] font-black text-ui-muted active:bg-ui-page-alt"
         >
           <Grid2X2 className="h-5 w-5" />
-          <span>{isAr ? 'المنتجات' : 'Menu'}</span>
+          <span>{terminology.items}</span>
         </button>
 
         <button
@@ -960,7 +984,7 @@ export function PosWorkspacePage() {
           className="relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] font-black text-ui-muted active:bg-ui-page-alt disabled:opacity-40"
         >
           <ShoppingCart className="h-5 w-5" />
-          <span>{isCheckout ? (isAr ? 'الدفع' : 'Pay') : (isAr ? 'الطلب' : 'Order')}</span>
+          <span>{isCheckout ? (isAr ? 'الدفع' : 'Pay') : terminology.order}</span>
           {pos.cart.length > 0 && (
             <span className="absolute end-[22%] top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-ui-primary px-1 text-[9px] text-ui-primary-fg">
               {pos.cart.reduce((sum, item) => sum + item.quantity, 0)}

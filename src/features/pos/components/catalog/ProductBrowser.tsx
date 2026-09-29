@@ -141,6 +141,7 @@ export function ProductBrowser({ products, categories, search, selectedCategory,
       <Search className={`absolute start-3 top-1/2 -translate-y-1/2 text-ui-subtle ${mobile ? 'h-5 w-5' : 'h-4 w-4'}`} />
       <input
         ref={inputRef}
+        data-testid="pos-product-search"
         value={search}
         onChange={(event) => onSearch(event.target.value)}
         onKeyDown={(event) => {

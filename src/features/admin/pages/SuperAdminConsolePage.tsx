@@ -35,6 +35,8 @@ import { RolesTab } from './RolesTab';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { ORGANIZATION_MODULE_KEYS, ORGANIZATION_MODULES, type OrganizationModuleKey } from '@/core/modules/module.config';
 import { OrganizationCreateWizard } from '@/features/admin/components/OrganizationCreateWizard';
+import { BUSINESS_PROFILE_KEYS, BUSINESS_PROFILE_PRESETS, type BusinessProfileKey } from '@/core/organizations/businessProfiles';
+import { ORGANIZATION_EXPERIENCE_PRESETS, resolveOrganizationExperience, type OrganizationTerminology, type OrganizationThemePreset, type PosLayoutKey } from '@/core/organizations/organizationExperience';
 
 interface TenantStats {
   organization_id: string;
@@ -112,6 +114,17 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
   const [loadingOrganizationModules, setLoadingOrganizationModules] = useState(false);
   const [savingModuleKey, setSavingModuleKey] = useState<OrganizationModuleKey | null>(null);
   const [organizationCreateOpen, setOrganizationCreateOpen] = useState(false);
+  const [organizationBusinessType, setOrganizationBusinessType] = useState<BusinessProfileKey>('custom');
+  const [organizationProfileRaw, setOrganizationProfileRaw] = useState<Record<string, unknown>>({});
+  const [organizationThemePreset, setOrganizationThemePreset] = useState<BusinessProfileKey>('custom');
+  const [organizationThemeDraft, setOrganizationThemeDraft] = useState<OrganizationThemePreset>(
+    ORGANIZATION_EXPERIENCE_PRESETS.custom.theme,
+  );
+  const [organizationPosLayout, setOrganizationPosLayout] = useState<PosLayoutKey>('retail');
+  const [organizationTerminology, setOrganizationTerminology] = useState<OrganizationTerminology>(
+    ORGANIZATION_EXPERIENCE_PRESETS.custom.terminology,
+  );
+  const [savingOrganizationExperience, setSavingOrganizationExperience] = useState(false);
 
   // System Controls state (Allow New User Creation)
   const [allowNewUserCreation, setAllowNewUserCreation] = useState<boolean>(true);
@@ -241,6 +254,39 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
     }
   }, [ar, show]);
 
+  const loadOrganizationExperience = useCallback(async (organizationId: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('organizations')
+        .select('business_type,business_profile')
+        .eq('id', organizationId)
+        .maybeSingle();
+      if (error || !data) throw error ?? new Error('ORGANIZATION_NOT_FOUND');
+
+      const businessType = (data.business_type || 'custom') as BusinessProfileKey;
+      const profile = (data.business_profile || {}) as Record<string, unknown>;
+      const experience = resolveOrganizationExperience(businessType, profile);
+      const themeKey = BUSINESS_PROFILE_KEYS.find(
+        (key) => ORGANIZATION_EXPERIENCE_PRESETS[key].theme.key === experience.theme.key,
+      ) ?? businessType;
+
+      setOrganizationBusinessType(businessType);
+      setOrganizationProfileRaw(profile);
+      setOrganizationThemePreset(themeKey);
+      setOrganizationThemeDraft(experience.theme);
+      setOrganizationPosLayout(experience.posLayout.key);
+      setOrganizationTerminology(experience.terminology);
+    } catch {
+      setOrganizationBusinessType('custom');
+      setOrganizationProfileRaw({});
+      setOrganizationThemePreset('custom');
+      setOrganizationThemeDraft(ORGANIZATION_EXPERIENCE_PRESETS.custom.theme);
+      setOrganizationPosLayout(ORGANIZATION_EXPERIENCE_PRESETS.custom.posLayout.key);
+      setOrganizationTerminology(ORGANIZATION_EXPERIENCE_PRESETS.custom.terminology);
+      show(ar ? 'تعذر تحميل هوية المؤسسة' : 'Failed to load organization identity', 'error');
+    }
+  }, [ar, show]);
+
   // ─────────────────────────────────────────────────────────────
   // 3. Load Users & Audit Logs
   // ─────────────────────────────────────────────────────────────
@@ -356,7 +402,38 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
   const openOrganizationModules = (tenant: TenantStats) => {
     setModuleOrg(tenant);
     setOrganizationModules([]);
-    void loadOrganizationModules(tenant.organization_id);
+    void Promise.all([
+      loadOrganizationModules(tenant.organization_id),
+      loadOrganizationExperience(tenant.organization_id),
+    ]);
+  };
+
+  const handleSaveOrganizationExperience = async () => {
+    if (!moduleOrg || savingOrganizationExperience) return;
+    setSavingOrganizationExperience(true);
+    try {
+      const themeProfile = organizationThemeDraft;
+      const layoutBase = ORGANIZATION_EXPERIENCE_PRESETS[organizationBusinessType].posLayout;
+      const nextProfile = {
+        ...organizationProfileRaw,
+        theme_profile: themeProfile,
+        terminology_profile: organizationTerminology,
+        pos_layout: { ...layoutBase, key: organizationPosLayout },
+      };
+
+      const { error } = await supabase
+        .from('organizations')
+        .update({ business_profile: nextProfile })
+        .eq('id', moduleOrg.organization_id);
+
+      if (error) throw error;
+      setOrganizationProfileRaw(nextProfile);
+      show(ar ? 'تم حفظ ثيم ومسميات وتصميم نقطة البيع للمؤسسة' : 'Organization theme, terminology and POS layout saved', 'success');
+    } catch {
+      show(ar ? 'فشل حفظ هوية المؤسسة' : 'Failed to save organization identity', 'error');
+    } finally {
+      setSavingOrganizationExperience(false);
+    }
   };
 
   const handleOrganizationModuleToggle = async (row: OrganizationModuleRow) => {
@@ -1178,6 +1255,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
           onClose={() => {
             setModuleOrg(null);
             setOrganizationModules([]);
+            setOrganizationProfileRaw({});
           }}
           title={ar ? `موديولات المؤسسة — ${moduleOrg.organization_name}` : `Organization Modules — ${moduleOrg.organization_name}`}
         >
@@ -1186,6 +1264,132 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
               {ar
                 ? 'الموديول يحدد ما هو متاح للمؤسسة. بعد التفعيل يظل المستخدم محتاجًا للصلاحية المناسبة لكل شاشة أو عملية.'
                 : 'Modules define what is available to the organization. User permissions are still required for every screen and action.'}
+            </div>
+
+            <div className="rounded-xl border border-ui-border bg-ui-surface p-4">
+              <div className="mb-3">
+                <div className="font-bold text-ui-text">{ar ? 'هوية المؤسسة ونقطة البيع' : 'Organization Identity & POS'}</div>
+                <div className="text-[11px] text-ui-subtle">
+                  {ar ? 'يمكن تغيير الثيم والمسميات وتصميم نقطة البيع دون تغيير نوع النشاط أو البيانات.' : 'Customize theme, terminology and POS layout without changing business type or data.'}
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Select
+                  label={ar ? 'ثيم المؤسسة' : 'Organization theme'}
+                  value={organizationThemePreset}
+                  onChange={(e) => {
+                    const key = e.target.value as BusinessProfileKey;
+                    setOrganizationThemePreset(key);
+                    setOrganizationThemeDraft(ORGANIZATION_EXPERIENCE_PRESETS[key].theme);
+                  }}
+                >
+                  {BUSINESS_PROFILE_KEYS.map((key) => (
+                    <option key={key} value={key}>
+                      {ar ? BUSINESS_PROFILE_PRESETS[key].ar : BUSINESS_PROFILE_PRESETS[key].en}
+                    </option>
+                  ))}
+                </Select>
+
+                <Select
+                  label={ar ? 'تصميم نقطة البيع' : 'POS layout'}
+                  value={organizationPosLayout}
+                  onChange={(e) => setOrganizationPosLayout(e.target.value as PosLayoutKey)}
+                >
+                  <option value="restaurant">{ar ? 'مطعم / طاولات ومطبخ' : 'Restaurant / tables & kitchen'}</option>
+                  <option value="retail">{ar ? 'تجزئة / باركود سريع' : 'Retail / fast barcode'}</option>
+                  <option value="pharmacy">{ar ? 'صيدلية / بحث وباركود' : 'Pharmacy / search & barcode'}</option>
+                  <option value="wholesale">{ar ? 'جملة / كميات كبيرة' : 'Wholesale / bulk quantities'}</option>
+                  <option value="vehicle">{ar ? 'معرض سيارات / حجز وبيع' : 'Vehicle showroom / reserve & sell'}</option>
+                  <option value="service">{ar ? 'خدمات وحجوزات' : 'Services & booking'}</option>
+                </Select>
+
+                <Select
+                  label={ar ? 'الوضع الافتراضي' : 'Default mode'}
+                  value={organizationThemeDraft.mode}
+                  onChange={(e) => setOrganizationThemeDraft({ ...organizationThemeDraft, mode: e.target.value as 'light' | 'dark' })}
+                >
+                  <option value="light">{ar ? 'فاتح' : 'Light'}</option>
+                  <option value="dark">{ar ? 'داكن' : 'Dark'}</option>
+                </Select>
+
+                <Select
+                  label={ar ? 'شكل الحواف' : 'Corner style'}
+                  value={organizationThemeDraft.radius}
+                  onChange={(e) => setOrganizationThemeDraft({ ...organizationThemeDraft, radius: e.target.value as OrganizationThemePreset['radius'] })}
+                >
+                  <option value="soft">{ar ? 'ناعمة' : 'Soft'}</option>
+                  <option value="rounded">{ar ? 'مستديرة' : 'Rounded'}</option>
+                  <option value="compact">{ar ? 'مضغوطة' : 'Compact'}</option>
+                </Select>
+
+                <Input
+                  label={ar ? 'درجة اللون الرئيسي 0-360' : 'Brand hue 0-360'}
+                  type="number"
+                  min="0"
+                  max="360"
+                  value={organizationThemeDraft.brandHue}
+                  onChange={(e) => setOrganizationThemeDraft({ ...organizationThemeDraft, brandHue: Math.max(0, Math.min(360, Number(e.target.value) || 0)) })}
+                />
+                <Input
+                  label={ar ? 'تشبع اللون الرئيسي %' : 'Brand saturation %'}
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={organizationThemeDraft.brandSat}
+                  onChange={(e) => setOrganizationThemeDraft({ ...organizationThemeDraft, brandSat: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
+                />
+                <Input
+                  label={ar ? 'درجة لون الخلفية 0-360' : 'Surface hue 0-360'}
+                  type="number"
+                  min="0"
+                  max="360"
+                  value={organizationThemeDraft.surfaceHue}
+                  onChange={(e) => setOrganizationThemeDraft({ ...organizationThemeDraft, surfaceHue: Math.max(0, Math.min(360, Number(e.target.value) || 0)) })}
+                />
+                <Input
+                  label={ar ? 'تشبع الخلفية %' : 'Surface saturation %'}
+                  type="number"
+                  min="0"
+                  max="100"
+                  value={organizationThemeDraft.surfaceSat}
+                  onChange={(e) => setOrganizationThemeDraft({ ...organizationThemeDraft, surfaceSat: Math.max(0, Math.min(100, Number(e.target.value) || 0)) })}
+                />
+
+                <Input label={ar ? 'مسمى الصنف' : 'Item label'} value={organizationTerminology.item} onChange={(e) => setOrganizationTerminology({ ...organizationTerminology, item: e.target.value })} />
+                <Input label={ar ? 'مسمى الأصناف' : 'Items label'} value={organizationTerminology.items} onChange={(e) => setOrganizationTerminology({ ...organizationTerminology, items: e.target.value })} />
+                <Input label={ar ? 'مسمى العميل' : 'Customer label'} value={organizationTerminology.customer} onChange={(e) => setOrganizationTerminology({ ...organizationTerminology, customer: e.target.value })} />
+                <Input label={ar ? 'مسمى العملاء' : 'Customers label'} value={organizationTerminology.customers} onChange={(e) => setOrganizationTerminology({ ...organizationTerminology, customers: e.target.value })} />
+                <Input label={ar ? 'مسمى المورد' : 'Supplier label'} value={organizationTerminology.supplier} onChange={(e) => setOrganizationTerminology({ ...organizationTerminology, supplier: e.target.value })} />
+                <Input label={ar ? 'مسمى الفرع' : 'Branch label'} value={organizationTerminology.branch} onChange={(e) => setOrganizationTerminology({ ...organizationTerminology, branch: e.target.value })} />
+                <Input label={ar ? 'مسمى الطلب' : 'Order label'} value={organizationTerminology.order} onChange={(e) => setOrganizationTerminology({ ...organizationTerminology, order: e.target.value })} />
+                <Input label={ar ? 'مسمى طلب جديد' : 'New order label'} value={organizationTerminology.newOrder} onChange={(e) => setOrganizationTerminology({ ...organizationTerminology, newOrder: e.target.value })} />
+              </div>
+
+              <div className="mt-3 flex flex-wrap justify-end gap-2">
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={savingOrganizationExperience}
+                  onClick={() => {
+                    const defaults = ORGANIZATION_EXPERIENCE_PRESETS[organizationBusinessType];
+                    setOrganizationThemePreset(organizationBusinessType);
+                    setOrganizationThemeDraft(defaults.theme);
+                    setOrganizationPosLayout(defaults.posLayout.key);
+                    setOrganizationTerminology(defaults.terminology);
+                  }}
+                >
+                  {ar ? 'إرجاع افتراضيات النشاط' : 'Reset business defaults'}
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={savingOrganizationExperience}
+                  onClick={() => void handleSaveOrganizationExperience()}
+                >
+                  {savingOrganizationExperience && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {ar ? 'حفظ هوية المؤسسة' : 'Save organization identity'}
+                </Button>
+              </div>
             </div>
 
             {loadingOrganizationModules ? (

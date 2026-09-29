@@ -4,6 +4,7 @@ const SUPABASE_ORIGIN = process.env.VITE_SUPABASE_URL || 'https://azzdesuowpdcof
 const TEST_USER_ID = '00000000-0000-0000-0000-000000000001';
 const BRANCH_ID = '00000000-0000-0000-0000-000000000010';
 const SECOND_BRANCH_ID = '00000000-0000-0000-0000-000000000011';
+const ORGANIZATION_ID = '00000000-0000-0000-0000-000000000012';
 const PRODUCT_ID = '00000000-0000-0000-0000-000000000020';
 const WAREHOUSE_ID = '00000000-0000-0000-0000-000000000030';
 const TABLE_ID = '00000000-0000-0000-0000-000000000040';
@@ -14,8 +15,8 @@ const SEND_ID = '00000000-0000-0000-0000-000000000062';
 
 const fakeUser = { id: TEST_USER_ID, email: 'e2e@example.test', full_name: 'E2E Admin', role: 'super_admin', is_active: true, branch_id: BRANCH_ID, created_at: new Date().toISOString() };
 const branches = [
-  { id: BRANCH_ID, name: 'E2E Branch', name_en: 'E2E Branch', is_active: true },
-  { id: SECOND_BRANCH_ID, name: 'Second Branch', name_en: 'Second Branch', is_active: true },
+  { id: BRANCH_ID, name: 'E2E Branch', name_en: 'E2E Branch', is_active: true, organization_id: ORGANIZATION_ID },
+  { id: SECOND_BRANCH_ID, name: 'Second Branch', name_en: 'Second Branch', is_active: true, organization_id: ORGANIZATION_ID },
 ];
 const product = { id: PRODUCT_ID, branch_id: BRANCH_ID, name: 'E2E Burger', name_en: 'E2E Burger', sku: 'E2E-001', barcode: '628000000020', sale_price: 100, product_type: 'simple', category_id: null, is_active: true, low_stock_threshold: 5 };
 const diningTable = { id: TABLE_ID, branch_id: BRANCH_ID, area_id: null, name: 'Table 1', capacity: 4, status: 'vacant', shape: 'square', layout: { x: 0, y: 0, w: 120, h: 120 }, is_active: true, created_at: new Date().toISOString(), updated_at: new Date().toISOString() };
@@ -29,7 +30,7 @@ function makeSession() {
   return { access_token: accessToken, refresh_token: 'e2e-refresh-token', expires_in: 3600, expires_at: Math.floor(Date.now() / 1000) + 3600, token_type: 'bearer', user: { id: TEST_USER_ID, aud: 'authenticated', role: 'authenticated', email: fakeUser.email, user_metadata: {}, app_metadata: {} } };
 }
 
-async function mockPosBackend(page: Page) {
+async function mockPosBackend(page: Page, businessType: 'restaurant' | 'pharmacy' = 'restaurant') {
   rpcCalls = [];
   rpcPayloads = {};
   const session = makeSession();
@@ -70,6 +71,15 @@ async function mockPosBackend(page: Page) {
   await page.route(`${SUPABASE_ORIGIN}/rest/v1/customers**`, async (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
   await page.route(`${SUPABASE_ORIGIN}/rest/v1/categories**`, async (r) => r.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
   await page.route(`${SUPABASE_ORIGIN}/rest/v1/branches**`, async (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(branches) }));
+  await page.route(`${SUPABASE_ORIGIN}/rest/v1/organizations**`, async (r) => r.fulfill({
+    status: 200,
+    contentType: 'application/json',
+    body: JSON.stringify([{
+      id: ORGANIZATION_ID,
+      business_type: businessType,
+      business_profile: {},
+    }]),
+  }));
   await page.route(`${SUPABASE_ORIGIN}/rest/v1/settings**`, async (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ currency: 'EGP', tax_enabled: false, tax_rate: 0 }) }));
   await page.route(`${SUPABASE_ORIGIN}/rest/v1/warehouses**`, async (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ id: WAREHOUSE_ID, branch_id: BRANCH_ID, is_active: true }]) }));
   await page.route(`${SUPABASE_ORIGIN}/rest/v1/inventory**`, async (r) => r.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([{ product_id: PRODUCT_ID, quantity: 20 }]) }));
@@ -460,5 +470,35 @@ test.describe('POS action-level', () => {
     await page.getByRole('button', { name: /رجوع|Back/i }).click();
     await expect(page.getByTestId('pos-tables-landing-actions')).toBeVisible();
     await expect(tableButton(page)).toBeVisible();
+  });
+});
+
+test.describe('POS organization layout profiles', () => {
+  test('pharmacy layout hides restaurant-only flows and focuses barcode search', async ({ page }) => {
+    await mockPosBackend(page, 'pharmacy');
+    await login(page);
+
+    const posLink = page.getByRole('link', { name: /نقطة البيع|POS/i }).first();
+    await expect(posLink).toBeVisible({ timeout: 10000 });
+    await posLink.click();
+    await expect(page).toHaveURL(/#\/pos$/);
+
+    await page.getByTestId('pos-action-new-order').click();
+
+    await expect(page.getByTestId('pos-catalog-shell')).toHaveAttribute('data-pos-layout', 'pharmacy');
+    await expect(page.getByTestId('pos-tables-landing-shell')).toHaveCount(0);
+    await expect(page.getByTestId('pos-counter-tables')).toHaveCount(0);
+    await expect(page.getByTestId('pos-counter-kds')).toHaveCount(0);
+
+    const search = page.locator('[data-testid="pos-product-search"]:visible').first();
+    await expect(search).toBeVisible();
+    await expect(search).toBeFocused();
+
+    await addProduct(page);
+    await expect(page.getByTestId('pos-action-send-kitchen')).toHaveCount(0);
+    await expect(page.getByTestId('pos-action-pay')).toBeVisible();
+    await expect(page.getByText(/dine[- ]?in|صالة|داخل المطعم/i)).toHaveCount(0);
+    await expect(page.locator('html')).toHaveAttribute('data-pos-layout', 'pharmacy');
+    await expect(page.locator('body')).not.toHaveText(/Error Loading Data|خطأ في تحميل البيانات/i);
   });
 });

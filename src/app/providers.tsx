@@ -8,6 +8,7 @@ import { OfflineProvider } from '../context/OfflineContext';
 import { ToastProvider } from '../components/Toast';
 import { GuidedWorkflowProvider } from '@/core/guard/GuidedWorkflowContext';
 import { OrganizationModulesProvider } from '@/core/modules/OrganizationModulesContext';
+import { OrganizationExperienceProvider } from '@/core/organizations/OrganizationExperienceContext';
 import type { ReactNode } from 'react';
 
 export function AppProviders({ children }: { children: ReactNode }) {
@@ -18,6 +19,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
           <SettingsProvider>
             <RolesProvider>
               <OrganizationModulesProvider>
+                <OrganizationExperienceProvider>
                 <OfflineProvider>
                 <ToastProvider>
                   <HashRouter>
@@ -27,6 +29,7 @@ export function AppProviders({ children }: { children: ReactNode }) {
                   </HashRouter>
                 </ToastProvider>
                 </OfflineProvider>
+                </OrganizationExperienceProvider>
               </OrganizationModulesProvider>
             </RolesProvider>
           </SettingsProvider>
