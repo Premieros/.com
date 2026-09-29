@@ -169,11 +169,12 @@ export function PosWorkspacePage() {
   const live = useActiveOrders(effectiveBranch);
 
   useEffect(() => {
-    if (!effSettings?.pos_barcode_autofocus) return;
+    const shouldAutoFocusBarcode = posLayout.barcodeFirst || Boolean(effSettings?.pos_barcode_autofocus);
+    if (!shouldAutoFocusBarcode) return;
     if (panel || pos.checkoutOpen || mobileOrderOpen || configProduct || configItem || customerModalOpen || tableModalOpen || shiftModalOpen) return;
     const timer = setTimeout(() => barcodeRef.current?.focus(), 60);
     return () => clearTimeout(timer);
-  }, [effSettings?.pos_barcode_autofocus, panel, pos.checkoutOpen, mobileOrderOpen, configProduct, configItem, customerModalOpen, tableModalOpen, shiftModalOpen]);
+  }, [posLayout.barcodeFirst, effSettings?.pos_barcode_autofocus, panel, pos.checkoutOpen, mobileOrderOpen, configProduct, configItem, customerModalOpen, tableModalOpen, shiftModalOpen]);
 
   const { orders, tables, counts, ordersByTable, itemsByOrder, kitchenSendsByOrder, sentOrderItemIds, tableById } = live;
   const customerById = useMemo(() => Object.fromEntries(customers.map((c) => [c.id, c])), [customers]);
