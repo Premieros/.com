@@ -45,6 +45,7 @@ const PurchaseRequestsPage = lazy(() => import('../features/trade/pages/Purchase
 const RfqsPage = lazy(() => import('../features/trade/pages/RfqsPage').then(m => ({ default: m.RfqsPage })));
 const ReceivingPage = lazy(() => import('../features/trade/pages/ReceivingPage').then(m => ({ default: m.ReceivingPage })));
 const CustomersPage = lazy(() => import('../features/parties/pages/CustomersPage').then(m => ({ default: m.CustomersPage })));
+const BusinessRecordsPage = lazy(() => import('../features/operations/pages/BusinessRecordsPage').then(m => ({ default: m.BusinessRecordsPage })));
 const SuppliersPage = lazy(() => import('../features/parties/pages/SuppliersPage').then(m => ({ default: m.SuppliersPage })));
 const ExpensesPage = lazy(() => import('../features/trade/pages/ExpensesPage').then(m => ({ default: m.ExpensesPage })));
 const SalesPage = lazy(() => import('../features/trade/pages/SalesPage').then(m => ({ default: m.SalesPage })));
@@ -193,6 +194,7 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.rfqs} element={<ProtectedRoute permission="purchases.rfq"><RfqsPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.receiving} element={<ProtectedRoute permission="purchases.receiving"><ReceivingPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.customers} element={<ProtectedRoute permission="customers.view"><CustomersPage /></ProtectedRoute>} />
+        <Route path={APP_ROUTES.businessRecords} element={<ProtectedRoute permissionsAny={["customers.view", "suppliers.view", "products.view"]}><BusinessRecordsPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.suppliers} element={<ProtectedRoute permission="suppliers.view"><SuppliersPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.expenses} element={<ProtectedRoute permission="expenses.view"><ExpensesPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.sales} element={<ProtectedRoute permission="sales.view"><SalesPage /></ProtectedRoute>} />

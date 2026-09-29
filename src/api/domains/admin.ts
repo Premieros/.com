@@ -19,6 +19,21 @@ export const admin = {
   updateFinancialVisibilitySettings(p: { p_recent_days: number; p_historical_percent: number }): ApiResult<{ success: boolean; recent_days?: number; historical_percent?: number; error?: string }> { return rpc('update_financial_visibility_settings', p); },
   bootstrapInitialSuperAdmin(p: { p_email: string; p_password: string; p_full_name?: string; p_username?: string }): ApiResult<{ success: boolean; user_id?: string; email?: string; error?: string; message?: string }> { return rpc('bootstrap_initial_super_admin', p); },
   getSuperAdminTenantStats(): ApiResult<Array<{ organization_id: string; organization_name: string; organization_slug: string; is_active: boolean; created_at: string; branch_count: number; user_count: number; total_branches: number; active_branches: number; has_active_subscription?: boolean }>> { return rpc('get_super_admin_tenant_stats', {}); },
+  createOrganizationFromProfile(p: {
+    p_name: string;
+    p_business_type: string;
+    p_branch_name: string;
+    p_enabled_modules: string[];
+    p_business_profile: Record<string, unknown>;
+    p_owner_name: string;
+    p_owner_email: string;
+    p_owner_password: string;
+    p_phone?: string | null;
+    p_address?: string | null;
+    p_currency?: string;
+    p_tax_enabled?: boolean;
+    p_tax_rate?: number;
+  }): ApiResult<{ success?: boolean; error?: string; detail?: string; organization_id?: string; branch_id?: string; warehouse_id?: string; owner_user_id?: string; business_type?: string; trial_days?: number }> { return rpc('super_admin_create_organization_from_profile', p); },
   toggleOrganizationStatus(p: { p_org_id: string; p_is_active: boolean }): ApiResult<{ success?: boolean; error?: string }> { return rpc('toggle_organization_status', p); },
   getOrganizationModuleCatalog(p: { p_organization_id: string }): ApiResult<Array<{ feature_key: string; feature_name: string; category: string; enabled: boolean; source: string }>> { return rpc('get_organization_module_catalog', p); },
   setOrganizationModule(p: { p_organization_id: string; p_feature_key: string; p_enabled: boolean; p_reason?: string | null }): ApiResult<{ success?: boolean; error?: string; organization_id?: string; feature_key?: string; enabled?: boolean }> { return rpc('super_admin_set_organization_module', p); },

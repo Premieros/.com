@@ -14,6 +14,7 @@ import { useCan } from '@/lib/permissions';
 import { generateBarcode } from '@/lib/format';
 import { useGuidedWorkflow } from '@/core/guard';
 import { invalidatePosCatalogCache } from '@/core/offline/invalidatePosCatalogCache';
+import { BusinessAttributesFields } from '@/features/shared/BusinessAttributesFields';
 import type { Category, InventoryUnit } from '@/lib/types';
 
 type ManufacturedComponent = { unit_id: string; quantity: number };
@@ -57,6 +58,7 @@ export function ProductSetupWizardPage() {
     wholesale_price: 0,
     is_active: true,
   });
+  const [businessAttributes, setBusinessAttributes] = useState<Record<string, unknown>>({});
   const [manufacturedComponents, setManufacturedComponents] = useState<ManufacturedComponent[]>([]);
   const [rawComponents, setRawComponents] = useState<RawComponent[]>([]);
 
@@ -202,6 +204,12 @@ export function ProductSetupWizardPage() {
       createdProductId = data.product_id ?? null;
       if (!createdProductId) throw new Error(data?.error || 'error');
 
+      const { error: attributesError } = await supabase
+        .from('products')
+        .update({ business_attributes: businessAttributes })
+        .eq('id', createdProductId);
+      if (attributesError) throw attributesError;
+
       if (rawComponents.length > 0) {
         await api.catalog.saveProductDirectRawComponents({
           product_id: createdProductId,
@@ -279,6 +287,9 @@ export function ProductSetupWizardPage() {
             <Input label={t('costPrice')} type="number" step="0.01" value={form.cost_price || ''} onChange={(event) => setForm({ ...form, cost_price: Number(event.target.value) || 0 })} />
             <Input label={t('salePrice')} type="number" step="0.01" value={form.sale_price || ''} onChange={(event) => setForm({ ...form, sale_price: Number(event.target.value) || 0 })} />
             <Input label={t('wholesalePrice')} type="number" step="0.01" value={form.wholesale_price || ''} onChange={(event) => setForm({ ...form, wholesale_price: Number(event.target.value) || 0 })} />
+            <div className="md:col-span-2">
+              <BusinessAttributesFields entity="product" value={businessAttributes} onChange={setBusinessAttributes} />
+            </div>
           </div>
         )}
 

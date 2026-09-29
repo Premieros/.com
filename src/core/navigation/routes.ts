@@ -48,6 +48,7 @@ export const APP_ROUTES = {
   rfqs: '/purchases/rfqs',
   receiving: '/purchases/receiving',
   customers: '/customers',
+  businessRecords: '/business-records',
   suppliers: '/suppliers',
   expenses: '/expenses',
   sales: '/sales',

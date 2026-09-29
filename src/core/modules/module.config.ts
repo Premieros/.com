@@ -62,6 +62,7 @@ const ROUTE_MODULES: Partial<Record<AppRoute, OrganizationModuleKey>> = {
   [APP_ROUTES.receiving]: 'purchases',
 
   [APP_ROUTES.customers]: 'customers',
+  [APP_ROUTES.businessRecords]: 'customers',
   [APP_ROUTES.suppliers]: 'suppliers',
   [APP_ROUTES.expenses]: 'expenses',
   [APP_ROUTES.shifts]: 'shift_management',

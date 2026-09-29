@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-29T09:42:00.000Z",
+  "generated_at": "2026-09-29T12:05:00.000Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -1151,6 +1151,24 @@
       ]
     },
     {
+      "name": "super_admin_create_organization_from_profile",
+      "params": [
+        "address",
+        "branch_name",
+        "business_profile",
+        "business_type",
+        "currency",
+        "enabled_modules",
+        "name",
+        "owner_email",
+        "owner_name",
+        "owner_password",
+        "phone",
+        "tax_enabled",
+        "tax_rate"
+      ]
+    },
+    {
       "name": "super_admin_set_organization_module",
       "params": [
         "enabled",
@@ -1301,6 +1319,7 @@
     "audit_log",
     "branch_settings",
     "branches",
+    "business_records",
     "categories",
     "chart_of_accounts",
     "customers",

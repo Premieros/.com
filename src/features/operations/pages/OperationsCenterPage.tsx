@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Boxes, ChefHat, ClipboardCheck, PackageSearch, ShoppingCart, Truck, Warehouse } from 'lucide-react';
+import { ArrowLeftRight, Boxes, ChefHat, ClipboardCheck, NotebookPen, PackageSearch, ShoppingCart, Truck, Warehouse } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { CenterGrid, type CenterTileItem } from '@/components/design/CenterTile';
 import { useLanguage } from '@/context/LanguageContext';
@@ -19,6 +19,7 @@ export function OperationsCenterPage() {
     { id: 'counts', ar: 'الجرد والتسويات', en: 'Counts & Adjustments', descriptionAr: 'الجرد الفعلي وتسويات المخزون.', descriptionEn: 'Physical counts and stock adjustments.', route: APP_ROUTES.stockCounts, permission: can('inventory.view'), icon: ClipboardCheck },
     { id: 'low-stock', ar: 'تنبيهات المخزون', en: 'Low Stock Alerts', descriptionAr: 'الأصناف التي تحتاج إلى إعادة طلب.', descriptionEn: 'Items that need replenishment.', route: APP_ROUTES.lowStockAlerts, permission: can('inventory.view'), icon: PackageSearch },
     { id: 'purchases', ar: 'المشتريات', en: 'Purchasing', descriptionAr: 'الفواتير وطلبات الشراء والاستلام.', descriptionEn: 'Purchases, requests, and receiving.', route: APP_ROUTES.purchases, permission: can('purchases.view'), icon: Truck },
+    { id: 'business-records', ar: 'سجلات النشاط', en: 'Business Records', descriptionAr: 'الحجوزات والمواعيد والخطط والسجلات الخاصة بنوع المؤسسة.', descriptionEn: 'Bookings, appointments, plans, and profile-specific operational records.', route: APP_ROUTES.businessRecords, permission: can('customers.view') || can('suppliers.view') || can('products.view'), icon: NotebookPen },
     { id: 'kitchen', ar: 'المطبخ والطلبات', en: 'Kitchen & Orders', descriptionAr: 'متابعة الطلبات التشغيلية من نقطة البيع.', descriptionEn: 'Follow operational orders from POS.', route: APP_ROUTES.floorPlan, permission: can('floor_plan.view'), icon: ChefHat },
   ];
 
