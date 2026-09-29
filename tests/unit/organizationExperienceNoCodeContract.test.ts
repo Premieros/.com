@@ -31,6 +31,8 @@ describe('organization no-code experience contract', () => {
     expect(provider).toContain('dataset.posLayout');
     expect(provider).toContain("setProperty('--ui-radius'");
     expect(provider).toContain("setProperty('--ui-radius-2xl'");
+    expect(provider).toContain('DEFAULT_EXPERIENCE_CONTEXT');
+    expect(provider).toContain('?? DEFAULT_EXPERIENCE_CONTEXT');
   });
 
   it('lets Super Admin customize and reset existing organization identity', () => {
