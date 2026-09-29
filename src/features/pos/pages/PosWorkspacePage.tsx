@@ -856,6 +856,8 @@ export function PosWorkspacePage() {
             kitchenDispatch={pos.kitchenDispatch}
             customerName={pos.customerId ? customerById[pos.customerId]?.name || null : null}
             operatorName={activeOrderOperatorName}
+            layout={posLayout}
+            terminology={terminology}
             onOpenTransferModal={() => {
               if (pos.activeTable && pos.activeOrderId) {
                 const currentOrd =
