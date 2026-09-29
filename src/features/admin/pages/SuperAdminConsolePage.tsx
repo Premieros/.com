@@ -34,6 +34,7 @@ import { Modal } from '@/components/Modal';
 import { RolesTab } from './RolesTab';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { ORGANIZATION_MODULE_KEYS, ORGANIZATION_MODULES, type OrganizationModuleKey } from '@/core/modules/module.config';
+import { OrganizationCreateWizard } from '@/features/admin/components/OrganizationCreateWizard';
 
 interface TenantStats {
   organization_id: string;
@@ -110,6 +111,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
   const [organizationModules, setOrganizationModules] = useState<OrganizationModuleRow[]>([]);
   const [loadingOrganizationModules, setLoadingOrganizationModules] = useState(false);
   const [savingModuleKey, setSavingModuleKey] = useState<OrganizationModuleKey | null>(null);
+  const [organizationCreateOpen, setOrganizationCreateOpen] = useState(false);
 
   // System Controls state (Allow New User Creation)
   const [allowNewUserCreation, setAllowNewUserCreation] = useState<boolean>(true);
@@ -623,6 +625,10 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
                 <h3 className="text-base font-bold text-ui-text">{ar ? 'سجل المنظمات والمتاجر' : 'Organizations Directory'}</h3>
                 <p className="text-xs text-ui-subtle">{ar ? 'قائمة بجميع المستأجرين والشركات المسجلة في النظام' : 'Manage multi-tenant accounts and their branch quotas'}</p>
               </div>
+              <Button size="sm" onClick={() => setOrganizationCreateOpen(true)}>
+                <Plus className="w-4 h-4" />
+                {ar ? 'إضافة مؤسسة' : 'Add Organization'}
+              </Button>
             </div>
 
             <div className="overflow-x-auto">
@@ -1297,6 +1303,12 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
           </div>
         </Modal>
       )}
+      <OrganizationCreateWizard
+        open={organizationCreateOpen}
+        onClose={() => setOrganizationCreateOpen(false)}
+        onCreated={loadTenants}
+        ar={ar}
+      />
     </DesignSurface>
   );
 }
