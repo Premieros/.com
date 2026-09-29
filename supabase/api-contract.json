@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-29T11:45:00.000Z",
+  "generated_at": "2026-09-29T12:05:00.000Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -1319,6 +1319,7 @@
     "audit_log",
     "branch_settings",
     "branches",
+    "business_records",
     "categories",
     "chart_of_accounts",
     "customers",
