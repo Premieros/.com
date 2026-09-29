@@ -36,8 +36,8 @@ Create complete business-aware organizations from Super Admin using reusable pre
 
 ### Status
 - implementation active on `development/organization-business-profiles-20260929`
-- append-only migration added but NOT applied to hosted Production
-- source repository and source Supabase remain READ ONLY
+- PR #9 migrations applied to hosted Production `hvqlkapynjfjikqithvd` after explicit approval
+- full Production API contract parity is Green; source repository and source Supabase remain READ ONLY
 
 ## VERIFICATION GATE BEFORE MERGE
 
@@ -55,7 +55,6 @@ Required:
 
 ## NEXT ACTION
 
-1. Complete business-profile regression tests.
-2. Run Fast Verify and Full Verify on exact branch HEAD.
-3. Fix target-side regressions only.
-4. Do not merge or apply hosted Production migration before Green verification and explicit approval.
+1. Run Fast Verify and Full Verify on the documentation-only final HEAD.
+2. If Green, mark PR #9 Ready for Review.
+3. Stop before merge unless explicit merge approval is given.
