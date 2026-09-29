@@ -12,6 +12,7 @@ import {
   type BusinessProfileKey,
 } from '@/core/organizations/businessProfiles';
 import { BUSINESS_RUNTIME_PROFILES } from '@/core/organizations/businessProfileRuntime';
+import { ORGANIZATION_EXPERIENCE_PRESETS, type PosLayoutKey } from '@/core/organizations/organizationExperience';
 
 interface Props {
   open: boolean;
@@ -25,6 +26,13 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
   const [businessType, setBusinessType] = useState<BusinessProfileKey>('restaurant');
   const [enabledModules, setEnabledModules] = useState<OrganizationModuleKey[]>(
     BUSINESS_PROFILE_PRESETS.restaurant.enabledModules,
+  );
+  const [themePresetKey, setThemePresetKey] = useState<BusinessProfileKey>('restaurant');
+  const [posLayoutKey, setPosLayoutKey] = useState<PosLayoutKey>(
+    ORGANIZATION_EXPERIENCE_PRESETS.restaurant.posLayout.key,
+  );
+  const [terminology, setTerminology] = useState(
+    ORGANIZATION_EXPERIENCE_PRESETS.restaurant.terminology,
   );
   const [form, setForm] = useState({
     name: '',
@@ -42,6 +50,8 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
 
   const preset = BUSINESS_PROFILE_PRESETS[businessType];
   const runtimeProfile = BUSINESS_RUNTIME_PROFILES[businessType];
+  const selectedTheme = ORGANIZATION_EXPERIENCE_PRESETS[themePresetKey].theme;
+  const defaultPosLayout = ORGANIZATION_EXPERIENCE_PRESETS[businessType].posLayout;
 
   const selectedModuleSet = useMemo(() => new Set(enabledModules), [enabledModules]);
 
@@ -49,6 +59,9 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
     const nextPreset = BUSINESS_PROFILE_PRESETS[next];
     setBusinessType(next);
     setEnabledModules([...nextPreset.enabledModules]);
+    setThemePresetKey(next);
+    setPosLayoutKey(ORGANIZATION_EXPERIENCE_PRESETS[next].posLayout.key);
+    setTerminology(ORGANIZATION_EXPERIENCE_PRESETS[next].terminology);
     setForm((current) => ({
       ...current,
       currency: nextPreset.defaults.currency,
@@ -66,6 +79,9 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
   const reset = () => {
     setBusinessType('restaurant');
     setEnabledModules([...BUSINESS_PROFILE_PRESETS.restaurant.enabledModules]);
+    setThemePresetKey('restaurant');
+    setPosLayoutKey(ORGANIZATION_EXPERIENCE_PRESETS.restaurant.posLayout.key);
+    setTerminology(ORGANIZATION_EXPERIENCE_PRESETS.restaurant.terminology);
     setForm({
       name: '',
       branchName: '',
@@ -104,6 +120,9 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
           capabilities: preset.capabilities,
           runtime_fields: runtimeProfile.fields,
           record_types: runtimeProfile.records,
+          theme_profile: selectedTheme,
+          terminology_profile: terminology,
+          pos_layout: { ...defaultPosLayout, key: posLayoutKey },
           preset_key: preset.key,
         },
         p_owner_name: form.ownerName.trim(),
@@ -194,6 +213,53 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
               ))}
             </div>
           )}
+        </div>
+
+        <div className="rounded-xl border border-ui-border bg-ui-surface p-4">
+          <div className="mb-3">
+            <h4 className="text-sm font-bold text-ui-text">
+              {ar ? 'هوية المؤسسة ونقطة البيع' : 'Organization identity & POS'}
+            </h4>
+            <p className="text-xs text-ui-subtle">
+              {ar ? 'اختر الثيم وتصميم نقطة البيع وعدّل المسميات التي ستظهر للمستخدمين.' : 'Choose the theme, POS layout, and terminology shown to users.'}
+            </p>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Select
+              label={ar ? 'ثيم المؤسسة' : 'Organization theme'}
+              value={themePresetKey}
+              onChange={(e) => setThemePresetKey(e.target.value as BusinessProfileKey)}
+            >
+              {BUSINESS_PROFILE_KEYS.map((key) => (
+                <option key={key} value={key}>
+                  {ar ? BUSINESS_PROFILE_PRESETS[key].ar : BUSINESS_PROFILE_PRESETS[key].en}
+                </option>
+              ))}
+            </Select>
+
+            <Select
+              label={ar ? 'تصميم نقطة البيع' : 'POS layout'}
+              value={posLayoutKey}
+              onChange={(e) => setPosLayoutKey(e.target.value as PosLayoutKey)}
+            >
+              <option value="restaurant">{ar ? 'مطعم / طاولات ومطبخ' : 'Restaurant / tables & kitchen'}</option>
+              <option value="retail">{ar ? 'تجزئة / باركود سريع' : 'Retail / fast barcode'}</option>
+              <option value="pharmacy">{ar ? 'صيدلية / بحث وباركود' : 'Pharmacy / search & barcode'}</option>
+              <option value="wholesale">{ar ? 'جملة / كميات كبيرة' : 'Wholesale / bulk quantities'}</option>
+              <option value="vehicle">{ar ? 'معرض سيارات / حجز وبيع' : 'Vehicle showroom / reserve & sell'}</option>
+              <option value="service">{ar ? 'خدمات وحجوزات' : 'Services & booking'}</option>
+            </Select>
+
+            <Input label={ar ? 'مسمى الصنف' : 'Item label'} value={terminology.item} onChange={(e) => setTerminology({ ...terminology, item: e.target.value })} />
+            <Input label={ar ? 'مسمى الأصناف' : 'Items label'} value={terminology.items} onChange={(e) => setTerminology({ ...terminology, items: e.target.value })} />
+            <Input label={ar ? 'مسمى العميل' : 'Customer label'} value={terminology.customer} onChange={(e) => setTerminology({ ...terminology, customer: e.target.value })} />
+            <Input label={ar ? 'مسمى العملاء' : 'Customers label'} value={terminology.customers} onChange={(e) => setTerminology({ ...terminology, customers: e.target.value })} />
+            <Input label={ar ? 'مسمى المورد' : 'Supplier label'} value={terminology.supplier} onChange={(e) => setTerminology({ ...terminology, supplier: e.target.value })} />
+            <Input label={ar ? 'مسمى الفرع' : 'Branch label'} value={terminology.branch} onChange={(e) => setTerminology({ ...terminology, branch: e.target.value })} />
+            <Input label={ar ? 'مسمى الطلب' : 'Order label'} value={terminology.order} onChange={(e) => setTerminology({ ...terminology, order: e.target.value })} />
+            <Input label={ar ? 'مسمى طلب جديد' : 'New order label'} value={terminology.newOrder} onChange={(e) => setTerminology({ ...terminology, newOrder: e.target.value })} />
+          </div>
         </div>
 
         <div>
