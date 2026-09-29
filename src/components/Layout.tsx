@@ -69,6 +69,7 @@ const ICONS: Record<MenuIcon, ReactNode> = {
   settings: <Settings className="h-5 w-5" />,
   superAdmin: <SlidersHorizontal className="h-5 w-5 text-brand-500" />,
   importExport: <FileSpreadsheet className="h-5 w-5" />,
+  businessRecords: <NotebookPen className="h-5 w-5" />,
 };
 
 export function Layout({ children }: { children: ReactNode }) {
