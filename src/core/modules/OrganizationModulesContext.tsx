@@ -12,11 +12,13 @@ import { supabase } from '@/api';
 import { useAuth } from '@/context/AuthContext';
 import { useBranches } from '@/hooks/useBranches';
 import { useBranchFilter } from '@/lib/useBranchFilter';
-import type {
-  BusinessFieldDefinition,
-  BusinessRecordTypeDefinition,
-} from '@/core/organizations/businessProfileRuntime';
 import type { BusinessProfileKey } from '@/core/organizations/businessProfiles';
+import {
+  businessPathAllowed,
+  resolveBusinessRuntime,
+  type BusinessRuntime,
+  type StoredBusinessProfile,
+} from '@/core/organizations/businessRuntime';
 import {
   ORGANIZATION_MODULE_KEYS,
   type OrganizationModuleKey,
@@ -24,28 +26,19 @@ import {
 
 type ModuleAccessMap = Record<OrganizationModuleKey, boolean>;
 
-export interface OrganizationBusinessProfile {
-  preset_key?: BusinessProfileKey;
-  terminology?: {
-    item?: string;
-    customer?: string;
-    supplier?: string;
-    branch?: string;
-  };
-  capabilities?: string[];
-  runtime_fields?: BusinessFieldDefinition[];
-  record_types?: BusinessRecordTypeDefinition[];
-  [key: string]: unknown;
-}
+export type OrganizationBusinessProfile = StoredBusinessProfile;
 
 interface OrganizationModulesContextValue {
   organizationId: string | null;
   businessType: BusinessProfileKey | null;
   businessProfile: OrganizationBusinessProfile | null;
+  runtime: BusinessRuntime;
   loading: boolean;
   compatibilityFallback: boolean;
   access: ModuleAccessMap;
   canAccessModule: (moduleKey: OrganizationModuleKey | null | undefined) => boolean;
+  hasCapability: (capability: string) => boolean;
+  canAccessPath: (pathname: string) => boolean;
   refresh: () => Promise<void>;
 }
 
@@ -257,6 +250,11 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
     return () => window.removeEventListener(RUNTIME_CHANGED_EVENT, onRuntimeChanged);
   }, [organizationId, refresh]);
 
+  const runtime = useMemo(
+    () => resolveBusinessRuntime(businessType, businessProfile),
+    [businessProfile, businessType],
+  );
+
   const canAccessModule = useCallback(
     (moduleKey: OrganizationModuleKey | null | undefined) => {
       if (!moduleKey) return true;
@@ -265,23 +263,39 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
     [access],
   );
 
+  const hasCapability = useCallback(
+    (capability: string) => runtime.capabilities.has(capability),
+    [runtime],
+  );
+
+  const canAccessPath = useCallback(
+    (pathname: string) => businessPathAllowed(runtime, pathname),
+    [runtime],
+  );
+
   const value = useMemo<OrganizationModulesContextValue>(() => ({
     organizationId,
     businessType,
     businessProfile,
+    runtime,
     loading,
     compatibilityFallback,
     access,
     canAccessModule,
+    hasCapability,
+    canAccessPath,
     refresh,
   }), [
     organizationId,
     businessType,
     businessProfile,
+    runtime,
     loading,
     compatibilityFallback,
     access,
     canAccessModule,
+    hasCapability,
+    canAccessPath,
     refresh,
   ]);
 

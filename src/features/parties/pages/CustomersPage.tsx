@@ -24,12 +24,15 @@ import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
 import type { ArAgingRow, Customer } from '@/lib/types';
+import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
 
 export function CustomersPage() {
   const { t, lang } = useLanguage();
   const { show } = useToast();
   const can = useCan();
   const branchFilter = useBranchFilter();
+  const { runtime } = useOrganizationModules();
+  const customerLabel = runtime.terminology.customer[lang === 'ar' ? 'ar' : 'en'];
   const { rows: items, loading, total, hasMore, loadMore, loadingMore, refresh: reloadCustomers, fetchAll: fetchAllCustomers } = usePaginatedRows<Customer>({
     table: 'customers',
     select: '*',
@@ -134,7 +137,7 @@ export function CustomersPage() {
 
   return (
     <DesignSurface testId="customers-page">
-      <DesignPageHeader title={t('customers')} actions={can('customers.manage') ? <Button size="sm" onClick={openAdd} data-testid="customers-add"><Plus className="w-4 h-4" /> {t('add')}</Button> : undefined} />
+      <DesignPageHeader title={customerLabel} actions={can('customers.manage') ? <Button size="sm" onClick={openAdd} data-testid="customers-add"><Plus className="w-4 h-4" /> {t('add')}</Button> : undefined} />
       <DesignPanel testId="customers-search-panel">
         <DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="customers-search" />
       </DesignPanel>
@@ -161,7 +164,7 @@ export function CustomersPage() {
         />
         <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
       </DesignPanel>
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? t('edit') : t('add')}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? `${t('edit')} — ${customerLabel}` : `${t('add')} — ${customerLabel}`}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Input label={t('name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />

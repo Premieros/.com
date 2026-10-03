@@ -5,6 +5,9 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { MENU_ITEMS } from '@/core/navigation/menu.config';
 import { isAdminRole, useCan } from '@/lib/permissions';
+import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
+import { moduleForRoute } from '@/core/modules/module.config';
+import { businessMenuLabel } from '@/core/organizations/businessRuntime';
 
 const OPEN_COMMAND_PALETTE_EVENT = 'premier:open-command-palette';
 
@@ -18,6 +21,7 @@ export function CommandPalette() {
   const { user } = useAuth();
   const can = useCan();
   const navigate = useNavigate();
+  const { canAccessModule, canAccessPath, runtime } = useOrganizationModules();
   const ar = lang === 'ar';
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -57,11 +61,20 @@ export function CommandPalette() {
       if (item.ownerOnly && !admin) return false;
       if (item.permission && !can(item.permission)) return false;
       if (item.permissionsAny && !item.permissionsAny.some((permission) => can(permission))) return false;
+      if (runtime.navigation.hidden.has(item.id)) return false;
+      if (!canAccessModule(moduleForRoute(item.route))) return false;
+      if (!canAccessPath(item.route)) return false;
       if (!normalizedQuery) return true;
-      return [item.id, item.labelKey, item.group, item.route]
+      const label = businessMenuLabel(
+        runtime,
+        item.id,
+        ar ? 'ar' : 'en',
+        item.label ? item.label[ar ? 'ar' : 'en'] : item.labelKey,
+      );
+      return [item.id, label, item.group, item.route]
         .some((value) => value.toLocaleLowerCase().includes(normalizedQuery));
     });
-  }, [can, query, user?.role]);
+  }, [ar, can, canAccessModule, canAccessPath, query, runtime, user?.role]);
 
   useEffect(() => {
     if (selectedIndex >= items.length) setSelectedIndex(Math.max(items.length - 1, 0));
@@ -104,7 +117,12 @@ export function CommandPalette() {
           ) : items.map((item, index) => (
             <button key={item.id} type="button" onMouseEnter={() => setSelectedIndex(index)} onClick={() => choose(index)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-3 text-start transition ${index === selectedIndex ? 'bg-ui-primary-soft text-ui-primary' : 'text-ui-text hover:bg-ui-page-alt'}`}>
               <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-ui-page-alt"><Package className="h-4 w-4" /></span>
-              <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{item.labelKey}</span><span className="block truncate text-xs text-ui-muted">{item.route}</span></span>
+              <span className="min-w-0 flex-1"><span className="block truncate font-semibold">{businessMenuLabel(
+                runtime,
+                item.id,
+                ar ? 'ar' : 'en',
+                item.label ? item.label[ar ? 'ar' : 'en'] : item.labelKey,
+              )}</span><span className="block truncate text-xs text-ui-muted">{item.route}</span></span>
               {item.permission && <span className="hidden text-[10px] text-ui-subtle sm:block">{item.permission}</span>}
             </button>
           ))}

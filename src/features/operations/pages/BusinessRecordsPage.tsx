@@ -56,7 +56,7 @@ export function BusinessRecordsPage() {
   const { lang } = useLanguage();
   const ar = lang === 'ar';
   const { show } = useToast();
-  const { organizationId, businessProfile } = useOrganizationModules();
+  const { organizationId, runtime } = useOrganizationModules();
   const branchId = useBranchFilter();
   const [rows, setRows] = useState<BusinessRecordRow[]>([]);
   const [customers, setCustomers] = useState<OptionRow[]>([]);
@@ -68,8 +68,8 @@ export function BusinessRecordsPage() {
   const [form, setForm] = useState({ ...EMPTY_FORM });
 
   const recordTypes = useMemo(
-    () => businessProfile?.record_types || [],
-    [businessProfile],
+    () => runtime.recordTypes,
+    [runtime],
   );
 
   const typeMap = useMemo(
@@ -224,8 +224,10 @@ export function BusinessRecordsPage() {
   return (
     <DesignSurface testId="business-records-page">
       <DesignPageHeader
-        title={ar ? 'سجلات النشاط' : 'Business Records'}
-        subtitle={ar ? 'حجوزات ومواعيد وخطط وسجلات تشغيل حسب نوع المؤسسة.' : 'Bookings, appointments, plans and operational records driven by the organization profile.'}
+        title={runtime.navigation.menuLabels['business-records']?.[ar ? 'ar' : 'en'] || (ar ? 'سجلات النشاط' : 'Business Records')}
+        subtitle={ar
+          ? `سجلات تشغيل ${runtime.title.ar} حسب ملف النشاط الفعلي.`
+          : `Operational records for ${runtime.title.en}, driven by the active business profile.`}
         actions={recordTypes.length > 0 ? (
           <Button size="sm" onClick={openAdd}>
             <Plus className="h-4 w-4" />
@@ -285,17 +287,17 @@ export function BusinessRecordsPage() {
               <option value="cancelled">{ar ? 'ملغي' : 'Cancelled'}</option>
             </Select>
 
-            <Select label={ar ? 'العميل' : 'Customer'} value={form.customer_id} onChange={(e) => setForm({ ...form, customer_id: e.target.value })} required={selectedType?.customerRequired}>
+            <Select label={runtime.terminology.customer[ar ? 'ar' : 'en']} value={form.customer_id} onChange={(e) => setForm({ ...form, customer_id: e.target.value })} required={selectedType?.customerRequired}>
               <option value="">--</option>
               {customers.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
             </Select>
 
-            <Select label={ar ? 'المورد / مزود الخدمة' : 'Supplier / Provider'} value={form.supplier_id} onChange={(e) => setForm({ ...form, supplier_id: e.target.value })} required={selectedType?.supplierRequired}>
+            <Select label={runtime.terminology.supplier[ar ? 'ar' : 'en']} value={form.supplier_id} onChange={(e) => setForm({ ...form, supplier_id: e.target.value })} required={selectedType?.supplierRequired}>
               <option value="">--</option>
               {suppliers.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
             </Select>
 
-            <Select label={ar ? 'الصنف / الخدمة' : 'Item / Service'} value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })}>
+            <Select label={runtime.terminology.item[ar ? 'ar' : 'en']} value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })}>
               <option value="">--</option>
               {products.map((row) => <option key={row.id} value={row.id}>{row.name}</option>)}
             </Select>
