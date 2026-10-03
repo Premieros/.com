@@ -22,6 +22,8 @@ import {
 import { loadDashboardPaymentAggregates } from '../services/dashboardPayments';
 import { loadDashboardSalesSnapshot, type DashboardSalesSnapshot } from '../services/dashboardSnapshot';
 import { DashboardStandbyBar } from '../components/DashboardStandbyBar';
+import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
+import { APP_ROUTES } from '@/core/navigation/routes';
 
 type Range = 'today' | 'week' | 'month' | 'year';
 type RelatedName = { name?: string | null; name_en?: string | null; low_stock_threshold?: number | null };
@@ -60,6 +62,7 @@ type DashboardOps = {
   openOrderValue: number;
   purchases: number;
   expenses: number;
+  businessRecords: number;
 };
 
 const rangeLabels: Record<Range, [string, string]> = {
@@ -195,20 +198,25 @@ export function DashboardDataPage() {
   const branchFilter = useBranchFilter();
   const { effectiveSettings } = useSettings();
   const { branches } = useBranches();
+  const { organizationId, runtime, canAccessModule, canAccessPath } = useOrganizationModules();
   const ar = lang === 'ar';
-  const canCreateSale = can('pos.view') && can('pos.order.create');
-  const canViewPos = can('pos.view');
-  const canViewSales = can('sales.view') || can('reports.view');
-  const canViewReports = can('reports.view');
-  const canViewInventory = can('inventory.view');
-  const canViewFloorPlan = can('floor_plan.view');
-  const canViewPurchases = can('purchases.view');
-  const canViewExpenses = can('expenses.view');
-  const canViewKds = can('pos.kds_view');
-  const canViewFinancial = can('reports.financial');
-  const canViewAudit = can('audit.view');
+  const dashboardSections = runtime.dashboard.sections;
+  const canCreateSale = can('pos.view') && can('pos.order.create') && canAccessModule('pos') && canAccessPath(APP_ROUTES.pos);
+  const canViewPos = can('pos.view') && canAccessModule('pos') && dashboardSections.has('orders');
+  const canViewSales = (can('sales.view') || can('reports.view'))
+    && dashboardSections.has('sales')
+    && (canAccessModule('pos') || runtime.capabilities.has('service_sales'));
+  const canViewReports = can('reports.view') && canAccessModule('reports');
+  const canViewInventory = can('inventory.view') && canAccessModule('inventory') && dashboardSections.has('inventory');
+  const canViewFloorPlan = can('floor_plan.view') && canAccessPath(APP_ROUTES.floorPlan);
+  const canViewPurchases = can('purchases.view') && canAccessModule('purchases') && dashboardSections.has('purchases');
+  const canViewExpenses = can('expenses.view') && canAccessModule('expenses') && dashboardSections.has('expenses');
+  const canViewKds = can('pos.kds_view') && canAccessPath(APP_ROUTES.kitchenDisplay);
+  const canViewFinancial = can('reports.financial') && canAccessModule('accounting') && dashboardSections.has('finance');
+  const canViewBusinessRecords = dashboardSections.has('business_records') && runtime.recordTypes.length > 0;
+  const canViewAudit = can('audit.view') && canAccessModule('audit_logs');
   const canViewSettings = can('settings.manage');
-  const canViewTreasury = can('accounts.view');
+  const canViewTreasury = can('accounts.view') && canAccessModule('accounting');
   const [range, setRange] = useState<Range>(() => history.unlimited ? 'month' : 'week');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -225,6 +233,7 @@ export function DashboardDataPage() {
     openOrderValue: 0,
     purchases: 0,
     expenses: 0,
+    businessRecords: 0,
   });
   const settings = effectiveSettings(branchFilter);
   const money = useCallback((value: number) => formatFinancialCurrency(value, settings?.currency || 'EGP', lang), [settings?.currency, lang]);
@@ -402,8 +411,20 @@ export function DashboardDataPage() {
           })()
         : Promise.resolve({ data: [], error: null });
 
-      const [ordersRes, purchasesRes, expensesRes] = await Promise.all([
-        orderPromise, purchasePromise, expensePromise,
+      const businessRecordsPromise = canViewBusinessRecords && organizationId
+        ? (() => {
+            let q = supabase
+              .from('business_records')
+              .select('id', { count: 'exact', head: true })
+              .eq('organization_id', organizationId)
+              .neq('status', 'cancelled');
+            if (branchFilter) q = q.eq('branch_id', branchFilter);
+            return q;
+          })()
+        : Promise.resolve({ count: 0, data: [], error: null });
+
+      const [ordersRes, purchasesRes, expensesRes, businessRecordsRes] = await Promise.all([
+        orderPromise, purchasePromise, expensePromise, businessRecordsPromise,
       ]);
       if (cancelled) return;
 
@@ -414,13 +435,14 @@ export function DashboardDataPage() {
         openOrderValue: activeOrders.reduce((sum, order) => sum + Math.max(0, Number(order.total || 0)), 0),
         purchases: (purchasesRes.data || []).reduce((sum: number, row: Record<string, unknown>) => sum + Math.max(0, Number(row.total || 0) - Number(row.returned_amount || 0)), 0),
         expenses: (expensesRes.data || []).reduce((sum: number, row: Record<string, unknown>) => sum + Number(row.amount || 0), 0),
+        businessRecords: Number(businessRecordsRes.count || 0),
       });
     })();
 
     return () => { cancelled = true; };
   }, [
     branchFilter, range,
-    canViewPos, canViewPurchases, canViewExpenses,
+    canViewPos, canViewPurchases, canViewExpenses, canViewBusinessRecords, organizationId,
   ]);
 
   const current = useMemo(() => {
@@ -516,7 +538,26 @@ export function DashboardDataPage() {
   return <div dir={ar ? 'rtl' : 'ltr'} className="min-h-[calc(100vh-64px)] w-full min-w-0 bg-ui-page py-3 sm:py-4" data-testid="dashboard-surface"><div className="w-full min-w-0 space-y-5">
     <DashboardStandbyBar canCreateSale={canCreateSale} />
 
-    <section className="rounded-[32px] bg-gradient-to-br from-[#24114f] via-[#4b20a9] to-[#6d35df] p-6 text-white shadow-ui-lg"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex items-center gap-2 text-white/80"><BarChart3 className="h-4 w-4" /><span className="text-xs font-bold uppercase tracking-[0.18em]">Premier Control</span></div><h2 className="mt-2 text-3xl font-black">{ar ? 'لوحة التحكم' : 'Dashboard'}</h2><p className="mt-1 text-sm text-white/70">{history.unlimited ? (ar ? 'عرض كامل للتاريخ حسب الصلاحية' : 'Full historical access enabled') : (ar ? 'آخر 7 أيام كاملة، وما قبلها حسب سياسة العرض' : 'Last 7 days are complete; older periods follow the visibility policy')}</p></div><div className="flex flex-wrap gap-2">{(Object.keys(rangeLabels) as Range[]).map((item) => <button key={item} onClick={() => setRange(item)} className={`rounded-xl px-4 py-2 text-sm font-bold ${range === item ? 'bg-white text-ui-primary' : 'bg-white/10 text-white'}`}>{rangeLabels[item][ar ? 0 : 1]}</button>)}<button onClick={() => void load()} className="rounded-xl bg-white/10 p-2" aria-label={ar ? 'تحديث' : 'Refresh'}><RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /></button></div></div></section>
+    <section className="rounded-[32px] bg-gradient-to-br from-[#24114f] via-[#4b20a9] to-[#6d35df] p-6 text-white shadow-ui-lg"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex items-center gap-2 text-white/80"><BarChart3 className="h-4 w-4" /><span className="text-xs font-bold uppercase tracking-[0.18em]">Premier Control</span></div><h2 className="mt-2 text-3xl font-black">{ar ? `لوحة ${runtime.title.ar}` : `${runtime.title.en} Dashboard`}</h2><p className="mt-1 text-sm text-white/70">{ar ? runtime.description.ar : runtime.description.en}</p></div><div className="flex flex-wrap gap-2">{(Object.keys(rangeLabels) as Range[]).map((item) => <button key={item} onClick={() => setRange(item)} className={`rounded-xl px-4 py-2 text-sm font-bold ${range === item ? 'bg-white text-ui-primary' : 'bg-white/10 text-white'}`}>{rangeLabels[item][ar ? 0 : 1]}</button>)}<button onClick={() => void load()} className="rounded-xl bg-white/10 p-2" aria-label={ar ? 'تحديث' : 'Refresh'}><RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /></button></div></div></section>
+
+    <section data-testid="business-runtime-quick-actions" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {runtime.dashboard.quickActions
+        .filter((action) =>
+          (!action.module || canAccessModule(action.module))
+          && (!action.capability || runtime.capabilities.has(action.capability))
+          && canAccessPath(action.route),
+        )
+        .map((action) => (
+          <Link
+            key={action.id}
+            to={action.route}
+            className="rounded-2xl border border-ui-border bg-ui-surface p-4 text-sm font-extrabold text-ui-text shadow-ui-sm transition hover:-translate-y-0.5 hover:border-ui-primary/30 hover:shadow-ui-md"
+          >
+            <span className="text-ui-primary">→</span>{' '}
+            {ar ? action.ar : action.en}
+          </Link>
+        ))}
+    </section>
 
     {error && <div className="rounded-2xl border border-ui-danger/30 bg-ui-danger-soft p-4 text-sm font-bold text-ui-danger">{error}</div>}
 
@@ -536,6 +577,7 @@ export function DashboardDataPage() {
         {canViewSales && <Metric testId="kpi-returns" icon={ReceiptText} title={ar ? 'المرتجعات' : 'Returns'} value={current.returns} display={money(current.returns)} previous={previous.returns} href={canViewReports ? '/reports?reportType=returns' : undefined} ar={ar} />}
         {canViewPurchases && <Metric testId="kpi-purchases" icon={ShoppingCart} title={ar ? 'المشتريات' : 'Purchases'} value={ops.purchases} display={money(ops.purchases)} previous={0} href="/purchases" ar={ar} />}
         {canViewExpenses && <Metric testId="kpi-expenses" icon={Wallet} title={ar ? 'المصروفات' : 'Expenses'} value={ops.expenses} display={money(ops.expenses)} previous={0} href="/expenses" ar={ar} />}
+        {canViewBusinessRecords && <Metric testId="kpi-business-records" icon={ReceiptText} title={runtime.navigation.menuLabels['business-records']?.[ar ? 'ar' : 'en'] || (ar ? 'سجلات النشاط' : 'Business records')} value={ops.businessRecords} display={formatNumber(ops.businessRecords, 0)} previous={0} href={APP_ROUTES.businessRecords} ar={ar} />}
       </section>
 
       {canViewReports && canViewSales && <section className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]"><Card><h2 className="text-lg font-black text-ui-text">{ar ? 'حركة صافي المبيعات' : 'Net sales performance'}</h2><div className="mt-4 h-72">{current.orders > 0 ? <Suspense fallback={<div className="flex h-full items-center justify-center"><RefreshCw className="h-5 w-5 animate-spin text-ui-primary" /></div>}><DashboardSalesChart data={chart} formatValue={money} /></Suspense> : <Empty ar={ar} />}</div></Card>
