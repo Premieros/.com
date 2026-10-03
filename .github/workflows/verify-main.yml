@@ -15,8 +15,8 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  SUPABASE_PROJECT_REF: hvqlkapynjfjikqithvd
-  VITE_SUPABASE_URL: https://hvqlkapynjfjikqithvd.supabase.co
+  SUPABASE_PROJECT_REF: cuitndfayupfysejlpda
+  VITE_SUPABASE_URL: https://cuitndfayupfysejlpda.supabase.co
   VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'dummy_anon_key_for_ci_build' }}
 
 jobs:
@@ -60,8 +60,8 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     env:
-      SUPABASE_PROJECT_REF: hvqlkapynjfjikqithvd
-      VITE_SUPABASE_URL: https://hvqlkapynjfjikqithvd.supabase.co
+      SUPABASE_PROJECT_REF: cuitndfayupfysejlpda
+      VITE_SUPABASE_URL: https://cuitndfayupfysejlpda.supabase.co
       SUPABASE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres
     steps:
       - uses: actions/checkout@v4
@@ -104,8 +104,8 @@ jobs:
     needs: [verify, db]
     runs-on: ubuntu-latest
     env:
-      SUPABASE_PROJECT_REF: hvqlkapynjfjikqithvd
-      VITE_SUPABASE_URL: https://hvqlkapynjfjikqithvd.supabase.co
+      SUPABASE_PROJECT_REF: cuitndfayupfysejlpda
+      VITE_SUPABASE_URL: https://cuitndfayupfysejlpda.supabase.co
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
