@@ -591,6 +591,17 @@ BEGIN
     'public._deduct_sale_inventory_with_modifiers_core(uuid,uuid,jsonb,uuid,text)'::regprocedure
   ) INTO v_def;
 
+  -- Re-applying this migration to a database where the policy patch already
+  -- exists must be a safe no-op. This also makes recovery from interrupted
+  -- DDL application deterministic.
+  IF position('public.effective_allow_negative_stock' in v_def) > 0
+     AND position('public._deduct_ready_product_stock_policy' in v_def) > 0
+     AND position('public._deduct_inventory_unit_stock_policy' in v_def) > 0
+     AND position('v_allow_negative' in v_def) > 0
+     AND position('auth.uid(),v_allow_negative' in v_def) > 0 THEN
+    RETURN;
+  END IF;
+
   v_next:=replace(
     v_def,
     '  v_base_ready boolean := false;'||E'\n',
