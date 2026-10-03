@@ -1,7 +1,7 @@
 import { expect, test } from '@playwright/test';
 
 test('application shell renders when Supabase is unreachable', async ({ page }) => {
-  await page.route('https://hvqlkapynjfjikqithvd.supabase.co/**', async (route) => {
+  await page.route('https://cuitndfayupfysejlpda.supabase.co/**', async (route) => {
     await route.abort('failed');
   });
 
