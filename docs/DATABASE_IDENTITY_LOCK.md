@@ -5,8 +5,8 @@
 This repository is bound to exactly one hosted Supabase project:
 
 - Repository: `Premieros/.com`
-- Supabase project ref: `hvqlkapynjfjikqithvd`
-- Supabase project URL: `https://hvqlkapynjfjikqithvd.supabase.co`
+- Supabase project ref: `cuitndfayupfysejlpda`
+- Supabase project URL: `https://cuitndfayupfysejlpda.supabase.co`
 
 ## Non-negotiable rule
 
