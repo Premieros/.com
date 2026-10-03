@@ -54,6 +54,8 @@ describe('full ERP/POS operating cycle', () => {
         [userId, userEmail],
       );
 
+      await client.query("select set_config('app.register_branch','on',true)");
+
       await client.query(
         `insert into public.users(id,email,full_name,role,branch_id,is_active)
          values($1,$2,'CI Full Cycle','super_admin',$3,true)`,
@@ -62,7 +64,8 @@ describe('full ERP/POS operating cycle', () => {
 
       await client.query(
         `select set_config('app.user_id',$1,true),
-                set_config('app.jwt',$2,true)`,
+                set_config('app.jwt',$2,true),
+                set_config('app.register_branch','off',true)`,
         [userId, JSON.stringify({ sub: userId, role: 'authenticated' })],
       );
 
