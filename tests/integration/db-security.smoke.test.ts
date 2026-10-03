@@ -109,6 +109,31 @@ describe('canonical database integration smoke', () => {
     expect(debtTables).toHaveLength(2);
     expect(debtTables.every((row) => row.rls_enabled)).toBe(true);
 
+    const { rows: debtPolicies } = await client.query<{ table_name: string; policy_count: string }>(
+      `select tablename as table_name, count(*)::text as policy_count
+       from pg_policies
+       where schemaname = 'public'
+         and tablename in ('product_stock_debts', 'inventory_unit_stock_debts')
+       group by tablename
+       order by tablename`,
+    );
+    expect(debtPolicies).toHaveLength(2);
+    expect(debtPolicies.every((row) => Number(row.policy_count) > 0)).toBe(true);
+
+    const { rows: debtIndexes } = await client.query<{ indexname: string }>(
+      `select indexname
+       from pg_indexes
+       where schemaname = 'public'
+         and tablename in ('product_stock_debts', 'inventory_unit_stock_debts')
+         and (
+           indexname like '%_branch_id'
+           or indexname like '%_warehouse_id'
+           or indexname like '%_sale_id'
+           or indexname like '%_oversold_batch_id'
+         )`,
+    );
+    expect(debtIndexes.length).toBeGreaterThanOrEqual(8);
+
     const { rows: functions } = await client.query<{ function_name: string }>(
       `select p.proname as function_name
        from pg_proc p
