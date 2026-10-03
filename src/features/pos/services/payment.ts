@@ -217,22 +217,9 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   try {
     const { data, error } = await posApi.processSale(settlementPayload);
     if (!error && (data as { success?: boolean })?.success) {
-      if (Array.isArray(p.p_items)) {
-        for (const item of p.p_items) {
-          if (item.product_id) {
-            await InventoryRepository.recordLocalMovement({
-              id: `mov_${createOfflineToken()}`,
-              productId: item.product_id,
-              branchId: p.p_branch_id,
-              quantityDelta: -Number(item.quantity || 0),
-              reason: 'sale',
-              referenceId: p.p_invoice_number,
-              timestamp: new Date().toISOString(),
-            });
-          }
-        }
-      }
-
+      // Do not create an unsynced local stock movement for a server-confirmed sale.
+      // The server transaction has already committed the authoritative deduction;
+      // keeping a second unsynced movement would make local availability deduct it again.
       return {
         result: {
           ...(data as RpcResult),
