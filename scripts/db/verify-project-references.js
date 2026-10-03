@@ -3,7 +3,7 @@ import path from 'node:path'
 
 const ROOT = process.cwd()
 const CANONICAL_REPOSITORY = 'Premieros/.com'
-const CANONICAL_PROJECT_REF = 'hvqlkapynjfjikqithvd'
+const CANONICAL_PROJECT_REF = 'cuitndfayupfysejlpda'
 const SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'coverage', 'playwright-report'])
 const TEXT_EXTENSIONS = new Set([
   '.md', '.txt', '.js', '.cjs', '.mjs', '.ts', '.tsx', '.json', '.yml', '.yaml',
