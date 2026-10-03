@@ -25,12 +25,15 @@ import { usePaginatedRows } from '@/hooks/usePaginatedRows';
 import { useGuidedWorkflow } from '@/core/guard';
 import { SupplierStatementModal } from '../components/SupplierStatementModal';
 import type { ApAgingRow, Supplier, SupplierEvaluationRow } from '@/lib/types';
+import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
 
 export function SuppliersPage() {
   const { t, lang } = useLanguage();
   const { show } = useToast();
   const can = useCan();
   const branchFilter = useBranchFilter();
+  const { runtime } = useOrganizationModules();
+  const supplierLabel = runtime.terminology.supplier[lang === 'ar' ? 'ar' : 'en'];
   const { guidedContext, completePrerequisiteAndReturn } = useGuidedWorkflow();
   const { rows: items, loading, total, hasMore, loadMore, loadingMore, refresh: reloadSuppliers, fetchAll: fetchAllSuppliers } = usePaginatedRows<Supplier>({
     table: 'suppliers',
@@ -164,7 +167,7 @@ export function SuppliersPage() {
 
   return (
     <DesignSurface testId="suppliers-page">
-      <DesignPageHeader title={t('suppliers')} actions={
+      <DesignPageHeader title={supplierLabel} actions={
         <>
           {can('purchases.evaluation') && (
             <Button variant="outline" size="sm" onClick={toggleEvaluation} data-testid="suppliers-evaluation"><Trophy className="w-4 h-4" /> {t('supplierEvaluation')}</Button>
@@ -207,7 +210,7 @@ export function SuppliersPage() {
           </DesignPanel>
         </>
       )}
-      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? t('edit') : t('add')}>
+      <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? `${t('edit')} — ${supplierLabel}` : `${t('add')} — ${supplierLabel}`}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Input label={t('name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} required />
