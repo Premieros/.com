@@ -80,6 +80,9 @@ test.describe('visual business profile matrix', () => {
   for (const scenario of profiles) {
     test(`${scenario.profile} renders the expected operating system shape`, async ({ page }, testInfo) => {
       await page.setViewportSize({ width: 1440, height: 1100 });
+      await page.route('https://hvqlkapynjfjikqithvd.supabase.co/**', async (route) => {
+        await route.abort('failed');
+      });
       await page.goto(`/__runtime-preview/${scenario.profile}`);
       await expect(page.getByTestId('runtime-preview')).toHaveAttribute('data-profile', scenario.profile);
       await expect(page.getByTestId('workflow')).toHaveText(scenario.workflow);
