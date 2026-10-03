@@ -228,6 +228,7 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
               reason: 'sale',
               referenceId: p.p_invoice_number,
               createdAt: new Date().toISOString(),
+              synced: true,
             });
           }
         }
