@@ -474,3 +474,65 @@ export function businessGroupLabel(
 ): string {
   return runtime.navigation.groupLabels[group]?.[language] || fallback;
 }
+
+
+const RAW_MATERIAL_REPORTS = new Set([
+  'raw_material_consumption',
+  'raw_material_current_cost',
+  'raw_material_financial',
+  'sales_component_reconciliation',
+  'production_waste',
+]);
+
+const POS_ONLY_REPORTS = new Set([
+  'cashier_performance',
+  'sales_by_employee',
+  'daily_closing_range',
+]);
+
+export function businessReportAllowed(
+  runtime: BusinessRuntime,
+  reportKey: string,
+  category?: string,
+): boolean {
+  if (RAW_MATERIAL_REPORTS.has(reportKey)) {
+    return runtime.capabilities.has('raw_materials') || runtime.capabilities.has('recipes');
+  }
+  if (POS_ONLY_REPORTS.has(reportKey)) {
+    return runtime.dashboard.sections.has('orders');
+  }
+  if (reportKey === 'inventory' || reportKey === 'low_stock') {
+    return runtime.dashboard.sections.has('inventory');
+  }
+  if (reportKey === 'purchases') {
+    return runtime.dashboard.sections.has('purchases');
+  }
+  if (reportKey === 'expenses') {
+    return runtime.dashboard.sections.has('expenses');
+  }
+
+  if (category === 'manufacturing_costing') {
+    return runtime.capabilities.has('raw_materials')
+      || runtime.capabilities.has('recipes')
+      || runtime.capabilities.has('component_groups');
+  }
+  if (category === 'inventory') return runtime.dashboard.sections.has('inventory');
+  if (category === 'employees_shifts') {
+    return runtime.capabilities.has('shifts') || runtime.dashboard.sections.has('orders');
+  }
+  if (category === 'sales') return runtime.dashboard.sections.has('sales');
+  if (category === 'financial' || category === 'treasury_payments') {
+    return runtime.dashboard.sections.has('finance');
+  }
+
+  return true;
+}
+
+export function businessFinancialViewAllowed(
+  runtime: BusinessRuntime,
+  view: string,
+): boolean {
+  if (view === 'inventory_movement') return runtime.dashboard.sections.has('inventory');
+  if (view === 'ap_aging') return runtime.dashboard.sections.has('purchases');
+  return runtime.dashboard.sections.has('finance');
+}
