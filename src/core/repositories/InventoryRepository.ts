@@ -7,10 +7,12 @@ export class InventoryRepository {
    * Record a local stock movement in the local ledger (e.g. -2 for Sale while offline).
    * Does NOT blindly overwrite product quantity.
    */
-  public static async recordLocalMovement(movement: Omit<LocalStockMovement, 'synced'>): Promise<void> {
+  public static async recordLocalMovement(
+    movement: Omit<LocalStockMovement, 'synced'> & { synced?: boolean },
+  ): Promise<void> {
     const fullMovement: LocalStockMovement = {
       ...movement,
-      synced: false,
+      synced: movement.synced ?? false,
     };
     await dbPut('local_stock_movements', fullMovement);
   }
