@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeEach } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import fs from 'node:fs';
 import path from 'node:path';
 import { mergeEffectiveSettings } from '../src/context/SettingsContext';
@@ -131,7 +131,7 @@ describe('Negative Stock: Stock Calculation & Outbox Logic Simulation', () => {
   // Pure functional simulation of InventoryRepository calculation logic
   function calculateEffectiveStock(
     baseServerQuantity: number,
-    localMovements: Array<{ productId: string; delta: number; synced: boolean }>,
+    localMovements: Array<{ productId: string; delta: number; synced: boolean; referenceId?: string }>,
     pendingSales: Array<{
       status: string;
       items: Array<{ productId: string; quantity: number }>;
@@ -143,11 +143,15 @@ describe('Negative Stock: Stock Calculation & Outbox Logic Simulation', () => {
       .filter((m) => m.productId === targetProductId && !m.synced)
       .reduce((sum, m) => sum + m.delta, 0);
 
-    const unsyncedMovementInvoices = new Set(localMovements.map((m) => m.productId));
+    const movementRefIds = new Set(
+      localMovements
+        .map((movement) => movement.referenceId)
+        .filter((referenceId): referenceId is string => Boolean(referenceId)),
+    );
     let extraUnsyncedSalesDeductions = 0;
 
     for (const sale of pendingSales) {
-      if (sale.status === 'synced') continue;
+      if (sale.status === 'synced' || movementRefIds.has(sale.invoiceNumber)) continue;
       for (const item of sale.items) {
         if (item.productId === targetProductId) {
           extraUnsyncedSalesDeductions += item.quantity;
@@ -155,7 +159,7 @@ describe('Negative Stock: Stock Calculation & Outbox Logic Simulation', () => {
       }
     }
 
-    return baseServerQuantity + localMovementDeltas;
+    return baseServerQuantity + localMovementDeltas - extraUnsyncedSalesDeductions;
   }
 
   it('Scenario 1: Negative stock DISABLED - blocks sale when stock is insufficient', () => {
@@ -201,6 +205,40 @@ describe('Negative Stock: Stock Calculation & Outbox Logic Simulation', () => {
 
     // Must be blocked because 4 > 3
     expect(saleAllowed).toBe(false);
+  });
+
+  it('Scenario 1c: pending outbox sale reduces effective stock when no local movement exists', () => {
+    const pendingSales = [
+      {
+        status: 'pending',
+        invoiceNumber: 'INV-OFF-1',
+        items: [{ productId: 'prod-1', quantity: 6 }],
+      },
+    ];
+
+    const availableStock = calculateEffectiveStock(10, [], pendingSales, 'prod-1');
+    expect(availableStock).toBe(4);
+  });
+
+  it('Scenario 1d: pending outbox sale is not deducted twice when its local movement already exists', () => {
+    const localMovements = [
+      {
+        productId: 'prod-1',
+        delta: -6,
+        synced: false,
+        referenceId: 'INV-OFF-1',
+      },
+    ];
+    const pendingSales = [
+      {
+        status: 'pending',
+        invoiceNumber: 'INV-OFF-1',
+        items: [{ productId: 'prod-1', quantity: 6 }],
+      },
+    ];
+
+    const availableStock = calculateEffectiveStock(10, localMovements, pendingSales, 'prod-1');
+    expect(availableStock).toBe(4);
   });
 
   it('Scenario 2: Negative stock ENABLED - permits sale and accurately records negative balance', () => {
