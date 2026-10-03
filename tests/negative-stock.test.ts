@@ -117,6 +117,26 @@ describe('Negative Stock: Architectural & UI Contract Verification', () => {
     expect(paymentService).toContain('InventoryRepository.recordLocalMovement');
   });
 
+  it('keeps local stock movements limited to queued offline sales and reconciles them after sync/discard', () => {
+    const paymentService = fs.readFileSync(
+      path.join(root, 'src/features/pos/services/payment.ts'),
+      'utf8',
+    );
+    const syncEngine = fs.readFileSync(
+      path.join(root, 'src/core/offline/syncEngine.ts'),
+      'utf8',
+    );
+    const offlineContext = fs.readFileSync(
+      path.join(root, 'src/context/OfflineContext.tsx'),
+      'utf8',
+    );
+
+    const movementWrites = paymentService.match(/InventoryRepository\.recordLocalMovement/g) || [];
+    expect(movementWrites).toHaveLength(1);
+    expect(syncEngine).toContain('InventoryRepository.markMovementsSynced([invoiceNumber, item.id])');
+    expect(offlineContext).toContain('InventoryRepository.markMovementsSynced([invoiceNumber, id])');
+  });
+
   it('verifies usePosOrder connects allow_negative_stock to cart-level stock gating', () => {
     const posHook = fs.readFileSync(
       path.join(root, 'src/features/pos/hooks/usePosOrder.ts'),
