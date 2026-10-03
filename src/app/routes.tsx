@@ -65,6 +65,7 @@ const SettingsControlCenterPage = lazy(() => import('../features/admin/pages/Set
 const SuperAdminConsolePage = lazy(() => import('../features/admin/pages/SuperAdminConsolePage').then(m => ({ default: m.SuperAdminConsolePage })));
 const SystemHealthPage = lazy(() => import('../features/admin/pages/SystemHealthPage').then(m => ({ default: m.SystemHealthPage })));
 const ImportExportCenterPage = lazy(() => import('../features/import-export/pages/ImportExportCenterPage').then(m => ({ default: m.ImportExportCenterPage })));
+const BusinessRuntimePreviewPage = lazy(() => import('../testing/BusinessRuntimePreviewPage').then(m => ({ default: m.BusinessRuntimePreviewPage })));
 
 function PageLoader() {
   return <div className="min-h-screen flex items-center justify-center bg-ui-page"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-ui-primary" /></div>;
@@ -145,6 +146,9 @@ export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
+        {import.meta.env.VITE_BUSINESS_RUNTIME_PREVIEW === 'true' && (
+          <Route path="/__runtime-preview/:profile" element={<BusinessRuntimePreviewPage />} />
+        )}
         <Route path={APP_ROUTES.login} element={<PublicRoute><LoginPage /></PublicRoute>} />
         <Route path={APP_ROUTES.register} element={<Navigate to={APP_ROUTES.login} replace />} />
         <Route path={APP_ROUTES.frontendV2} element={<ProtectedRoute fullscreen><V2GatewayPage /></ProtectedRoute>} />
