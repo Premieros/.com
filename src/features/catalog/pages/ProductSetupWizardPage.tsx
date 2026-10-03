@@ -16,6 +16,7 @@ import { useGuidedWorkflow } from '@/core/guard';
 import { invalidatePosCatalogCache } from '@/core/offline/invalidatePosCatalogCache';
 import { BusinessAttributesFields } from '@/features/shared/BusinessAttributesFields';
 import type { Category, InventoryUnit } from '@/lib/types';
+import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
 
 type ManufacturedComponent = { unit_id: string; quantity: number };
 type RawComponent = { raw_material_id: string; quantity: number; wastage_percent: number };
@@ -37,8 +38,13 @@ export function ProductSetupWizardPage() {
   const branchFilter = useBranchFilter();
   const { branches } = useBranches();
   const can = useCan();
+  const { runtime } = useOrganizationModules();
   const { guidedContext, completePrerequisiteAndReturn } = useGuidedWorkflow();
   const isAr = lang === 'ar';
+  const supportsRawComposition = runtime.capabilities.has('raw_materials') || runtime.capabilities.has('recipes');
+  const supportsComponentGroups = runtime.capabilities.has('component_groups');
+  const supportsComposition = supportsRawComposition || supportsComponentGroups;
+  const itemLabel = runtime.terminology.item[isAr ? 'ar' : 'en'];
 
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
@@ -66,6 +72,15 @@ export function ProductSetupWizardPage() {
   const selectedManufacturedIds = useMemo(() => new Set(manufacturedComponents.map((row) => row.unit_id).filter(Boolean)), [manufacturedComponents]);
   const selectedRawIds = useMemo(() => new Set(rawComponents.map((row) => row.raw_material_id).filter(Boolean)), [rawComponents]);
   const totalComponentCount = manufacturedComponents.length + rawComponents.length;
+  const wizardSteps = useMemo(() => [
+    { step: 1, label: isAr ? `بيانات ${itemLabel}` : itemLabel },
+    ...(supportsComponentGroups ? [{ step: 2, label: isAr ? 'مجموعات المكونات' : 'Component groups' }] : []),
+    ...(supportsRawComposition ? [{ step: 3, label: isAr ? 'الخامات' : 'Raw materials' }] : []),
+    { step: 4, label: isAr ? 'مراجعة' : 'Review' },
+  ], [isAr, itemLabel, supportsComponentGroups, supportsRawComposition]);
+  const currentStepIndex = Math.max(0, wizardSteps.findIndex((item) => item.step === step));
+  const previousStep = wizardSteps[Math.max(0, currentStepIndex - 1)]?.step ?? 1;
+  const nextStep = wizardSteps[Math.min(wizardSteps.length - 1, currentStepIndex + 1)]?.step ?? 4;
 
   const rawUnitLabel = (material?: RawMaterial) => {
     const unit = material?.measurement_unit;
@@ -95,12 +110,16 @@ export function ProductSetupWizardPage() {
       setLoadingComponents(true);
       const [cats, manufactured, raws] = await Promise.all([
         supabase.from('categories').select('*').eq('branch_id', branchId).order('name'),
-        supabase.from('inventory_units').select('*').eq('branch_id', branchId).eq('unit_type', 'manufactured').eq('is_active', true).order('name'),
-        supabase.from('raw_materials')
-          .select('id,name,branch_id,is_active,default_cost,unit_id,measurement_unit:measurement_units!raw_materials_unit_id_fkey(id,name,symbol,code)')
-          .eq('branch_id', branchId)
-          .eq('is_active', true)
-          .order('name'),
+        supportsComponentGroups
+          ? supabase.from('inventory_units').select('*').eq('branch_id', branchId).eq('unit_type', 'manufactured').eq('is_active', true).order('name')
+          : Promise.resolve({ data: [], error: null }),
+        supportsRawComposition
+          ? supabase.from('raw_materials')
+              .select('id,name,branch_id,is_active,default_cost,unit_id,measurement_unit:measurement_units!raw_materials_unit_id_fkey(id,name,symbol,code)')
+              .eq('branch_id', branchId)
+              .eq('is_active', true)
+              .order('name')
+          : Promise.resolve({ data: [], error: null }),
       ]);
       if (cancelled) return;
       if (cats.error) show(cats.error.message, 'error');
@@ -118,7 +137,13 @@ export function ProductSetupWizardPage() {
     });
 
     return () => { cancelled = true; };
-  }, [branchId, show]);
+  }, [branchId, show, supportsComponentGroups, supportsRawComposition]);
+
+  useEffect(() => {
+    if (!supportsComponentGroups) setManufacturedComponents([]);
+    if (!supportsRawComposition) setRawComponents([]);
+    if (!wizardSteps.some((item) => item.step === step)) setStep(1);
+  }, [step, supportsComponentGroups, supportsRawComposition, wizardSteps]);
 
   const addManufacturedComponent = () => setManufacturedComponents((prev) => [...prev, { unit_id: '', quantity: 1 }]);
   const updateManufacturedComponent = (index: number, patch: Partial<ManufacturedComponent>) => {
@@ -137,7 +162,7 @@ export function ProductSetupWizardPage() {
       show(isAr ? 'أكمل اسم المنتج والفرع' : 'Complete the product name and branch', 'error');
       return false;
     }
-    if (step === 2) {
+    if (step === 2 && supportsComponentGroups) {
       if (manufacturedComponents.some((row) => !row.unit_id || row.quantity <= 0)) {
         show(isAr ? 'اختر مجموعة المكونات وحدد كمية صحيحة' : 'Select each component group and enter a valid quantity', 'error');
         return false;
@@ -151,7 +176,7 @@ export function ProductSetupWizardPage() {
         return false;
       }
     }
-    if (step === 3) {
+    if (step === 3 && supportsRawComposition) {
       if (rawComponents.some((row) => !row.raw_material_id || row.quantity <= 0 || row.wastage_percent < 0)) {
         show(isAr ? 'اختر الخامة وحدد كمية صحيحة' : 'Select each raw material and enter a valid quantity', 'error');
         return false;
@@ -175,7 +200,7 @@ export function ProductSetupWizardPage() {
   const save = async () => {
     if (!can('products.create') || saving || !branchId) return;
     if (!validateStep()) return;
-    if (rawComponents.length > 0 && !can('recipes.manage')) {
+    if (supportsRawComposition && rawComponents.length > 0 && !can('recipes.manage')) {
       show(isAr ? 'لا تملك صلاحية إدارة الخامات المباشرة للمنتج.' : 'You do not have permission to manage direct product raw materials.', 'error');
       return;
     }
@@ -183,7 +208,7 @@ export function ProductSetupWizardPage() {
     setSaving(true);
     let createdProductId: string | null = null;
     try {
-      const derivedProductType: 'ready' | 'manufactured' = rawComponents.length > 0 || manufacturedComponents.length > 0 ? 'manufactured' : 'ready';
+      const derivedProductType: 'ready' | 'manufactured' = supportsComposition && (rawComponents.length > 0 || manufacturedComponents.length > 0) ? 'manufactured' : 'ready';
       const { data, error: productError } = await api.catalog.createProduct({
         p_name: form.name.trim(),
         p_name_en: form.name_en.trim() || null,
@@ -196,7 +221,7 @@ export function ProductSetupWizardPage() {
         p_wholesale_price: Number(form.wholesale_price) || 0,
         p_is_active: form.is_active,
         p_product_type: derivedProductType,
-        p_unit_links: manufacturedComponents.length > 0
+        p_unit_links: supportsComponentGroups && manufacturedComponents.length > 0
           ? manufacturedComponents.map((row) => ({ unit_id: row.unit_id, quantity: Number(row.quantity) }))
           : null,
       });
@@ -210,7 +235,7 @@ export function ProductSetupWizardPage() {
         .eq('id', createdProductId);
       if (attributesError) throw attributesError;
 
-      if (rawComponents.length > 0) {
+      if (supportsRawComposition && rawComponents.length > 0) {
         await api.catalog.saveProductDirectRawComponents({
           product_id: createdProductId,
           branch_id: branchId,
@@ -245,20 +270,18 @@ export function ProductSetupWizardPage() {
   return (
     <DesignSurface testId="product-setup-wizard-page">
       <DesignPageHeader
-        title={isAr ? 'إضافة منتج' : 'Add Product'}
-        subtitle={isAr ? 'أنشئ المنتج ثم اربطه بمجموعات المكونات والخامات الموجودة مسبقًا. الخصم الفعلي للخامات يتم عند إرسال الطلب للمطبخ.' : 'Create the product, then link existing component groups and raw materials. Raw stock is deducted when the order is sent to the kitchen.'}
-        actions={<Button variant="outline" size="sm" onClick={() => navigate('/products')}><ChevronLeft className="w-4 h-4" />{isAr ? 'العودة للمنتجات' : 'Back to products'}</Button>}
+        title={isAr ? `إضافة ${itemLabel}` : `Add ${itemLabel}`}
+        subtitle={supportsComposition
+          ? (isAr ? `أنشئ ${itemLabel} واربط مكوناته التشغيلية حسب نشاط المؤسسة.` : `Create the ${itemLabel} and link the operational composition required by this business.`)
+          : (isAr ? `أدخل بيانات ${itemLabel} والحقول الخاصة بنشاط المؤسسة فقط.` : `Enter the ${itemLabel} data and business-specific fields only.`)}
+        actions={<Button variant="outline" size="sm" onClick={() => navigate('/products')}><ChevronLeft className="w-4 h-4" />{isAr ? 'العودة' : 'Back'}</Button>}
       />
       <DesignPanel>
         <div className="flex items-center gap-2 mb-6 overflow-x-auto pb-1">
-          {[
-            ['1', isAr ? 'بيانات المنتج' : 'Product'],
-            ['2', isAr ? 'مجموعات المكونات' : 'Component groups'],
-            ['3', isAr ? 'الخامات' : 'Raw materials'],
-            ['4', isAr ? 'مراجعة' : 'Review'],
-          ].map(([number, label]) => {
-            const active = Number(number) === step;
-            const done = Number(number) < step;
+          {wizardSteps.map(({ step: stepNumber, label }, index) => {
+            const number = String(stepNumber);
+            const active = stepNumber === step;
+            const done = index < currentStepIndex;
             return (
               <div key={number} className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm whitespace-nowrap ${active ? 'bg-brand-600 text-white' : done ? 'bg-ui-success-soft text-ui-success' : 'bg-ui-page-alt text-ui-subtle'}`}>
                 <span className="w-6 h-6 rounded-full flex items-center justify-center bg-white/20">{done ? <Check className="w-4 h-4" /> : number}</span>
@@ -293,7 +316,7 @@ export function ProductSetupWizardPage() {
           </div>
         )}
 
-        {step === 2 && (
+        {supportsComponentGroups && step === 2 && (
           <div className="space-y-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
@@ -322,7 +345,7 @@ export function ProductSetupWizardPage() {
           </div>
         )}
 
-        {step === 3 && (
+        {supportsRawComposition && step === 3 && (
           <div className="space-y-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
               <div>
@@ -362,34 +385,36 @@ export function ProductSetupWizardPage() {
               <p className="text-lg font-bold">{form.name}</p>
               <p className="text-sm text-ui-subtle mt-1">{branchName}</p>
               <div className="grid md:grid-cols-2 gap-4 mt-4">
-                <div>
+                {supportsComponentGroups && <div>
                   <p className="font-semibold mb-2">{isAr ? 'مجموعات المكونات المختارة' : 'Selected component groups'}</p>
                   {manufacturedComponents.length === 0 ? <p className="text-sm text-ui-subtle">—</p> : manufacturedComponents.map((row, index) => <div key={index} className="text-sm flex justify-between gap-3 py-1"><span>{manufacturedItems.find((item) => item.id === row.unit_id)?.name || row.unit_id}</span><span>× {row.quantity}</span></div>)}
-                </div>
-                <div>
+                </div>}
+                {supportsRawComposition && <div>
                   <p className="font-semibold mb-2">{isAr ? 'الخامات المختارة' : 'Selected raw materials'}</p>
                   {rawComponents.length === 0 ? <p className="text-sm text-ui-subtle">—</p> : rawComponents.map((row, index) => {
                     const material = rawMaterials.find((item) => item.id === row.raw_material_id);
                     return <div key={index} className="text-sm flex justify-between gap-3 py-1"><span>{material?.name || row.raw_material_id}</span><span>{row.quantity} {rawUnitLabel(material)} · {row.wastage_percent}%</span></div>;
                   })}
-                </div>
+                </div>}
               </div>
             </div>
-            <p className="text-sm text-ui-subtle">{isAr ? `سيتم ربط ${totalComponentCount} مكوّن موجود بالمنتج. لن يتم إنشاء خامة أو مجموعة مكونات من داخل شاشة المنتج.` : `${totalComponentCount} existing components will be linked. No raw material or component group will be created from the product screen.`}</p>
+            <p className="text-sm text-ui-subtle">{supportsComposition
+              ? (isAr ? `سيتم ربط ${totalComponentCount} مكوّن بـ ${itemLabel}.` : `${totalComponentCount} existing components will be linked to the ${itemLabel}.`)
+              : (isAr ? `سيتم حفظ ${itemLabel} بدون دورة تصنيع أو مكونات غير مطلوبة لهذا النشاط.` : `The ${itemLabel} will be saved without manufacturing composition that this business does not use.`)}</p>
           </div>
         )}
 
         <div className="flex justify-between gap-2 mt-6 pt-4 border-t border-ui-border">
-          <Button variant="secondary" onClick={() => setStep((current) => Math.max(1, current - 1))} disabled={step === 1 || saving}>
+          <Button variant="secondary" onClick={() => setStep(previousStep)} disabled={currentStepIndex === 0 || saving}>
             <ChevronLeft className="w-4 h-4" />{isAr ? 'السابق' : 'Back'}
           </Button>
-          {step < 4 ? (
-            <Button onClick={() => validateStep() && setStep((current) => current + 1)} disabled={loadingComponents}>
+          {currentStepIndex < wizardSteps.length - 1 ? (
+            <Button onClick={() => validateStep() && setStep(nextStep)} disabled={loadingComponents}>
               <ChevronRight className="w-4 h-4" />{isAr ? 'التالي' : 'Next'}
             </Button>
           ) : (
             <Button onClick={save} disabled={saving || !branchId}>
-              <PackagePlus className="w-4 h-4" />{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? 'حفظ المنتج' : 'Save product')}
+              <PackagePlus className="w-4 h-4" />{saving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (isAr ? `حفظ ${itemLabel}` : `Save ${itemLabel}`)}
             </Button>
           )}
         </div>
