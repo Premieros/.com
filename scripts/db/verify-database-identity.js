@@ -1,41 +1,26 @@
 const EXPECTED_REPOSITORY = 'Premieros/.com'
-const BLOCKED_REPOSITORIES = new Set(['Premieros/johna-s'])
-const BLOCKED_PROJECT_REF = 'azzdesuowpdcoflmyezn'
 const EXPECTED_PROJECT_REF = 'hvqlkapynjfjikqithvd'
-const configuredRef = (process.env.SUPABASE_PROJECT_REF || EXPECTED_PROJECT_REF).trim()
-const configuredUrl = (process.env.VITE_SUPABASE_URL || `https://${EXPECTED_PROJECT_REF}.supabase.co`).trim().replace(/\/$/, '')
+const EXPECTED_URL = `https://${EXPECTED_PROJECT_REF}.supabase.co`
 
 function fail(message) {
   console.error(`DATABASE_IDENTITY_LOCK_FAILED: ${message}`)
   process.exit(1)
 }
 
-
 const configuredRepository = (process.env.GITHUB_REPOSITORY || EXPECTED_REPOSITORY).trim()
-
-if (BLOCKED_REPOSITORIES.has(configuredRepository)) {
-  fail(`Repository ${configuredRepository} is explicitly blocked for this project`)
-}
+const configuredRef = (process.env.SUPABASE_PROJECT_REF || EXPECTED_PROJECT_REF).trim()
+const configuredUrl = (process.env.VITE_SUPABASE_URL || EXPECTED_URL).trim().replace(/\/$/, '')
 
 if (configuredRepository !== EXPECTED_REPOSITORY) {
   fail(`GITHUB_REPOSITORY must be ${EXPECTED_REPOSITORY}, received ${configuredRepository || '<empty>'}`)
-}
-
-if (configuredRef === BLOCKED_PROJECT_REF) {
-  fail(`The original Production project ${BLOCKED_PROJECT_REF} is permanently blocked in this repository`)
 }
 
 if (configuredRef !== EXPECTED_PROJECT_REF) {
   fail(`SUPABASE_PROJECT_REF must be ${EXPECTED_PROJECT_REF}, received ${configuredRef || '<empty>'}`)
 }
 
-const expectedUrl = `https://${EXPECTED_PROJECT_REF}.supabase.co`
-if (!configuredUrl) {
-  fail('VITE_SUPABASE_URL is required for the clean clone')
-}
-
-if (configuredUrl !== expectedUrl) {
-  fail(`VITE_SUPABASE_URL must be ${expectedUrl}, received ${configuredUrl}`)
+if (configuredUrl !== EXPECTED_URL) {
+  fail(`VITE_SUPABASE_URL must be ${EXPECTED_URL}, received ${configuredUrl || '<empty>'}`)
 }
 
 let parsed
@@ -45,18 +30,13 @@ try {
   fail('VITE_SUPABASE_URL is not a valid URL')
 }
 
-if (parsed.protocol !== 'https:' || parsed.hostname !== `${configuredRef}.supabase.co`) {
-  fail(`Supabase hostname must be ${configuredRef}.supabase.co`)
+if (parsed.protocol !== 'https:' || parsed.hostname !== `${EXPECTED_PROJECT_REF}.supabase.co`) {
+  fail(`Supabase hostname must be ${EXPECTED_PROJECT_REF}.supabase.co`)
 }
 
 const dbUrl = (process.env.SUPABASE_DB_URL || '').trim()
-if (dbUrl && !/localhost|127\.0\.0\.1/.test(dbUrl)) {
-  if (dbUrl.includes(BLOCKED_PROJECT_REF)) {
-    fail('SUPABASE_DB_URL must not point to the original Production project')
-  }
-  if (!dbUrl.includes(configuredRef)) {
-    fail('SUPABASE_DB_URL must contain the configured clean-clone project ref')
-  }
+if (dbUrl && !/localhost|127\.0\.0\.1/.test(dbUrl) && !dbUrl.includes(EXPECTED_PROJECT_REF)) {
+  fail('Remote SUPABASE_DB_URL must belong to the canonical Supabase project')
 }
 
-console.log(`Project identity verified: ${EXPECTED_REPOSITORY} -> ${configuredRef}`)
+console.log(`Project identity verified: ${EXPECTED_REPOSITORY} -> ${EXPECTED_PROJECT_REF}`)

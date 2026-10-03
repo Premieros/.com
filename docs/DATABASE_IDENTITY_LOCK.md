@@ -1,34 +1,25 @@
-# Database Identity Lock — johna-s
+# Database Identity Lock — Premieros/.com
 
-## Canonical project identity
+## Canonical identity
 
-This repository is permanently bound to the following Supabase project unless an explicit migration plan is approved and this lock is intentionally changed in the same reviewed change:
+This repository is bound to exactly one hosted Supabase project:
 
-- Repository: `Premieros/johna-s`
-- Supabase project ref: `azzdesuowpdcoflmyezn`
-- Supabase project URL: `https://azzdesuowpdcoflmyezn.supabase.co`
-- Supabase project name: `john's`
+- Repository: `Premieros/.com`
+- Supabase project ref: `hvqlkapynjfjikqithvd`
+- Supabase project URL: `https://hvqlkapynjfjikqithvd.supabase.co`
 
 ## Non-negotiable rule
 
-No application code, CI workflow, deployment workflow, migration command, production-parity check, environment file, database connection string, or operational script may point this repository to another Supabase project.
+Application code, CI, deployment workflows, print agents, operational scripts and documentation must not point to any other hosted Supabase project or any other Premieros repository.
 
-A different project ref or Supabase URL is a hard failure, not a fallback.
+Local PostgreSQL on `localhost` / `127.0.0.1` is allowed only for isolated CI and development tests.
 
 ## Enforcement
 
-`scripts/db/verify-database-identity.js` enforces the canonical identity.
-
-The verification must run before production build/deploy and as part of repository verification. It rejects:
-
-1. `SUPABASE_PROJECT_REF` values other than `azzdesuowpdcoflmyezn`.
-2. `VITE_SUPABASE_URL` values other than `https://azzdesuowpdcoflmyezn.supabase.co`.
-3. Remote `SUPABASE_DB_URL` values that do not belong to the locked project. Localhost/127.0.0.1 database URLs remain allowed for isolated CI tests only.
-
-## Secrets rule
-
-GitHub/hosting secrets may provide credentials such as the publishable/anon key, but they must never override the project identity with another Supabase URL or project ref.
+- `scripts/db/verify-database-identity.js` validates runtime environment identity.
+- `scripts/db/verify-project-references.js` scans the repository and rejects foreign project/database references.
+- CI and deployment workflows run both checks.
 
 ## Change control
 
-Changing this file alone does not authorize a database move. Any future database migration requires an explicit user instruction, a migration plan, data verification, rollback plan, and coordinated updates to this lock, CI and deployment configuration.
+Changing the canonical project identity requires an explicit user instruction and a separately reviewed migration/rollback plan. Database schema changes remain separately approval-gated.

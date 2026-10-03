@@ -10,7 +10,7 @@ namespace PremierPrintAgentLite
 {
     internal sealed class MainForm : Form
     {
-        private const string AppUrl = "https://premieros.github.io/johna-s/";
+        private const string AppUrl = "https://premieros.github.io/.com/";
         private readonly WebView2 _web = new WebView2();
         private readonly NotifyIcon _tray = new NotifyIcon();
         private readonly PrintBridge _bridge = new PrintBridge();

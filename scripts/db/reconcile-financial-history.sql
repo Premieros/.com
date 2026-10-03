@@ -1,4 +1,4 @@
--- Historical financial reconciliation for Premieros/johna-s.
+-- Historical financial reconciliation for Premieros/.com.
 --
 -- SAFETY:
 -- - This file is NOT a migration and is never run by normal deploys.

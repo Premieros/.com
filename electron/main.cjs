@@ -8,7 +8,7 @@ const os = require('os');
 const { execFile } = require('child_process');
 const { PerPrinterQueue, withTimeout } = require('./printerQueue.cjs');
 
-const DEFAULT_URL = 'https://premieros.github.io/johna-s/';
+const DEFAULT_URL = 'https://premieros.github.io/.com/';
 const TRUSTED_ORIGIN = 'https://premieros.github.io';
 const DEFAULT_THERMAL_WIDTH_MM = 80;
 const PRINT_LOAD_TIMEOUT_MS = 6000;
@@ -23,7 +23,7 @@ function resolveTargetUrl() {
   const candidate = process.env.ELECTRON_START_URL || process.env.POS_APP_URL || DEFAULT_URL;
   try {
     const parsed = new URL(candidate);
-    const isTrustedProduction = parsed.origin === TRUSTED_ORIGIN && parsed.pathname.startsWith('/johna-s');
+    const isTrustedProduction = parsed.origin === TRUSTED_ORIGIN && parsed.pathname.startsWith('/.com');
     const isLocalDev = parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost';
     if (isTrustedProduction || isLocalDev) return candidate;
   } catch {
@@ -230,7 +230,7 @@ function createWindow() {
     try {
       const parsed = new URL(url);
       const target = new URL(resolveTargetUrl());
-      const sameTrustedApp = parsed.origin === target.origin && parsed.pathname.startsWith('/johna-s');
+      const sameTrustedApp = parsed.origin === target.origin && parsed.pathname.startsWith('/.com');
       const sameLocalDev = (target.hostname === 'localhost' || target.hostname === '127.0.0.1') && parsed.origin === target.origin;
       if (!sameTrustedApp && !sameLocalDev) event.preventDefault();
     } catch {

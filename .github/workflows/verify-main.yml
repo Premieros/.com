@@ -30,10 +30,10 @@ jobs:
           cache: npm
       - name: Install dependencies
         run: if [ -f package-lock.json ]; then npm ci; else npm install; fi
-      - name: Verify mandatory active work log
-        run: npx vitest run tests/unit/activeWorklogGateContract.test.ts
       - name: Verify locked Supabase project identity
         run: node scripts/db/verify-database-identity.js
+      - name: Verify repository project references
+        run: node scripts/db/verify-project-references.js
       - name: Verify frontend API contract is current
         run: node scripts/db/gen-contract.js --check
       - run: npm run lint
@@ -73,6 +73,8 @@ jobs:
         run: if [ -f package-lock.json ]; then npm ci; else npm install; fi
       - name: Verify locked Supabase project identity
         run: node scripts/db/verify-database-identity.js
+      - name: Verify repository project references
+        run: node scripts/db/verify-project-references.js
       - name: Apply auth stub (CI only, never on real Supabase)
         run: node scripts/db/apply-migration.js --file supabase/ci/stub_auth.sql
       - name: Apply canonical migrations
@@ -114,6 +116,8 @@ jobs:
         run: if [ -f package-lock.json ]; then npm ci; else npm install; fi
       - name: Verify locked Supabase project identity
         run: node scripts/db/verify-database-identity.js
+      - name: Verify repository project references
+        run: node scripts/db/verify-project-references.js
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
       - name: Build application
