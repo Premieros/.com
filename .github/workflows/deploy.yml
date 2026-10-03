@@ -16,9 +16,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  SUPABASE_PROJECT_REF: hvqlkapynjfjikqithvd
-  VITE_SUPABASE_URL: https://hvqlkapynjfjikqithvd.supabase.co
-  VITE_SUPABASE_ANON_KEY: sb_publishable_9W6651rcdIsyBoegwGe_qw_MvCPRIPK
+  SUPABASE_PROJECT_REF: cuitndfayupfysejlpda
+  VITE_SUPABASE_URL: https://cuitndfayupfysejlpda.supabase.co
+  VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
   VITE_WORK_AUTHORIZATION_GATE: "0"
 
 jobs:
