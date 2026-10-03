@@ -117,6 +117,20 @@ describe('Negative Stock: Architectural & UI Contract Verification', () => {
     expect(paymentService).toContain('InventoryRepository.recordLocalMovement');
   });
 
+  it('clears a branch negative-stock override when the branch returns to company inheritance', () => {
+    const settingsContext = fs.readFileSync(
+      path.join(root, 'src/context/SettingsContext.tsx'),
+      'utf8',
+    );
+    const settingsRepository = fs.readFileSync(
+      path.join(root, 'src/core/repositories/SettingsRepository.ts'),
+      'utf8',
+    );
+
+    expect(settingsContext).toContain("hasOwnProperty.call(patch, 'allow_negative_stock')");
+    expect(settingsRepository).toContain('localStorage.removeItem(overrideKey)');
+  });
+
   it('keeps local stock movements limited to queued offline sales and reconciles them after sync/discard', () => {
     const paymentService = fs.readFileSync(
       path.join(root, 'src/features/pos/services/payment.ts'),
