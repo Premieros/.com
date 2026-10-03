@@ -109,6 +109,52 @@ vi.mock('@/context/SettingsContext', () => ({
 vi.mock('@/context/RolesContext', () => ({ useRoles: () => appMocks.roles }));
 vi.mock('@/context/ThemeContext', () => ({ useTheme: () => appMocks.theme }));
 vi.mock('@/components/Toast', () => ({ useToast: () => ({ show: () => {} }) }));
+vi.mock('@/core/modules/OrganizationModulesContext', () => {
+  const runtime = {
+    key: 'retail',
+    title: { ar: 'تجزئة', en: 'Retail' },
+    description: { ar: 'تجزئة', en: 'Retail' },
+    workflow: 'retail',
+    landingRoute: '/dashboard',
+    terminology: {
+      item: { ar: 'منتج', en: 'Product' },
+      customer: { ar: 'عميل', en: 'Customer' },
+      supplier: { ar: 'مورد', en: 'Supplier' },
+      branch: { ar: 'متجر', en: 'Store' },
+      sale: { ar: 'بيع', en: 'Sale' },
+      purchase: { ar: 'شراء', en: 'Purchase' },
+    },
+    capabilities: new Set(['barcode', 'stock_counts', 'low_stock', 'pricing', 'shifts']),
+    runtimeFields: [],
+    recordTypes: [],
+    navigation: {
+      order: ['dashboard', 'pos', 'products', 'inventory-center'],
+      hidden: new Set(['raw-materials', 'kitchen-display', 'operations-center']),
+      menuLabels: {},
+      groupLabels: {},
+    },
+    dashboard: {
+      sections: new Set(['sales', 'inventory', 'purchases', 'expenses', 'finance']),
+      quickActions: [],
+    },
+  };
+  return {
+    useOrganizationModules: () => ({
+      organizationId: '00000000-0000-0000-0000-000000000010',
+      businessType: 'retail',
+      businessProfile: null,
+      runtime,
+      loading: false,
+      compatibilityFallback: false,
+      access: {},
+      canAccessModule: () => true,
+      hasCapability: (capability: string) => runtime.capabilities.has(capability),
+      canAccessPath: () => true,
+      refresh: async () => {},
+    }),
+    notifyOrganizationRuntimeChanged: () => {},
+  };
+});
 
 import { LoginPage } from '@/features/auth/pages/LoginPage';
 import { DashboardEnhancedPage } from '@/features/dashboard/pages/DashboardEnhancedPage';
