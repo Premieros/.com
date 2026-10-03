@@ -60,20 +60,10 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
   const [compatibilityFallback, setCompatibilityFallback] = useState(false);
 
   const userId = user?.id ?? null;
-  const isPlatformAdmin = user?.role === 'super_admin';
-
   const refresh = useCallback(async () => {
     if (!userId) {
       setOrganizationId(null);
       setAccess(ALL_DISABLED);
-      setCompatibilityFallback(false);
-      setLoading(false);
-      return;
-    }
-
-    if (isPlatformAdmin) {
-      setOrganizationId(null);
-      setAccess(ALL_ENABLED);
       setCompatibilityFallback(false);
       setLoading(false);
       return;
@@ -132,7 +122,6 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
     branchId,
     branches,
     branchesLoading,
-    isPlatformAdmin,
     user?.branch_id,
     userId,
   ]);
@@ -144,10 +133,9 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
   const canAccessModule = useCallback(
     (moduleKey: OrganizationModuleKey | null | undefined) => {
       if (!moduleKey) return true;
-      if (isPlatformAdmin) return true;
       return access[moduleKey] !== false;
     },
-    [access, isPlatformAdmin],
+    [access],
   );
 
   const value = useMemo<OrganizationModulesContextValue>(() => ({
