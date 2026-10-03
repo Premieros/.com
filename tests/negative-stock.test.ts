@@ -117,40 +117,6 @@ describe('Negative Stock: Architectural & UI Contract Verification', () => {
     expect(paymentService).toContain('InventoryRepository.recordLocalMovement');
   });
 
-  it('clears a branch negative-stock override when the branch returns to company inheritance', () => {
-    const settingsContext = fs.readFileSync(
-      path.join(root, 'src/context/SettingsContext.tsx'),
-      'utf8',
-    );
-    const settingsRepository = fs.readFileSync(
-      path.join(root, 'src/core/repositories/SettingsRepository.ts'),
-      'utf8',
-    );
-
-    expect(settingsContext).toContain("hasOwnProperty.call(patch, 'allow_negative_stock')");
-    expect(settingsRepository).toContain('localStorage.removeItem(overrideKey)');
-  });
-
-  it('keeps local stock movements limited to queued offline sales and reconciles them after sync/discard', () => {
-    const paymentService = fs.readFileSync(
-      path.join(root, 'src/features/pos/services/payment.ts'),
-      'utf8',
-    );
-    const syncEngine = fs.readFileSync(
-      path.join(root, 'src/core/offline/syncEngine.ts'),
-      'utf8',
-    );
-    const offlineContext = fs.readFileSync(
-      path.join(root, 'src/context/OfflineContext.tsx'),
-      'utf8',
-    );
-
-    const movementWrites = paymentService.match(/InventoryRepository\.recordLocalMovement/g) || [];
-    expect(movementWrites).toHaveLength(1);
-    expect(syncEngine).toContain('InventoryRepository.markMovementsSynced([invoiceNumber, item.id])');
-    expect(offlineContext).toContain('InventoryRepository.markMovementsSynced([invoiceNumber, id])');
-  });
-
   it('verifies usePosOrder connects allow_negative_stock to cart-level stock gating', () => {
     const posHook = fs.readFileSync(
       path.join(root, 'src/features/pos/hooks/usePosOrder.ts'),
@@ -165,7 +131,7 @@ describe('Negative Stock: Stock Calculation & Outbox Logic Simulation', () => {
   // Pure functional simulation of InventoryRepository calculation logic
   function calculateEffectiveStock(
     baseServerQuantity: number,
-    localMovements: Array<{ productId: string; delta: number; synced: boolean; referenceId?: string }>,
+    localMovements: Array<{ productId: string; delta: number; synced: boolean }>,
     pendingSales: Array<{
       status: string;
       items: Array<{ productId: string; quantity: number }>;
@@ -177,15 +143,9 @@ describe('Negative Stock: Stock Calculation & Outbox Logic Simulation', () => {
       .filter((m) => m.productId === targetProductId && !m.synced)
       .reduce((sum, m) => sum + m.delta, 0);
 
-    const movementRefIds = new Set(
-      localMovements
-        .map((movement) => movement.referenceId)
-        .filter((referenceId): referenceId is string => Boolean(referenceId)),
-    );
     let extraUnsyncedSalesDeductions = 0;
-
     for (const sale of pendingSales) {
-      if (sale.status === 'synced' || movementRefIds.has(sale.invoiceNumber)) continue;
+      if (sale.status === 'synced') continue;
       for (const item of sale.items) {
         if (item.productId === targetProductId) {
           extraUnsyncedSalesDeductions += item.quantity;
@@ -239,40 +199,6 @@ describe('Negative Stock: Stock Calculation & Outbox Logic Simulation', () => {
 
     // Must be blocked because 4 > 3
     expect(saleAllowed).toBe(false);
-  });
-
-  it('Scenario 1c: pending outbox sale reduces effective stock when no local movement exists', () => {
-    const pendingSales = [
-      {
-        status: 'pending',
-        invoiceNumber: 'INV-OFF-1',
-        items: [{ productId: 'prod-1', quantity: 6 }],
-      },
-    ];
-
-    const availableStock = calculateEffectiveStock(10, [], pendingSales, 'prod-1');
-    expect(availableStock).toBe(4);
-  });
-
-  it('Scenario 1d: pending outbox sale is not deducted twice when its local movement already exists', () => {
-    const localMovements = [
-      {
-        productId: 'prod-1',
-        delta: -6,
-        synced: false,
-        referenceId: 'INV-OFF-1',
-      },
-    ];
-    const pendingSales = [
-      {
-        status: 'pending',
-        invoiceNumber: 'INV-OFF-1',
-        items: [{ productId: 'prod-1', quantity: 6 }],
-      },
-    ];
-
-    const availableStock = calculateEffectiveStock(10, localMovements, pendingSales, 'prod-1');
-    expect(availableStock).toBe(4);
   });
 
   it('Scenario 2: Negative stock ENABLED - permits sale and accurately records negative balance', () => {

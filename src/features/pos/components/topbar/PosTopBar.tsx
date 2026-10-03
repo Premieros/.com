@@ -80,8 +80,8 @@ export function PosTopBar({
   }, [location.pathname, onNewOrder]);
 
   useEffect(() => {
-    const id = window.setInterval(() => setNow(new Date()), 30000);
-    return () => window.clearInterval(id);
+    const id = setInterval(() => setNow(new Date()), 30000);
+    return () => clearInterval(id);
   }, []);
 
   const canManageCurrentShift = shiftChecked && (activeShift ? perms.canCloseShift : perms.canOpenShift);
