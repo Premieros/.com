@@ -1,7 +1,7 @@
 # Execution Guardrails — Premieros/.com
 
 Repository: `Premieros/.com`
-Canonical Supabase: `hvqlkapynjfjikqithvd`
+Canonical Supabase: `cuitndfayupfysejlpda`
 Production branch: `main`
 
 ## Hard safety rules
