@@ -1,5 +1,5 @@
 const EXPECTED_REPOSITORY = 'Premieros/.com'
-const EXPECTED_PROJECT_REF = 'hvqlkapynjfjikqithvd'
+const EXPECTED_PROJECT_REF = 'cuitndfayupfysejlpda'
 const EXPECTED_URL = `https://${EXPECTED_PROJECT_REF}.supabase.co`
 
 function fail(message) {
