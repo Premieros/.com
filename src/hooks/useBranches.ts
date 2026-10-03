@@ -20,6 +20,13 @@ async function fetchBranchesForUser(userId: string, force = false): Promise<Bran
     if (error) throw error;
     const next = (data as Branch[]) || [];
     branchCacheByUser.set(userId, next);
+    try {
+      if (typeof localStorage !== 'undefined' && next.length > 0) {
+        localStorage.setItem('premier:cached_branches', JSON.stringify(next));
+      }
+    } catch {
+      // ignore
+    }
     return next;
   })().finally(() => {
     branchRequestByUser.delete(userId);
@@ -37,12 +44,27 @@ export function notifyBranchesChanged(): void {
   }
 }
 
+function getInitialBranches(userId: string | null): Branch[] {
+  if (!userId) return [];
+  const inMem = branchCacheByUser.get(userId);
+  if (inMem && inMem.length > 0) return inMem;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const saved = localStorage.getItem('premier:cached_branches');
+      if (saved) return JSON.parse(saved) as Branch[];
+    }
+  } catch {
+    // ignore
+  }
+  return [];
+}
+
 export function useBranches() {
   const { user } = useAuth();
   const userId = user?.id ?? null;
-  const cached = userId ? branchCacheByUser.get(userId) : undefined;
-  const [branches, setBranches] = useState<Branch[]>(cached ?? []);
-  const [loading, setLoading] = useState(Boolean(userId) && cached === undefined);
+  const initial = getInitialBranches(userId);
+  const [branches, setBranches] = useState<Branch[]>(initial);
+  const [loading, setLoading] = useState(Boolean(userId) && initial.length === 0);
   const [error, setError] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -53,18 +75,25 @@ export function useBranches() {
       return;
     }
 
-    setLoading(branchCacheByUser.get(userId) === undefined);
+    setLoading(branches.length === 0);
     try {
       const next = await fetchBranchesForUser(userId, true);
       setBranches(next);
       setError(null);
-    } catch (error) {
-      setBranches([]);
-      setError(userFacingErrorMessage(error));
+    } catch (err) {
+      // Offline fallback: keep current branches or read from storage
+      const fallback = getInitialBranches(userId);
+      if (fallback.length > 0) {
+        setBranches(fallback);
+        setError(null);
+      } else {
+        setBranches([]);
+        setError(userFacingErrorMessage(err));
+      }
     } finally {
       setLoading(false);
     }
-  }, [userId]);
+  }, [userId, branches.length]);
 
   useEffect(() => {
     if (!userId) {

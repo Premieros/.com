@@ -4,11 +4,11 @@ import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useTheme } from '@/context/ThemeContext';
 import { useAuth } from '@/context/AuthContext';
+import { useOffline } from '@/context/OfflineContext';
 import { Logo } from '@/components/Logo';
 import type { Branch } from '@/lib/types';
 import type { ActiveShiftInfo } from '../../hooks/usePosOrder';
 import { usePosPermissions } from '../../hooks/usePosPermissions';
-import { offlinePosManager } from '../../services/offlinePos';
 
 export type PosPanelId = 'orders' | 'tables' | 'kitchen' | null;
 
@@ -56,26 +56,20 @@ export function PosTopBar({
   const landingOpened = useRef(false);
   const isAr = lang === 'ar';
 
+  const { isOnline, isSyncing, pendingCount, syncNow } = useOffline();
   const [now, setNow] = useState(() => new Date());
-  const [online, setOnline] = useState(typeof navigator !== 'undefined' ? navigator.onLine : true);
+  const online = isOnline;
   const [more, setMore] = useState(false);
-  const [pendingCount, setPendingCount] = useState(0);
-  const [syncing, setSyncing] = useState(false);
-
-  const refreshPending = useCallback(() => {
-    setPendingCount(offlinePosManager.getPendingCount());
-  }, []);
+  const syncing = isSyncing;
 
   const triggerSync = useCallback(async () => {
     if (syncing || !navigator.onLine) return;
-    setSyncing(true);
     try {
-      await offlinePosManager.syncAllPending();
-    } finally {
-      setSyncing(false);
-      refreshPending();
+      await syncNow();
+    } catch {
+      // handled in sync engine
     }
-  }, [syncing, refreshPending]);
+  }, [syncing, syncNow]);
 
   useEffect(() => {
     if (landingOpened.current) return;

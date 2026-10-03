@@ -310,6 +310,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
         pos_default_payment_method: settings.pos_default_payment_method || 'cash',
         pos_barcode_autofocus: settings.pos_barcode_autofocus ? 1 : 0,
         low_stock_threshold: settings.low_stock_threshold ?? 5,
+        allow_negative_stock: settings.allow_negative_stock ? '1' : '0',
       });
     }
   }, [settings]);
@@ -325,6 +326,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
         tax_enabled: row?.tax_enabled != null ? (row.tax_enabled ? '1' : '0') : null,
         currency: row?.currency ?? '',
         low_stock_threshold: row?.low_stock_threshold ?? null,
+        allow_negative_stock: row?.allow_negative_stock != null ? (row.allow_negative_stock ? '1' : '0') : null,
       });
     }
   }, [targetBranchId, branchSettingsMap]);
@@ -410,6 +412,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
         pos_default_payment_method: String(generalForm.pos_default_payment_method || 'cash'),
         pos_barcode_autofocus: Boolean(generalForm.pos_barcode_autofocus),
         low_stock_threshold: Number(generalForm.low_stock_threshold) || 5,
+        allow_negative_stock: generalForm.allow_negative_stock === '1',
       });
       if (!ok) {
         show(ar ? 'فشل حفظ الإعدادات المركزية. لم يتم تطبيق التغيير.' : 'Failed to save enterprise settings. No change was applied.', 'error');
@@ -435,6 +438,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
         tax_rate: branchForm.tax_rate != null ? Number(branchForm.tax_rate) : null,
         tax_enabled: branchForm.tax_enabled != null ? branchForm.tax_enabled === '1' : null,
         low_stock_threshold: branchForm.low_stock_threshold != null ? Number(branchForm.low_stock_threshold) : null,
+        allow_negative_stock: branchForm.allow_negative_stock != null ? branchForm.allow_negative_stock === '1' : undefined,
       });
       if (!ok) {
         show(ar ? 'فشل حفظ تخصيصات الفرع. لم يتم تطبيق التغيير.' : 'Failed to save branch customizations. No change was applied.', 'error');
@@ -889,6 +893,34 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
             </div>
 
             <div className="pt-4 border-t border-ui-border">
+              <h4 className="font-bold text-ui-text mb-3">{ar ? 'إعدادات المخزون وسياسة البيع بالسالب للمنشأة' : 'Inventory & Negative Stock Policy'}</h4>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <div className="space-y-1">
+                  <Select
+                    label={ar ? 'السماح بالبيع بالسالب (الإعداد الافتراضي العام)' : 'Allow Negative Stock (Enterprise Default)'}
+                    value={generalForm.allow_negative_stock || '0'}
+                    onChange={(e) => setGeneralForm({ ...generalForm, allow_negative_stock: e.target.value })}
+                    options={[
+                      { value: '0', label: ar ? 'معطل - منع البيع بالسالب (موصى به)' : 'Disabled - Strictly block negative stock' },
+                      { value: '1', label: ar ? 'مفعل - السماح بإتمام البيع برصيد سالب' : 'Enabled - Allow negative balance sales' },
+                    ]}
+                  />
+                  <p className="text-[11px] text-ui-subtle">
+                    {ar
+                      ? 'عند التعطيل: يُمنع إتمام البيع إذا كان الرصيد المتاح محلياً (مع خصم مبيعات الـ Offline) أقل من الكمية المطلوبة.'
+                      : 'When disabled, sales are blocked if available stock drops below zero. Unsynced offline sales are deducted.'}
+                  </p>
+                </div>
+                <Input
+                  label={ar ? 'حد تنبيه انخفاض المخزون الافتراضي' : 'Default Low Stock Threshold'}
+                  type="number"
+                  value={generalForm.low_stock_threshold ?? 5}
+                  onChange={(e) => setGeneralForm({ ...generalForm, low_stock_threshold: Number(e.target.value) || 0 })}
+                />
+              </div>
+            </div>
+
+            <div className="pt-4 border-t border-ui-border">
               <h4 className="font-bold text-ui-text mb-3">{ar ? 'إعدادات الفاتورة والطباعة' : 'Receipt & Printer Defaults'}</h4>
               <div className="grid gap-4 sm:grid-cols-2">
                 <Textarea
@@ -960,6 +992,33 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
                   { value: '0', label: ar ? 'معطلة لهذا الفرع' : 'Disabled for this branch' },
                 ]}
               />
+              <div className="sm:col-span-2 space-y-1">
+                <Select
+                  label={ar ? 'سياسة البيع بالسالب لهذا الفرع' : 'Branch Negative Stock Policy'}
+                  value={branchForm.allow_negative_stock == null ? '' : String(branchForm.allow_negative_stock)}
+                  onChange={(e) =>
+                    setBranchForm({
+                      ...branchForm,
+                      allow_negative_stock: e.target.value === '' ? null : e.target.value,
+                    })
+                  }
+                  options={[
+                    {
+                      value: '',
+                      label: ar
+                        ? `وراثة إعداد المنشأة الافتراضي (${generalForm.allow_negative_stock === '1' ? 'مسموح' : 'غير مسموح'})`
+                        : `Inherit enterprise default (${generalForm.allow_negative_stock === '1' ? 'Allowed' : 'Disallowed'})`,
+                    },
+                    { value: '0', label: ar ? 'منع البيع بالسالب لهذا الفرع نهائياً' : 'Disallow negative stock for this branch' },
+                    { value: '1', label: ar ? 'السماح بالبيع بالسالب لهذا الفرع' : 'Allow negative stock for this branch' },
+                  ]}
+                />
+                <p className="text-[11px] text-ui-subtle">
+                  {ar
+                    ? 'يمكنك تخصيص هذا الفرع بطلب سياسة مستقلة عن سياسة المنشأة المركزية.'
+                    : 'Override company policy specifically for this branch.'}
+                </p>
+              </div>
               <Input
                 label={ar ? 'نسبة ضريبة الفرع (%)' : 'Branch Tax Rate (%)'}
                 type="number"

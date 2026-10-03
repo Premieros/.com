@@ -23,6 +23,7 @@ import { useActiveOrders } from '../hooks/useActiveOrders';
 import { usePosPermissions } from '../hooks/usePosPermissions';
 import { usePosKeyboard } from '../hooks/usePosKeyboard';
 import { cartLineKey, orderItemLineKey } from '../utils/cart';
+import { InventoryRepository } from '@/core/repositories/InventoryRepository';
 import { OrderStartWizard, type StartStep, type StartOrderOptions } from '../components/start/OrderStartWizard';
 import { ProductBrowser } from '../components/catalog/ProductBrowser';
 import { ProductConfigModal } from '../components/catalog/ProductConfigModal';
@@ -137,6 +138,21 @@ export function PosWorkspacePage() {
   // authoritative inventory deduction point and may drive raw stock negative.
   // Do not preflight product/recipe stock from the workspace.
   const currentBranchName = branches.find((b) => b.id === effectiveBranch)?.name || effectiveBranch;
+  const [liveStockMap, setLiveStockMap] = useState<Record<string, number>>(EMPTY_POS_STOCK_MAP);
+
+  const refreshLiveStockMap = useCallback(async () => {
+    if (!effectiveBranch) return;
+    try {
+      const map = await InventoryRepository.getBranchStockMap(effectiveBranch);
+      setLiveStockMap(map);
+    } catch {
+      // fallback
+    }
+  }, [effectiveBranch]);
+
+  useEffect(() => {
+    void refreshLiveStockMap();
+  }, [refreshLiveStockMap, effectiveBranch]);
 
   const pos = usePosOrder({
     branchId: effectiveBranch,
@@ -146,13 +162,16 @@ export function PosWorkspacePage() {
     effSettings,
     activeShift,
     products,
-    stockMap: EMPTY_POS_STOCK_MAP,
+    stockMap: liveStockMap,
   });
   const canModifyCurrentOrder = pos.activeOrderId ? perms.canEditOrder : perms.canCreateOrder;
 
   useEffect(() => {
-    if (pos.receiptSaleId) setMobileOrderOpen(false);
-  }, [pos.receiptSaleId]);
+    if (pos.receiptSaleId) {
+      setMobileOrderOpen(false);
+      void refreshLiveStockMap();
+    }
+  }, [pos.receiptSaleId, refreshLiveStockMap]);
 
   const live = useActiveOrders(effectiveBranch);
 

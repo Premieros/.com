@@ -12,6 +12,9 @@ import {
   Percent,
   LockKeyhole,
   Unlock,
+  Boxes,
+  CheckCircle2,
+  AlertTriangle,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/api';
@@ -29,7 +32,7 @@ import { findUiTheme, UI_THEMES } from '@/lib/themes';
 import type { BranchSettings } from '@/lib/types';
 import { APP_ROUTES } from '@/core/navigation/routes';
 
-type SettingsTab = 'branch_profile' | 'tax' | 'business_day' | 'branch_staff' | 'appearance' | 'language';
+type SettingsTab = 'branch_profile' | 'tax' | 'business_day' | 'inventory' | 'branch_staff' | 'appearance' | 'language';
 
 interface UserRow {
   id: string;
@@ -73,6 +76,7 @@ export function SettingsControlCenterPage() {
         tax_enabled: row?.tax_enabled ?? null,
         currency: row?.currency ?? '',
         low_stock_threshold: row?.low_stock_threshold ?? null,
+        allow_negative_stock: row?.allow_negative_stock,
         business_day_mode: row?.business_day_mode ?? 'fixed_time',
         business_day_start: row?.business_day_start ?? '00:00',
         business_day_end: row?.business_day_end ?? '00:00',
@@ -120,6 +124,7 @@ export function SettingsControlCenterPage() {
         branchForm.low_stock_threshold != null && !Number.isNaN(branchForm.low_stock_threshold)
           ? branchForm.low_stock_threshold
           : null,
+      allow_negative_stock: branchForm.allow_negative_stock,
       business_day_mode: branchForm.business_day_mode || 'fixed_time',
       business_day_start: branchForm.business_day_start || '00:00',
       business_day_end: branchForm.business_day_end || '00:00',
@@ -139,6 +144,7 @@ export function SettingsControlCenterPage() {
     { key: 'branch_profile', label: isAr ? 'بيانات الفرع والطباعة' : 'Branch Profile & Receipts', icon: <Store className="w-4 h-4" /> },
     { key: 'tax', label: isAr ? 'الضريبة' : 'Tax', icon: <Percent className="w-4 h-4" /> },
     { key: 'business_day', label: isAr ? 'اليوم المالي والشفتات' : 'Business Day & Shifts', icon: <CalendarClock className="w-4 h-4" /> },
+    { key: 'inventory', label: isAr ? 'المخزون والبيع بالسالب' : 'Inventory & Negative Stock', icon: <Boxes className="w-4 h-4" /> },
     { key: 'branch_staff', label: isAr ? 'طاقم عمل الفرع' : 'Branch Staff', icon: <Users className="w-4 h-4" /> },
     { key: 'appearance', label: isAr ? 'المظهر والثيم' : 'Appearance & Theme', icon: <Palette className="w-4 h-4" /> },
     { key: 'language', label: isAr ? 'اللغة والتوطين' : 'Language', icon: <Languages className="w-4 h-4" /> },
@@ -404,6 +410,190 @@ export function SettingsControlCenterPage() {
                 <Button onClick={saveBranchSpecific} disabled={saving}>
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   <span>{isAr ? 'حفظ إعدادات اليوم المالي' : 'Save Business Day Settings'}</span>
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {active === 'inventory' && (
+            <Card className="space-y-6 p-4 sm:p-6">
+              <div>
+                <h2 className="text-lg font-bold text-ui-text">
+                  {isAr ? 'إعدادات المخزون وسياسة البيع بالسالب' : 'Inventory & Negative Stock Policy'}
+                </h2>
+                <p className="text-xs text-ui-subtle">
+                  {isAr
+                    ? 'التحكم في السماح أو منع بيع المنتجات عند وصول الرصيد المتاح إلى الصفر أو أقل'
+                    : 'Control whether products can be sold when available stock reaches zero or less'}
+                </p>
+              </div>
+
+              {/* Effective Status Badge */}
+              {(() => {
+                const globalSetting = settings?.allow_negative_stock ?? false;
+                const branchOverride = branchForm.allow_negative_stock;
+                const isEffectiveAllowed = branchOverride !== undefined ? branchOverride : globalSetting;
+                const isInherited = branchOverride === undefined;
+
+                return (
+                  <div
+                    className={`p-4 rounded-xl border flex items-start gap-3 ${
+                      isEffectiveAllowed
+                        ? 'bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-400'
+                        : 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400'
+                    }`}
+                  >
+                    {isEffectiveAllowed ? (
+                      <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
+                    ) : (
+                      <CheckCircle2 className="w-5 h-5 shrink-0 mt-0.5" />
+                    )}
+                    <div className="text-xs leading-relaxed">
+                      <p className="font-bold text-sm mb-1">
+                        {isAr
+                          ? isEffectiveAllowed
+                            ? 'البيع بالسالب: مسموح حالياً لهذا الفرع'
+                            : 'البيع بالسالب: غير مسموح (محظور) لهذا الفرع'
+                          : isEffectiveAllowed
+                            ? 'Negative Stock: Currently ALLOWED for this branch'
+                            : 'Negative Stock: Currently DISALLOWED (Strictly Blocked)'}
+                      </p>
+                      <p className="opacity-90">
+                        {isAr
+                          ? isInherited
+                            ? `(موروث من سياسة المنشأة المركزية: ${globalSetting ? 'مسموح' : 'غير مسموح'})`
+                            : '(مخصص بشكل صريح لهذا الفرع)'
+                          : isInherited
+                            ? `(Inherited from company default policy: ${globalSetting ? 'Allowed' : 'Disallowed'})`
+                            : '(Explicitly overridden for this branch)'}
+                      </p>
+                    </div>
+                  </div>
+                );
+              })()}
+
+              <div className="space-y-4">
+                <label className="text-sm font-bold text-ui-text block">
+                  {isAr ? 'سياسة البيع بالسالب لهذا الفرع:' : 'Negative Stock Policy for this Branch:'}
+                </label>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <button
+                    type="button"
+                    onClick={() => setBranchForm({ ...branchForm, allow_negative_stock: undefined })}
+                    className={`p-4 rounded-xl border text-start transition flex flex-col justify-between gap-2 ${
+                      branchForm.allow_negative_stock === undefined
+                        ? 'border-brand-500 bg-brand-500/10 text-ui-text'
+                        : 'border-ui-border bg-ui-page hover:bg-ui-page-alt text-ui-muted'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-xs font-bold text-ui-text">
+                        {isAr ? 'وراثة إعداد المنشأة' : 'Inherit Company Default'}
+                      </p>
+                      <p className="text-[11px] text-ui-subtle mt-1">
+                        {isAr
+                          ? `استخدام سياسة المنشأة المركزية (${settings?.allow_negative_stock ? 'مسموح' : 'غير مسموح'})`
+                          : `Follow enterprise master setting (${settings?.allow_negative_stock ? 'Allowed' : 'Disallowed'})`}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-semibold text-brand-600">
+                      {branchForm.allow_negative_stock === undefined ? (isAr ? '✓ الإعداد الحالي' : '✓ Selected') : ''}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBranchForm({ ...branchForm, allow_negative_stock: false })}
+                    className={`p-4 rounded-xl border text-start transition flex flex-col justify-between gap-2 ${
+                      branchForm.allow_negative_stock === false
+                        ? 'border-emerald-500 bg-emerald-500/10 text-ui-text'
+                        : 'border-ui-border bg-ui-page hover:bg-ui-page-alt text-ui-muted'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                        {isAr ? 'منع البيع بالسالب (موصى به)' : 'Disallow Negative Stock'}
+                      </p>
+                      <p className="text-[11px] text-ui-subtle mt-1">
+                        {isAr
+                          ? 'يمنع إتمام البيع نهائياً إذا كانت الكمية المتاحة محلياً ستصبح أقل من صفر'
+                          : 'Block sales if available stock will drop below zero'}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-semibold text-emerald-600">
+                      {branchForm.allow_negative_stock === false ? (isAr ? '✓ الإعداد الحالي' : '✓ Selected') : ''}
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setBranchForm({ ...branchForm, allow_negative_stock: true })}
+                    className={`p-4 rounded-xl border text-start transition flex flex-col justify-between gap-2 ${
+                      branchForm.allow_negative_stock === true
+                        ? 'border-amber-500 bg-amber-500/10 text-ui-text'
+                        : 'border-ui-border bg-ui-page hover:bg-ui-page-alt text-ui-muted'
+                    }`}
+                  >
+                    <div>
+                      <p className="text-xs font-bold text-amber-600 dark:text-amber-400">
+                        {isAr ? 'السماح بالبيع بالسالب' : 'Allow Negative Stock'}
+                      </p>
+                      <p className="text-[11px] text-ui-subtle mt-1">
+                        {isAr
+                          ? 'يسمح بالبيع وتسجيل الرصيد السالب وحركة المخزون بدقة أونلاين وأوفلاين'
+                          : 'Permit selling with negative balance and audit movement'}
+                      </p>
+                    </div>
+                    <span className="text-[10px] font-semibold text-amber-600">
+                      {branchForm.allow_negative_stock === true ? (isAr ? '✓ الإعداد الحالي' : '✓ Selected') : ''}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              <div className="pt-4 border-t border-ui-border grid gap-4 sm:grid-cols-2">
+                <Input
+                  label={isAr ? 'حد تنبيه انخفاض المخزون للفرع' : 'Branch Low Stock Alert Threshold'}
+                  type="number"
+                  value={branchForm.low_stock_threshold ?? ''}
+                  onChange={(e) =>
+                    setBranchForm({
+                      ...branchForm,
+                      low_stock_threshold: e.target.value === '' ? null : Number(e.target.value),
+                    })
+                  }
+                  placeholder={String(settings?.low_stock_threshold ?? 5)}
+                />
+              </div>
+
+              <div className="rounded-xl border border-ui-border bg-ui-page-alt p-4 space-y-2">
+                <p className="text-xs font-bold text-ui-text">
+                  {isAr ? 'كيف يتم التحقق واحتساب المخزون المتاح؟' : 'How available stock is validated:'}
+                </p>
+                <ul className="text-[11px] text-ui-subtle list-disc list-inside space-y-1">
+                  <li>
+                    {isAr
+                      ? 'الرصيد المتاح = آخر رصيد معروف للمخزون − الحركات المحلية غير المتزامنة − المبيعات المحلية غير المتزامنة في صندوق الانتظار (Sales Outbox).'
+                      : 'Available Stock = Last known snapshot − Unsynced local movements − Pending outbox sales in queue.'}
+                  </li>
+                  <li>
+                    {isAr
+                      ? 'يعمل الفحص على مستوى الواجهة (UI) وعلى مستوى منطق الأعمال (Business Logic) في نفس الوقت.'
+                      : 'Enforcement runs in both the user interface and business logic simultaneously.'}
+                  </li>
+                  <li>
+                    {isAr
+                      ? 'يعمل بكامل الكفاءة سواء كانت نقطة البيع متصلة بالإنترنت (Online) أو غير متصلة (Offline).'
+                      : 'Works identically in both Online and Offline cashier modes.'}
+                  </li>
+                </ul>
+              </div>
+
+              <div className="pt-4 border-t border-ui-border flex justify-end">
+                <Button onClick={saveBranchSpecific} disabled={saving}>
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  <span>{isAr ? 'حفظ إعدادات المخزون' : 'Save Inventory Settings'}</span>
                 </Button>
               </div>
             </Card>

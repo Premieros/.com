@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './AuthContext';
+import { AuthRepository } from '@/core/repositories/AuthRepository';
 import {
   ALL_PERMISSIONS,
   ROLE_META,
@@ -81,10 +82,15 @@ export function RolesProvider({ children }: { children: ReactNode }) {
         is_active: row.is_active ?? true,
       }));
       setRolesList(list);
+      AuthRepository.saveRolesMatrix(list);
     } else {
-      // Permission resolution is deliberately fail-closed. Role names are only
-      // labels/templates; losing the roles table must never grant fallback power.
-      setRolesList([]);
+      // Offline fallback: check if we have a valid previously cached roles matrix
+      const cached = AuthRepository.getCachedRolesMatrix();
+      if (cached && cached.length > 0) {
+        setRolesList(cached);
+      } else {
+        setRolesList([]);
+      }
     }
     setLoading(false);
   }, [sessionUserId]);

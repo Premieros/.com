@@ -28,10 +28,11 @@ export type { ActiveShiftInfo, UsePosOrderInput } from './usePosOrderBase';
  * Configuration, branch, permission, shift and order-state checks remain intact.
  */
 export function usePosOrder(input: UsePosOrderInput) {
+  const allowNegative = input.effSettings?.allow_negative_stock === true;
   const sellThroughInput = useMemo<UsePosOrderInput>(() => ({
     ...input,
-    rawShortageOnly: Object.fromEntries(input.products.map((product) => [product.id, true])),
-  }), [input]);
+    rawShortageOnly: Object.fromEntries(input.products.map((product) => [product.id, allowNegative])),
+  }), [input, allowNegative]);
 
   const base = usePosOrderBase(sellThroughInput);
   const { t, lang } = useLanguage();

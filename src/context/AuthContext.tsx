@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import * as api from '../api';
 import type { AppUser } from '../lib/types';
 import { isAuthSessionError } from '../lib/authSessionError';
+import { AuthRepository } from '@/core/repositories/AuthRepository';
 
 interface AuthContextValue {
   session: Session | null;
@@ -27,6 +28,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const clearAuthState = useCallback(() => {
     setSession(null);
     setUser(null);
+    AuthRepository.clearUserProfile();
   }, []);
 
   const loadUser = useCallback(async (activeSession: Session | null): Promise<AppUser | null> => {
@@ -62,6 +64,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const profile = data as AppUser;
     setUser(profile);
+    AuthRepository.saveUserProfile(profile);
     return profile;
   }, [clearAuthState]);
 
@@ -86,6 +89,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (mounted) setLoading(false);
       } catch (error) {
         if (!mounted) return;
+
+        // Offline / network failure fallback: check if we have a valid cached profile
+        const cached = AuthRepository.getCachedUserProfile();
+        if (cached && cached.id === activeSession.user.id && cached.is_active !== false) {
+          setUser(cached);
+          setSession(activeSession);
+          setLoading(false);
+          return;
+        }
 
         if (isAuthSessionError(error)) {
           if (allowRefresh) {

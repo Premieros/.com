@@ -27,6 +27,7 @@ export interface BranchSettings {
   tax_enabled: boolean | null;
   currency: string | null;
   low_stock_threshold: number | null;
+  allow_negative_stock?: boolean;
   business_day_mode: 'fixed_time' | 'shift_span';
   business_day_start: string;
   business_day_end: string;
@@ -45,6 +46,7 @@ export interface Settings {
   currency: string;
   tax_rate: number;
   tax_enabled: boolean;
+  allow_negative_stock?: boolean;
   receipt_footer: string | null;
   receipt_header: string | null;
   logo_url: string | null;

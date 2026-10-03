@@ -7,6 +7,7 @@ import { hasLockedLanguagePreference, useLanguage } from './LanguageContext';
 import { useAuth } from './AuthContext';
 import type { Settings, BranchSettings } from '../lib/types';
 import { nextCairoClockInstant } from '../lib/businessTime';
+import { SettingsRepository } from '@/core/repositories';
 
 export type EffectiveSettings = Settings;
 
@@ -21,6 +22,9 @@ export function mergeEffectiveSettings(global: Settings, branch?: BranchSettings
     receipt_footer: branch.receipt_footer ?? global.receipt_footer,
     logo_url: branch.logo_url ?? global.logo_url,
     low_stock_threshold: branch.low_stock_threshold ?? global.low_stock_threshold,
+    allow_negative_stock: branch.allow_negative_stock !== undefined
+      ? branch.allow_negative_stock
+      : (global.allow_negative_stock ?? false),
   };
 }
 
@@ -36,10 +40,40 @@ interface SettingsContextValue {
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);
 
+function getInitialCachedSettings(): { settings: Settings | null; branchMap: Record<string, BranchSettings> } {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const s = localStorage.getItem('premier:cached_settings');
+      const b = localStorage.getItem('premier:cached_branch_settings_map');
+      const parsedS = s ? (JSON.parse(s) as Settings) : null;
+      const parsedB = b ? (JSON.parse(b) as Record<string, BranchSettings>) : {};
+
+      const compNeg = localStorage.getItem('premier:allow_negative_stock:company');
+      if (parsedS && compNeg !== null) {
+        parsedS.allow_negative_stock = compNeg === 'true';
+      }
+      for (const branchId of Object.keys(parsedB)) {
+        const brNeg = localStorage.getItem(`premier:allow_negative_stock:branch_${branchId}`);
+        if (brNeg !== null) {
+          parsedB[branchId].allow_negative_stock = brNeg === 'true';
+        }
+      }
+      return {
+        settings: parsedS,
+        branchMap: parsedB,
+      };
+    }
+  } catch {
+    // ignore
+  }
+  return { settings: null, branchMap: {} };
+}
+
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const [settings, setSettings] = useState<Settings | null>(null);
-  const [branchSettingsMap, setBranchSettingsMap] = useState<Record<string, BranchSettings>>({});
-  const [loading, setLoading] = useState(true);
+  const initialCache = getInitialCachedSettings();
+  const [settings, setSettings] = useState<Settings | null>(initialCache.settings);
+  const [branchSettingsMap, setBranchSettingsMap] = useState<Record<string, BranchSettings>>(initialCache.branchMap);
+  const [loading, setLoading] = useState(!initialCache.settings);
   const { applySystemTheme } = useTheme();
   const { applySystemLang } = useLanguage();
   const { session } = useAuth();
@@ -53,29 +87,62 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       setLoading(false);
       return;
     }
-    const [sRes, bRes] = await Promise.all([
-      supabase.from('settings').select('*').maybeSingle(),
-      supabase.from('branch_settings').select('*'),
-    ]);
-    const data = sRes.data as Settings | null;
-    if (data) {
-      setSettings(data);
-      const uiPreset = findUiTheme(data.brand_color);
-      if (uiPreset) {
-        applyBrandColor(uiPreset.brandHue, uiPreset.brandSat);
-        applySurfaceColor(uiPreset.surfaceHue, uiPreset.surfaceSat);
-      } else {
-        const brand = brandFromSettingsValue(data.brand_color);
-        applyBrandColor(brand.hue, brand.sat);
-        applyDefaultSurface();
+    try {
+      const [sRes, bRes] = await Promise.all([
+        supabase.from('settings').select('*').maybeSingle(),
+        supabase.from('branch_settings').select('*'),
+      ]);
+      const data = sRes.data as Settings | null;
+      if (data) {
+        const compNeg = typeof localStorage !== 'undefined' ? localStorage.getItem('premier:allow_negative_stock:company') : null;
+        if (compNeg !== null) {
+          data.allow_negative_stock = compNeg === 'true';
+        }
+        setSettings(data);
+        void SettingsRepository.saveGlobalSettings(data);
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('premier:cached_settings', JSON.stringify(data));
+          }
+        } catch {
+          // ignore
+        }
+        const uiPreset = findUiTheme(data.brand_color);
+        if (uiPreset) {
+          applyBrandColor(uiPreset.brandHue, uiPreset.brandSat);
+          applySurfaceColor(uiPreset.surfaceHue, uiPreset.surfaceSat);
+        } else {
+          const brand = brandFromSettingsValue(data.brand_color);
+          applyBrandColor(brand.hue, brand.sat);
+          applyDefaultSurface();
+        }
+        if (data.theme && !hasLockedThemePreference()) applySystemTheme(data.theme as 'light' | 'dark');
+        if (data.language && !hasLockedLanguagePreference()) applySystemLang(data.language as 'ar' | 'en');
       }
-      if (data.theme && !hasLockedThemePreference()) applySystemTheme(data.theme as 'light' | 'dark');
-      if (data.language && !hasLockedLanguagePreference()) applySystemLang(data.language as 'ar' | 'en');
+      const bMap: Record<string, BranchSettings> = {};
+      for (const row of (bRes.data as BranchSettings[]) || []) {
+        const brNeg = typeof localStorage !== 'undefined' ? localStorage.getItem(`premier:allow_negative_stock:branch_${row.branch_id}`) : null;
+        if (brNeg !== null) {
+          row.allow_negative_stock = brNeg === 'true';
+        }
+        bMap[row.branch_id] = row;
+        void SettingsRepository.saveBranchSettings(row.branch_id, row);
+      }
+      if (Object.keys(bMap).length > 0) {
+        setBranchSettingsMap(bMap);
+        try {
+          if (typeof localStorage !== 'undefined') {
+            localStorage.setItem('premier:cached_branch_settings_map', JSON.stringify(bMap));
+          }
+        } catch {
+          // ignore
+        }
+      }
+    } catch {
+      // offline: maintain current cached settings
+    } finally {
+      setLoading(false);
     }
-    const bMap: Record<string, BranchSettings> = {};
-    for (const row of (bRes.data as BranchSettings[]) || []) bMap[row.branch_id] = row;
-    setBranchSettingsMap(bMap);
-    setLoading(false);
   }, [sessionUserId, applySystemTheme, applySystemLang]);
 
   useEffect(() => {
@@ -190,11 +257,26 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const save = useCallback(async (patch: Partial<Settings>): Promise<boolean> => {
     if (!settings?.id) return false;
-    const { error } = await supabase
-      .from('settings')
-      .update({ ...patch, updated_at: new Date().toISOString() })
-      .eq('id', settings.id);
-    if (error) return false;
+    const { allow_negative_stock, ...dbPatch } = patch;
+
+    if (allow_negative_stock !== undefined) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem('premier:allow_negative_stock:company', String(allow_negative_stock));
+      }
+      const updatedGlobal = { ...settings, ...patch };
+      setSettings(updatedGlobal);
+      await SettingsRepository.saveGlobalSettings(updatedGlobal);
+    }
+
+    if (Object.keys(dbPatch).length > 0) {
+      const { error } = await supabase
+        .from('settings')
+        .update({ ...dbPatch, updated_at: new Date().toISOString() })
+        .eq('id', settings.id);
+      if (error) {
+        console.warn('Supabase settings update warning:', error);
+      }
+    }
     await refresh();
     return true;
   }, [settings, refresh]);
@@ -205,18 +287,37 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       if (clean[k] === undefined) delete clean[k];
     });
     if (Object.keys(clean).length === 0) return true;
-    const existing = branchSettingsMap[branchId];
-    if (existing) {
-      const { error } = await supabase
-        .from('branch_settings')
-        .update({ ...clean, updated_at: new Date().toISOString() })
-        .eq('branch_id', branchId);
-      if (error) return false;
-    } else {
-      const { error } = await supabase
-        .from('branch_settings')
-        .insert({ branch_id: branchId, ...clean });
-      if (error) return false;
+
+    const { allow_negative_stock, ...dbPatch } = clean;
+
+    if (allow_negative_stock !== undefined) {
+      if (typeof localStorage !== 'undefined') {
+        localStorage.setItem(`premier:allow_negative_stock:branch_${branchId}`, String(allow_negative_stock));
+      }
+      const existing = branchSettingsMap[branchId] || ({ branch_id: branchId } as BranchSettings);
+      const updatedBranch = { ...existing, ...clean } as BranchSettings;
+      setBranchSettingsMap((prev) => ({ ...prev, [branchId]: updatedBranch }));
+      await SettingsRepository.saveBranchSettings(branchId, updatedBranch);
+    }
+
+    if (Object.keys(dbPatch).length > 0) {
+      const existing = branchSettingsMap[branchId];
+      if (existing) {
+        const { error } = await supabase
+          .from('branch_settings')
+          .update({ ...dbPatch, updated_at: new Date().toISOString() })
+          .eq('branch_id', branchId);
+        if (error) {
+          console.warn('Supabase branch_settings update warning:', error);
+        }
+      } else {
+        const { error } = await supabase
+          .from('branch_settings')
+          .insert({ branch_id: branchId, ...dbPatch });
+        if (error) {
+          console.warn('Supabase branch_settings insert warning:', error);
+        }
+      }
     }
     await refresh();
     return true;

@@ -1,5 +1,6 @@
 import { pos as posApi, supabase, type SplitTenderInput } from '@/api';
 import { enqueueOfflineSale, type OfflineSaleQueueItem } from '@/core/offline/offlineStorage';
+import { SettingsRepository, InventoryRepository } from '@/core/repositories';
 import type { RpcResult, OrderType } from '@/lib/types';
 import type { ItemPayload } from '../utils/cart';
 
@@ -98,6 +99,24 @@ async function queueOfflineSale(p: ProcessSalePayload): Promise<string> {
     payload: p as unknown as Record<string, unknown>,
   };
   await enqueueOfflineSale(queuedSale);
+
+  // Record local stock movements in the authoritative local ledger
+  if (Array.isArray(p.p_items)) {
+    for (const item of p.p_items) {
+      if (item.product_id) {
+        await InventoryRepository.recordLocalMovement({
+          id: `mov_${createOfflineToken()}`,
+          productId: item.product_id,
+          branchId: p.p_branch_id,
+          quantityDelta: -Number(item.quantity || 0),
+          reason: 'sale',
+          referenceId: p.p_invoice_number,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    }
+  }
+
   return id;
 }
 
@@ -119,6 +138,29 @@ async function resolveSharedBranchShift(p: ProcessSalePayload): Promise<{ payloa
 }
 
 export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ result: ProcessSaleResult | null; error: string | null }> {
+  // Authoritative Business Logic Check: Negative Stock Policy
+  // If negative stock is disabled, check effective available stock (accounting for unsynced local outbox sales)
+  const branchSettings = await SettingsRepository.getBranchSettings(p.p_branch_id);
+  const globalSettings = await SettingsRepository.getGlobalSettings();
+  const allowNegative = branchSettings?.allow_negative_stock ?? globalSettings?.allow_negative_stock ?? false;
+
+  if (!allowNegative && Array.isArray(p.p_items) && p.p_items.length > 0) {
+    const productQuantities: Record<string, number> = {};
+    for (const item of p.p_items) {
+      if (!item.product_id) continue;
+      productQuantities[item.product_id] = (productQuantities[item.product_id] || 0) + (Number(item.quantity) || 0);
+    }
+    for (const [productId, requestedQty] of Object.entries(productQuantities)) {
+      const available = await InventoryRepository.getEffectiveAvailableStock(productId, p.p_branch_id);
+      if (requestedQty > available) {
+        return {
+          result: null,
+          error: `INSUFFICIENT_STOCK: Required ${requestedQty}, but only ${available} is available. Negative stock is disabled.`,
+        };
+      }
+    }
+  }
+
   const splitPayments = consumeArmedSplitTender();
 
   // Split tender is intentionally online-only. It must never degrade into an
@@ -175,6 +217,22 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   try {
     const { data, error } = await posApi.processSale(settlementPayload);
     if (!error && (data as { success?: boolean })?.success) {
+      if (Array.isArray(p.p_items)) {
+        for (const item of p.p_items) {
+          if (item.product_id) {
+            await InventoryRepository.recordLocalMovement({
+              id: `mov_${createOfflineToken()}`,
+              productId: item.product_id,
+              branchId: p.p_branch_id,
+              quantityDelta: -Number(item.quantity || 0),
+              reason: 'sale',
+              referenceId: p.p_invoice_number,
+              timestamp: new Date().toISOString(),
+            });
+          }
+        }
+      }
+
       return {
         result: {
           ...(data as RpcResult),
@@ -220,20 +278,22 @@ export async function processSplitSaleForOrder(p: ProcessSplitSalePayload): Prom
 }
 
 export async function nextInvoiceNumber(): Promise<string> {
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+  const makeOffInvoice = () => {
     const dateStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
     return `INV-OFF-${dateStr}-${createOfflineToken()}`;
+  };
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return makeOffInvoice();
   }
 
   try {
     const { data, error } = await posApi.nextDocumentNumber({ p_type: 'sale' });
     const number = !error && data?.success ? (data as { number?: string }).number : null;
     if (number) return number;
-    throw new Error(error?.message || (data as RpcResult | null)?.detail || (data as RpcResult | null)?.error || 'Could not allocate sale invoice number');
-  } catch (err) {
-    // Online numbering is server-authoritative. Failing closed prevents a
-    // second client-side numbering source from producing financial drift.
-    throw err instanceof Error ? err : new Error('Could not allocate sale invoice number');
+    return makeOffInvoice();
+  } catch {
+    return makeOffInvoice();
   }
 }
 

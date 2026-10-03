@@ -3,9 +3,11 @@
  * Handles local caching of products/settings, queueing offline transactions,
  * and background / on-demand syncing when internet connection is restored.
  */
-import { pos as posApi } from '@/api';
 import type { ProcessSalePayload } from '../services/payment';
 import type { Product, Category } from '@/lib/types';
+import { offlineSyncEngine } from '@/core/offline/syncEngine';
+import { removeOfflineSale, getPendingSalesCount } from '@/core/offline/offlineStorage';
+import { ProductRepository } from '@/core/repositories/ProductRepository';
 
 const OFFLINE_QUEUE_KEY = 'pos_offline_sales_queue_v1';
 const OFFLINE_PRODUCTS_CACHE_KEY = 'pos_offline_products_cache_v1';
@@ -19,6 +21,12 @@ export interface QueuedSale {
   syncError?: string;
 }
 
+let cachedPendingCount = 0;
+// Subscribe to authoritative IndexedDB sync engine changes
+offlineSyncEngine.subscribe((status) => {
+  cachedPendingCount = status.pendingCount;
+});
+
 export const offlinePosManager = {
   // 1. Local Cache of Catalog
   saveCatalogCache(branchId: string, products: Product[], categories: Category[]) {
@@ -26,8 +34,10 @@ export const offlinePosManager = {
       localStorage.setItem(`${OFFLINE_PRODUCTS_CACHE_KEY}_${branchId}`, JSON.stringify(products));
       localStorage.setItem(`${OFFLINE_CATEGORIES_CACHE_KEY}_${branchId}`, JSON.stringify(categories));
     } catch (e) {
-      console.warn('Failed to cache catalog for offline mode', e);
+      console.warn('Failed to cache catalog in localStorage', e);
     }
+    // Also persist into authoritative IndexedDB product repository
+    void ProductRepository.cacheCatalog(branchId, products, categories);
   },
 
   getCatalogCache(branchId: string): { products: Product[]; categories: Category[] } | null {
@@ -46,7 +56,7 @@ export const offlinePosManager = {
     return null;
   },
 
-  // 2. Queue Operations
+  // 2. Queue Operations (backed by authoritative IndexedDB queue)
   getQueue(): QueuedSale[] {
     try {
       const data = localStorage.getItem(OFFLINE_QUEUE_KEY);
@@ -57,7 +67,13 @@ export const offlinePosManager = {
   },
 
   getPendingCount(): number {
-    return this.getQueue().filter((item) => !item.synced).length;
+    return cachedPendingCount || offlineSyncEngine.getStatus().pendingCount;
+  },
+
+  async refreshPendingCountAsync(): Promise<number> {
+    const count = await getPendingSalesCount();
+    cachedPendingCount = count;
+    return count;
   },
 
   enqueueSale(payload: ProcessSalePayload): QueuedSale {
@@ -84,6 +100,7 @@ export const offlinePosManager = {
     } catch (e) {
       console.error(e);
     }
+    void removeOfflineSale(localId);
   },
 
   clearSyncedSales() {
@@ -95,50 +112,21 @@ export const offlinePosManager = {
     }
   },
 
-  // 3. Sync Process
+  // 3. Sync Process (delegates to the authoritative sync engine)
   async syncAllPending(onProgress?: (synced: number, total: number) => void): Promise<{ success: number; failed: number; errors: string[] }> {
-    const queue = this.getQueue();
-    const pending = queue.filter((q) => !q.synced);
-    if (pending.length === 0) {
-      return { success: 0, failed: 0, errors: [] };
-    }
-
-    let successCount = 0;
-    let failedCount = 0;
+    const result = await offlineSyncEngine.syncAll();
     const errors: string[] = [];
-
-    for (let i = 0; i < pending.length; i++) {
-      const item = pending[i];
-      try {
-        const { data, error } = await posApi.processSale(item.payload);
-        if (!error && (data as { success?: boolean })?.success) {
-          item.synced = true;
-          delete item.syncError;
-          successCount++;
-        } else {
-          item.syncError = error?.message || (data as { error?: string })?.error || 'Sync failed';
-          failedCount++;
-          errors.push(item.syncError);
-        }
-      } catch (err) {
-        item.syncError = err instanceof Error ? err.message : 'Network error during sync';
-        failedCount++;
-        errors.push(item.syncError);
-      }
-
-      if (onProgress) {
-        onProgress(i + 1, pending.length);
-      }
+    if (result.failedCount > 0) {
+      const status = offlineSyncEngine.getStatus();
+      if (status.lastError) errors.push(status.lastError);
     }
-
-    // Save updated queue (keeping failed ones, removing successfully synced ones)
-    const remaining = queue.filter((q) => !q.synced);
-    try {
-      localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(remaining));
-    } catch (e) {
-      console.error(e);
+    if (onProgress) {
+      onProgress(result.successCount, result.successCount + result.failedCount);
     }
-
-    return { success: successCount, failed: failedCount, errors };
+    return {
+      success: result.successCount,
+      failed: result.failedCount,
+      errors,
+    };
   },
 };
