@@ -77,10 +77,11 @@ function NoAccessPage() {
 function resolveLandingRoute(
   can: (permission: Permission) => boolean,
   canAccessModule: (moduleKey: OrganizationModuleKey | null) => boolean,
+  canAccessPath: (pathname: string) => boolean,
   role?: string | null,
 ): string | null {
-  if (can('dashboard.view') && canAccessModule(moduleForRoute(APP_ROUTES.dashboard))) return APP_ROUTES.dashboard;
-  if (role === 'cashier' && can('pos.view') && canAccessModule(moduleForRoute(APP_ROUTES.pos))) return APP_ROUTES.pos;
+  if (can('dashboard.view') && canAccessModule(moduleForRoute(APP_ROUTES.dashboard)) && canAccessPath(APP_ROUTES.dashboard)) return APP_ROUTES.dashboard;
+  if (role === 'cashier' && can('pos.view') && canAccessModule(moduleForRoute(APP_ROUTES.pos)) && canAccessPath(APP_ROUTES.pos)) return APP_ROUTES.pos;
   const candidates: Array<[Permission, AppRoute]> = [
     ['pos.view', APP_ROUTES.pos], ['pos.kds_view', APP_ROUTES.kitchenDisplay], ['floor_plan.view', APP_ROUTES.floorPlan],
     ['approvals.review', APP_ROUTES.approvals], ['waste.view', APP_ROUTES.wasteCenter],
@@ -93,7 +94,7 @@ function resolveLandingRoute(
     ['users.view', APP_ROUTES.users], ['roles.permissions.manage', APP_ROUTES.permissions], ['audit.view', APP_ROUTES.auditLog], ['branches.manage', APP_ROUTES.branches], ['settings.manage', APP_ROUTES.settings],
   ];
   for (const [permission, route] of candidates) {
-    if (can(permission) && canAccessModule(moduleForRoute(route))) return route;
+    if (can(permission) && canAccessModule(moduleForRoute(route)) && canAccessPath(route)) return route;
   }
   return null;
 }
@@ -101,15 +102,15 @@ function resolveLandingRoute(
 function ProtectedRoute({ children, permission, permissionsAny, fullscreen, superAdminOnly = false, ownerOnly = false }: { children: ReactNode; permission?: Permission; permissionsAny?: Permission[]; fullscreen?: boolean; superAdminOnly?: boolean; ownerOnly?: boolean }) {
   const { session, loading, user } = useAuth();
   const { loading: rolesLoading } = useRoles();
-  const { loading: modulesLoading, canAccessModule } = useOrganizationModules();
+  const { loading: modulesLoading, canAccessModule, canAccessPath } = useOrganizationModules();
   const location = useLocation();
   const can = useCan();
   if (loading || rolesLoading || modulesLoading) return <PageLoader />;
   if (!session) return <Navigate to={APP_ROUTES.login} replace />;
   if (!user) return <PageLoader />;
-  const landingRoute = resolveLandingRoute(can, canAccessModule, user.role);
+  const landingRoute = resolveLandingRoute(can, canAccessModule, canAccessPath, user.role);
   const routeModule = moduleForPath(location.pathname);
-  if (!canAccessModule(routeModule)) return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
+  if (!canAccessModule(routeModule) || !canAccessPath(location.pathname)) return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
   if (superAdminOnly && user.role !== 'super_admin') return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
   if (ownerOnly && !isAdminRole(user.role)) return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
   if (permission && !can(permission)) return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
@@ -121,22 +122,22 @@ function ProtectedRoute({ children, permission, permissionsAny, fullscreen, supe
 function PublicRoute({ children }: { children: ReactNode }) {
   const { session, loading, user } = useAuth();
   const { loading: rolesLoading } = useRoles();
-  const { loading: modulesLoading, canAccessModule } = useOrganizationModules();
+  const { loading: modulesLoading, canAccessModule, canAccessPath } = useOrganizationModules();
   const can = useCan();
   if (loading || rolesLoading || modulesLoading) return <PageLoader />;
-  if (session && user) { const landingRoute = resolveLandingRoute(can, canAccessModule, user.role); return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />; }
+  if (session && user) { const landingRoute = resolveLandingRoute(can, canAccessModule, canAccessPath, user.role); return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />; }
   return <>{children}</>;
 }
 
 function DefaultRoute() {
   const { session, loading, user } = useAuth();
   const { loading: rolesLoading } = useRoles();
-  const { loading: modulesLoading, canAccessModule } = useOrganizationModules();
+  const { loading: modulesLoading, canAccessModule, canAccessPath } = useOrganizationModules();
   const can = useCan();
   if (loading || rolesLoading || modulesLoading) return <PageLoader />;
   if (!session) return <Navigate to={APP_ROUTES.login} replace />;
   if (!user) return <PageLoader />;
-  const landingRoute = resolveLandingRoute(can, canAccessModule, user.role);
+  const landingRoute = resolveLandingRoute(can, canAccessModule, canAccessPath, user.role);
   return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
 }
 
