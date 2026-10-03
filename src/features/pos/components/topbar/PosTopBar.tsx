@@ -80,26 +80,9 @@ export function PosTopBar({
   }, [location.pathname, onNewOrder]);
 
   useEffect(() => {
-    refreshPending();
-    const id = setInterval(() => setNow(new Date()), 30000);
-
-    const on = () => {
-      setOnline(true);
-      void triggerSync();
-    };
-    const off = () => setOnline(false);
-
-    window.addEventListener('online', on);
-    window.addEventListener('offline', off);
-    window.addEventListener('storage', refreshPending);
-
-    return () => {
-      clearInterval(id);
-      window.removeEventListener('online', on);
-      window.removeEventListener('offline', off);
-      window.removeEventListener('storage', refreshPending);
-    };
-  }, [refreshPending, triggerSync]);
+    const id = window.setInterval(() => setNow(new Date()), 30000);
+    return () => window.clearInterval(id);
+  }, []);
 
   const canManageCurrentShift = shiftChecked && (activeShift ? perms.canCloseShift : perms.canOpenShift);
 

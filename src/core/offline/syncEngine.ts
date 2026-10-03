@@ -5,6 +5,7 @@
  */
 
 import { pos as posApi, supabase } from '@/api';
+import { InventoryRepository } from '@/core/repositories';
 import {
   getAllOfflineSales,
   updateOfflineSaleStatus,
@@ -270,7 +271,13 @@ class OfflineSyncEngine {
           throw new Error(message);
         }
 
-        // Successfully synced/reconciled -> delete from queue.
+        // The server now owns the authoritative deduction. Remove the matching
+        // local pending movement before dropping the outbox row so local availability
+        // cannot continue deducting the same sale after reconciliation.
+        const invoiceNumber = String(item.payload.p_invoice_number || item.invoice_number || '').trim();
+        if (invoiceNumber) {
+          await InventoryRepository.markMovementsSynced([invoiceNumber, item.id]);
+        }
         await removeOfflineSale(item.id);
         successCount++;
         this.syncedRecentlyCount++;
