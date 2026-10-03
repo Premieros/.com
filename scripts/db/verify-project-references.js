@@ -28,7 +28,7 @@ function inspectFile(filePath) {
   lines.forEach((line, index) => {
     const lineNo = index + 1
 
-    for (const match of line.matchAll(/Premieros\/([A-Za-z0-9_.-]+)/g)) {
+    for (const match of line.matchAll(/Premieros\/([A-Za-z0-9_.-]*[A-Za-z0-9_-])/g)) {
       const full = `Premieros/${match[1]}`
       if (full !== CANONICAL_REPOSITORY) {
         failures.push(`${rel}:${lineNo} foreign repository reference: ${full}`)
