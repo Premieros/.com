@@ -1,9 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { supabase } from '@/api';
+import { useMemo } from 'react';
 import { Input, Select } from '@/components/Input';
 import { useLanguage } from '@/context/LanguageContext';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
-import type { BusinessFieldDefinition } from '@/core/organizations/businessProfileRuntime';
 
 type EntityType = 'product' | 'customer' | 'supplier';
 
@@ -15,44 +13,12 @@ interface Props {
 
 export function BusinessAttributesFields({ entity, value, onChange }: Props) {
   const { lang } = useLanguage();
-  const { organizationId } = useOrganizationModules();
-  const [fields, setFields] = useState<BusinessFieldDefinition[]>([]);
+  const { businessProfile } = useOrganizationModules();
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const load = async () => {
-      if (!organizationId) {
-        setFields([]);
-        return;
-      }
-
-      const { data, error } = await supabase
-        .from('organizations')
-        .select('business_profile')
-        .eq('id', organizationId)
-        .maybeSingle();
-
-      if (cancelled) return;
-      if (error) {
-        setFields([]);
-        return;
-      }
-
-      const profile = (data?.business_profile || {}) as {
-        runtime_fields?: BusinessFieldDefinition[];
-      };
-
-      setFields((profile.runtime_fields || []).filter((field) => field.entity === entity));
-    };
-
-    void load();
-    return () => {
-      cancelled = true;
-    };
-  }, [entity, organizationId]);
-
-  const visible = useMemo(() => fields, [fields]);
+  const visible = useMemo(
+    () => (businessProfile?.runtime_fields || []).filter((field) => field.entity === entity),
+    [businessProfile, entity],
+  );
 
   if (visible.length === 0) return null;
 
