@@ -25,7 +25,7 @@ describe('full ERP/POS operating cycle', () => {
     const unitId = randomUUID();
     const rawId = randomUUID();
     const productId = randomUUID();
-    const token = randomUUID().replaceAll('-', '').slice(0, 12);
+    const token = randomUUID().replace(/-/g, '').slice(0, 12);
     const userEmail = `cycle-${token}@ci.invalid`;
 
     const json = async (sql: string, params: unknown[] = []) => {
