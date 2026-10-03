@@ -13,11 +13,11 @@ interface Props {
 
 export function BusinessAttributesFields({ entity, value, onChange }: Props) {
   const { lang } = useLanguage();
-  const { businessProfile } = useOrganizationModules();
+  const { runtime } = useOrganizationModules();
 
   const visible = useMemo(
-    () => (businessProfile?.runtime_fields || []).filter((field) => field.entity === entity),
-    [businessProfile, entity],
+    () => runtime.runtimeFields.filter((field) => field.entity === entity),
+    [runtime, entity],
   );
 
   if (visible.length === 0) return null;
