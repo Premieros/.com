@@ -25,6 +25,7 @@ import { OfflineStatusIndicator } from './OfflineStatusIndicator';
 import { PageUtilityControls } from './PageUtilityControls';
 import { ReturnContextBanner } from '@/core/guard/ReturnContextBanner';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
+import { businessGroupLabel, businessMenuLabel } from '@/core/organizations/businessRuntime';
 import { moduleForRoute } from '@/core/modules/module.config';
 
 const ICONS: Record<MenuIcon, ReactNode> = {
@@ -103,14 +104,15 @@ export function Layout({ children }: { children: ReactNode }) {
   });
   const ar = lang === 'ar';
   const branchFilter = useBranchFilter();
+  const { canAccessModule, canAccessPath, runtime } = useOrganizationModules();
   const isPosRoute = location.pathname === APP_ROUTES.pos || location.pathname.startsWith(`${APP_ROUTES.pos}/`);
-  const activeOrderCount = useActiveOrderCount(branchFilter || user?.branch_id || '', !isPosRoute);
+  const orderTrackingEnabled = canAccessModule('pos') && canAccessPath(APP_ROUTES.floorPlan) && !isPosRoute;
+  const activeOrderCount = useActiveOrderCount(branchFilter || user?.branch_id || '', orderTrackingEnabled);
 
   const isAdmin = isAdminRole(user?.role);
-  const canViewFloorPlan = can('floor_plan.view');
+  const canViewFloorPlan = can('floor_plan.view') && canAccessPath(APP_ROUTES.floorPlan);
   const canOpenSettings = can('settings.manage');
   const { branches } = useBranches();
-  const { canAccessModule } = useOrganizationModules();
   const [, setActiveBranchId] = useActiveBranchId();
   const [branchMenuOpen, setBranchMenuOpen] = useState(false);
   const branchMenuRef = useRef<HTMLDivElement>(null);
@@ -138,16 +140,20 @@ export function Layout({ children }: { children: ReactNode }) {
     };
   }, [branchMenuOpen]);
 
-  const visibleItems = useMemo(
-    () => MENU_ITEMS.filter((item) =>
-      (!item.permission || can(item.permission)) &&
-      (!item.permissionsAny || item.permissionsAny.some((permission) => can(permission))) &&
-      (!item.superAdminOnly || user?.role === 'super_admin') &&
-      (!item.ownerOnly || isAdmin) &&
-      canAccessModule(moduleForRoute(item.route)),
-    ),
-    [can, user?.role, isAdmin, canAccessModule],
-  );
+  const visibleItems = useMemo(() => {
+    const order = new Map(runtime.navigation.order.map((id, index) => [id, index]));
+    return MENU_ITEMS
+      .filter((item) =>
+        (!item.permission || can(item.permission)) &&
+        (!item.permissionsAny || item.permissionsAny.some((permission) => can(permission))) &&
+        (!item.superAdminOnly || user?.role === 'super_admin') &&
+        (!item.ownerOnly || isAdmin) &&
+        !runtime.navigation.hidden.has(item.id) &&
+        canAccessModule(moduleForRoute(item.route)) &&
+        canAccessPath(item.route),
+      )
+      .sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
+  }, [can, user?.role, isAdmin, canAccessModule, canAccessPath, runtime]);
   const grouped = useMemo(() => visibleItems.reduce<Record<MenuGroup, typeof visibleItems>>((acc, item) => {
     (acc[item.group] ??= []).push(item);
     return acc;
@@ -178,7 +184,7 @@ export function Layout({ children }: { children: ReactNode }) {
   }, [desktopSidebarHidden]);
 
   const mobilePrimaryItems = useMemo(() => {
-    const priority = ['dashboard', 'pos', 'operations-center', 'inventory-center', 'sales'];
+    const priority = runtime.navigation.order;
     const picked = priority
       .map((id) => visibleItems.find((item) => item.id === id))
       .filter((item): item is (typeof visibleItems)[number] => !!item);
@@ -192,7 +198,7 @@ export function Layout({ children }: { children: ReactNode }) {
     }
 
     return picked.slice(0, 4);
-  }, [visibleItems]);
+  }, [runtime.navigation.order, visibleItems]);
 
   const mobilePrimaryRouteActive = mobilePrimaryItems.some((item) =>
     location.pathname === item.route || location.pathname.startsWith(`${item.route}/`),
@@ -402,7 +408,7 @@ export function Layout({ children }: { children: ReactNode }) {
             return (
               <section key={group} data-testid={`nav-group-${group}`} className="mb-3">
                 <button data-testid={`nav-group-toggle-${group}`} type="button" onClick={() => setCollapsed((v) => ({ ...v, [group]: !v[group] }))} className="flex min-h-9 w-full items-center justify-between rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-ui-subtle transition hover:bg-ui-page-alt hover:text-ui-text">
-                  <span>{MENU_GROUPS[group][ar ? 'ar' : 'en']}</span>
+                  <span>{businessGroupLabel(runtime, group, ar ? 'ar' : 'en', MENU_GROUPS[group][ar ? 'ar' : 'en'])}</span>
                   <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-150 ${collapsed[group] ? 'rotate-90' : ''}`} />
                 </button>
                 {!collapsed[group] && (
@@ -419,7 +425,12 @@ export function Layout({ children }: { children: ReactNode }) {
                         className={({ isActive }) => `group flex min-h-[40px] items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-150 ${isActive ? 'bg-ui-primary text-ui-primary-fg shadow-[0_4px_12px_rgba(91,43,216,0.18)]' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary'}`}
                       >
                         {ICONS[item.icon]}
-                        <span className="flex-1 truncate">{item.label ? item.label[ar ? 'ar' : 'en'] : item.labelKey ? t(item.labelKey) : item.id}</span>
+                        <span className="flex-1 truncate">{businessMenuLabel(
+                          runtime,
+                          item.id,
+                          ar ? 'ar' : 'en',
+                          item.label ? item.label[ar ? 'ar' : 'en'] : item.labelKey ? t(item.labelKey) : item.id,
+                        )}</span>
                       </NavLink>
                     ))}
                   </div>
@@ -467,7 +478,12 @@ export function Layout({ children }: { children: ReactNode }) {
           >
             <span className="flex h-6 items-center justify-center">{ICONS[item.icon]}</span>
             <span className="w-full truncate text-center">
-              {item.label ? item.label[ar ? 'ar' : 'en'] : item.labelKey ? t(item.labelKey) : item.id}
+              {businessMenuLabel(
+                runtime,
+                item.id,
+                ar ? 'ar' : 'en',
+                item.label ? item.label[ar ? 'ar' : 'en'] : item.labelKey ? t(item.labelKey) : item.id,
+              )}
             </span>
           </NavLink>
         ))}
