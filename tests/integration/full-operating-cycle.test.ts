@@ -155,7 +155,7 @@ describe('full ERP/POS operating cycle', () => {
         `select public.complete_production_order($1,'[]'::jsonb) as result`,
         [productionOrderId],
       );
-      expect(completeProduction?.success).toBe(true);
+      expect(completeProduction?.success, JSON.stringify(completeProduction)).toBe(true);
       expect(Number(completeProduction?.total_cost)).toBe(20);
 
       const postProduction = await client.query<{ raw_qty: string; product_qty: string }>(
