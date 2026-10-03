@@ -25,6 +25,7 @@ describe('full ERP/POS operating cycle', () => {
     const unitId = randomUUID();
     const rawId = randomUUID();
     const productId = randomUUID();
+    const readyProductId = randomUUID();
     const token = randomUUID().replace(/-/g, '').slice(0, 12);
     const userEmail = `cycle-${token}@ci.invalid`;
 
@@ -99,8 +100,10 @@ describe('full ERP/POS operating cycle', () => {
 
       await client.query(
         `insert into public.products(id,name,sku,cost_price,sale_price,wholesale_price,is_active,product_type,branch_id)
-         values($1,'CI Manufactured',$2,0,15,15,true,'manufactured',$3)`,
-        [productId, `CIP-${token}`, branchId],
+         values
+           ($1,'CI Manufactured',$2,0,15,15,true,'manufactured',$4),
+           ($3,'CI Ready',$5,5,10,10,true,'ready',$4)`,
+        [productId, `CIP-${token}`, readyProductId, branchId, `CIRP-${token}`],
       );
 
       const recipe = await client.query<{ id: string }>(
@@ -220,14 +223,29 @@ describe('full ERP/POS operating cycle', () => {
       );
       expect(Number(offlineCount.rows[0].count)).toBe(1);
 
-      // Stock is now 2.
-      const stockBeforeNegative = await client.query<{ qty: string }>(
-        'select quantity::text as qty from public.inventory where product_id=$1 and warehouse_id=$2',
-        [productId, warehouseId],
+      // Manufactured finished stock is now 2 and raw stock remains untouched by finished-stock sales.
+      const stockBeforeNegative = await client.query<{ product_qty: string; raw_qty: string }>(
+        `select
+           (select quantity from public.inventory where product_id=$1 and warehouse_id=$2)::text as product_qty,
+           (select coalesce(sum(quantity),0) from public.raw_material_batches where raw_material_id=$3 and branch_id=$4)::text as raw_qty`,
+        [productId, warehouseId, rawId, branchId],
       );
-      expect(Number(stockBeforeNegative.rows[0].qty)).toBe(2);
+      expect(Number(stockBeforeNegative.rows[0].product_qty)).toBe(2);
+      expect(Number(stockBeforeNegative.rows[0].raw_qty)).toBe(10);
 
-      // 5) Negative stock OFF: selling 3 must fail and leave stock unchanged.
+      // Seed a simple ready product specifically for negative-stock policy checks.
+      const seedReady = await json(
+        `select public.process_purchase(
+          $1,null,$2,$3,10,0,0,10,10,'cash','completed','CI ready stock seed',
+          jsonb_build_array(jsonb_build_object(
+            'product_id',$4::text,'quantity',2,'unit_cost',5,'unit_name','piece','batch_number',$5::text
+          ))
+        ) as result`,
+        [`PUR-READY-SEED-${token}`, branchId, warehouseId, readyProductId, `RS-${token}`],
+      );
+      expect(seedReady?.success).toBe(true);
+
+      // 5) Negative stock OFF: selling 3 with only 2 ready units must fail.
       expect(
         (
           await client.query<{ value: boolean }>(
@@ -240,13 +258,13 @@ describe('full ERP/POS operating cycle', () => {
       const blockedInvoice = `INV-BLOCK-${token}`;
       const blockedSale = await json(
         `select public.process_sale(
-          $1,$2,$3,null,$4,45,0,'amount',0,0,45,45,'cash','completed',
+          $1,$2,$3,null,$4,30,0,'amount',0,0,30,30,'cash','completed',
           jsonb_build_array(jsonb_build_object(
             'product_id',$5::text,'quantity',3,'unit_name','piece','discount_amount',0,'modifier_option_ids','[]'::jsonb
           )),
           null,'takeaway',null,null,1
         ) as result`,
-        [blockedInvoice, branchId, warehouseId, userId, productId],
+        [blockedInvoice, branchId, warehouseId, userId, readyProductId],
       );
       expect(blockedSale?.success).not.toBe(true);
 
@@ -256,7 +274,7 @@ describe('full ERP/POS operating cycle', () => {
       );
       expect(Number(blockedCount.rows[0].count)).toBe(0);
 
-      // 6) Negative stock ON: selling 5 with only 2 available creates debt 3 and stock -3.
+      // 6) Negative stock ON: selling 5 with only 2 ready units creates debt 3 and stock -3.
       await client.query(
         'update public.branch_settings set allow_negative_stock=true,updated_at=now() where branch_id=$1',
         [branchId],
@@ -273,13 +291,13 @@ describe('full ERP/POS operating cycle', () => {
       const negativeInvoice = `INV-NEG-${token}`;
       const negativeSale = await json(
         `select public.process_sale(
-          $1,$2,$3,null,$4,75,0,'amount',0,0,75,75,'cash','completed',
+          $1,$2,$3,null,$4,50,0,'amount',0,0,50,50,'cash','completed',
           jsonb_build_array(jsonb_build_object(
             'product_id',$5::text,'quantity',5,'unit_name','piece','discount_amount',0,'modifier_option_ids','[]'::jsonb
           )),
           null,'takeaway',null,null,1
         ) as result`,
-        [negativeInvoice, branchId, warehouseId, userId, productId],
+        [negativeInvoice, branchId, warehouseId, userId, readyProductId],
       );
       expect(negativeSale?.success).toBe(true);
 
@@ -296,7 +314,7 @@ describe('full ERP/POS operating cycle', () => {
          where d.product_id=$1 and d.branch_id=$3 and d.warehouse_id=$2
          order by d.created_at desc
          limit 1`,
-        [productId, warehouseId, branchId],
+        [readyProductId, warehouseId, branchId],
       );
       expect(Number(debtState.rows[0].stock_qty)).toBe(-3);
       expect(Number(debtState.rows[0].debt_qty)).toBe(3);
@@ -310,7 +328,7 @@ describe('full ERP/POS operating cycle', () => {
             'product_id',$4::text,'quantity',5,'unit_cost',5,'unit_name','piece','batch_number',$5::text
           ))
         ) as result`,
-        [`PUR-FG-${token}`, branchId, warehouseId, productId, `FB-${token}`],
+        [`PUR-FG-${token}`, branchId, warehouseId, readyProductId, `FB-${token}`],
       );
       expect(purchaseReady?.success).toBe(true);
 
@@ -329,7 +347,7 @@ describe('full ERP/POS operating cycle', () => {
          where d.product_id=$1 and d.branch_id=$3 and d.warehouse_id=$2
          order by d.created_at desc
          limit 1`,
-        [productId, warehouseId, branchId],
+        [readyProductId, warehouseId, branchId],
       );
       expect(Number(settledDebt.rows[0].stock_qty)).toBe(2);
       expect(Number(settledDebt.rows[0].settled_qty)).toBe(3);
@@ -379,7 +397,7 @@ describe('full ERP/POS operating cycle', () => {
         [branchId],
       );
 
-      expect(Number(lifecycle.rows[0].purchases)).toBe(2);
+      expect(Number(lifecycle.rows[0].purchases)).toBe(3);
       expect(Number(lifecycle.rows[0].sales)).toBe(3);
       expect(Number(lifecycle.rows[0].productions)).toBe(1);
       expect(Number(lifecycle.rows[0].journals)).toBeGreaterThanOrEqual(7);
