@@ -30,6 +30,7 @@ export const MENU_GROUPS: Record<MenuGroup, { ar: string; en: string }> = {
 
 export const MENU_ITEMS: MenuItemConfig[] = [
   { id: 'dashboard', route: APP_ROUTES.dashboard, icon: 'dashboard', labelKey: 'dashboard', permission: 'dashboard.view', group: 'main' },
+  { id: 'business-records', route: APP_ROUTES.businessRecords, icon: 'customers', labelKey: 'customers', label: { ar: 'سجلات النشاط', en: 'Business Records' }, permission: 'customers.view', group: 'main' },
   { id: 'pos', route: APP_ROUTES.pos, icon: 'pos', labelKey: 'pos', permission: 'pos.view', group: 'main' },
   { id: 'kitchen-display', route: APP_ROUTES.kitchenDisplay, icon: 'kitchenDisplay', labelKey: 'kitchenDisplay', permission: 'pos.kds_view', group: 'main' },
 
