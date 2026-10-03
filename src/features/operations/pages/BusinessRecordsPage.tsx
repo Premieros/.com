@@ -11,7 +11,6 @@ import { Modal } from '@/components/Modal';
 import { useToast } from '@/components/Toast';
 import { useLanguage } from '@/context/LanguageContext';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
-import type { BusinessRecordTypeDefinition } from '@/core/organizations/businessProfileRuntime';
 import { useBranchFilter } from '@/lib/useBranchFilter';
 import { formatCurrency, formatDate } from '@/lib/format';
 
@@ -57,9 +56,8 @@ export function BusinessRecordsPage() {
   const { lang } = useLanguage();
   const ar = lang === 'ar';
   const { show } = useToast();
-  const { organizationId } = useOrganizationModules();
+  const { organizationId, businessProfile } = useOrganizationModules();
   const branchId = useBranchFilter();
-  const [recordTypes, setRecordTypes] = useState<BusinessRecordTypeDefinition[]>([]);
   const [rows, setRows] = useState<BusinessRecordRow[]>([]);
   const [customers, setCustomers] = useState<OptionRow[]>([]);
   const [suppliers, setSuppliers] = useState<OptionRow[]>([]);
@@ -69,6 +67,11 @@ export function BusinessRecordsPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
 
+  const recordTypes = useMemo(
+    () => businessProfile?.record_types || [],
+    [businessProfile],
+  );
+
   const typeMap = useMemo(
     () => new Map(recordTypes.map((type) => [type.key, type])),
     [recordTypes],
@@ -76,14 +79,12 @@ export function BusinessRecordsPage() {
 
   const load = useCallback(async () => {
     if (!organizationId) {
-      setRecordTypes([]);
       setRows([]);
       return;
     }
 
     setLoading(true);
-    const [orgRes, recordsRes, customersRes, suppliersRes, productsRes] = await Promise.all([
-      supabase.from('organizations').select('business_profile').eq('id', organizationId).maybeSingle(),
+    const [recordsRes, customersRes, suppliersRes, productsRes] = await Promise.all([
       (() => {
         let query = supabase
           .from('business_records')
@@ -110,13 +111,8 @@ export function BusinessRecordsPage() {
       })(),
     ]);
 
-    if (orgRes.error) show(orgRes.error.message, 'error');
     if (recordsRes.error) show(recordsRes.error.message, 'error');
 
-    const profile = (orgRes.data?.business_profile || {}) as {
-      record_types?: BusinessRecordTypeDefinition[];
-    };
-    setRecordTypes(profile.record_types || []);
     setRows((recordsRes.data || []) as BusinessRecordRow[]);
     setCustomers((customersRes.data || []) as OptionRow[]);
     setSuppliers((suppliersRes.data || []) as OptionRow[]);

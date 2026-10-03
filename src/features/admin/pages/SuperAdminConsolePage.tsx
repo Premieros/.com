@@ -34,6 +34,8 @@ import { Modal } from '@/components/Modal';
 import { RolesTab } from './RolesTab';
 import { formatDate, formatDateTime } from '@/lib/format';
 import { ORGANIZATION_MODULE_KEYS, ORGANIZATION_MODULES, type OrganizationModuleKey } from '@/core/modules/module.config';
+import { notifyOrganizationRuntimeChanged } from '@/core/modules/OrganizationModulesContext';
+import { notifyBranchesChanged } from '@/hooks/useBranches';
 import { OrganizationCreateWizard } from '@/features/admin/components/OrganizationCreateWizard';
 
 interface TenantStats {
@@ -378,6 +380,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
           ? { ...item, enabled: nextEnabled, source: 'organization_override' }
           : item
       )));
+      notifyOrganizationRuntimeChanged();
       show(
         nextEnabled
           ? (ar ? 'تم تفعيل الموديول للمؤسسة' : 'Module enabled for organization')
@@ -1365,7 +1368,11 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
       <OrganizationCreateWizard
         open={organizationCreateOpen}
         onClose={() => setOrganizationCreateOpen(false)}
-        onCreated={loadTenants}
+        onCreated={async () => {
+          notifyBranchesChanged();
+          notifyOrganizationRuntimeChanged();
+          await loadTenants();
+        }}
         ar={ar}
       />
     </DesignSurface>
