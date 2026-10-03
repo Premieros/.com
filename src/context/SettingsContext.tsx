@@ -282,23 +282,27 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [settings, refresh]);
 
   const saveBranchSettings = useCallback(async (branchId: string, patch: Partial<BranchSettings>): Promise<boolean> => {
+    const hasNegativeStockPatch = Object.prototype.hasOwnProperty.call(patch, 'allow_negative_stock');
+    const requestedNegativeStock = patch.allow_negative_stock;
     const clean: Partial<BranchSettings> = { ...patch };
     (Object.keys(clean) as (keyof BranchSettings)[]).forEach((k) => {
       if (clean[k] === undefined) delete clean[k];
     });
-    if (Object.keys(clean).length === 0) return true;
 
-    const { allow_negative_stock, ...dbPatch } = clean;
+    const { allow_negative_stock: _ignoredNegativeStock, ...dbPatch } = clean;
+    void _ignoredNegativeStock;
 
-    if (allow_negative_stock !== undefined) {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem(`premier:allow_negative_stock:branch_${branchId}`, String(allow_negative_stock));
-      }
+    if (hasNegativeStockPatch) {
       const existing = branchSettingsMap[branchId] || ({ branch_id: branchId } as BranchSettings);
-      const updatedBranch = { ...existing, ...clean } as BranchSettings;
+      const updatedBranch = {
+        ...existing,
+        allow_negative_stock: requestedNegativeStock,
+      } as BranchSettings;
       setBranchSettingsMap((prev) => ({ ...prev, [branchId]: updatedBranch }));
       await SettingsRepository.saveBranchSettings(branchId, updatedBranch);
     }
+
+    if (Object.keys(dbPatch).length === 0 && !hasNegativeStockPatch) return true;
 
     if (Object.keys(dbPatch).length > 0) {
       const existing = branchSettingsMap[branchId];
