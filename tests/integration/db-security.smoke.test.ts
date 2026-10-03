@@ -76,6 +76,58 @@ describe('canonical database integration smoke', () => {
     expect(rows.every((row) => Number(row.policy_count) > 0)).toBe(true);
   });
 
+  it('installs the server-authoritative negative-stock policy and protected debt ledgers', async () => {
+    const { rows: columns } = await client.query<{
+      table_name: string;
+      column_name: string;
+      is_nullable: string;
+      column_default: string | null;
+    }>(
+      `select table_name, column_name, is_nullable, column_default
+       from information_schema.columns
+       where table_schema = 'public'
+         and column_name = 'allow_negative_stock'
+         and table_name in ('settings', 'branch_settings')
+       order by table_name`,
+    );
+
+    expect(columns).toHaveLength(2);
+    const branchColumn = columns.find((row) => row.table_name === 'branch_settings');
+    const globalColumn = columns.find((row) => row.table_name === 'settings');
+    expect(branchColumn?.is_nullable).toBe('YES');
+    expect(globalColumn?.is_nullable).toBe('NO');
+    expect(globalColumn?.column_default).toContain('false');
+
+    const { rows: debtTables } = await client.query<{ table_name: string; rls_enabled: boolean }>(
+      `select c.relname as table_name, c.relrowsecurity as rls_enabled
+       from pg_class c
+       join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public'
+         and c.relname in ('product_stock_debts', 'inventory_unit_stock_debts')
+       order by c.relname`,
+    );
+    expect(debtTables).toHaveLength(2);
+    expect(debtTables.every((row) => row.rls_enabled)).toBe(true);
+
+    const { rows: functions } = await client.query<{ function_name: string }>(
+      `select p.proname as function_name
+       from pg_proc p
+       join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and p.proname in (
+           'effective_allow_negative_stock',
+           '_deduct_ready_product_stock_policy',
+           '_deduct_inventory_unit_stock_policy'
+         )
+       order by p.proname`,
+    );
+    expect(functions.map((row) => row.function_name).sort()).toEqual([
+      '_deduct_inventory_unit_stock_policy',
+      '_deduct_ready_product_stock_policy',
+      'effective_allow_negative_stock',
+    ]);
+  });
+
   it('keeps the sale boundary functions security-definer with an explicit public search_path', async () => {
     const { rows } = await client.query<{
       function_name: string;
