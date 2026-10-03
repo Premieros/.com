@@ -7,6 +7,8 @@ import { useCan, type Permission } from '@/lib/permissions';
 import { useLanguage } from '@/context/LanguageContext';
 import { REPORT_REGISTRY } from '../reportRegistry';
 import type { ReportType } from '../reportFilters';
+import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
+import { businessFinancialViewAllowed, businessReportAllowed } from '@/core/organizations/businessRuntime';
 
 type FinancialView =
   | 'trial_balance'
@@ -45,6 +47,7 @@ const FINANCIAL_REPORTS: Array<{ key: FinancialView; ar: string; en: string }> =
 export function ReportsCenterPage() {
   const can = useCan();
   const { lang } = useLanguage();
+  const { runtime } = useOrganizationModules();
   const location = useLocation();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -62,8 +65,9 @@ export function ReportsCenterPage() {
     () => REPORT_REGISTRY.filter((report) =>
       !LEGACY_HIDDEN_REPORTS.has(report.key)
       && report.permissions.every((permission) => can(permission as Permission))
+      && businessReportAllowed(runtime, report.key, report.category)
     ),
-    [can],
+    [can, runtime],
   );
 
   const initialOperational =
@@ -80,10 +84,11 @@ export function ReportsCenterPage() {
   }, [requestedType, permittedOperational]);
 
   const canFinancial = can('reports.financial');
+  const allowedFinancialViews = FINANCIAL_REPORTS.filter((report) => businessFinancialViewAllowed(runtime, report.key));
   const activeFinancialView: FinancialView =
-    requestedFinancialView && FINANCIAL_REPORTS.some((report) => report.key === requestedFinancialView)
+    requestedFinancialView && allowedFinancialViews.some((report) => report.key === requestedFinancialView)
       ? requestedFinancialView
-      : 'trial_balance';
+      : allowedFinancialViews[0]?.key || 'trial_balance';
 
   const filteredOperational = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -97,14 +102,15 @@ export function ReportsCenterPage() {
 
   const filteredFinancial = useMemo(() => {
     if (!canFinancial) return [];
+    const allowed = FINANCIAL_REPORTS.filter((report) => businessFinancialViewAllowed(runtime, report.key));
     const q = search.trim().toLowerCase();
-    if (!q) return FINANCIAL_REPORTS;
-    return FINANCIAL_REPORTS.filter((report) =>
+    if (!q) return allowed;
+    return allowed.filter((report) =>
       report.ar.toLowerCase().includes(q)
       || report.en.toLowerCase().includes(q)
       || report.key.toLowerCase().includes(q)
     );
-  }, [search, canFinancial]);
+  }, [search, canFinancial, runtime]);
 
   const selectOperational = useCallback((type: ReportType) => {
     setActiveReport(type);
@@ -118,7 +124,7 @@ export function ReportsCenterPage() {
   }, [navigate]);
 
   const currentName = requestedFinancial
-    ? FINANCIAL_REPORTS.find((report) => report.key === activeFinancialView)
+    ? allowedFinancialViews.find((report) => report.key === activeFinancialView)
     : permittedOperational.find((report) => report.key === activeReport);
 
   const reportList = (
