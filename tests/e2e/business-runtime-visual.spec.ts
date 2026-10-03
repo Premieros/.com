@@ -83,7 +83,7 @@ test.describe('visual business profile matrix', () => {
       await page.route('https://hvqlkapynjfjikqithvd.supabase.co/**', async (route) => {
         await route.abort('failed');
       });
-      await page.goto(`/__runtime-preview/${scenario.profile}`);
+      await page.goto(`/#/__runtime-preview/${scenario.profile}`);
       await expect(page.getByTestId('runtime-preview')).toHaveAttribute('data-profile', scenario.profile);
       await expect(page.getByTestId('workflow')).toHaveText(scenario.workflow);
       await expect(page.getByTestId('catalog-mode')).toHaveText(scenario.catalogMode);
