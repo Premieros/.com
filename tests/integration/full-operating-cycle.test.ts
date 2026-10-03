@@ -122,7 +122,7 @@ describe('full ERP/POS operating cycle', () => {
         `select public.process_purchase(
           $1,null,$2,$3,40,0,0,40,40,'cash','completed','CI raw purchase',
           jsonb_build_array(jsonb_build_object(
-            'raw_material_id',$4::text,'quantity',20,'unit_cost',2,'unit_name','u','batch_number',$5
+            'raw_material_id',$4::text,'quantity',20,'unit_cost',2,'unit_name','u','batch_number',$5::text
           ))
         ) as result`,
         [`PUR-RAW-${token}`, branchId, warehouseId, rawId, `RB-${token}`],
@@ -307,7 +307,7 @@ describe('full ERP/POS operating cycle', () => {
         `select public.process_purchase(
           $1,null,$2,$3,25,0,0,25,25,'cash','completed','CI debt settlement purchase',
           jsonb_build_array(jsonb_build_object(
-            'product_id',$4::text,'quantity',5,'unit_cost',5,'unit_name','piece','batch_number',$5
+            'product_id',$4::text,'quantity',5,'unit_cost',5,'unit_name','piece','batch_number',$5::text
           ))
         ) as result`,
         [`PUR-FG-${token}`, branchId, warehouseId, productId, `FB-${token}`],
