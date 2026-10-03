@@ -111,7 +111,7 @@ async function queueOfflineSale(p: ProcessSalePayload): Promise<string> {
           quantityDelta: -Number(item.quantity || 0),
           reason: 'sale',
           referenceId: p.p_invoice_number,
-          timestamp: new Date().toISOString(),
+          createdAt: new Date().toISOString(),
         });
       }
     }
