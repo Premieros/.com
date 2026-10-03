@@ -4,8 +4,8 @@
 
 - Repository: `Premieros/.com`
 - Baseline branch: `main`
-- Canonical Supabase project: `hvqlkapynjfjikqithvd`
-- Canonical Supabase URL: `https://hvqlkapynjfjikqithvd.supabase.co`
+- Canonical Supabase project: `cuitndfayupfysejlpda`
+- Canonical Supabase URL: `https://cuitndfayupfysejlpda.supabase.co`
 
 No other hosted database or repository is an allowed source, fallback, donor, mirror or runtime dependency.
 
