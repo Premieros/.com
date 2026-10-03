@@ -22,6 +22,13 @@ env:
   VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY || 'dummy_anon_key_for_ci_build' }}
 
 jobs:
+  identity:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify exclusive repository and database identity
+        run: node scripts/db/verify-database-identity.js
+
   scope:
     runs-on: ubuntu-latest
     outputs:
