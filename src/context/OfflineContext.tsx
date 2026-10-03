@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { offlineSyncEngine, type SyncStatus } from '@/core/offline/syncEngine';
+import { InventoryRepository } from '@/core/repositories';
 import {
   saveOfflineCache,
   getOfflineCache,
@@ -168,6 +169,12 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const discardQueuedSale = useCallback(async (id: string) => {
+    const queued = (await getAllOfflineSales()).find((item) => item.id === id);
+    const invoiceNumber = String(queued?.payload?.p_invoice_number || queued?.invoice_number || '').trim();
+
+    if (invoiceNumber) {
+      await InventoryRepository.markMovementsSynced([invoiceNumber, id]);
+    }
     await removeOfflineSale(id);
     await offlineSyncEngine.refreshPendingCount();
   }, []);
