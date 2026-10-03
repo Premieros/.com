@@ -91,8 +91,11 @@ export class SettingsRepository {
         const map = cachedMap ? (JSON.parse(cachedMap) as Record<string, BranchSettings>) : {};
         map[branchId] = settings;
         localStorage.setItem('premier:cached_branch_settings_map', JSON.stringify(map));
+        const overrideKey = `premier:allow_negative_stock:branch_${branchId}`;
         if (settings.allow_negative_stock !== undefined) {
-          localStorage.setItem(`premier:allow_negative_stock:branch_${branchId}`, String(settings.allow_negative_stock));
+          localStorage.setItem(overrideKey, String(settings.allow_negative_stock));
+        } else {
+          localStorage.removeItem(overrideKey);
         }
       } catch {
         // ignore
