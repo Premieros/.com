@@ -16,12 +16,7 @@ export class SettingsRepository {
       try {
         const cached = localStorage.getItem('premier:cached_settings');
         if (cached) {
-          const parsed = JSON.parse(cached) as Settings;
-          const override = localStorage.getItem('premier:allow_negative_stock:company');
-          if (override !== null) {
-            parsed.allow_negative_stock = override === 'true';
-          }
-          return parsed;
+          return JSON.parse(cached) as Settings;
         }
       } catch {
         // ignore
@@ -64,13 +59,7 @@ export class SettingsRepository {
         if (cachedMap) {
           const map = JSON.parse(cachedMap) as Record<string, BranchSettings>;
           const branch = map[branchId];
-          if (branch) {
-            const override = localStorage.getItem(`premier:allow_negative_stock:branch_${branchId}`);
-            if (override !== null) {
-              branch.allow_negative_stock = override === 'true';
-            }
-            return branch;
-          }
+          if (branch) return branch;
         }
       } catch {
         // ignore
@@ -92,7 +81,7 @@ export class SettingsRepository {
         map[branchId] = settings;
         localStorage.setItem('premier:cached_branch_settings_map', JSON.stringify(map));
         const overrideKey = `premier:allow_negative_stock:branch_${branchId}`;
-        if (settings.allow_negative_stock !== undefined) {
+        if (typeof settings.allow_negative_stock === 'boolean') {
           localStorage.setItem(overrideKey, String(settings.allow_negative_stock));
         } else {
           localStorage.removeItem(overrideKey);

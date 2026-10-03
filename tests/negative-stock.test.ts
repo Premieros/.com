@@ -113,8 +113,22 @@ describe('Negative Stock: Architectural & UI Contract Verification', () => {
     // Verifies effective available stock check with unsynced local outbox sales
     expect(paymentService).toContain('InventoryRepository.getEffectiveAvailableStock');
     expect(paymentService).toContain('INSUFFICIENT_STOCK');
-    // Verifies recording of local movement on both offline queue and online success
+    // Offline movements stay pending; server-confirmed movements are explicitly synced
     expect(paymentService).toContain('InventoryRepository.recordLocalMovement');
+    expect(paymentService).toContain('synced: true');
+  });
+
+  it('verifies the server policy migration persists company/branch controls and debt-backed oversell', () => {
+    const migration = fs.readFileSync(
+      path.join(root, 'supabase/migrations/20261003093000_allow_negative_stock_server_policy.sql'),
+      'utf8',
+    );
+    expect(migration).toContain('ADD COLUMN IF NOT EXISTS allow_negative_stock boolean NOT NULL DEFAULT false');
+    expect(migration).toContain('ADD COLUMN IF NOT EXISTS allow_negative_stock boolean');
+    expect(migration).toContain('effective_allow_negative_stock');
+    expect(migration).toContain('product_stock_debts');
+    expect(migration).toContain('inventory_unit_stock_debts');
+    expect(migration).toContain('p_allow_negative');
   });
 
   it('verifies usePosOrder connects allow_negative_stock to cart-level stock gating', () => {

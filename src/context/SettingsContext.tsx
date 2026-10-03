@@ -22,9 +22,7 @@ export function mergeEffectiveSettings(global: Settings, branch?: BranchSettings
     receipt_footer: branch.receipt_footer ?? global.receipt_footer,
     logo_url: branch.logo_url ?? global.logo_url,
     low_stock_threshold: branch.low_stock_threshold ?? global.low_stock_threshold,
-    allow_negative_stock: branch.allow_negative_stock !== undefined
-      ? branch.allow_negative_stock
-      : (global.allow_negative_stock ?? false),
+    allow_negative_stock: branch.allow_negative_stock ?? global.allow_negative_stock ?? false,
   };
 }
 
@@ -45,22 +43,9 @@ function getInitialCachedSettings(): { settings: Settings | null; branchMap: Rec
     if (typeof localStorage !== 'undefined') {
       const s = localStorage.getItem('premier:cached_settings');
       const b = localStorage.getItem('premier:cached_branch_settings_map');
-      const parsedS = s ? (JSON.parse(s) as Settings) : null;
-      const parsedB = b ? (JSON.parse(b) as Record<string, BranchSettings>) : {};
-
-      const compNeg = localStorage.getItem('premier:allow_negative_stock:company');
-      if (parsedS && compNeg !== null) {
-        parsedS.allow_negative_stock = compNeg === 'true';
-      }
-      for (const branchId of Object.keys(parsedB)) {
-        const brNeg = localStorage.getItem(`premier:allow_negative_stock:branch_${branchId}`);
-        if (brNeg !== null) {
-          parsedB[branchId].allow_negative_stock = brNeg === 'true';
-        }
-      }
       return {
-        settings: parsedS,
-        branchMap: parsedB,
+        settings: s ? (JSON.parse(s) as Settings) : null,
+        branchMap: b ? (JSON.parse(b) as Record<string, BranchSettings>) : {},
       };
     }
   } catch {
@@ -94,10 +79,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       ]);
       const data = sRes.data as Settings | null;
       if (data) {
-        const compNeg = typeof localStorage !== 'undefined' ? localStorage.getItem('premier:allow_negative_stock:company') : null;
-        if (compNeg !== null) {
-          data.allow_negative_stock = compNeg === 'true';
-        }
         setSettings(data);
         void SettingsRepository.saveGlobalSettings(data);
         try {
@@ -121,10 +102,6 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       }
       const bMap: Record<string, BranchSettings> = {};
       for (const row of (bRes.data as BranchSettings[]) || []) {
-        const brNeg = typeof localStorage !== 'undefined' ? localStorage.getItem(`premier:allow_negative_stock:branch_${row.branch_id}`) : null;
-        if (brNeg !== null) {
-          row.allow_negative_stock = brNeg === 'true';
-        }
         bMap[row.branch_id] = row;
         void SettingsRepository.saveBranchSettings(row.branch_id, row);
       }
@@ -257,26 +234,20 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   const save = useCallback(async (patch: Partial<Settings>): Promise<boolean> => {
     if (!settings?.id) return false;
-    const { allow_negative_stock, ...dbPatch } = patch;
 
-    if (allow_negative_stock !== undefined) {
-      if (typeof localStorage !== 'undefined') {
-        localStorage.setItem('premier:allow_negative_stock:company', String(allow_negative_stock));
-      }
-      const updatedGlobal = { ...settings, ...patch };
-      setSettings(updatedGlobal);
-      await SettingsRepository.saveGlobalSettings(updatedGlobal);
+    const next = { ...settings, ...patch };
+    const { error } = await supabase
+      .from('settings')
+      .update({ ...patch, updated_at: new Date().toISOString() })
+      .eq('id', settings.id);
+
+    if (error) {
+      console.warn('Supabase settings update warning:', error);
+      return false;
     }
 
-    if (Object.keys(dbPatch).length > 0) {
-      const { error } = await supabase
-        .from('settings')
-        .update({ ...dbPatch, updated_at: new Date().toISOString() })
-        .eq('id', settings.id);
-      if (error) {
-        console.warn('Supabase settings update warning:', error);
-      }
-    }
+    setSettings(next);
+    await SettingsRepository.saveGlobalSettings(next);
     await refresh();
     return true;
   }, [settings, refresh]);
@@ -284,45 +255,40 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const saveBranchSettings = useCallback(async (branchId: string, patch: Partial<BranchSettings>): Promise<boolean> => {
     const hasNegativeStockPatch = Object.prototype.hasOwnProperty.call(patch, 'allow_negative_stock');
     const requestedNegativeStock = patch.allow_negative_stock;
-    const clean: Partial<BranchSettings> = { ...patch };
-    (Object.keys(clean) as (keyof BranchSettings)[]).forEach((k) => {
-      if (clean[k] === undefined) delete clean[k];
-    });
 
-    const { allow_negative_stock: _ignoredNegativeStock, ...dbPatch } = clean;
-    void _ignoredNegativeStock;
-
+    const clean: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(patch)) {
+      if (key === 'allow_negative_stock') continue;
+      if (value !== undefined) clean[key] = value;
+    }
     if (hasNegativeStockPatch) {
-      const existing = branchSettingsMap[branchId] || ({ branch_id: branchId } as BranchSettings);
-      const updatedBranch = {
-        ...existing,
-        allow_negative_stock: requestedNegativeStock,
-      } as BranchSettings;
-      setBranchSettingsMap((prev) => ({ ...prev, [branchId]: updatedBranch }));
-      await SettingsRepository.saveBranchSettings(branchId, updatedBranch);
+      clean.allow_negative_stock = typeof requestedNegativeStock === 'boolean'
+        ? requestedNegativeStock
+        : null;
     }
 
-    if (Object.keys(dbPatch).length === 0 && !hasNegativeStockPatch) return true;
+    const existing = branchSettingsMap[branchId];
+    const payload = { ...clean, updated_at: new Date().toISOString() };
 
-    if (Object.keys(dbPatch).length > 0) {
-      const existing = branchSettingsMap[branchId];
-      if (existing) {
-        const { error } = await supabase
-          .from('branch_settings')
-          .update({ ...dbPatch, updated_at: new Date().toISOString() })
-          .eq('branch_id', branchId);
-        if (error) {
-          console.warn('Supabase branch_settings update warning:', error);
-        }
-      } else {
-        const { error } = await supabase
-          .from('branch_settings')
-          .insert({ branch_id: branchId, ...dbPatch });
-        if (error) {
-          console.warn('Supabase branch_settings insert warning:', error);
-        }
-      }
+    const result = existing
+      ? await supabase.from('branch_settings').update(payload).eq('branch_id', branchId)
+      : await supabase.from('branch_settings').insert({ branch_id: branchId, ...payload });
+
+    if (result.error) {
+      console.warn('Supabase branch_settings update warning:', result.error);
+      return false;
     }
+
+    const updatedBranch = {
+      ...(existing || ({ branch_id: branchId } as BranchSettings)),
+      ...patch,
+      allow_negative_stock: hasNegativeStockPatch
+        ? (typeof requestedNegativeStock === 'boolean' ? requestedNegativeStock : null)
+        : existing?.allow_negative_stock,
+    } as BranchSettings;
+
+    setBranchSettingsMap((prev) => ({ ...prev, [branchId]: updatedBranch }));
+    await SettingsRepository.saveBranchSettings(branchId, updatedBranch);
     await refresh();
     return true;
   }, [branchSettingsMap, refresh]);
