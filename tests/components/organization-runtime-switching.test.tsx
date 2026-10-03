@@ -52,7 +52,7 @@ const runtimeMocks = vi.hoisted(() => {
       data: moduleCatalog[args.p_organization_id] || [],
       error: null,
     })),
-    from: vi.fn((_table: string) => ({
+    from: vi.fn(() => ({
       select: () => ({
         eq: (_column: string, organizationId: string) => ({
           maybeSingle: async () => ({
