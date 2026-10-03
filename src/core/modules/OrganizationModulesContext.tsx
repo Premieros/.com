@@ -4,6 +4,7 @@ import {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
   type ReactNode,
 } from 'react';
@@ -11,6 +12,11 @@ import { supabase } from '@/api';
 import { useAuth } from '@/context/AuthContext';
 import { useBranches } from '@/hooks/useBranches';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import type {
+  BusinessFieldDefinition,
+  BusinessRecordTypeDefinition,
+} from '@/core/organizations/businessProfileRuntime';
+import type { BusinessProfileKey } from '@/core/organizations/businessProfiles';
 import {
   ORGANIZATION_MODULE_KEYS,
   type OrganizationModuleKey,
@@ -18,8 +24,24 @@ import {
 
 type ModuleAccessMap = Record<OrganizationModuleKey, boolean>;
 
+export interface OrganizationBusinessProfile {
+  preset_key?: BusinessProfileKey;
+  terminology?: {
+    item?: string;
+    customer?: string;
+    supplier?: string;
+    branch?: string;
+  };
+  capabilities?: string[];
+  runtime_fields?: BusinessFieldDefinition[];
+  record_types?: BusinessRecordTypeDefinition[];
+  [key: string]: unknown;
+}
+
 interface OrganizationModulesContextValue {
   organizationId: string | null;
+  businessType: BusinessProfileKey | null;
+  businessProfile: OrganizationBusinessProfile | null;
   loading: boolean;
   compatibilityFallback: boolean;
   access: ModuleAccessMap;
@@ -32,6 +54,17 @@ interface ModuleCatalogRow {
   enabled: boolean;
 }
 
+interface OrganizationRuntimeRow {
+  business_type: BusinessProfileKey | null;
+  business_profile: OrganizationBusinessProfile | null;
+}
+
+interface RuntimeCache {
+  access: ModuleAccessMap;
+  businessType: BusinessProfileKey | null;
+  businessProfile: OrganizationBusinessProfile | null;
+}
+
 const ALL_ENABLED = Object.fromEntries(
   ORGANIZATION_MODULE_KEYS.map((key) => [key, true]),
 ) as ModuleAccessMap;
@@ -39,6 +72,9 @@ const ALL_ENABLED = Object.fromEntries(
 const ALL_DISABLED = Object.fromEntries(
   ORGANIZATION_MODULE_KEYS.map((key) => [key, false]),
 ) as ModuleAccessMap;
+
+const RUNTIME_CHANGED_EVENT = 'premier:organization-runtime-changed';
+const CACHE_PREFIX = 'premier:organization-runtime:';
 
 const OrganizationModulesContext = createContext<OrganizationModulesContextValue | undefined>(undefined);
 
@@ -50,19 +86,53 @@ function isMissingModuleRpcError(error: { code?: string | null; message?: string
     || text.includes('could not find the function');
 }
 
+function readRuntimeCache(organizationId: string): RuntimeCache | null {
+  try {
+    if (typeof localStorage === 'undefined') return null;
+    const raw = localStorage.getItem(`${CACHE_PREFIX}${organizationId}`);
+    if (!raw) return null;
+    return JSON.parse(raw) as RuntimeCache;
+  } catch {
+    return null;
+  }
+}
+
+function writeRuntimeCache(organizationId: string, value: RuntimeCache): void {
+  try {
+    if (typeof localStorage === 'undefined') return;
+    localStorage.setItem(`${CACHE_PREFIX}${organizationId}`, JSON.stringify(value));
+  } catch {
+    // Offline cache is best-effort only.
+  }
+}
+
+export function notifyOrganizationRuntimeChanged(): void {
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new Event(RUNTIME_CHANGED_EVENT));
+  }
+}
+
 export function OrganizationModulesProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const { branches, loading: branchesLoading } = useBranches();
   const branchId = useBranchFilter();
+  const requestSequence = useRef(0);
   const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [businessType, setBusinessType] = useState<BusinessProfileKey | null>(null);
+  const [businessProfile, setBusinessProfile] = useState<OrganizationBusinessProfile | null>(null);
   const [access, setAccess] = useState<ModuleAccessMap>(ALL_ENABLED);
   const [loading, setLoading] = useState(false);
   const [compatibilityFallback, setCompatibilityFallback] = useState(false);
 
   const userId = user?.id ?? null;
+
   const refresh = useCallback(async () => {
+    const requestId = ++requestSequence.current;
+
     if (!userId) {
       setOrganizationId(null);
+      setBusinessType(null);
+      setBusinessProfile(null);
       setAccess(ALL_DISABLED);
       setCompatibilityFallback(false);
       setLoading(false);
@@ -83,6 +153,8 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
     setOrganizationId(nextOrganizationId);
 
     if (!nextOrganizationId) {
+      setBusinessType(null);
+      setBusinessProfile(null);
       // Transitional compatibility for old bootstrap data that has no tenant
       // relationship yet. RLS/permissions remain authoritative.
       setAccess(ALL_ENABLED);
@@ -91,33 +163,72 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
       return;
     }
 
-    setLoading(true);
-    const { data, error } = await supabase.rpc('get_organization_module_catalog', {
-      p_organization_id: nextOrganizationId,
-    });
+    const cached = readRuntimeCache(nextOrganizationId);
+    if (cached) {
+      setAccess(cached.access);
+      setBusinessType(cached.businessType);
+      setBusinessProfile(cached.businessProfile);
+    } else {
+      // Never leak the previous organization's runtime while a new one loads.
+      setAccess(ALL_DISABLED);
+      setBusinessType(null);
+      setBusinessProfile(null);
+    }
 
-    if (error) {
-      // During the code-before-migration deployment window, keep the existing
-      // application behavior. After the module RPC exists, transient failures
-      // retain the last known module state instead of broadening access.
-      if (isMissingModuleRpcError(error)) {
+    setLoading(true);
+
+    const [modulesResult, organizationResult] = await Promise.all([
+      supabase.rpc('get_organization_module_catalog', {
+        p_organization_id: nextOrganizationId,
+      }),
+      supabase
+        .from('organizations')
+        .select('business_type,business_profile')
+        .eq('id', nextOrganizationId)
+        .maybeSingle(),
+    ]);
+
+    if (requestId !== requestSequence.current) return;
+
+    const moduleError = modulesResult.error;
+    if (moduleError) {
+      if (isMissingModuleRpcError(moduleError)) {
         setAccess(ALL_ENABLED);
         setCompatibilityFallback(true);
+      } else if (!cached) {
+        setAccess(ALL_DISABLED);
+        setCompatibilityFallback(false);
       }
       setLoading(false);
       return;
     }
 
-    const next = { ...ALL_ENABLED };
-    for (const row of (data ?? []) as ModuleCatalogRow[]) {
+    const nextAccess = { ...ALL_ENABLED };
+    for (const row of (modulesResult.data ?? []) as ModuleCatalogRow[]) {
       if (ORGANIZATION_MODULE_KEYS.includes(row.feature_key as OrganizationModuleKey)) {
-        next[row.feature_key as OrganizationModuleKey] = row.enabled !== false;
+        nextAccess[row.feature_key as OrganizationModuleKey] = row.enabled !== false;
       }
     }
 
-    setAccess(next);
+    const runtimeRow = organizationResult.data as OrganizationRuntimeRow | null;
+    const nextBusinessType = organizationResult.error
+      ? cached?.businessType ?? null
+      : runtimeRow?.business_type ?? null;
+    const nextBusinessProfile = organizationResult.error
+      ? cached?.businessProfile ?? null
+      : runtimeRow?.business_profile ?? null;
+
+    setAccess(nextAccess);
+    setBusinessType(nextBusinessType);
+    setBusinessProfile(nextBusinessProfile);
     setCompatibilityFallback(false);
     setLoading(false);
+
+    writeRuntimeCache(nextOrganizationId, {
+      access: nextAccess,
+      businessType: nextBusinessType,
+      businessProfile: nextBusinessProfile,
+    });
   }, [
     branchId,
     branches,
@@ -130,6 +241,22 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
     void refresh();
   }, [refresh]);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const onRuntimeChanged = () => {
+      if (organizationId) {
+        try {
+          localStorage.removeItem(`${CACHE_PREFIX}${organizationId}`);
+        } catch {
+          // Ignore cache cleanup failures.
+        }
+      }
+      void refresh();
+    };
+    window.addEventListener(RUNTIME_CHANGED_EVENT, onRuntimeChanged);
+    return () => window.removeEventListener(RUNTIME_CHANGED_EVENT, onRuntimeChanged);
+  }, [organizationId, refresh]);
+
   const canAccessModule = useCallback(
     (moduleKey: OrganizationModuleKey | null | undefined) => {
       if (!moduleKey) return true;
@@ -140,12 +267,23 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
 
   const value = useMemo<OrganizationModulesContextValue>(() => ({
     organizationId,
+    businessType,
+    businessProfile,
     loading,
     compatibilityFallback,
     access,
     canAccessModule,
     refresh,
-  }), [organizationId, loading, compatibilityFallback, access, canAccessModule, refresh]);
+  }), [
+    organizationId,
+    businessType,
+    businessProfile,
+    loading,
+    compatibilityFallback,
+    access,
+    canAccessModule,
+    refresh,
+  ]);
 
   return (
     <OrganizationModulesContext.Provider value={value}>
