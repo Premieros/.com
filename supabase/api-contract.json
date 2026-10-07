@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T08:45:00.000Z",
+  "generated_at": "2026-10-07T09:25:00.000Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -1191,6 +1191,36 @@
       "name": "submit_stock_count",
       "params": [
         "stock_count_id"
+      ]
+    },
+    {
+      "name": "subscription_settings_get",
+      "params": []
+    },
+    {
+      "name": "subscription_settings_update",
+      "params": [
+        "allow_monthly",
+        "allow_yearly",
+        "beneficiary_name",
+        "grace_days",
+        "instapay_id",
+        "instructions_ar",
+        "instructions_en",
+        "qr_code_url",
+        "require_receipt",
+        "trial_days",
+        "warning_days"
+      ]
+    },
+    {
+      "name": "super_admin_change_subscription",
+      "params": [
+        "current_period_end",
+        "plan_id",
+        "status",
+        "tenant_id",
+        "trial_ends_at"
       ]
     },
     {
