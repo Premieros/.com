@@ -13,6 +13,7 @@ import { Modal } from '@/components/Modal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { logAudit } from '@/lib/audit';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { useBranches } from '@/hooks/useBranches';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
@@ -23,11 +24,12 @@ export function CategoriesPage() {
   const { show } = useToast();
   const can = useCan();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const { rows: items, loading, total, hasMore, loadMore, loadingMore, refresh: reloadCategories } = usePaginatedRows<Category>({
     table: 'categories',
     select: '*',
     order: { column: 'created_at', ascending: false },
-    branch_id: branchFilter,
+    branch_ids: branchScope.selectedBranchIds,
     pageSize: 100,
   });
   const [modalOpen, setModalOpen] = useState(false);
