@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T09:28:00.000Z",
+  "generated_at": "2026-10-07T09:29:00.000Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -1407,6 +1407,8 @@
     "orders",
     "organization_members",
     "organizations",
+    "plan_prices",
+    "plans",
     "product_components",
     "product_unit_links",
     "product_units",
@@ -1426,6 +1428,7 @@
     "sale_payments",
     "sales",
     "settings",
+    "subscriptions",
     "suppliers",
     "system_settings",
     "treasury_accounts",
