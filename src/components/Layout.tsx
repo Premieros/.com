@@ -26,6 +26,7 @@ import { ReturnContextBanner } from '@/core/guard/ReturnContextBanner';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
 import { businessGroupLabel, businessMenuLabel } from '@/core/organizations/businessRuntime';
 import { moduleForRoute } from '@/core/modules/module.config';
+import { useBranchScope } from '@/lib/branchScope';
 
 const ICONS: Record<MenuIcon, ReactNode> = {
   dashboard: <LayoutDashboard className="h-5 w-5" />,
@@ -103,6 +104,7 @@ export function Layout({ children }: { children: ReactNode }) {
   });
   const ar = lang === 'ar';
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const { canAccessModule, canAccessPath, runtime } = useOrganizationModules();
   const isPosRoute = location.pathname === APP_ROUTES.pos || location.pathname.startsWith(`${APP_ROUTES.pos}/`);
   const orderTrackingEnabled = canAccessModule('pos') && canAccessPath(APP_ROUTES.floorPlan) && !isPosRoute;
@@ -377,6 +379,41 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <div data-testid="app-content-shell" className={`min-h-screen pt-[64px] transition-all duration-200 ${desktopSidebarHidden ? 'lg:ms-0' : 'lg:ms-[260px]'}`}>
         <ReturnContextBanner />
+        {branchScope.isAggregate && (
+          <div data-testid="aggregate-branch-action-banner" className="border-b border-ui-warning/30 bg-ui-warning/10 px-4 py-2.5 sm:px-6 lg:px-7">
+            <div className="mx-auto flex max-w-[1600px] flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-xs font-black text-ui-text">
+                  {ar
+                    ? `عرض مجمع لـ ${branchScope.selectedBranchIds.length} فروع`
+                    : `Combined view for ${branchScope.selectedBranchIds.length} branches`}
+                </p>
+                <p className="text-[11px] font-semibold text-ui-muted">
+                  {ar
+                    ? 'حدد فرع الإجراء قبل الإنشاء أو التعديل أو الحذف. العرض يبقى مجمعًا للفروع المحددة.'
+                    : 'Choose the action branch before create, edit, or delete. The view remains combined for selected branches.'}
+                </p>
+              </div>
+              <label className="flex shrink-0 items-center gap-2">
+                <span className="text-[11px] font-black text-ui-warning">{ar ? 'فرع الإجراء' : 'Action branch'}</span>
+                <select
+                  data-testid="aggregate-action-branch-select"
+                  value={branchScope.actionBranchId || ''}
+                  onChange={(event) => branchScope.setActionBranchId(event.target.value)}
+                  className="min-h-9 min-w-[180px] rounded-xl border border-ui-warning/40 bg-ui-surface px-3 text-xs font-black text-ui-text outline-none focus:border-ui-primary"
+                >
+                  {branchScope.organizationBranches
+                    .filter((branch) => branchScope.selectedBranchSet.has(branch.id))
+                    .map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {lang === 'ar' ? branch.name : branch.name_en || branch.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            </div>
+          </div>
+        )}
         <main data-testid="app-main" className="min-h-[calc(100vh-64px)] bg-ui-page p-4 sm:p-6 lg:p-7">
           <div
             data-testid="design-content-surface"
