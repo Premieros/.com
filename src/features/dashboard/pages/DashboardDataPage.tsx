@@ -9,6 +9,7 @@ import {
 import { reporting, supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
 import { useCan } from '@/lib/permissions';
@@ -196,6 +197,8 @@ export function DashboardDataPage() {
   const can = useCan();
   const history = useHistoryAccess();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
+  const readBranchIds = branchScope.selectedBranchIds.length ? branchScope.selectedBranchIds : (branchFilter ? [branchFilter] : []);
   const { effectiveSettings } = useSettings();
   const { branches } = useBranches();
   const { organizationId, runtime, canAccessModule, canAccessPath } = useOrganizationModules();
@@ -256,6 +259,7 @@ export function DashboardDataPage() {
     const window = periodWindow(effectiveRange);
     const boundedSnapshot = await loadDashboardSalesSnapshot({
       branchId: branchFilter || null,
+      branchIds: readBranchIds,
       currentFrom: window.start.toISOString(),
       currentTo: window.end.toISOString(),
       previousFrom: window.previousStart.toISOString(),
@@ -281,9 +285,9 @@ export function DashboardDataPage() {
     const previousFields = 'id,total,paid_amount,payment_method,branch_id,created_at,refunded_amount,discount_amount';
     let currentQuery = supabase.from('sales').select(fields).gte('created_at', window.start.toISOString()).lte('created_at', window.end.toISOString()).order('created_at', { ascending: false }).limit(5000);
     let previousQuery = supabase.from('sales').select(previousFields).gte('created_at', window.previousStart.toISOString()).lte('created_at', window.previousEnd.toISOString()).order('created_at', { ascending: false }).limit(5000);
-    if (branchFilter) {
-      currentQuery = currentQuery.eq('branch_id', branchFilter);
-      previousQuery = previousQuery.eq('branch_id', branchFilter);
+    if (readBranchIds.length) {
+      currentQuery = currentQuery.in('branch_id', readBranchIds);
+      previousQuery = previousQuery.in('branch_id', readBranchIds);
     }
 
     const [currentResult, previousResult] = await Promise.all([currentQuery, previousQuery]);
@@ -313,7 +317,7 @@ export function DashboardDataPage() {
         .gte('sale.created_at', window.start.toISOString())
         .lte('sale.created_at', window.end.toISOString())
         .limit(5000);
-      if (branchFilter) itemQuery = itemQuery.eq('sale.branch_id', branchFilter);
+      if (readBranchIds.length) itemQuery = itemQuery.in('sale.branch_id', readBranchIds);
       itemPromise = itemQuery;
     }
 
@@ -329,7 +333,7 @@ export function DashboardDataPage() {
 
     setLoading(false);
     setRefreshing(false);
-  }, [ar, branchFilter, range, canViewSales]);
+  }, [ar, branchFilter, branchScope.scopeKey, range, canViewSales]);
 
   useEffect(() => { void load(); }, [load]);
 
@@ -340,11 +344,11 @@ export function DashboardDataPage() {
       let rawBalanceQuery = canViewInventory ? supabase.from('raw_material_inventory').select('raw_material_id,branch_id,quantity') : null;
       let unitMasterQuery = canViewInventory ? supabase.from('inventory_units').select('id,branch_id,name,min_stock,low_stock_threshold,is_active').eq('is_active', true) : null;
       let unitBatchQuery = canViewInventory ? supabase.from('inventory_unit_batches').select('unit_id,branch_id,quantity') : null;
-      if (branchFilter) {
-        if (rawMasterQuery) rawMasterQuery = rawMasterQuery.eq('branch_id', branchFilter);
-        if (rawBalanceQuery) rawBalanceQuery = rawBalanceQuery.eq('branch_id', branchFilter);
-        if (unitMasterQuery) unitMasterQuery = unitMasterQuery.eq('branch_id', branchFilter);
-        if (unitBatchQuery) unitBatchQuery = unitBatchQuery.eq('branch_id', branchFilter);
+      if (readBranchIds.length) {
+        if (rawMasterQuery) rawMasterQuery = rawMasterQuery.in('branch_id', readBranchIds);
+        if (rawBalanceQuery) rawBalanceQuery = rawBalanceQuery.in('branch_id', readBranchIds);
+        if (unitMasterQuery) unitMasterQuery = unitMasterQuery.in('branch_id', readBranchIds);
+        if (unitBatchQuery) unitBatchQuery = unitBatchQuery.in('branch_id', readBranchIds);
       }
       const [rawMastersResult, rawBalancesResult, unitMastersResult, unitBatchesResult] = await Promise.all([
         rawMasterQuery ?? Promise.resolve({ data: [], error: null }),
@@ -364,7 +368,8 @@ export function DashboardDataPage() {
       const lowStockCount = stockQueryFailed ? null : alerts.length;
       const from = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01`;
       const to = now.toISOString().slice(0, 10);
-      const targetBranches = branchFilter ? branches.filter((branch) => branch.id === branchFilter) : branches;
+      const selectedBranchSet = new Set(readBranchIds);
+      const targetBranches = branches.filter((branch) => selectedBranchSet.has(branch.id));
       const statements = canViewFinancial
         ? await Promise.all(targetBranches.map((branch) => reporting.getIncomeStatement({ p_branch_id: branch.id, p_from_date: from, p_to_date: to })))
         : [];
@@ -373,7 +378,7 @@ export function DashboardDataPage() {
       const profit = canViewFinancial && targetBranches.length && validStatements.length === targetBranches.length ? validStatements.reduce((sum, result) => sum + Number(result.data?.net_income || 0), 0) : null;
       setQuickStats({ expenses, profit, lowStockCount });
     })();
-  }, [branchFilter, branches, settings?.low_stock_threshold, canViewInventory, canViewFinancial]);
+  }, [branchFilter, branchScope.scopeKey, branches, settings?.low_stock_threshold, canViewInventory, canViewFinancial]);
 
   useEffect(() => {
     let cancelled = false;
@@ -390,7 +395,7 @@ export function DashboardDataPage() {
               .select('id,status,order_type,table_id,branch_id,total,order_items(quantity)')
               .in('status', ['open', 'held'])
               .limit(5000);
-            if (branchFilter) q = q.eq('branch_id', branchFilter);
+            if (readBranchIds.length) q = q.in('branch_id', readBranchIds);
             return q;
           })()
         : Promise.resolve({ data: [], error: null });
@@ -398,7 +403,7 @@ export function DashboardDataPage() {
       const purchasePromise = canViewPurchases
         ? (() => {
             let q = supabase.from('purchases').select('total,returned_amount,branch_id,created_at').gte('created_at', fromIso);
-            if (branchFilter) q = q.eq('branch_id', branchFilter);
+            if (readBranchIds.length) q = q.in('branch_id', readBranchIds);
             return q;
           })()
         : Promise.resolve({ data: [], error: null });
@@ -406,7 +411,7 @@ export function DashboardDataPage() {
       const expensePromise = canViewExpenses
         ? (() => {
             let q = supabase.from('expenses').select('amount,branch_id,expense_date,status').gte('expense_date', fromDate).neq('status', 'voided');
-            if (branchFilter) q = q.eq('branch_id', branchFilter);
+            if (readBranchIds.length) q = q.in('branch_id', readBranchIds);
             return q;
           })()
         : Promise.resolve({ data: [], error: null });
@@ -418,7 +423,7 @@ export function DashboardDataPage() {
               .select('id', { count: 'exact', head: true })
               .eq('organization_id', organizationId)
               .neq('status', 'cancelled');
-            if (branchFilter) q = q.eq('branch_id', branchFilter);
+            if (readBranchIds.length) q = q.in('branch_id', readBranchIds);
             return q;
           })()
         : Promise.resolve({ count: 0, data: [], error: null });
@@ -441,7 +446,7 @@ export function DashboardDataPage() {
 
     return () => { cancelled = true; };
   }, [
-    branchFilter, range,
+    branchFilter, branchScope.scopeKey, range,
     canViewPos, canViewPurchases, canViewExpenses, canViewBusinessRecords, organizationId,
   ]);
 
