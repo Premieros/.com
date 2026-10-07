@@ -45,7 +45,7 @@ interface PersistResult {
 
 const EMPTY_CART: CartItem[] = [];
 
-const VALID_PAYMENT_METHODS: PosPaymentMethod[] = ['cash', 'card', 'transfer', 'credit'];
+const VALID_PAYMENT_METHODS: PosPaymentMethod[] = ['cash', 'card', 'transfer', 'instapay', 'bank_transfer', 'credit'];
 
 export function usePosOrder(input: UsePosOrderInput) {
   const { branchId, branchName, orderId, customers, effSettings, activeShift, stockMap, rawShortageOnly = {}, onInventoryChanged } = input;
