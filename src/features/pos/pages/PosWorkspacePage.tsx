@@ -233,6 +233,14 @@ export function PosWorkspacePage() {
 
   const handlePay = useCallback(() => {
     if (!perms.canPay || !shiftChecked || pos.cart.length === 0) return;
+    if (posSurface.customerRequired && !pos.customerId) {
+      setCustomerModalOpen(true);
+      show(
+        isAr ? `اختر ${posSurface.customerLabel.ar} قبل إتمام ${posSurface.transactionLabel.ar}.` : `Select a ${posSurface.customerLabel.en} before completing this ${posSurface.transactionLabel.en.toLowerCase()}.`,
+        'error',
+      );
+      return;
+    }
     const allowed = guardPos({
       productsCount: products.length,
       activeShiftId: posSurface.requiresShift ? activeShift?.id || null : undefined,
@@ -243,7 +251,7 @@ export function PosWorkspacePage() {
     pos.setPaidAmount(pos.total);
     pos.setCheckoutOpen(true);
     setMobileOrderOpen(true);
-  }, [perms.canPay, shiftChecked, pos, guardPos, products.length, activeShift?.id, posSurface.requiresShift]);
+  }, [perms.canPay, shiftChecked, pos, guardPos, products.length, activeShift?.id, posSurface, show, isAr]);
 
   // Keyboard Shortcuts Hook
   usePosKeyboard({
@@ -936,7 +944,7 @@ export function PosWorkspacePage() {
               onSearch={setSearch}
               onSelectCategory={setSelectedCategory}
               onAddToCart={pos.addToCart}
-              onConfigureProduct={(p) => setConfigProduct(p)}
+              onConfigureProduct={posSurface.showRestaurantOrderControls ? (p) => setConfigProduct(p) : undefined}
               inputRef={barcodeRef}
             />
           </div>
