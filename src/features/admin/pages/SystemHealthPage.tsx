@@ -5,6 +5,7 @@ import { Card } from '@/components/PageHeader';
 import { Button } from '@/components/Button';
 import { useLanguage } from '@/context/LanguageContext';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { getAllOfflineSales } from '@/core/offline/offlineStorage';
 import { formatNumber } from '@/lib/format';
 import { AdminDataManagementPanel } from './AdminDataManagementPanel';
@@ -68,6 +69,7 @@ export function SystemHealthPage() {
   const { lang } = useLanguage();
   const ar = lang === 'ar';
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const [checks, setChecks] = useState<Check[]>([]);
   const [running, setRunning] = useState(false);
   const [finishedAt, setFinishedAt] = useState<string | null>(null);
@@ -76,25 +78,66 @@ export function SystemHealthPage() {
     setRunning(true);
     setChecks([{ key: 'loading', ar: 'فحص التشغيل', en: 'Operational health', status: 'checking', detail: ar ? 'جارٍ الفحص...' : 'Checking...' }]);
 
-    const [remote, offline] = await Promise.all([
-      admin.getSystemHealthSnapshot({ p_branch_id: branchFilter || null }),
+    const targetBranchIds = branchScope.selectedBranchIds.length > 0
+      ? branchScope.selectedBranchIds
+      : (branchFilter ? [branchFilter] : []);
+    const [remoteResults, offline] = await Promise.all([
+      Promise.all(
+        (targetBranchIds.length > 0 ? targetBranchIds : [null]).map((branchId) =>
+          admin.getSystemHealthSnapshot({ p_branch_id: branchId }),
+        ),
+      ),
       getAllOfflineSales().catch(() => []),
     ]);
 
-    if (remote.error || !remote.data || typeof remote.data !== 'object') {
+    const failedRemote = remoteResults.find((result) => result.error || !result.data || typeof result.data !== 'object');
+    if (failedRemote) {
       setChecks([{
         key: 'database',
         ar: 'قاعدة البيانات',
         en: 'Database',
         status: 'error',
-        detail: remote.error?.message || (ar ? 'تعذر تنفيذ فحص التشغيل' : 'Operational health check failed'),
+        detail: failedRemote.error?.message || (ar ? 'تعذر تنفيذ فحص التشغيل' : 'Operational health check failed'),
       }]);
       setFinishedAt(new Date().toLocaleString());
       setRunning(false);
       return;
     }
 
-    const snapshot = remote.data as HealthSnapshot;
+    const snapshots = remoteResults.map((result) => result.data as HealthSnapshot);
+    const numericKeys: (keyof HealthSnapshot)[] = [
+      'active_shifts',
+      'duplicate_open_shift_branches',
+      'open_orders',
+      'stale_empty_open_orders',
+      'vacant_tables_with_effective_orders',
+      'occupied_tables_without_effective_orders',
+      'unbalanced_journal_entries',
+      'sale_payment_detail_mismatch',
+      'sale_item_refund_integrity_violations',
+      'live_kitchen_inventory_mismatch',
+      'active_print_jobs',
+      'stale_active_print_jobs',
+      'pending_work_authorizations',
+    ];
+    const snapshot: HealthSnapshot = snapshots.length <= 1
+      ? (snapshots[0] || {})
+      : {
+          success: snapshots.every((row) => row.success !== false),
+          database_ok: snapshots.every((row) => row.database_ok !== false),
+          generated_at: new Date().toISOString(),
+          branch_id: null,
+          latest_daily_close_at: snapshots
+            .map((row) => row.latest_daily_close_at)
+            .filter((value): value is string => !!value)
+            .sort()
+            .at(-1) || null,
+        };
+    if (snapshots.length > 1) {
+      for (const key of numericKeys) {
+        (snapshot as Record<string, unknown>)[key] = snapshots.reduce((sum, row) => sum + n(row[key]), 0);
+      }
+    }
     if (snapshot.success === false) {
       setChecks([{
         key: 'permission',
@@ -190,7 +233,7 @@ export function SystemHealthPage() {
     setChecks(next);
     setFinishedAt(new Date(snapshot.generated_at || Date.now()).toLocaleString());
     setRunning(false);
-  }, [ar, branchFilter]);
+  }, [ar, branchFilter, branchScope.scopeKey, branchScope.selectedBranchIds]);
 
   useEffect(() => { void runChecks(); }, [runChecks]);
 
