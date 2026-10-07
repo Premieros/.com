@@ -111,6 +111,24 @@ BEGIN
     v_message
   );
 
+  -- Automatic acknowledgement visible in the same conversation.
+  -- We intentionally attribute it to the customer user id with sender_kind=support
+  -- instead of inventing a fake auth identity.
+  IF NOT public.is_super_admin() THEN
+    INSERT INTO public.support_messages(
+      conversation_id, sender_user_id, sender_kind, body
+    ) VALUES (
+      v_conversation_id,
+      v_user_id,
+      'support',
+      'استلمنا رسالتك، سيتم الرد عليك في أقرب وقت.'
+    );
+
+    UPDATE public.support_conversations
+    SET last_message_at = now(), updated_at = now()
+    WHERE id = v_conversation_id;
+  END IF;
+
   RETURN jsonb_build_object(
     'success', true,
     'conversation_id', v_conversation_id
