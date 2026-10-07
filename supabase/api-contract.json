@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T09:25:00.000Z",
+  "generated_at": "2026-10-07T09:28:00.000Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -1192,10 +1192,6 @@
       "params": [
         "stock_count_id"
       ]
-    },
-    {
-      "name": "subscription_settings_get",
-      "params": []
     },
     {
       "name": "subscription_settings_update",
