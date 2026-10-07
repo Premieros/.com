@@ -41,6 +41,8 @@ import { PosOrderHeaderBar } from '../components/order/PosOrderHeaderBar';
 import { TransferOrderModal } from '../components/tables/TransferOrderModal';
 import { orderOperatorName } from '../utils/operatorName';
 import { VoidItemModal } from '../components/order/VoidItemModal';
+import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
+import { resolvePosBusinessSurface } from '../businessSurface';
 
 const EMPTY_POS_STOCK_MAP: Record<string, number> = {};
 
@@ -65,6 +67,8 @@ export function PosWorkspacePage() {
   const { branches: sharedBranches } = useBranches();
   const { show } = useToast();
   const perms = usePosPermissions();
+  const { runtime } = useOrganizationModules();
+  const posSurface = useMemo(() => resolvePosBusinessSurface(runtime), [runtime]);
   const {
     guardPos,
     startGuidance,
@@ -115,6 +119,11 @@ export function PosWorkspacePage() {
   const effSettings: Settings | null = settings ? mergeEffectiveSettings(settings, effectiveBranch ? branchSettingsMap[effectiveBranch] : null) : null;
 
   const reloadShift = useCallback(() => {
+    if (!posSurface.requiresShift) {
+      setShiftChecked(true);
+      setActiveShift(null);
+      return;
+    }
     if (!effectiveBranch) {
       setShiftChecked(true);
       setActiveShift(null);
@@ -128,7 +137,7 @@ export function PosWorkspacePage() {
       })
       .catch(() => setActiveShift(null))
       .finally(() => setShiftChecked(true));
-  }, [effectiveBranch]);
+  }, [effectiveBranch, posSurface.requiresShift]);
 
   useEffect(() => {
     reloadShift();
@@ -226,7 +235,7 @@ export function PosWorkspacePage() {
     if (!perms.canPay || !shiftChecked || pos.cart.length === 0) return;
     const allowed = guardPos({
       productsCount: products.length,
-      activeShiftId: activeShift?.id || null,
+      activeShiftId: posSurface.requiresShift ? activeShift?.id || null : undefined,
       formData: { cart: pos.cart, orderType: pos.orderType },
     });
     if (!allowed) return;
@@ -234,7 +243,7 @@ export function PosWorkspacePage() {
     pos.setPaidAmount(pos.total);
     pos.setCheckoutOpen(true);
     setMobileOrderOpen(true);
-  }, [perms.canPay, shiftChecked, pos, guardPos, products.length, activeShift?.id]);
+  }, [perms.canPay, shiftChecked, pos, guardPos, products.length, activeShift?.id, posSurface.requiresShift]);
 
   // Keyboard Shortcuts Hook
   usePosKeyboard({
@@ -273,7 +282,7 @@ export function PosWorkspacePage() {
   } = pos;
 
   useEffect(() => {
-    if (orderIdParam) {
+    if (!posSurface.showRestaurantOrderControls || orderIdParam) {
       setStartStep(null);
       return;
     }
@@ -284,7 +293,7 @@ export function PosWorkspacePage() {
       setPreselectedTableId(null);
       setStartStep(initState.startStep);
     } else setStartStep(null);
-  }, [orderIdParam, initState.tableId, initState.startStep]);
+  }, [orderIdParam, initState.tableId, initState.startStep, posSurface.showRestaurantOrderControls]);
 
   useEffect(() => {
     payConsumed.current = false;
@@ -667,6 +676,7 @@ export function PosWorkspacePage() {
     />
   ) : (
     <CurrentOrderPanel
+      surface={posSurface}
       cart={pos.cart}
       currency={pos.effCurrency}
       subtotal={pos.subtotal}
@@ -711,7 +721,15 @@ export function PosWorkspacePage() {
       onConfigureItem={(item) => setConfigItem(item)}
       onOpenCustomerModal={() => setCustomerModalOpen(true)}
       onOpenTableModal={() => setTableModalOpen(true)}
-      perms={{ ...perms, canEditOrder: canModifyCurrentOrder }}
+      perms={{
+        ...perms,
+        canEditOrder: canModifyCurrentOrder,
+        canSendKitchen: posSurface.showKitchen && perms.canSendKitchen,
+        canViewKitchen: posSurface.showKitchen && perms.canViewKitchen,
+        canPrintKitchen: posSurface.showKitchen && perms.canPrintKitchen,
+        canTransferOrder: posSurface.showTables && perms.canTransferOrder,
+        canSplitOrder: posSurface.showTables && perms.canSplitOrder,
+      }}
       onVoidItem={(item, sentQty) => {
         setVoidItem(item);
         setVoidSentQty(sentQty);
@@ -723,6 +741,7 @@ export function PosWorkspacePage() {
   return (
     <div data-testid="pos-workspace" className="flex h-[100dvh] flex-col overflow-hidden bg-ui-page text-ui-text">
       <PosTopBar
+        surface={posSurface}
         panel={panel}
         onPanel={(p) => {
           setStartStep(null);
@@ -746,7 +765,8 @@ export function PosWorkspacePage() {
         onOpenShiftModal={() => setShiftModalOpen(true)}
         onNewOrder={() => {
           pos.resetWorkspace();
-          window.dispatchEvent(new Event('pos:show-tables-landing'));
+          pos.setOrderType('takeaway');
+          if (posSurface.showTables) window.dispatchEvent(new Event('pos:show-tables-landing'));
           setStartStep(null);
           setPreselectedTableId(null);
           setPanel(null);
@@ -789,7 +809,8 @@ export function PosWorkspacePage() {
 
       {/* Main Split-Screen Workspace */}
       <div data-testid="pos-main-workspace" className="flex min-h-0 flex-1 overflow-hidden">
-        {/* Tables-first landing stays available on phones, tablets, and desktop. */}
+        {/* Restaurant operations are only mounted for table-service businesses. */}
+        {posSurface.showTables && (
         <div data-testid="pos-tables-landing-shell" className="flex h-full shrink-0">
           <PosTablesSidebar
             branchId={effectiveBranch}
@@ -832,9 +853,11 @@ export function PosWorkspacePage() {
             activeOrderType={pos.orderType}
           />
         </div>
+        )}
 
-        {/* Center: Product Browser with Fast Order Header Bar */}
+        {/* Center: business-specific catalog and sale workspace */}
         <div data-testid="pos-catalog-shell" className="flex min-h-0 min-w-0 flex-1 flex-col bg-ui-page">
+          {posSurface.showRestaurantOrderControls ? (
           <PosOrderHeaderBar
             orderNumber={pos.activeOrderNumber}
             orderId={pos.activeOrderId}
@@ -875,6 +898,29 @@ export function PosWorkspacePage() {
             onPrint={() => void pos.printReceipt()}
             onPay={handlePay}
           />
+          ) : (
+            <div data-testid="pos-business-sale-header" className="border-b border-ui-border bg-ui-surface px-4 py-3">
+              <div className="flex flex-wrap items-center gap-3">
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-black text-ui-accent">{isAr ? posSurface.title.ar : posSurface.title.en}</p>
+                  <h1 className="truncate text-lg font-black text-ui-text">{isAr ? posSurface.newSaleLabel.ar : posSurface.newSaleLabel.en}</h1>
+                  <p className="mt-0.5 truncate text-[11px] font-bold text-ui-muted">{isAr ? posSurface.subtitle.ar : posSurface.subtitle.en}</p>
+                </div>
+                {posSurface.customerEmphasis && (
+                  <button
+                    type="button"
+                    data-testid="pos-business-customer-action"
+                    onClick={() => setCustomerModalOpen(true)}
+                    className="rounded-xl border border-ui-primary/30 bg-ui-primary-soft px-3 py-2 text-xs font-black text-ui-accent"
+                  >
+                    {pos.customerId
+                      ? customerById[pos.customerId]?.name || (isAr ? posSurface.customerLabel.ar : posSurface.customerLabel.en)
+                      : (isAr ? `اختر ${posSurface.customerLabel.ar}` : `Select ${posSurface.customerLabel.en}`)}
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
 
           <div className="flex-1 min-h-0">
             <ProductBrowser
@@ -886,7 +932,7 @@ export function PosWorkspacePage() {
               hasBranch={!!effectiveBranch}
               canModifyOrder={canModifyCurrentOrder}
               shiftChecked={shiftChecked}
-              shiftOpen={!!activeShift}
+              shiftOpen={!!activeShift || !posSurface.requiresShift}
               onSearch={setSearch}
               onSelectCategory={setSelectedCategory}
               onAddToCart={pos.addToCart}
@@ -953,7 +999,7 @@ export function PosWorkspacePage() {
 
       <nav
         data-testid="pos-mobile-command-dock"
-        className="fixed bottom-0 start-0 end-0 z-40 grid grid-cols-4 border-t border-ui-border bg-ui-surface/95 px-1 pt-1 shadow-[0_-10px_30px_rgba(0,0,0,0.10)] backdrop-blur-xl lg:hidden"
+        className="fixed bottom-0 start-0 end-0 z-40 grid grid-cols-4 border-t border-ui-border bg-ui-surface/95 px-1 pt-1 shadow-[0_-10px_30px_rgba(0,0,0,0.10)] backdrop-blur-xl lg:hidden`}
         aria-label={isAr ? 'تحكم شاشة البيع' : 'POS mobile controls'}
       >
         <button
@@ -968,7 +1014,7 @@ export function PosWorkspacePage() {
           className="flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] font-black text-ui-muted active:bg-ui-page-alt"
         >
           <Grid2X2 className="h-5 w-5" />
-          <span>{isAr ? 'المنتجات' : 'Menu'}</span>
+          <span>{isAr ? posSurface.catalogLabel.ar : posSurface.catalogLabel.en}</span>
         </button>
 
         <button
@@ -979,7 +1025,7 @@ export function PosWorkspacePage() {
           className="relative flex min-h-14 flex-col items-center justify-center gap-0.5 rounded-xl px-1 text-[10px] font-black text-ui-muted active:bg-ui-page-alt disabled:opacity-40"
         >
           <ShoppingCart className="h-5 w-5" />
-          <span>{isCheckout ? (isAr ? 'الدفع' : 'Pay') : (isAr ? 'الطلب' : 'Order')}</span>
+          <span>{isCheckout ? (isAr ? 'الدفع' : 'Pay') : (isAr ? posSurface.currentSaleLabel.ar : posSurface.currentSaleLabel.en)}</span>
           {pos.cart.length > 0 && (
             <span className="absolute end-[22%] top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-ui-primary px-1 text-[9px] text-ui-primary-fg">
               {pos.cart.reduce((sum, item) => sum + item.quantity, 0)}
@@ -987,6 +1033,7 @@ export function PosWorkspacePage() {
           )}
         </button>
 
+        {posSurface.showActiveOrders && (
         <button
           data-testid="pos-mobile-nav-orders"
           type="button"
@@ -1006,7 +1053,9 @@ export function PosWorkspacePage() {
             </span>
           )}
         </button>
+        )}
 
+        {posSurface.showTables && (
         <button
           data-testid="pos-mobile-nav-tables"
           type="button"
@@ -1020,8 +1069,10 @@ export function PosWorkspacePage() {
           <Utensils className="h-5 w-5" />
           <span>{isAr ? 'الطاولات' : 'Tables'}</span>
         </button>
+        )}
       </nav>
 
+      {posSurface.showActiveOrders && (
       <ActiveOrdersDrawer
         open={panel === 'orders'}
         onClose={() => setPanel(null)}
@@ -1036,7 +1087,9 @@ export function PosWorkspacePage() {
         onPay={(o) => openOrderWorkspace(o.id, { pay: true })}
         onCancel={(o) => void handleCancelOrder(o.id)}
       />
+      )}
 
+      {posSurface.showTables && (
       <TablesPanel
         open={panel === 'tables'}
         onClose={() => setPanel(null)}
@@ -1048,7 +1101,9 @@ export function PosWorkspacePage() {
         onPay={(o) => openOrderWorkspace(o.id, { pay: true })}
         onStart={(tb) => startOrderAtTable(tb.id)}
       />
+      )}
 
+      {posSurface.showKitchen && (
       <KitchenPanel
         open={panel === 'kitchen'}
         onClose={() => setPanel(null)}
@@ -1058,8 +1113,9 @@ export function PosWorkspacePage() {
         tableById={tableById}
         productNames={productNames}
       />
+      )}
 
-      {startStep && (
+      {posSurface.showRestaurantOrderControls && startStep && (
         <OrderStartWizard
           step={startStep}
           tables={tables}
@@ -1147,6 +1203,7 @@ export function PosWorkspacePage() {
       />
 
       {/* Table Select Modal */}
+      {posSurface.showTables && (
       <TableSelectModal
         isOpen={tableModalOpen}
         onClose={() => setTableModalOpen(false)}
@@ -1155,8 +1212,10 @@ export function PosWorkspacePage() {
         selectedTableId={pos.activeTable?.id || null}
         onSelectTable={(table) => pos.setTableId(table.id)}
       />
+      )}
 
       {/* Transfer Order Modal */}
+      {posSurface.showTables && (
       <TransferOrderModal
         open={transferModalOpen}
         onClose={() => {
@@ -1172,6 +1231,7 @@ export function PosWorkspacePage() {
         onConfirmTransfer={handleConfirmTransfer}
         onOperatorTransferred={() => setReloadKey((value) => value + 1)}
       />
+      )}
 
       {/* Void Sent Item Modal */}
       <VoidItemModal
