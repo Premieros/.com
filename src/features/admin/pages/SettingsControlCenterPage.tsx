@@ -15,6 +15,8 @@ import {
   Boxes,
   CheckCircle2,
   AlertTriangle,
+  Landmark,
+  Smartphone,
 } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/api';
@@ -32,7 +34,7 @@ import { findUiTheme, UI_THEMES } from '@/lib/themes';
 import type { BranchSettings } from '@/lib/types';
 import { APP_ROUTES } from '@/core/navigation/routes';
 
-type SettingsTab = 'branch_profile' | 'tax' | 'business_day' | 'inventory' | 'branch_staff' | 'appearance' | 'language';
+type SettingsTab = 'branch_profile' | 'tax' | 'business_day' | 'inventory' | 'payments' | 'branch_staff' | 'appearance' | 'language';
 
 interface UserRow {
   id: string;
@@ -81,6 +83,9 @@ export function SettingsControlCenterPage() {
         business_day_start: row?.business_day_start ?? '00:00',
         business_day_end: row?.business_day_end ?? '00:00',
         auto_close_shift_at_day_end: row?.auto_close_shift_at_day_end ?? false,
+        manual_transfer_enabled: row?.manual_transfer_enabled ?? false,
+        instapay_handle: row?.instapay_handle ?? '',
+        bank_transfer_details: row?.bank_transfer_details ?? '',
       });
     }
   }, [targetBranchId, branchSettingsMap]);
@@ -129,6 +134,9 @@ export function SettingsControlCenterPage() {
       business_day_start: branchForm.business_day_start || '00:00',
       business_day_end: branchForm.business_day_end || '00:00',
       auto_close_shift_at_day_end: branchForm.auto_close_shift_at_day_end ?? false,
+      manual_transfer_enabled: branchForm.manual_transfer_enabled ?? false,
+      instapay_handle: branchForm.instapay_handle?.trim() || null,
+      bank_transfer_details: branchForm.bank_transfer_details?.trim() || null,
     };
     const ok = await saveBranchSettings(targetBranchId, patch);
     if (ok) {
@@ -145,6 +153,7 @@ export function SettingsControlCenterPage() {
     { key: 'tax', label: isAr ? 'الضريبة' : 'Tax', icon: <Percent className="w-4 h-4" /> },
     { key: 'business_day', label: isAr ? 'اليوم المالي والشفتات' : 'Business Day & Shifts', icon: <CalendarClock className="w-4 h-4" /> },
     { key: 'inventory', label: isAr ? 'المخزون والبيع بالسالب' : 'Inventory & Negative Stock', icon: <Boxes className="w-4 h-4" /> },
+    { key: 'payments', label: isAr ? 'InstaPay والتحويل البنكي' : 'InstaPay & Bank Transfer', icon: <Landmark className="w-4 h-4" /> },
     { key: 'branch_staff', label: isAr ? 'طاقم عمل الفرع' : 'Branch Staff', icon: <Users className="w-4 h-4" /> },
     { key: 'appearance', label: isAr ? 'المظهر والثيم' : 'Appearance & Theme', icon: <Palette className="w-4 h-4" /> },
     { key: 'language', label: isAr ? 'اللغة والتوطين' : 'Language', icon: <Languages className="w-4 h-4" /> },
@@ -594,6 +603,87 @@ export function SettingsControlCenterPage() {
                 <Button onClick={saveBranchSpecific} disabled={saving}>
                   {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
                   <span>{isAr ? 'حفظ إعدادات المخزون' : 'Save Inventory Settings'}</span>
+                </Button>
+              </div>
+            </Card>
+          )}
+
+          {active === 'payments' && (
+            <Card className="space-y-6 p-4 sm:p-6">
+              <div>
+                <h2 className="text-lg font-bold text-ui-text">
+                  {isAr ? 'التحويلات اليدوية وInstaPay' : 'Manual Transfers & InstaPay'}
+                </h2>
+                <p className="text-xs text-ui-subtle">
+                  {isAr
+                    ? 'اعرض بيانات التحويل للكاشير، ولا يُعتمد الدفع إلا بعد موافقة مدير من مركز الموافقات.'
+                    : 'Show transfer details to the cashier and require manager approval before the sale is treated as paid.'}
+                </p>
+              </div>
+
+              <label className="flex items-start gap-3 rounded-2xl border border-ui-border bg-ui-page-alt p-4">
+                <input
+                  type="checkbox"
+                  checked={Boolean(branchForm.manual_transfer_enabled)}
+                  onChange={(e) => setBranchForm({ ...branchForm, manual_transfer_enabled: e.target.checked })}
+                  className="mt-1 h-4 w-4"
+                />
+                <div>
+                  <p className="text-sm font-black text-ui-text">
+                    {isAr ? 'تفعيل InstaPay والتحويل البنكي في نقطة البيع' : 'Enable InstaPay and bank transfer in POS'}
+                  </p>
+                  <p className="mt-1 text-xs font-medium text-ui-muted">
+                    {isAr
+                      ? 'كل عملية تتطلب مرجع تحويل وموافقة مدير قبل إتمام البيع.'
+                      : 'Every transaction requires a transfer reference and manager approval before checkout.'}
+                  </p>
+                </div>
+              </label>
+
+              <div className="grid gap-4 lg:grid-cols-2">
+                <div className="space-y-2 rounded-2xl border border-ui-border bg-ui-surface-raised p-4">
+                  <div className="flex items-center gap-2">
+                    <Smartphone className="h-5 w-5 text-ui-accent" />
+                    <p className="text-sm font-black text-ui-text">InstaPay</p>
+                  </div>
+                  <Input
+                    label={isAr ? 'عنوان InstaPay / رقم التحويل' : 'InstaPay address / transfer number'}
+                    value={branchForm.instapay_handle || ''}
+                    onChange={(e) => setBranchForm({ ...branchForm, instapay_handle: e.target.value })}
+                    placeholder="name@instapay"
+                  />
+                  <p className="text-[11px] font-medium text-ui-subtle">
+                    {isAr ? 'سيظهر هذا النص للكاشير والعميل عند اختيار InstaPay.' : 'Shown to the cashier/customer when InstaPay is selected.'}
+                  </p>
+                </div>
+
+                <div className="space-y-2 rounded-2xl border border-ui-border bg-ui-surface-raised p-4">
+                  <div className="flex items-center gap-2">
+                    <Landmark className="h-5 w-5 text-ui-accent" />
+                    <p className="text-sm font-black text-ui-text">
+                      {isAr ? 'التحويل البنكي' : 'Bank transfer'}
+                    </p>
+                  </div>
+                  <Textarea
+                    label={isAr ? 'بيانات الحساب البنكي' : 'Bank account details'}
+                    value={branchForm.bank_transfer_details || ''}
+                    onChange={(e) => setBranchForm({ ...branchForm, bank_transfer_details: e.target.value })}
+                    placeholder={isAr ? 'اسم البنك، اسم المستفيد، رقم الحساب أو IBAN' : 'Bank, beneficiary, account number or IBAN'}
+                    rows={4}
+                  />
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-ui-warning/30 bg-ui-warning/10 p-4 text-xs font-bold text-ui-warning">
+                {isAr
+                  ? 'لا يسجل النظام التحويل كدفعة مؤكدة بمجرد إدخال الرقم المرجعي. يجب أن يوافق مدير مخول من مركز الموافقات، وبعدها فقط يتم ترحيل المبلغ إلى حساب البنك محاسبيًا.'
+                  : 'Entering a reference never marks the payment as confirmed. An authorized manager must approve it first; only then is the bank collection posted.'}
+              </div>
+
+              <div className="flex justify-end border-t border-ui-border pt-4">
+                <Button onClick={saveBranchSpecific} disabled={saving}>
+                  {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                  <span>{isAr ? 'حفظ إعدادات الدفع' : 'Save Payment Settings'}</span>
                 </Button>
               </div>
             </Card>
