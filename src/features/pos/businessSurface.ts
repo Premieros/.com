@@ -18,6 +18,7 @@ export interface PosBusinessSurface {
   showRestaurantOrderControls: boolean;
   requiresShift: boolean;
   customerEmphasis: boolean;
+  customerRequired: boolean;
 }
 
 const T = (ar: string, en: string) => ({ ar, en });
@@ -40,6 +41,7 @@ export function resolvePosBusinessSurface(runtime: BusinessRuntime): PosBusiness
     showRestaurantOrderControls: restaurant,
     requiresShift: capabilities.has('shifts'),
     customerEmphasis: runtime.workflow === 'vehicle_sales' || runtime.workflow === 'manufacturing',
+    customerRequired: runtime.workflow === 'vehicle_sales',
   };
 
   switch (runtime.workflow) {
