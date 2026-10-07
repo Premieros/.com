@@ -36,6 +36,17 @@ export interface ReceiptTender {
   amount: number;
 }
 
+export type ManualPaymentMethod = 'instapay' | 'bank_transfer';
+
+export interface ManualPaymentApproval {
+  requestId: string;
+  method: ManualPaymentMethod;
+  amount: number;
+  reference: string;
+}
+
+export type ManualPaymentApprovalStatus = 'pending' | 'approved' | 'rejected' | 'expired' | 'consumed';
+
 export type ProcessSaleResult = RpcResult & {
   offline?: boolean;
   pending_sync?: boolean;
@@ -50,6 +61,10 @@ let armedSplitTender: SplitTenderInput[] | null = null;
 let armedSplitTenderAt = 0;
 const SPLIT_TENDER_ARM_TTL_MS = 15_000;
 
+let armedManualPayment: ManualPaymentApproval | null = null;
+let armedManualPaymentAt = 0;
+const MANUAL_PAYMENT_ARM_TTL_MS = 60_000;
+
 export function armSplitTender(payments: SplitTenderInput[]): void {
   armedSplitTender = payments
     .filter((payment) => Number(payment.amount) > 0)
@@ -60,6 +75,26 @@ export function armSplitTender(payments: SplitTenderInput[]): void {
 export function clearArmedSplitTender(): void {
   armedSplitTender = null;
   armedSplitTenderAt = 0;
+}
+
+export function armManualPaymentApproval(approval: ManualPaymentApproval): void {
+  armedManualPayment = { ...approval, amount: Number(approval.amount) };
+  armedManualPaymentAt = Date.now();
+}
+
+export function clearArmedManualPaymentApproval(): void {
+  armedManualPayment = null;
+  armedManualPaymentAt = 0;
+}
+
+function consumeArmedManualPayment(): ManualPaymentApproval | null {
+  if (!armedManualPayment || Date.now() - armedManualPaymentAt > MANUAL_PAYMENT_ARM_TTL_MS) {
+    clearArmedManualPaymentApproval();
+    return null;
+  }
+  const approval = armedManualPayment;
+  clearArmedManualPaymentApproval();
+  return approval;
 }
 
 function consumeArmedSplitTender(): SplitTenderInput[] | null {
@@ -137,6 +172,61 @@ async function resolveSharedBranchShift(p: ProcessSalePayload): Promise<{ payloa
   }
 }
 
+export async function requestManualPaymentApproval(input: {
+  branchId: string;
+  method: ManualPaymentMethod;
+  amount: number;
+  reference: string;
+  senderName?: string | null;
+  note?: string | null;
+}): Promise<{ requestId: string | null; status: ManualPaymentApprovalStatus | null; error: string | null }> {
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return { requestId: null, status: null, error: 'Manual transfer confirmation requires an online connection.' };
+  }
+
+  try {
+    const { data, error } = await posApi.requestManualPaymentApproval({
+      p_branch_id: input.branchId,
+      p_method: input.method,
+      p_amount: Number(input.amount),
+      p_reference: input.reference.trim(),
+      p_sender_name: input.senderName?.trim() || null,
+      p_note: input.note?.trim() || null,
+    });
+    const result = data as { success?: boolean; request_id?: string; status?: string; error?: string; detail?: string } | null;
+    if (error || !result?.success || !result.request_id) {
+      return {
+        requestId: null,
+        status: null,
+        error: error?.message || result?.detail || result?.error || 'Could not request payment confirmation.',
+      };
+    }
+    return {
+      requestId: result.request_id,
+      status: (result.status || 'pending') as ManualPaymentApprovalStatus,
+      error: null,
+    };
+  } catch (err) {
+    return { requestId: null, status: null, error: err instanceof Error ? err.message : 'Could not request payment confirmation.' };
+  }
+}
+
+export async function getManualPaymentApprovalStatus(requestId: string): Promise<{
+  status: ManualPaymentApprovalStatus | null;
+  error: string | null;
+}> {
+  try {
+    const { data, error } = await posApi.manualPaymentApprovalStatus({ p_request_id: requestId });
+    const result = data as { success?: boolean; status?: string; error?: string; detail?: string } | null;
+    if (error || !result?.success) {
+      return { status: null, error: error?.message || result?.detail || result?.error || 'Could not check payment confirmation.' };
+    }
+    return { status: (result.status || null) as ManualPaymentApprovalStatus | null, error: null };
+  } catch (err) {
+    return { status: null, error: err instanceof Error ? err.message : 'Could not check payment confirmation.' };
+  }
+}
+
 export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ result: ProcessSaleResult | null; error: string | null }> {
   // Authoritative Business Logic Check: Negative Stock Policy
   // If negative stock is disabled, check effective available stock (accounting for unsynced local outbox sales)
@@ -200,6 +290,72 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   const resolvedShift = await resolveSharedBranchShift(p);
   if (!resolvedShift.payload) return { result: null, error: resolvedShift.error || 'SHIFT_REQUIRED' };
   const settlementPayload = resolvedShift.payload;
+
+  const isManualPayment = settlementPayload.p_payment_method === 'instapay'
+    || settlementPayload.p_payment_method === 'bank_transfer';
+
+  if (isManualPayment) {
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      return { result: null, error: 'Manual transfer confirmation requires an online connection.' };
+    }
+
+    const approval = consumeArmedManualPayment();
+    if (!approval) {
+      return { result: null, error: 'PAYMENT_APPROVAL_REQUIRED' };
+    }
+
+    if (
+      approval.method !== settlementPayload.p_payment_method
+      || Math.abs(Number(approval.amount) - Number(settlementPayload.p_paid_amount || settlementPayload.p_total)) > 0.01
+    ) {
+      return { result: null, error: 'PAYMENT_APPROVAL_SCOPE_MISMATCH' };
+    }
+
+    try {
+      const { p_paid_amount: _paidAmount, ...manualPayload } = settlementPayload;
+      void _paidAmount;
+      const { data, error } = await posApi.processSaleManualPayment({
+        ...manualPayload,
+        p_approval_request_id: approval.requestId,
+        p_manual_reference: approval.reference,
+        p_payment_method: approval.method,
+      });
+      const result = data as RpcResult | null;
+      if (error || !result?.success) {
+        return { result, error: error?.message || result?.detail || result?.error || 'Manual payment sale failed' };
+      }
+
+      if (Array.isArray(p.p_items)) {
+        for (const item of p.p_items) {
+          if (item.product_id) {
+            await InventoryRepository.recordLocalMovement({
+              id: `mov_${createOfflineToken()}`,
+              productId: item.product_id,
+              branchId: p.p_branch_id,
+              quantityDelta: -Number(item.quantity || 0),
+              reason: 'sale',
+              referenceId: p.p_invoice_number,
+              createdAt: new Date().toISOString(),
+              synced: true,
+            });
+          }
+        }
+      }
+
+      return {
+        result: {
+          ...result,
+          payments: [{
+            payment_method: approval.method,
+            amount: Number(approval.amount),
+          }],
+        },
+        error: null,
+      };
+    } catch (err) {
+      return { result: null, error: err instanceof Error ? err.message : 'Network error while processing manual payment sale' };
+    }
+  }
 
   if (splitPayments) {
     const { p_paid_amount: _paidAmount, p_payment_method: _paymentMethod, ...splitBase } = settlementPayload;
