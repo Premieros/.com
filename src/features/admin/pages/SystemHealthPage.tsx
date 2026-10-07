@@ -127,11 +127,13 @@ export function SystemHealthPage() {
           database_ok: snapshots.every((row) => row.database_ok !== false),
           generated_at: new Date().toISOString(),
           branch_id: null,
-          latest_daily_close_at: snapshots
-            .map((row) => row.latest_daily_close_at)
-            .filter((value): value is string => !!value)
-            .sort()
-            .at(-1) || null,
+          latest_daily_close_at: (() => {
+            const values = snapshots
+              .map((row) => row.latest_daily_close_at)
+              .filter((value): value is string => !!value)
+              .sort();
+            return values.length ? values[values.length - 1] : null;
+          })(),
         };
     if (snapshots.length > 1) {
       for (const key of numericKeys) {
