@@ -465,3 +465,60 @@
 @media (prefers-reduced-motion: reduce) {
   .premier-wait-mark, .premier-wait-orbit { animation: none; }
 }
+
+
+/* Full-screen login marketing motion. */
+.login-scene-stage {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: login-scene-enter 520ms cubic-bezier(.2,.8,.2,1);
+}
+.login-float-card { animation: login-float 4.8s ease-in-out infinite; }
+.login-float-card-delayed { animation: login-float 5.6s ease-in-out infinite 0.7s; }
+.login-food-orbit { animation: login-orbit 8s ease-in-out infinite; }
+.login-food-orbit-delayed { animation: login-orbit-reverse 9s ease-in-out infinite; }
+.login-chart-bar { transform-origin: bottom; animation: login-bar-rise 720ms cubic-bezier(.2,.8,.2,1) both; }
+.login-report-sheet { animation: login-sheet-breathe 4.8s ease-in-out infinite; }
+
+@keyframes login-scene-enter {
+  from { opacity: 0; transform: translateY(16px) scale(.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes login-float {
+  0%, 100% { transform: translateY(0) rotate(0deg); }
+  50% { transform: translateY(-10px) rotate(.35deg); }
+}
+@keyframes login-orbit {
+  0%, 100% { transform: translate(0,0) rotate(-6deg) scale(1); }
+  50% { transform: translate(16px,12px) rotate(6deg) scale(1.03); }
+}
+@keyframes login-orbit-reverse {
+  0%, 100% { transform: translate(0,0) rotate(6deg) scale(1); }
+  50% { transform: translate(-14px,-10px) rotate(-7deg) scale(1.04); }
+}
+@keyframes login-bar-rise {
+  from { transform: scaleY(.08); opacity: .35; }
+  to { transform: scaleY(1); opacity: 1; }
+}
+@keyframes login-sheet-breathe {
+  0%, 100% { filter: saturate(1); }
+  50% { filter: saturate(1.08); }
+}
+
+@media (max-width: 639px) {
+  .login-showcase main { min-height: auto; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-scene-stage,
+  .login-float-card,
+  .login-float-card-delayed,
+  .login-food-orbit,
+  .login-food-orbit-delayed,
+  .login-chart-bar,
+  .login-report-sheet {
+    animation: none !important;
+  }
+}
