@@ -19,6 +19,7 @@ import { formatCurrency } from '@/lib/format';
 import { importFromExcel } from '@/lib/excel';
 import { logAudit } from '@/lib/audit';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
@@ -31,13 +32,14 @@ export function CustomersPage() {
   const { show } = useToast();
   const can = useCan();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const { runtime } = useOrganizationModules();
   const customerLabel = runtime.terminology.customer[lang === 'ar' ? 'ar' : 'en'];
   const { rows: items, loading, total, hasMore, loadMore, loadingMore, refresh: reloadCustomers, fetchAll: fetchAllCustomers } = usePaginatedRows<Customer>({
     table: 'customers',
     select: '*',
     order: { column: 'created_at', ascending: false },
-    branch_id: branchFilter,
+    branch_ids: branchScope.selectedBranchIds,
     pageSize: 100,
   });
   const [search, setSearch] = useState('');
@@ -54,7 +56,7 @@ export function CustomersPage() {
   useEffect(() => {
     let cancelled = false;
     const loadOpenBalances = async () => {
-      const branchIds = branchFilter ? [branchFilter] : branches.map((branch) => branch.id);
+      const branchIds = branchScope.selectedBranchIds;
       if (!branchIds.length) {
         if (!cancelled) setOpenBalances({});
         return;
@@ -70,7 +72,7 @@ export function CustomersPage() {
     };
     void loadOpenBalances();
     return () => { cancelled = true; };
-  }, [branchFilter, branches]);
+  }, [branchScope.scopeKey]);
 
   const balanceFor = (customer: Customer) => Number(openBalances[customer.id] || 0);
   const filtered = items.filter((c) => !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search));
