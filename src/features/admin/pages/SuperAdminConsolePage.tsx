@@ -20,6 +20,7 @@ import {
   Sliders,
   History,
   WalletCards,
+  MessageCircle,
 } from 'lucide-react';
 import { supabase, admin } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -39,6 +40,7 @@ import { notifyOrganizationRuntimeChanged } from '@/core/modules/OrganizationMod
 import { notifyBranchesChanged } from '@/hooks/useBranches';
 import { OrganizationCreateWizard } from '@/features/admin/components/OrganizationCreateWizard';
 import { SubscriptionManagementTab } from './SubscriptionManagementTab';
+import { SupportInboxTab } from './SupportInboxTab';
 
 interface TenantStats {
   organization_id: string;
@@ -86,6 +88,7 @@ interface OrganizationModuleRow {
 type SuperTab =
   | 'tenants'
   | 'subscriptions'
+  | 'support'
   | 'system_controls'
   | 'general'
   | 'branches_override'
@@ -533,6 +536,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
   const TABS: { key: SuperTab; label: string; icon: React.ReactNode }[] = [
     { key: 'tenants', label: ar ? 'المستأجرون والمنظمات' : 'Tenants & Organizations', icon: <Building2 className="w-4 h-4" /> },
     { key: 'subscriptions', label: ar ? 'إدارة الاشتراكات' : 'Subscriptions', icon: <WalletCards className="w-4 h-4" /> },
+    { key: 'support', label: ar ? 'دعم العملاء' : 'Customer Support', icon: <MessageCircle className="w-4 h-4" /> },
     { key: 'system_controls', label: ar ? 'التحكم في النظام ومستخدمي المنصة' : 'System Controls & Users', icon: <Sliders className="w-4 h-4" /> },
     { key: 'general', label: ar ? 'إعدادات المنشأة والمتجر المركزية' : 'Enterprise Settings', icon: <Store className="w-4 h-4" /> },
     { key: 'branches_override', label: ar ? 'تخصيصات الفروع' : 'Branch Overrides', icon: <SlidersHorizontal className="w-4 h-4" /> },
@@ -698,6 +702,10 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
       {/* ───────────────────────────────────────────────────────────── */}
       {activeTab === 'subscriptions' && (
         <SubscriptionManagementTab key={subscriptionRefreshKey} />
+      )}
+
+      {activeTab === 'support' && (
+        <SupportInboxTab />
       )}
 
       {/* ───────────────────────────────────────────────────────────── */}
