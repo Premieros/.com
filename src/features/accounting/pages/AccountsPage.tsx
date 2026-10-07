@@ -14,6 +14,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { formatCurrency } from '@/lib/format';
 import { logAudit } from '@/lib/audit';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { useSettings } from '@/context/SettingsContext';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
@@ -31,6 +32,7 @@ export function AccountsPage() {
   const { t, lang } = useLanguage();
   const { show } = useToast();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const can = useCan();
   const { effectiveSettings } = useSettings();
   const [balances, setBalances] = useState<Record<string, number>>({});
@@ -49,23 +51,32 @@ export function AccountsPage() {
     table: 'chart_of_accounts',
     select: '*',
     order: { column: 'code', ascending: true },
-    branch_id: effectiveBranchFilter,
+    branch_ids: branchScope.selectedBranchIds,
     pageSize: 100,
-    enabled: !!effectiveBranchFilter,
+    enabled: branchScope.selectedBranchIds.length > 0,
   });
 
   const loadBalances = useCallback(async () => {
-    if (effectiveBranchFilter) {
-      const { data: tb } = await api.accounting.getTrialBalance({ p_branch_id: effectiveBranchFilter, p_to_date: new Date().toISOString().slice(0, 10) });
-      if (tb && Array.isArray(tb)) {
-        const map: Record<string, number> = {};
-        (tb as TrialBalanceRow[]).forEach((r) => { map[r.code] = Number(r.balance); });
-        setBalances(map);
-      }
-    } else {
+    if (branchScope.selectedBranchIds.length === 0) {
       setBalances({});
+      return;
     }
-  }, [effectiveBranchFilter]);
+    const toDate = new Date().toISOString().slice(0, 10);
+    const results = await Promise.all(
+      branchScope.selectedBranchIds.map((branchId) => api.accounting.getTrialBalance({
+        p_branch_id: branchId,
+        p_to_date: toDate,
+      })),
+    );
+    const map: Record<string, number> = {};
+    for (const result of results) {
+      if (!Array.isArray(result.data)) continue;
+      (result.data as TrialBalanceRow[]).forEach((row) => {
+        map[row.code] = Number(map[row.code] || 0) + Number(row.balance || 0);
+      });
+    }
+    setBalances(map);
+  }, [branchScope.scopeKey, branchScope.selectedBranchIds]);
   useEffect(() => { loadBalances(); }, [loadBalances]);
 
   const filtered = items.filter((a) => !search || a.name.toLowerCase().includes(search.toLowerCase()) || a.name_en?.toLowerCase().includes(search.toLowerCase()) || a.code.toLowerCase().includes(search.toLowerCase()));
