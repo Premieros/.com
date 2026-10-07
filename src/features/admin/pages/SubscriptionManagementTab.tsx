@@ -19,6 +19,7 @@ import { Card } from '@/components/PageHeader';
 import { Input, Select, Textarea } from '@/components/Input';
 import { Modal } from '@/components/Modal';
 import { formatDate, formatDateTime } from '@/lib/format';
+import { notifyOrganizationRuntimeChanged } from '@/core/modules/OrganizationModulesContext';
 
 interface OrganizationRow {
   id: string;
@@ -214,7 +215,8 @@ export function SubscriptionManagementTab() {
         throw error || new Error(data?.error || 'UPDATE_FAILED');
       }
 
-      show(ar ? 'تم تحديث اشتراك المؤسسة' : 'Organization subscription updated', 'success');
+      notifyOrganizationRuntimeChanged();
+      show(ar ? 'تم تحديث اشتراك المؤسسة وانعكس على فروعها' : 'Organization subscription updated for all branches', 'success');
       setEditingTenant(null);
       await load();
     } catch (error) {
