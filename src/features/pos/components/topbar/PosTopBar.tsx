@@ -9,10 +9,12 @@ import { Logo } from '@/components/Logo';
 import type { Branch } from '@/lib/types';
 import type { ActiveShiftInfo } from '../../hooks/usePosOrder';
 import { usePosPermissions } from '../../hooks/usePosPermissions';
+import type { PosBusinessSurface } from '../../businessSurface';
 
 export type PosPanelId = 'orders' | 'tables' | 'kitchen' | null;
 
 interface PosTopBarProps {
+  surface: PosBusinessSurface;
   panel: PosPanelId;
   onPanel: (p: Exclude<PosPanelId, null>) => void;
   counts: {
@@ -35,6 +37,7 @@ interface PosTopBarProps {
 }
 
 export function PosTopBar({
+  surface,
   onPanel,
   counts,
   branchId,
@@ -84,7 +87,7 @@ export function PosTopBar({
     return () => clearInterval(id);
   }, []);
 
-  const canManageCurrentShift = shiftChecked && (activeShift ? perms.canCloseShift : perms.canOpenShift);
+  const canManageCurrentShift = surface.requiresShift && shiftChecked && (activeShift ? perms.canCloseShift : perms.canOpenShift);
 
   const openShiftManagement = () => {
     if (!canManageCurrentShift) return;
@@ -123,7 +126,7 @@ export function PosTopBar({
         <Logo variant="mark" size={32} tone="auto" />
         <div className="hidden leading-tight sm:block">
           <p className="text-sm font-black text-ui-text">Premier</p>
-          <p className="text-[9px] font-black uppercase tracking-[.16em] text-ui-accent">{t('pos')}</p>
+          <p className="text-[9px] font-black uppercase tracking-[.12em] text-ui-accent">{isAr ? surface.title.ar : surface.title.en}</p>
         </div>
         {perms.canCreateOrder && (
           <button
@@ -132,7 +135,7 @@ export function PosTopBar({
             className="flex min-h-9 items-center gap-1.5 rounded-xl bg-ui-primary px-3 text-xs font-black text-ui-primary-fg shadow-ui-sm transition active:scale-95 hover:bg-ui-primary-hover"
           >
             <Plus className="h-4 w-4" />
-            <span className="hidden sm:inline">{isAr ? 'الطاولات / طلب جديد' : 'Tables / New order'}</span>
+            <span className="hidden sm:inline">{isAr ? surface.newSaleLabel.ar : surface.newSaleLabel.en}</span>
           </button>
         )}
       </div>
@@ -140,10 +143,10 @@ export function PosTopBar({
       <div className="flex-1" />
 
       <div data-testid="pos-top-counters" className="hidden items-center gap-1 lg:flex">
-        {counterButton('active-orders', 'الطلبات النشطة', 'Active orders', counts.activeOrders, <ListOrdered className="h-3.5 w-3.5" />, 'orders')}
-        {counterButton('delivery', 'الدليفري', 'Delivery', counts.deliveryOrders, <Truck className="h-3.5 w-3.5" />, 'orders')}
-        {counterButton('tables', 'الطاولات المشغولة', 'Occupied tables', counts.occupiedTables, <CalendarCheck className="h-3.5 w-3.5" />, 'tables')}
-        {perms.canViewKitchen && counterButton('kds', 'طلبات المطبخ', 'Kitchen queue', counts.kitchenOrders, <ChefHat className="h-3.5 w-3.5" />, 'kitchen')}
+        {surface.showActiveOrders && counterButton('active-orders', 'الطلبات النشطة', 'Active orders', counts.activeOrders, <ListOrdered className="h-3.5 w-3.5" />, 'orders')}
+        {surface.showDelivery && counterButton('delivery', 'الدليفري', 'Delivery', counts.deliveryOrders, <Truck className="h-3.5 w-3.5" />, 'orders')}
+        {surface.showTables && counterButton('tables', 'الطاولات المشغولة', 'Occupied tables', counts.occupiedTables, <CalendarCheck className="h-3.5 w-3.5" />, 'tables')}
+        {surface.showKitchen && perms.canViewKitchen && counterButton('kds', 'طلبات المطبخ', 'Kitchen queue', counts.kitchenOrders, <ChefHat className="h-3.5 w-3.5" />, 'kitchen')}
       </div>
 
       {pendingCount > 0 && (
@@ -197,24 +200,28 @@ export function PosTopBar({
         {more && (
           <div data-testid="pos-more-menu" className="absolute end-0 top-11 z-50 w-64 rounded-2xl border border-ui-border bg-ui-surface p-2 shadow-ui-xl">
             <div className="mb-1 px-3 py-2 text-xs font-black text-ui-subtle">{isAr ? 'إجراءات إضافية' : 'More actions'}</div>
-            <button
-              onClick={() => { onPanel('orders'); setMore(false); }}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold hover:bg-ui-page-alt"
-            >
-              <ListOrdered className="h-4 w-4" />
-              {t('activeOrders')}
-              {counts.activeOrders > 0 && <span className="ms-auto rounded-full bg-ui-primary px-2 py-0.5 text-[10px] text-ui-primary-fg">{counts.activeOrders}</span>}
-            </button>
-            <button
-              data-testid="pos-more-tables"
-              onClick={() => { onPanel('tables'); setMore(false); }}
-              className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold hover:bg-ui-page-alt"
-            >
-              <CalendarCheck className="h-4 w-4" />
-              {isAr ? 'الطاولات' : 'Tables'}
-              {counts.occupiedTables > 0 && <span className="ms-auto rounded-full bg-ui-warning px-2 py-0.5 text-[10px] text-white">{counts.occupiedTables}</span>}
-            </button>
-            {perms.canViewKitchen && (
+            {surface.showActiveOrders && (
+              <button
+                onClick={() => { onPanel('orders'); setMore(false); }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold hover:bg-ui-page-alt"
+              >
+                <ListOrdered className="h-4 w-4" />
+                {t('activeOrders')}
+                {counts.activeOrders > 0 && <span className="ms-auto rounded-full bg-ui-primary px-2 py-0.5 text-[10px] text-ui-primary-fg">{counts.activeOrders}</span>}
+              </button>
+            )}
+            {surface.showTables && (
+              <button
+                data-testid="pos-more-tables"
+                onClick={() => { onPanel('tables'); setMore(false); }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold hover:bg-ui-page-alt"
+              >
+                <CalendarCheck className="h-4 w-4" />
+                {isAr ? 'الطاولات' : 'Tables'}
+                {counts.occupiedTables > 0 && <span className="ms-auto rounded-full bg-ui-warning px-2 py-0.5 text-[10px] text-white">{counts.occupiedTables}</span>}
+              </button>
+            )}
+            {surface.showKitchen && perms.canViewKitchen && (
               <button
                 data-testid="pos-more-kitchen"
                 onClick={() => { onPanel('kitchen'); setMore(false); }}
