@@ -53,7 +53,7 @@ export const BUSINESS_PROFILE_PRESETS: Record<BusinessProfileKey, BusinessProfil
     descriptionEn: 'POS, tables, kitchen, components, raw materials, shifts and treasury.',
     enabledModules: [...CORE, 'pos', 'catalog', 'inventory', 'purchases', 'shift_management', 'costing', 'advanced_reports', 'approvals', 'kds'],
     terminology: { item: 'منتج', customer: 'عميل', supplier: 'مورد', branch: 'فرع' },
-    capabilities: ['tables', 'kds', 'recipes', 'raw_materials', 'modifiers', 'shifts', 'delivery', 'drive_thru'],
+    capabilities: ['tables', 'kds', 'recipes', 'raw_materials', 'component_groups', 'modifiers', 'shifts', 'delivery', 'drive_thru'],
     defaults: { taxEnabled: true, taxRate: 14, currency: 'EGP' },
   },
   food_manufacturing: {

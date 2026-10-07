@@ -34,6 +34,8 @@ describe('business runtime architecture', () => {
     expect(businessPathAllowed(runtime, APP_ROUTES.floorPlan)).toBe(true);
     expect(businessPathAllowed(runtime, APP_ROUTES.kitchenDisplay)).toBe(true);
     expect(businessPathAllowed(runtime, APP_ROUTES.rawMaterials)).toBe(true);
+    expect(businessPathAllowed(runtime, APP_ROUTES.inventoryUnits)).toBe(true);
+    expect(runtime.capabilities.has('component_groups')).toBe(true);
     expect(runtime.dashboard.sections.has('orders')).toBe(true);
     expect(runtime.terminology.item.ar).toContain('طبق');
   });
