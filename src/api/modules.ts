@@ -13,3 +13,5 @@ export { accounting } from './domains/accounting';
 export { reporting } from './domains/reporting';
 export { admin } from './domains/admin';
 export { branches } from './domains/branches';
+export { support } from './domains/support';
+export type { SupportConversation, SupportMessage } from './domains/support';
