@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -7,6 +8,7 @@ import { Input } from '@/components/Input';
 import { Logo } from '@/components/Logo';
 import { useToast } from '@/components/Toast';
 import { DesignSurface } from '@/components/design/DesignSurface';
+import { APP_ROUTES } from '@/core/navigation/routes';
 
 export function LoginPage() {
   const { signIn, signInWithUsername } = useAuth();
@@ -94,9 +96,21 @@ export function LoginPage() {
                 </>}
                 <Button data-testid="login-submit" type="submit" size="lg" className="w-full" disabled={loading}>{loading ? <Loader2 className="w-5 h-5 animate-spin" /> : <>{t('signIn')}<ArrowRight className="w-4 h-4" /></>}</Button>
               </form>
-              <p className="mt-5 text-center text-xs text-ui-subtle dark:text-ui-subtle">
-                {isAr ? 'إنشاء وإدارة الحسابات يتم من خلال إدارة النظام فقط.' : 'Accounts are created and managed by system administrators only.'}
-              </p>
+              <div className="mt-5 rounded-2xl border border-ui-primary/20 bg-ui-primary-soft p-4 text-center">
+                <p className="text-sm font-black text-ui-text">
+                  {isAr ? 'ليس لديك حساب؟' : 'New to Premier?'}
+                </p>
+                <p className="mt-1 text-xs font-medium text-ui-muted">
+                  {isAr ? 'سجّل الآن واحصل على 14 يومًا مجانًا، ثم تستمر شاشة البيع فقط.' : 'Register now for 14 free days, then continue with the sales screen only.'}
+                </p>
+                <Link
+                  data-testid="login-register-link"
+                  to={APP_ROUTES.register}
+                  className="mt-3 inline-flex rounded-xl bg-ui-primary px-4 py-2 text-xs font-black text-ui-primary-fg"
+                >
+                  {isAr ? 'إنشاء حساب مجاني' : 'Create free account'}
+                </Link>
+              </div>
             </div>
           </div>
         </div>
