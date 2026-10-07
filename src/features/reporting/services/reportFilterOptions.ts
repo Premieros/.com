@@ -20,28 +20,28 @@ type ReportFilterOptions = {
   tables: { id: string; name: string }[];
 };
 
-export async function loadReportFilterOptions(branchId: string, flags: ReportFilterOptionFlags): Promise<ReportFilterOptions> {
+export async function loadReportFilterOptions(branchIds: string[], flags: ReportFilterOptionFlags): Promise<ReportFilterOptions> {
   const [warehouses, cashiers, customers, suppliers, products, categories, tables] = await Promise.all([
     flags.warehouse
-      ? supabase.from('warehouses').select('id, name').eq('branch_id', branchId)
+      ? supabase.from('warehouses').select('id, name').in('branch_id', branchIds)
       : Promise.resolve({ data: [] }),
     flags.cashier
-      ? supabase.from('users').select('id, full_name, email').eq('branch_id', branchId)
+      ? supabase.from('users').select('id, full_name, email').in('branch_id', branchIds)
       : Promise.resolve({ data: [] }),
     flags.customer
-      ? supabase.from('customers').select('id, name, name_en').eq('branch_id', branchId)
+      ? supabase.from('customers').select('id, name, name_en').in('branch_id', branchIds)
       : Promise.resolve({ data: [] }),
     flags.supplier
-      ? supabase.from('suppliers').select('id, name, name_en').eq('branch_id', branchId)
+      ? supabase.from('suppliers').select('id, name, name_en').in('branch_id', branchIds)
       : Promise.resolve({ data: [] }),
     flags.product
-      ? supabase.from('products').select('id, name, name_en').eq('branch_id', branchId)
+      ? supabase.from('products').select('id, name, name_en').in('branch_id', branchIds)
       : Promise.resolve({ data: [] }),
     flags.category
-      ? supabase.from('categories').select('id, name, name_en').eq('branch_id', branchId)
+      ? supabase.from('categories').select('id, name, name_en').in('branch_id', branchIds)
       : Promise.resolve({ data: [] }),
     flags.table
-      ? supabase.from('dining_tables').select('id, name').eq('branch_id', branchId)
+      ? supabase.from('dining_tables').select('id, name').in('branch_id', branchIds)
       : Promise.resolve({ data: [] }),
   ]);
 
@@ -56,8 +56,8 @@ export async function loadReportFilterOptions(branchId: string, flags: ReportFil
   };
 }
 
-export async function loadExpenseCategoryOptions(branchId: string): Promise<string[]> {
-  const { data } = await supabase.from('expenses').select('category').eq('branch_id', branchId);
+export async function loadExpenseCategoryOptions(branchIds: string[]): Promise<string[]> {
+  const { data } = await supabase.from('expenses').select('category').in('branch_id', branchIds);
   return Array.from(
     new Set((data || []).map((row) => String((row as Record<string, unknown>).category || '')).filter(Boolean)),
   );
