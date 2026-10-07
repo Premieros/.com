@@ -4,6 +4,7 @@ import { PackageOpen, Save, History, Trophy } from 'lucide-react';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useToast } from '@/components/Toast';
 import { DesignSurface, DesignPageHeader, DesignPanel } from '@/components/design';
 import { DataTable, type Column } from '@/components/DataTable';
@@ -31,6 +32,8 @@ type Tab = 'backorders' | 'receipts' | 'evaluation';
 export function ReceivingPage() {
   const { t, lang } = useLanguage();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
+  const scopedBranchIds = branchScope.selectedBranchIds;
   const [searchParams, setSearchParams] = useSearchParams();
   const { show } = useToast();
   const can = useCan();
@@ -54,24 +57,47 @@ export function ReceivingPage() {
 
   const loadBackorders = useCallback(async () => {
     setBoLoading(true);
-    const { data } = await api.procurement.getPurchaseBackorders({ p_branch_id: branchFilter || null });
-    setBackorders(((data as PurchaseBackorderRow[]) || []).map((r) => ({ ...r, id: r.purchase_item_id })));
-    setBoLoading(false);
-  }, [branchFilter]);
+    try {
+      const results = await Promise.all(
+        scopedBranchIds.map((branchId) => api.procurement.getPurchaseBackorders({ p_branch_id: branchId })),
+      );
+      const rows = results.flatMap((result) => ((result.data as PurchaseBackorderRow[]) || []));
+      setBackorders(rows.map((r) => ({ ...r, id: r.purchase_item_id })));
+    } finally {
+      setBoLoading(false);
+    }
+  }, [branchScope.scopeKey]);
 
   const loadReceipts = useCallback(async () => {
     setRLoading(true);
-    const { data } = await api.procurement.getPurchaseReceipts({ p_branch_id: branchFilter || null });
-    setReceipts(((data as PurchaseReceiptRow[]) || []).map((r) => ({ ...r, id: r.receipt_id })));
-    setRLoading(false);
-  }, [branchFilter]);
+    try {
+      const results = await Promise.all(
+        scopedBranchIds.map((branchId) => api.procurement.getPurchaseReceipts({ p_branch_id: branchId })),
+      );
+      const rows = results.flatMap((result) => ((result.data as PurchaseReceiptRow[]) || []));
+      setReceipts(rows.map((r) => ({ ...r, id: r.receipt_id })));
+    } finally {
+      setRLoading(false);
+    }
+  }, [branchScope.scopeKey]);
 
   const loadEvaluation = useCallback(async () => {
     setEvLoading(true);
-    const { data } = await api.procurement.getSupplierEvaluation({ p_branch_id: branchFilter || null });
-    setEvaluation(((data as SupplierEvaluationRow[]) || []).map((r) => ({ ...r, id: r.supplier_id })));
-    setEvLoading(false);
-  }, [branchFilter]);
+    try {
+      const results = await Promise.all(
+        scopedBranchIds.map(async (branchId) => {
+          const result = await api.procurement.getSupplierEvaluation({ p_branch_id: branchId });
+          return { branchId, rows: ((result.data as SupplierEvaluationRow[]) || []) };
+        }),
+      );
+      const rows = results.flatMap(({ branchId, rows }) =>
+        rows.map((row) => ({ ...row, id: `${branchId}:${row.supplier_id}`, branch_id: branchId } as SupplierEvaluationRow & { id: string; branch_id: string })),
+      );
+      setEvaluation(rows as SupplierEvaluationRow[]);
+    } finally {
+      setEvLoading(false);
+    }
+  }, [branchScope.scopeKey]);
 
   useEffect(() => {
     loadBackorders();
@@ -199,7 +225,8 @@ export function ReceivingPage() {
     { key: 'received_at', header: t('receivedAt'), render: (r) => formatDate(r.received_at, lang) },
   ];
 
-  const evColumns: Column<SupplierEvaluationRow>[] = [
+  const evColumns: Column<SupplierEvaluationRow & { branch_id?: string }>[] = [
+    { key: 'branch_id', header: t('branch'), render: (r) => <BranchBadge name={branchName(r.branch_id)} /> },
     { key: 'supplier_name', header: t('supplier'), render: (r) => <span className="font-medium text-ui-text">{r.supplier_name}</span> },
     { key: 'orders_count', header: t('ordersCount'), render: (r) => r.orders_count },
     { key: 'total_purchased', header: t('totalPurchases'), render: (r) => <span className="font-semibold">{formatCurrency(r.total_purchased, currency, lang)}</span> },
@@ -231,7 +258,7 @@ export function ReceivingPage() {
       )}
       {tab === 'evaluation' && (
         <DesignPanel testId="evaluation-panel">
-          <DataTable columns={evColumns} data={evaluation} loading={evLoading} emptyMessage={t('noData')} />
+          <DataTable columns={evColumns} data={evaluation as Array<SupplierEvaluationRow & { branch_id?: string }>} loading={evLoading} emptyMessage={t('noData')} />
         </DesignPanel>
       )}
 
