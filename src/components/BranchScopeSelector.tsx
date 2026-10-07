@@ -110,12 +110,12 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
   }
 
   const renderGroups = () => (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       {groups.map((group) => {
         const allSelected = group.selectedCount === group.branches.length && group.branches.length > 0;
         const someSelected = group.selectedCount > 0 && !allSelected;
         return (
-          <div key={group.organizationId} className="overflow-hidden rounded-xl border border-ui-border">
+          <div key={group.organizationId} className="overflow-hidden rounded-lg border border-ui-border">
             <button
               type="button"
               data-testid={`organization-scope-${group.organizationId}`}
@@ -124,7 +124,7 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
                   scope.setOrganizationSelected(group.organizationId, !allSelected);
                 }
               }}
-              className="flex w-full items-center justify-between gap-2 bg-ui-page-alt px-3 py-2 text-start"
+              className="flex w-full items-center justify-between gap-2 bg-ui-page-alt px-2.5 py-1.5 text-start"
             >
               <span className="flex min-w-0 items-center gap-2">
                 <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
@@ -153,7 +153,7 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
                     type="button"
                     data-testid={`branch-scope-option-${branch.id}`}
                     onClick={() => scope.toggleBranch(branch.id)}
-                    className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-start text-xs text-ui-text transition hover:bg-ui-page-alt"
+                    className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-start text-xs text-ui-text transition hover:bg-ui-page-alt"
                   >
                     <span className={`flex h-4.5 w-4.5 shrink-0 items-center justify-center rounded border ${
                       selected ? 'border-ui-primary bg-ui-primary text-ui-primary-fg' : 'border-ui-border'
@@ -228,7 +228,7 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
         className={`flex min-h-9 items-center gap-2 rounded-lg border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-text transition hover:bg-ui-page-alt ${
-          compact ? 'max-w-[220px]' : 'max-w-[260px]'
+          compact ? 'max-w-[190px]' : 'max-w-[230px]'
         }`}
       >
         {scope.isAggregate ? <Layers3 className="h-4 w-4 shrink-0 text-ui-primary" /> : <Building2 className="h-4 w-4 shrink-0 text-ui-primary" />}
@@ -239,9 +239,9 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
       {open && (
         <div
           data-testid="branch-scope-menu"
-          className="absolute end-0 top-full z-50 mt-2 w-[292px] overflow-hidden rounded-xl border border-ui-border bg-ui-surface shadow-ui-lg"
+          className="absolute end-0 top-full z-50 mt-2 w-[258px] overflow-hidden rounded-lg border border-ui-border bg-ui-surface shadow-ui-lg"
         >
-          <div className="border-b border-ui-border p-2">
+          <div className="border-b border-ui-border p-1.5">
             <button
               type="button"
               data-testid="all-branches-option"
@@ -264,11 +264,11 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
             </button>
           </div>
 
-          <div className="max-h-72 overflow-y-auto p-2">
+          <div className="max-h-56 overflow-y-auto p-1.5">
             {renderGroups()}
           </div>
 
-          <div className="border-t border-ui-border bg-ui-page-alt/60 p-2">
+          <div className="border-t border-ui-border bg-ui-page-alt/60 p-1.5">
             <label className="grid gap-1">
               <span className="text-[10px] font-black text-ui-muted">{ar ? 'فرع الإجراء' : 'Action branch'}</span>
               <select
