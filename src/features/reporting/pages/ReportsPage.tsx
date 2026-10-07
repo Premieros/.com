@@ -23,7 +23,7 @@ import { ReportFilterBar } from '../ReportFilterBar';
 import { loadExpenseCategoryOptions, loadReportFilterOptions } from '../services/reportFilterOptions';
 import { loadExpenseReportRows, loadPurchaseReportRows, loadSalesReportRows } from '../services/reportCoreLoaders';
 import { loadCashierPerformanceRows, loadDetailedInvoiceRows, loadReturnRows, loadSalesByEmployeeRows } from '../services/reportSalesLoaders';
-import { loadComponentConsumptionRows, loadInventoryBatchRows, loadLowStockSources, loadProductBranchRows, loadSalesByProductItems, loadTopConsumedComponentRows, loadTopConsumedProductItems, loadWasteRows } from '../services/reportInventoryLoaders';
+import { loadComponentConsumptionRows, loadInventoryBatchRows, loadLowStockSources, loadSalesByProductItems, loadTopConsumedComponentRows, loadTopConsumedProductItems, loadWasteRows } from '../services/reportInventoryLoaders';
 import { useBranches } from '@/hooks/useBranches';
 import { useSettings } from '@/context/SettingsContext';
 import {
@@ -632,17 +632,24 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
         setChartData(rows.slice(0, 10).map((row) => ({ name: String(row[lang === 'ar' ? 'المنتج' : 'Product']), value: Number(row[lang === 'ar' ? 'صافي الكمية' : 'Net Quantity']) })));
         setSummary({ total: rows.length, count: rows.length });
       } else if (reportType === 'recipe_costs') {
-        const result = await costing.getOverview({ p_branch_id: effectiveBranchFilter });
-        if (result.error) { setData([]); setChartData([]); setSummary({ total: 0, count: 0 }); return; }
+        const overviewResults = await Promise.all(
+          reportBranchIds.map(async (branchId) => ({
+            branchId,
+            result: await costing.getOverview({ p_branch_id: branchId }),
+          })),
+        );
+        if (overviewResults.some(({ result }) => result.error)) {
+          setData([]); setChartData([]); setSummary({ total: 0, count: 0 }); return;
+        }
         const catName = filters.category ? options.categories.find((category) => category.id === filters.category)?.name ?? filters.category : '';
-        const productIds = (result.data || []).map((row) => row.product_id);
-        const productBranchRows = await loadProductBranchRows(productIds);
-        const productBranches = new Map(productBranchRows.map((product) => [product.id, product.branch_id]));
-        const rows = (result.data || [])
+        const overviewRows = overviewResults.flatMap(({ branchId, result }) =>
+          (result.data || []).map((row) => ({ ...row, __branch_id: branchId })),
+        );
+        const rows = overviewRows
           .filter((row) => row.recipe_item_count > 0)
           .filter((row) => !filters.product || row.product_id === filters.product)
           .filter((row) => !catName || row.category_name === catName)
-          .map((row) => withBranch(productBranches.get(row.product_id) || effectiveBranchFilter, {
+          .map((row) => withBranch(row.__branch_id, {
             [lang === 'ar' ? 'المنتج' : 'Product']: row.product_name,
             [lang === 'ar' ? 'تكلفة المكونات' : 'Component Cost']: Number(row.actual_cost),
             [lang === 'ar' ? 'سعر البيع' : 'Sale Price']: Number(row.sale_price),
