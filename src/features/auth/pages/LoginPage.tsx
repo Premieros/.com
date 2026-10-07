@@ -276,45 +276,45 @@ export function LoginPage() {
             if (event.target === event.currentTarget) setLoginOpen(false);
           }}
         >
-          <div className="relative w-full max-w-md overflow-hidden rounded-[30px] border border-blue-100 bg-white p-6 shadow-2xl sm:p-8">
+          <div className="relative w-full max-w-sm overflow-hidden rounded-2xl border border-blue-100 bg-white p-5 shadow-2xl sm:p-6">
             <button
               type="button"
               aria-label={isAr ? 'إغلاق' : 'Close'}
               onClick={() => setLoginOpen(false)}
-              className="absolute end-4 top-4 flex h-9 w-9 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200"
+              className="absolute end-3 top-3 flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200"
             >
               <X className="h-4 w-4" />
             </button>
 
-            <div className="mb-6">
-              <Logo variant="horizontal" size={42} tone="navy" showTagline={false} />
-              <div className="mt-6 flex items-center gap-2">
+            <div className="mb-4">
+              <Logo variant="horizontal" size={34} tone="navy" showTagline={false} />
+              <div className="mt-4 flex items-center gap-2">
                 <LockKeyhole className="h-5 w-5 text-blue-600" />
-                <h2 className="text-2xl font-black text-slate-950">{isAr ? 'مرحبًا بك' : 'Welcome back'}</h2>
+                <h2 className="text-xl font-black text-slate-950">{isAr ? 'مرحبًا بك' : 'Welcome back'}</h2>
               </div>
-              <p className="mt-2 text-sm font-semibold text-slate-500">
+              <p className="mt-1 text-xs font-semibold text-slate-500">
                 {isAr ? 'سجّل دخولك للوصول إلى Premier.' : 'Sign in to access Premier.'}
               </p>
             </div>
 
-            <div data-testid="login-mode-toggle" className="mb-5 flex rounded-2xl bg-slate-100 p-1">
+            <div data-testid="login-mode-toggle" className="mb-4 flex rounded-xl bg-slate-100 p-1">
               <button
                 type="button"
                 onClick={() => setMode('pin')}
-                className={`flex-1 rounded-xl py-2.5 text-sm font-black transition ${mode === 'pin' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}
+                className={`flex-1 rounded-lg py-2 text-xs font-black transition ${mode === 'pin' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}
               >
                 {t('loginWithPin')}
               </button>
               <button
                 type="button"
                 onClick={() => setMode('password')}
-                className={`flex-1 rounded-xl py-2.5 text-sm font-black transition ${mode === 'password' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}
+                className={`flex-1 rounded-lg py-2 text-xs font-black transition ${mode === 'password' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'}`}
               >
                 {t('loginWithEmail')}
               </button>
             </div>
 
-            <form data-testid="login-form" onSubmit={handleSubmit} className="space-y-4">
+            <form data-testid="login-form" onSubmit={handleSubmit} className="space-y-3">
               {mode === 'pin' ? (
                 <>
                   <Input id="login-username" label={t('username')} value={username} onChange={(e) => setUsername(e.target.value)} required autoComplete="username" />
@@ -332,9 +332,9 @@ export function LoginPage() {
               </Button>
             </form>
 
-            <div className="mt-5 rounded-2xl bg-blue-50 p-4 text-center">
-              <p className="text-sm font-black text-slate-800">{isAr ? 'ليس لديك حساب؟' : 'New to Premier?'}</p>
-              <Link to={APP_ROUTES.register} className="mt-2 inline-flex font-black text-blue-700 hover:underline">
+            <div className="mt-4 rounded-xl bg-blue-50 p-3 text-center">
+              <p className="text-xs font-black text-slate-800">{isAr ? 'ليس لديك حساب؟' : 'New to Premier?'}</p>
+              <Link to={APP_ROUTES.register} className="mt-1 inline-flex text-xs font-black text-blue-700 hover:underline">
                 {isAr ? 'ابدأ التجربة المجانية' : 'Start your free trial'}
               </Link>
             </div>
