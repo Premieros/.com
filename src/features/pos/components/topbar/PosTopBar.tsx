@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { Plus, Wifi, WifiOff, Timer, Moon, Sun, LogOut, Clock3, MoreHorizontal, ListOrdered, RefreshCw, CalendarCheck, ChefHat, Truck } from 'lucide-react';
+import { Plus, Wifi, WifiOff, Timer, Moon, Sun, LogOut, Clock3, MoreHorizontal, ListOrdered, RefreshCw, CalendarCheck, ChefHat, Truck, BadgeCheck } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useLanguage } from '@/context/LanguageContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -34,6 +34,8 @@ interface PosTopBarProps {
   onNewOrder: () => void;
   onExit: () => void;
   onOpenShiftModal?: () => void;
+  canReviewManualPayments?: boolean;
+  onReviewManualPayments?: () => void;
 }
 
 export function PosTopBar({
@@ -49,6 +51,8 @@ export function PosTopBar({
   onNewOrder,
   onExit,
   onOpenShiftModal,
+  canReviewManualPayments = false,
+  onReviewManualPayments,
 }: PosTopBarProps) {
   const { t, lang } = useLanguage();
   const { theme, toggleTheme } = useTheme();
@@ -239,6 +243,16 @@ export function PosTopBar({
               >
                 <CalendarCheck className="h-4 w-4 text-ui-accent" />
                 {activeShift ? (isAr ? 'إغلاق اليوم والوردية (Z-Report)' : 'Day & Shift Closing') : (isAr ? 'إدارة الشفتات / فتح وردية' : 'Shift Management / Open Shift')}
+              </button>
+            )}
+            {canReviewManualPayments && onReviewManualPayments && (
+              <button
+                data-testid="pos-review-manual-payments"
+                onClick={() => { onReviewManualPayments(); setMore(false); }}
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-bold hover:bg-ui-page-alt"
+              >
+                <BadgeCheck className="h-4 w-4 text-ui-accent" />
+                {isAr ? 'تأكيد InstaPay والتحويلات' : 'Confirm Transfers'}
               </button>
             )}
             {perms.canChangeBranch && canChangeBranch && (
