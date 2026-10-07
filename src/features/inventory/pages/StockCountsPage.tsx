@@ -6,6 +6,7 @@ import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
 import { useCan } from '@/lib/permissions';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { DesignSurface, DesignPageHeader, DesignSearch, DesignPanel, DesignPagination } from '@/components/design';
 import { DataTable, type Column } from '@/components/DataTable';
@@ -33,12 +34,14 @@ export function StockCountsPage() {
   const { show } = useToast();
   const can = useCan();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const history = useHistoryAccess();
 
   const { rows: counts, loading, error, total, hasMore, loadMore, loadingMore, refresh: reloadCounts } = usePaginatedRows<StockCount>({
     table: 'stock_counts',
     select: '*, branch:branches(*), warehouse:warehouses(*), items:stock_count_items(*, product:products(*), raw_material:raw_materials(*)), created_user:users!stock_counts_created_by_fkey(id, full_name, email)',
     order: { column: 'created_at', ascending: false },
+    branch_ids: branchScope.selectedBranchIds,
     or: history.minIso ? `created_at.gte.${history.minIso},status.in.(draft,submitted,approved)` : undefined,
     pageSize: 100,
   });
@@ -49,7 +52,7 @@ export function StockCountsPage() {
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
-  const [branchId, setBranchId] = useState(branchFilter || '');
+  const [branchId, setBranchId] = useState('');
 
   const [createOpen, setCreateOpen] = useState(false);
   const [form, setForm] = useState({ branch_id: '', warehouse_id: '', count_type: 'cycle', notes: '' });
@@ -74,7 +77,7 @@ export function StockCountsPage() {
     { key: 'cycle', label: t('countCycle') },
   ];
 
-  const visibleBranches = branchFilter ? branches.filter((b) => b.id === branchFilter) : branches;
+  const visibleBranches = branches.filter((b) => branchScope.selectedBranchSet.has(b.id));
   const formRawMaterials = form.branch_id ? rawMaterials.filter((r) => r.branch_id === form.branch_id) : [];
   const editProducts = editTarget ? products.filter((p) => p.branch_id === editTarget.branch_id) : [];
 
@@ -95,7 +98,7 @@ export function StockCountsPage() {
   useEffect(() => {
     if (!createOpen) return;
     setForm((current) => {
-      const candidateBranches = branchFilter ? branches.filter((b) => b.id === branchFilter) : branches;
+      const candidateBranches = branches.filter((b) => branchScope.selectedBranchSet.has(b.id));
       const nextBranchId = current.branch_id || branchFilter || (candidateBranches.length === 1 ? candidateBranches[0].id : '');
       if (!nextBranchId) return current;
       const branchWarehouses = warehouses.filter((w) => w.branch_id === nextBranchId);
@@ -103,7 +106,7 @@ export function StockCountsPage() {
       if (nextBranchId === current.branch_id && nextWarehouseId === current.warehouse_id) return current;
       return { ...current, branch_id: nextBranchId, warehouse_id: nextWarehouseId };
     });
-  }, [createOpen, branchFilter, branches, warehouses]);
+  }, [createOpen, branchFilter, branchScope.scopeKey, branches, warehouses]);
 
   const filtered = counts.filter((c) => {
     if (statusFilter !== 'all' && c.status !== statusFilter) return false;
