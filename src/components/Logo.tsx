@@ -1,7 +1,8 @@
 import { type ReactNode } from 'react';
 
-const NAVY = '#0F172A';
-const GOLD = '#D4AF37';
+const BLUE = '#2563EB';
+const BLUE_DARK = '#1D4ED8';
+const GOLD = '#F6C344';
 const WHITE = '#FFFFFF';
 
 export type LogoTone = 'navy' | 'white' | 'mono' | 'auto';
@@ -16,24 +17,28 @@ interface LogoProps {
   className?: string;
 }
 
-function Mark({ stem, bowl, arrow, size }: { stem: string; bowl: string; arrow: string; size: number }) {
+function Mark({ tone, size }: { tone: LogoTone; size: number }) {
+  const primary = tone === 'white' ? WHITE : tone === 'mono' ? 'currentColor' : BLUE;
+  const accent = tone === 'white' || tone === 'mono' ? 'currentColor' : GOLD;
+
   return (
     <svg
       width={size}
       height={size}
-      viewBox="0 0 24 24"
+      viewBox="0 0 32 32"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
-      <rect x="4.75" y="3" width="4.5" height="18" rx="2.25" fill={stem} />
       <path
-        d="M9.25 4.5 A 6 6 0 0 1 9.25 16.5"
-        stroke={bowl}
-        strokeWidth="4.5"
-        strokeLinecap="round"
+        d="M8 5.5A3.5 3.5 0 0 1 11.5 2H16c7.18 0 12 4.38 12 10.75 0 5.87-4.05 10.02-10.35 10.63L14 23.7V27a3 3 0 0 1-6 0V5.5Z"
+        fill={primary}
       />
-      <path d="M14.6 2.8 L17.4 2.8 L16 6.6 Z" fill={arrow} />
+      <path
+        d="M14 7.4h2.2c3.4 0 5.8 2.02 5.8 5.2 0 3.1-2.18 5-5.45 5.25L14 18.05V7.4Z"
+        fill={tone === 'white' ? BLUE_DARK : WHITE}
+      />
+      <path d="M20.2 7.2 23 5.35l1.25 3.05-2.95 1.35-1.1-2.55Z" fill={accent} />
     </svg>
   );
 }
@@ -46,29 +51,26 @@ export function Logo({
   tagline = 'Business Management Platform',
   className = '',
 }: LogoProps) {
-  const stem = tone === 'navy' ? NAVY : tone === 'white' ? WHITE : 'currentColor';
-  const bowl = tone === 'mono' ? 'currentColor' : GOLD;
-  const arrow = tone === 'mono' ? 'currentColor' : GOLD;
   const textCls =
     tone === 'white'
       ? 'text-white'
       : tone === 'mono'
         ? 'text-current'
-        : 'text-ui-text';
+        : 'text-blue-600';
 
-  const mark = <Mark stem={stem} bowl={bowl} arrow={arrow} size={size} />;
+  const mark = <Mark tone={tone} size={size} />;
 
   const textBlock = (
     <div className="flex flex-col" dir="ltr">
       <span
-        className={`font-bold tracking-tight leading-none ${textCls}`}
+        className={`font-extrabold tracking-tight leading-none ${textCls}`}
         style={{ fontSize: Math.round(size * 0.42) }}
       >
         Premier
       </span>
       {showTagline && (
         <span
-          className="uppercase tracking-[0.16em] text-ui-subtle mt-1 leading-none"
+          className={tone === 'white' ? 'mt-1 uppercase tracking-[0.14em] text-blue-100 leading-none' : 'mt-1 uppercase tracking-[0.14em] text-ui-subtle leading-none'}
           style={{ fontSize: Math.max(8, Math.round(size * 0.125)) }}
         >
           {tagline}
