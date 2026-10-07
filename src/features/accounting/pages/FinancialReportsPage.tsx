@@ -571,6 +571,14 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
         </div>
       )}
 
+      {branchScope.isAggregate && (
+        <div className="mb-3 rounded-xl border border-ui-primary/25 bg-ui-primary-soft px-4 py-3 text-sm text-ui-text">
+          {isAr
+            ? 'الملخصات المالية تجمع الفروع المحددة. التقارير التي تعتمد حسابًا أو خزنة أو صنفًا أو طرفًا محددًا تعمل على فرع الإجراء المختار أعلى الشاشة.'
+            : 'Financial summaries combine selected branches. Reports tied to a specific account, treasury, item, or party use the action branch selected above.'}
+        </div>
+      )}
+
       <DesignPanel testId="financial-reports-filters" className="ui-accent-finance">
         <div className="flex flex-col gap-4">
           {!hideViewPicker && (
@@ -647,6 +655,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ui-border">
+                  {branchScope.isAggregate && <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('branch')}</th>}
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('accountCode')}</th>
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('accountName')}</th>
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('accountType')}</th>
@@ -656,9 +665,10 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
                 </tr>
               </thead>
               <tbody>
-                {tb.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
+                {tb.length === 0 && <tr><td colSpan={branchScope.isAggregate ? 7 : 6} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
                 {tb.map((r) => (
-                  <tr key={r.code} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                  <tr key={`${r.branch_id}:${r.code}`} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                    {branchScope.isAggregate && <td className="px-4 py-3 font-semibold text-ui-muted">{r.branch_name}</td>}
                     <td className="px-4 py-3 font-mono text-ui-text">{r.code}</td>
                     <td className="px-4 py-3 text-ui-text">{isAr ? r.name : (r.name_en || r.name)}</td>
                     <td className="px-4 py-3 text-ui-subtle dark:text-ui-subtle">{r.account_type}</td>
@@ -669,7 +679,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
                 ))}
                 {tb.length > 0 && (
                   <tr className="bg-ui-page-alt/60 font-semibold text-ui-text">
-                    <td className="px-4 py-3" colSpan={3}>{t('total')}</td>
+                    <td className="px-4 py-3" colSpan={branchScope.isAggregate ? 4 : 3}>{t('total')}</td>
                     <td className="px-4 py-3 text-end">{formatCurrency(tbTotals.debit, currency, lang)}</td>
                     <td className="px-4 py-3 text-end">{formatCurrency(tbTotals.credit, currency, lang)}</td>
                     <td className="px-4 py-3 text-end">{formatCurrency(tbTotals.debit - tbTotals.credit, currency, lang)}</td>
@@ -841,6 +851,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ui-border">
+                  {branchScope.isAggregate && <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('branch')}</th>}
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('customer')}</th>
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('phone')}</th>
                   <th className="px-4 py-3 text-end font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('openBalance')}</th>
@@ -851,9 +862,10 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
                 </tr>
               </thead>
               <tbody>
-                {arAging.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
+                {arAging.length === 0 && <tr><td colSpan={branchScope.isAggregate ? 8 : 7} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
                 {arAging.map((r) => (
-                  <tr key={r.customer_id} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                  <tr key={`${r.branch_id}:${r.customer_id}`} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                    {branchScope.isAggregate && <td className="px-4 py-3 font-semibold text-ui-muted">{r.branch_name}</td>}
                     <td className="px-4 py-3 font-medium text-ui-text">{r.name}</td>
                     <td className="px-4 py-3 text-ui-subtle dark:text-ui-subtle">{r.phone || '-'}</td>
                     <td className="px-4 py-3 text-end font-semibold text-ui-danger">{formatCurrency(r.open_amount, currency, lang)}</td>
@@ -873,6 +885,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ui-border">
+                  {branchScope.isAggregate && <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('branch')}</th>}
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('supplier')}</th>
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('phone')}</th>
                   <th className="px-4 py-3 text-end font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('openBalance')}</th>
@@ -883,9 +896,10 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
                 </tr>
               </thead>
               <tbody>
-                {apAging.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
+                {apAging.length === 0 && <tr><td colSpan={branchScope.isAggregate ? 8 : 7} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
                 {apAging.map((r) => (
-                  <tr key={r.supplier_id} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                  <tr key={`${r.branch_id}:${r.supplier_id}`} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                    {branchScope.isAggregate && <td className="px-4 py-3 font-semibold text-ui-muted">{r.branch_name}</td>}
                     <td className="px-4 py-3 font-medium text-ui-text">{r.name}</td>
                     <td className="px-4 py-3 text-ui-subtle dark:text-ui-subtle">{r.phone || '-'}</td>
                     <td className="px-4 py-3 text-end font-semibold text-ui-danger">{formatCurrency(r.open_amount, currency, lang)}</td>
@@ -950,6 +964,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ui-border">
+                  {branchScope.isAggregate && <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('branch')}</th>}
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('accountName')}</th>
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('accountType')}</th>
                   <th className="px-4 py-3 text-end font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('inflow')}</th>
@@ -958,9 +973,10 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
                 </tr>
               </thead>
               <tbody>
-                {cashFlow.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
+                {cashFlow.length === 0 && <tr><td colSpan={branchScope.isAggregate ? 6 : 5} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
                 {cashFlow.map((r) => (
-                  <tr key={r.treasury_account_id} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                  <tr key={`${r.branch_id}:${r.treasury_account_id}`} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                    {branchScope.isAggregate && <td className="px-4 py-3 font-semibold text-ui-muted">{r.branch_name}</td>}
                     <td className="px-4 py-3 font-medium text-ui-text">{r.account_name}</td>
                     <td className="px-4 py-3 text-ui-subtle dark:text-ui-subtle">{r.account_type === 'cash' ? t('cash') : t('bank')}</td>
                     <td className="px-4 py-3 text-end text-ui-success dark:text-ui-success">{formatCurrency(r.inflow, currency, lang)}</td>
