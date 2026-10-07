@@ -35,6 +35,7 @@ interface OrganizationModulesContextValue {
   runtime: BusinessRuntime;
   loading: boolean;
   compatibilityFallback: boolean;
+  posOnlyMode: boolean;
   access: ModuleAccessMap;
   canAccessModule: (moduleKey: OrganizationModuleKey | null | undefined) => boolean;
   hasCapability: (capability: string) => boolean;
@@ -56,6 +57,7 @@ interface RuntimeCache {
   access: ModuleAccessMap;
   businessType: BusinessProfileKey | null;
   businessProfile: OrganizationBusinessProfile | null;
+  posOnlyMode?: boolean;
 }
 
 const ALL_ENABLED = Object.fromEntries(
@@ -116,6 +118,7 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
   const [access, setAccess] = useState<ModuleAccessMap>(ALL_ENABLED);
   const [loading, setLoading] = useState(false);
   const [compatibilityFallback, setCompatibilityFallback] = useState(false);
+  const [posOnlyMode, setPosOnlyMode] = useState(false);
 
   const userId = user?.id ?? null;
 
@@ -128,6 +131,7 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
       setBusinessProfile(null);
       setAccess(ALL_DISABLED);
       setCompatibilityFallback(false);
+      setPosOnlyMode(false);
       setLoading(false);
       return;
     }
@@ -152,6 +156,7 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
       // relationship yet. RLS/permissions remain authoritative.
       setAccess(ALL_ENABLED);
       setCompatibilityFallback(true);
+      setPosOnlyMode(false);
       setLoading(false);
       return;
     }
@@ -161,16 +166,18 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
       setAccess(cached.access);
       setBusinessType(cached.businessType);
       setBusinessProfile(cached.businessProfile);
+      setPosOnlyMode(cached.posOnlyMode === true);
     } else {
       // Never leak the previous organization's runtime while a new one loads.
       setAccess(ALL_DISABLED);
       setBusinessType(null);
       setBusinessProfile(null);
+      setPosOnlyMode(false);
     }
 
     setLoading(true);
 
-    const [modulesResult, organizationResult] = await Promise.all([
+    const [modulesResult, organizationResult, subscriptionResult] = await Promise.all([
       supabase.rpc('get_organization_module_catalog', {
         p_organization_id: nextOrganizationId,
       }),
@@ -179,6 +186,9 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
         .select('business_type,business_profile')
         .eq('id', nextOrganizationId)
         .maybeSingle(),
+      branch?.id
+        ? supabase.rpc('subscription_status', { p_branch_id: branch.id })
+        : Promise.resolve({ data: null, error: null }),
     ]);
 
     if (requestId !== requestSequence.current) return;
@@ -196,10 +206,17 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
       return;
     }
 
-    const nextAccess = { ...ALL_ENABLED };
+    const subscriptionData = subscriptionResult.data as { expired?: boolean } | null;
+    const nextPosOnlyMode = subscriptionResult.error
+      ? cached?.posOnlyMode === true
+      : subscriptionData?.expired === true;
+
+    const nextAccess = nextPosOnlyMode ? { ...ALL_DISABLED, pos: true } : { ...ALL_ENABLED };
     for (const row of (modulesResult.data ?? []) as ModuleCatalogRow[]) {
       if (ORGANIZATION_MODULE_KEYS.includes(row.feature_key as OrganizationModuleKey)) {
-        nextAccess[row.feature_key as OrganizationModuleKey] = row.enabled !== false;
+        if (!nextPosOnlyMode || row.feature_key === 'pos') {
+          nextAccess[row.feature_key as OrganizationModuleKey] = row.enabled !== false;
+        }
       }
     }
 
@@ -215,12 +232,14 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
     setBusinessType(nextBusinessType);
     setBusinessProfile(nextBusinessProfile);
     setCompatibilityFallback(false);
+    setPosOnlyMode(nextPosOnlyMode);
     setLoading(false);
 
     writeRuntimeCache(nextOrganizationId, {
       access: nextAccess,
       businessType: nextBusinessType,
       businessProfile: nextBusinessProfile,
+      posOnlyMode: nextPosOnlyMode,
     });
   }, [
     branchId,
@@ -269,8 +288,13 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
   );
 
   const canAccessPath = useCallback(
-    (pathname: string) => businessPathAllowed(runtime, pathname),
-    [runtime],
+    (pathname: string) => {
+      if (posOnlyMode) {
+        return pathname === '/pos' || pathname.startsWith('/pos/');
+      }
+      return businessPathAllowed(runtime, pathname);
+    },
+    [posOnlyMode, runtime],
   );
 
   const value = useMemo<OrganizationModulesContextValue>(() => ({
@@ -280,6 +304,7 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
     runtime,
     loading,
     compatibilityFallback,
+    posOnlyMode,
     access,
     canAccessModule,
     hasCapability,
@@ -292,6 +317,7 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
     runtime,
     loading,
     compatibilityFallback,
+    posOnlyMode,
     access,
     canAccessModule,
     hasCapability,
