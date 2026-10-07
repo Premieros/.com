@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T11:55:00.000Z",
+  "generated_at": "2026-10-07T12:20:00.000Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -1273,6 +1273,10 @@
       "params": [
         "status"
       ]
+    },
+    {
+      "name": "support_list_my_conversations",
+      "params": []
     },
     {
       "name": "support_open_conversation",
