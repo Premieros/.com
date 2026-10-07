@@ -1,18 +1,31 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Banknote, CreditCard, Smartphone, FileText, Tag, UtensilsCrossed, Users, CheckCircle2, Car, Bike, SplitSquareHorizontal } from 'lucide-react';
+import { ArrowLeft, Banknote, CreditCard, Smartphone, FileText, Tag, UtensilsCrossed, Users, CheckCircle2, Car, Bike, SplitSquareHorizontal, Landmark, RefreshCw, Loader2, Clock3 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/Button';
 import { formatCurrency } from '@/lib/format';
 import type { PosPaymentMethod } from '@/lib/posMath';
 import type { CartItem, Customer, DiningTable, OrderType } from '@/lib/types';
 import type { SplitTenderInput } from '@/api';
-import { armSplitTender, clearArmedSplitTender } from '../../services/payment';
+import {
+  armSplitTender,
+  clearArmedSplitTender,
+  armManualPaymentApproval,
+  clearArmedManualPaymentApproval,
+  requestManualPaymentApproval,
+  getManualPaymentApprovalStatus,
+  type ManualPaymentApprovalStatus,
+  type ManualPaymentMethod,
+} from '../../services/payment';
 import { orderTypeLabel } from '../../utils/format';
 import { parseCarNotes, parseDeliveryNotes } from '../../utils/orderLabels';
 import { CashierDiscountApprovalCard } from './CashierDiscountApprovalCard';
 
 interface PaymentPanelProps {
+  branchId: string;
   currentBranchName: string;
+  manualTransferEnabled?: boolean;
+  instapayHandle?: string | null;
+  bankTransferDetails?: string | null;
   orderType: OrderType;
   activeTable: DiningTable | null;
   activeOrderNumber: string | null;
@@ -45,12 +58,14 @@ interface PaymentPanelProps {
   orderNotes: string;
 }
 
-const METHODS: PosPaymentMethod[] = ['cash', 'card', 'transfer', 'credit'];
+const METHODS: PosPaymentMethod[] = ['cash', 'card', 'instapay', 'bank_transfer', 'credit'];
 const SPLIT_METHODS: SplitTenderInput['payment_method'][] = ['cash', 'card', 'transfer'];
 const ICONS: Record<PosPaymentMethod, React.ReactNode> = {
   cash: <Banknote className="h-6 w-6" />,
   card: <CreditCard className="h-6 w-6" />,
   transfer: <Smartphone className="h-6 w-6" />,
+  instapay: <Smartphone className="h-6 w-6" />,
+  bank_transfer: <Landmark className="h-6 w-6" />,
   credit: <FileText className="h-6 w-6" />,
 };
 
@@ -71,6 +86,18 @@ export function PaymentPanel(p: PaymentPanelProps) {
   const armedRef = useRef(false);
   const sawCompletingRef = useRef(false);
 
+  const isManualMethod = paymentMethod === 'instapay' || paymentMethod === 'bank_transfer';
+  const manualMethod = isManualMethod ? paymentMethod as ManualPaymentMethod : null;
+  const manualDestination = paymentMethod === 'instapay' ? p.instapayHandle : paymentMethod === 'bank_transfer' ? p.bankTransferDetails : null;
+  const manualConfigured = Boolean(p.manualTransferEnabled && manualDestination);
+  const [manualReference, setManualReference] = useState('');
+  const [manualSender, setManualSender] = useState('');
+  const [manualNote, setManualNote] = useState('');
+  const [manualApprovalId, setManualApprovalId] = useState<string | null>(null);
+  const [manualApprovalStatus, setManualApprovalStatus] = useState<ManualPaymentApprovalStatus | null>(null);
+  const [manualApprovalError, setManualApprovalError] = useState('');
+  const [manualRequesting, setManualRequesting] = useState(false);
+
   const splitPayments = useMemo<SplitTenderInput[]>(() => SPLIT_METHODS
     .map((payment_method) => ({ payment_method, amount: Number(splitAmounts[payment_method] || 0) }))
     .filter((entry) => entry.amount > 0), [splitAmounts]);
@@ -88,7 +115,42 @@ export function PaymentPanel(p: PaymentPanelProps) {
     }
   }, [p.completing]);
 
-  useEffect(() => () => clearArmedSplitTender(), []);
+  useEffect(() => () => {
+    clearArmedSplitTender();
+    clearArmedManualPaymentApproval();
+  }, []);
+
+  useEffect(() => {
+    clearArmedManualPaymentApproval();
+    setManualApprovalId(null);
+    setManualApprovalStatus(null);
+    setManualApprovalError('');
+  }, [p.branchId, paymentMethod, p.total]);
+
+  useEffect(() => {
+    if (!manualApprovalId || manualApprovalStatus !== 'pending') return;
+    let cancelled = false;
+
+    const check = async () => {
+      const result = await getManualPaymentApprovalStatus(manualApprovalId);
+      if (cancelled) return;
+      if (result.error) {
+        setManualApprovalError(result.error);
+        return;
+      }
+      if (result.status) {
+        setManualApprovalStatus(result.status);
+        setManualApprovalError('');
+      }
+    };
+
+    const timer = window.setInterval(() => { void check(); }, 3_000);
+    void check();
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [manualApprovalId, manualApprovalStatus]);
 
   useEffect(() => {
     if (paymentMethod === 'credit' && !creditAllowed) {
@@ -120,9 +182,67 @@ export function PaymentPanel(p: PaymentPanelProps) {
     setSplitAmount(method, Math.max(0, Number((p.total - other).toFixed(2))));
   };
 
+  const requestManualApproval = async () => {
+    if (!manualMethod || !manualConfigured || manualRequesting) return;
+    const reference = manualReference.trim();
+    if (reference.length < 3) {
+      setManualApprovalError(isAr ? 'أدخل رقم أو مرجع التحويل أولًا.' : 'Enter the transfer reference first.');
+      return;
+    }
+
+    p.onPaidAmountChange(p.total);
+    setManualRequesting(true);
+    setManualApprovalError('');
+    const result = await requestManualPaymentApproval({
+      branchId: p.branchId,
+      method: manualMethod,
+      amount: p.total,
+      reference,
+      senderName: manualSender,
+      note: manualNote,
+    });
+    setManualRequesting(false);
+
+    if (result.error || !result.requestId) {
+      setManualApprovalError(result.error || (isAr ? 'تعذر إرسال طلب التأكيد.' : 'Could not request confirmation.'));
+      return;
+    }
+
+    setManualApprovalId(result.requestId);
+    setManualApprovalStatus(result.status || 'pending');
+  };
+
+  const refreshManualApproval = async () => {
+    if (!manualApprovalId) return;
+    const result = await getManualPaymentApprovalStatus(manualApprovalId);
+    if (result.error) setManualApprovalError(result.error);
+    else {
+      setManualApprovalStatus(result.status);
+      setManualApprovalError('');
+    }
+  };
+
   const complete = () => {
     if (!splitMode && p.paymentMethod === 'credit' && !creditAllowed) {
       return;
+    }
+    if (!splitMode && isManualMethod) {
+      if (
+        !manualMethod
+        || !manualConfigured
+        || !manualApprovalId
+        || manualApprovalStatus !== 'approved'
+        || manualReference.trim().length < 3
+      ) {
+        return;
+      }
+      armManualPaymentApproval({
+        requestId: manualApprovalId,
+        method: manualMethod,
+        amount: p.total,
+        reference: manualReference.trim(),
+      });
+      p.onPaidAmountChange(p.total);
     }
     if (splitMode) {
       if (!splitValid) return;
@@ -136,12 +256,14 @@ export function PaymentPanel(p: PaymentPanelProps) {
       }, 15_500);
     } else {
       clearArmedSplitTender();
+      if (!isManualMethod) clearArmedManualPaymentApproval();
     }
     p.onComplete();
   };
 
   const back = () => {
     clearArmedSplitTender();
+    clearArmedManualPaymentApproval();
     armedRef.current = false;
     p.onBack();
   };
@@ -313,24 +435,42 @@ export function PaymentPanel(p: PaymentPanelProps) {
               <div className="grid grid-cols-2 gap-3">
                 {METHODS.map((m) => {
                   const isCreditBlocked = m === 'credit' && !creditAllowed;
+                  const isManual = m === 'instapay' || m === 'bank_transfer';
+                  const destinationReady = m === 'instapay' ? Boolean(p.instapayHandle) : m === 'bank_transfer' ? Boolean(p.bankTransferDetails) : true;
+                  const isManualBlocked = isManual && (!p.manualTransferEnabled || !destinationReady);
+                  const blocked = isCreditBlocked || isManualBlocked;
+                  const label = m === 'credit'
+                    ? (isAr ? 'آجل موظف' : 'Employee Credit')
+                    : m === 'card'
+                      ? (isAr ? 'فيزا / بطاقة' : 'Card')
+                      : m === 'instapay'
+                        ? 'InstaPay'
+                        : m === 'bank_transfer'
+                          ? (isAr ? 'تحويل بنكي' : 'Bank Transfer')
+                          : t(m);
                   return (
                     <button
                       data-testid={`pos-payment-method-${m}`}
                       key={m}
-                      disabled={isCreditBlocked}
-                      aria-disabled={isCreditBlocked}
-                      title={isCreditBlocked ? (isAr ? 'الدفع الآجل متاح للموظفين فقط' : 'Credit payment is available to employees only') : undefined}
+                      disabled={blocked}
+                      aria-disabled={blocked}
+                      title={
+                        isCreditBlocked
+                          ? (isAr ? 'الدفع الآجل متاح للموظفين فقط' : 'Credit payment is available to employees only')
+                          : isManualBlocked
+                            ? (isAr ? 'فعّل بيانات التحويل من إعدادات الفرع أولًا' : 'Configure manual transfers in branch settings first')
+                            : undefined
+                      }
                       onClick={() => {
-                        if (!isCreditBlocked) p.onPaymentMethodChange(m);
+                        if (!blocked) {
+                          p.onPaymentMethodChange(m);
+                          if (isManual) p.onPaidAmountChange(p.total);
+                        }
                       }}
-                      className={`flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl border-2 bg-ui-surface text-sm font-black shadow-ui-sm transition ${isCreditBlocked ? 'cursor-not-allowed opacity-45' : 'active:scale-[.98]'} ${p.paymentMethod === m ? 'border-ui-primary bg-ui-primary-soft text-ui-accent shadow-ui-lg' : 'border-ui-border text-ui-muted'}`}
+                      className={`flex min-h-24 flex-col items-center justify-center gap-2 rounded-2xl border-2 bg-ui-surface text-sm font-black shadow-ui-sm transition ${blocked ? 'cursor-not-allowed opacity-45' : 'active:scale-[.98]'} ${p.paymentMethod === m ? 'border-ui-primary bg-ui-primary-soft text-ui-accent shadow-ui-lg' : 'border-ui-border text-ui-muted'}`}
                     >
                       {ICONS[m]}
-                      {m === 'credit'
-                        ? (isAr ? 'آجل موظف' : 'Employee Credit')
-                        : m === 'card' && isAr
-                          ? 'فيزا / بطاقة'
-                          : t(m)}
+                      {label}
                       {p.paymentMethod === m && <CheckCircle2 className="h-4 w-4 text-ui-accent" />}
                     </button>
                   );
@@ -345,7 +485,113 @@ export function PaymentPanel(p: PaymentPanelProps) {
                 </div>
               )}
 
-              {p.paymentMethod !== 'credit' && (
+              {isManualMethod && (
+                <div data-testid="pos-manual-payment-card" className="space-y-4 rounded-3xl border border-ui-primary/30 bg-ui-surface p-5 shadow-ui-sm">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ui-primary-soft text-ui-accent">
+                      {paymentMethod === 'instapay' ? <Smartphone className="h-5 w-5" /> : <Landmark className="h-5 w-5" />}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-black text-ui-text">
+                        {paymentMethod === 'instapay' ? 'InstaPay' : (isAr ? 'التحويل البنكي' : 'Bank Transfer')}
+                      </p>
+                      <p className="mt-1 whitespace-pre-wrap break-words text-xs font-bold text-ui-muted">
+                        {manualDestination || (isAr ? 'لم يتم ضبط بيانات الاستلام.' : 'Payment destination is not configured.')}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-2xl bg-ui-page-alt p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="text-xs font-bold text-ui-muted">{isAr ? 'المبلغ المطلوب تحويله' : 'Amount to transfer'}</span>
+                      <span className="text-lg font-black text-ui-accent">{formatCurrency(p.total, p.currency, lang)}</span>
+                    </div>
+                  </div>
+
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-black text-ui-muted">{isAr ? 'رقم / مرجع التحويل' : 'Transfer reference'}</span>
+                      <input
+                        data-testid="pos-manual-payment-reference"
+                        value={manualReference}
+                        onChange={(e) => setManualReference(e.target.value)}
+                        disabled={manualApprovalStatus === 'approved'}
+                        className="h-11 w-full rounded-xl border border-ui-border bg-ui-page-alt px-3 text-sm font-bold text-ui-text outline-none focus:border-ui-primary"
+                        placeholder={isAr ? 'مثال: 839201' : 'e.g. 839201'}
+                      />
+                    </label>
+                    <label className="space-y-1.5">
+                      <span className="text-xs font-black text-ui-muted">{isAr ? 'اسم المحوّل (اختياري)' : 'Sender name (optional)'}</span>
+                      <input
+                        value={manualSender}
+                        onChange={(e) => setManualSender(e.target.value)}
+                        disabled={manualApprovalStatus === 'approved'}
+                        className="h-11 w-full rounded-xl border border-ui-border bg-ui-page-alt px-3 text-sm font-bold text-ui-text outline-none focus:border-ui-primary"
+                      />
+                    </label>
+                  </div>
+
+                  <label className="space-y-1.5">
+                    <span className="text-xs font-black text-ui-muted">{isAr ? 'ملاحظة (اختياري)' : 'Note (optional)'}</span>
+                    <input
+                      value={manualNote}
+                      onChange={(e) => setManualNote(e.target.value)}
+                      disabled={manualApprovalStatus === 'approved'}
+                      className="h-11 w-full rounded-xl border border-ui-border bg-ui-page-alt px-3 text-sm font-bold text-ui-text outline-none focus:border-ui-primary"
+                    />
+                  </label>
+
+                  {manualApprovalStatus && (
+                    <div className={`flex items-center gap-2 rounded-2xl px-3 py-3 text-xs font-black ${
+                      manualApprovalStatus === 'approved'
+                        ? 'bg-ui-success/10 text-ui-success'
+                        : manualApprovalStatus === 'rejected' || manualApprovalStatus === 'expired'
+                          ? 'bg-ui-danger/10 text-ui-danger'
+                          : 'bg-ui-warning/10 text-ui-warning'
+                    }`}>
+                      {manualApprovalStatus === 'approved'
+                        ? <CheckCircle2 className="h-4 w-4" />
+                        : manualApprovalStatus === 'pending'
+                          ? <Clock3 className="h-4 w-4" />
+                          : <RefreshCw className="h-4 w-4" />}
+                      <span>
+                        {manualApprovalStatus === 'approved'
+                          ? (isAr ? 'تم تأكيد التحويل من المدير. يمكنك إتمام البيع.' : 'Manager confirmed the transfer. You can complete the sale.')
+                          : manualApprovalStatus === 'pending'
+                            ? (isAr ? 'بانتظار تأكيد المدير من مركز الموافقات.' : 'Waiting for manager confirmation in Approval Center.')
+                            : manualApprovalStatus === 'rejected'
+                              ? (isAr ? 'تم رفض التحويل. راجع المرجع وأرسل طلبًا جديدًا.' : 'Transfer was rejected. Check the reference and submit again.')
+                              : (isAr ? 'انتهت صلاحية طلب التأكيد. أرسل طلبًا جديدًا.' : 'Confirmation request expired. Submit a new request.')}
+                      </span>
+                    </div>
+                  )}
+
+                  {manualApprovalError && (
+                    <div className="rounded-2xl bg-ui-danger/10 px-3 py-3 text-xs font-bold text-ui-danger">
+                      {manualApprovalError}
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      type="button"
+                      onClick={() => void requestManualApproval()}
+                      disabled={!manualConfigured || manualRequesting || manualReference.trim().length < 3 || manualApprovalStatus === 'pending' || manualApprovalStatus === 'approved'}
+                    >
+                      {manualRequesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      {isAr ? 'إرسال للتأكيد' : 'Request confirmation'}
+                    </Button>
+                    {manualApprovalId && (
+                      <Button type="button" variant="outline" onClick={() => void refreshManualApproval()}>
+                        <RefreshCw className="h-4 w-4" />
+                        {isAr ? 'تحديث الحالة' : 'Refresh status'}
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {!isManualMethod && p.paymentMethod !== 'credit' && (
                 <div className="rounded-3xl border border-ui-border bg-ui-surface p-5 shadow-ui-sm">
                   <label className="mb-2 block text-xs font-black text-ui-muted">{t('paid')}</label>
                   <input
@@ -378,7 +624,13 @@ export function PaymentPanel(p: PaymentPanelProps) {
             size="lg"
             className="w-full !min-h-14 !rounded-2xl !bg-ui-success text-lg font-black shadow-ui-xl"
             onClick={complete}
-            disabled={p.completing || !p.canComplete || (splitMode && !splitValid) || (!splitMode && p.paymentMethod === 'credit' && !creditAllowed)}
+            disabled={
+              p.completing
+              || !p.canComplete
+              || (splitMode && !splitValid)
+              || (!splitMode && p.paymentMethod === 'credit' && !creditAllowed)
+              || (!splitMode && isManualMethod && (!manualConfigured || manualApprovalStatus !== 'approved' || !manualApprovalId))
+            }
           >
             {p.completing
               ? (isAr ? 'جاري المعالجة...' : 'Processing...')

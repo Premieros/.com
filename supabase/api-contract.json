@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-09-29T12:05:00.000Z",
+  "generated_at": "2026-10-07T08:45:00.000Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -798,6 +798,12 @@
       ]
     },
     {
+      "name": "manual_payment_approval_status",
+      "params": [
+        "request_id"
+      ]
+    },
+    {
       "name": "match_bank_line",
       "params": [
         "journal_entry_id",
@@ -927,6 +933,32 @@
         "order_id",
         "order_type",
         "paid_amount",
+        "payment_method",
+        "salesperson_id",
+        "shift_id",
+        "status",
+        "subtotal",
+        "table_id",
+        "tax_amount",
+        "total",
+        "warehouse_id"
+      ]
+    },
+    {
+      "name": "process_sale_manual_payment",
+      "params": [
+        "approval_request_id",
+        "bonus_amount",
+        "branch_id",
+        "customer_id",
+        "discount_amount",
+        "discount_type",
+        "guest_count",
+        "invoice_number",
+        "items",
+        "manual_reference",
+        "order_id",
+        "order_type",
         "payment_method",
         "salesperson_id",
         "shift_id",
@@ -1086,6 +1118,17 @@
       "params": [
         "product_id",
         "units"
+      ]
+    },
+    {
+      "name": "request_manual_payment_approval",
+      "params": [
+        "amount",
+        "branch_id",
+        "method",
+        "note",
+        "reference",
+        "sender_name"
       ]
     },
     {

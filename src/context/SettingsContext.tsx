@@ -23,6 +23,9 @@ export function mergeEffectiveSettings(global: Settings, branch?: BranchSettings
     logo_url: branch.logo_url ?? global.logo_url,
     low_stock_threshold: branch.low_stock_threshold ?? global.low_stock_threshold,
     allow_negative_stock: branch.allow_negative_stock ?? global.allow_negative_stock ?? false,
+    manual_transfer_enabled: branch.manual_transfer_enabled ?? global.manual_transfer_enabled ?? false,
+    instapay_handle: branch.instapay_handle ?? global.instapay_handle ?? null,
+    bank_transfer_details: branch.bank_transfer_details ?? global.bank_transfer_details ?? null,
   };
 }
 

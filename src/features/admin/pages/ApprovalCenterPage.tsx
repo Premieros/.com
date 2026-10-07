@@ -175,7 +175,7 @@ const POLICY_SCOPES = [
   'manager:discount', 'manager:reprint', 'manager:void_order', 'manager:cancel_sent_item',
   'manager:refund', 'manager:open_drawer', 'manager:change_payment_method',
   'manager:force_close_shift', 'manager:split_order', 'manager:merge_order',
-  'manager:transfer_order', 'waste', 'stock_count', 'warehouse_transfer',
+  'manager:transfer_order', 'manager:confirm_manual_payment', 'waste', 'stock_count', 'warehouse_transfer',
 ];
 
 function ApprovalPoliciesPanel({ ar, branches, userId, allowGlobal }: { ar: boolean; branches: Array<{ id: string; name: string }>; userId: string; allowGlobal: boolean }) {

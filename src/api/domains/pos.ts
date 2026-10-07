@@ -104,6 +104,56 @@ export const pos = {
     return rpc<RpcResult>('process_sale', p);
   },
 
+  requestManualPaymentApproval(p: {
+    p_branch_id: string;
+    p_method: 'instapay' | 'bank_transfer';
+    p_amount: number;
+    p_reference: string;
+    p_sender_name?: string | null;
+    p_note?: string | null;
+  }): ApiResult<RpcResult & { request_id?: string; status?: string; duplicate?: boolean; expires_in_seconds?: number }> {
+    return rpc('request_manual_payment_approval', p);
+  },
+
+  manualPaymentApprovalStatus(p: {
+    p_request_id: string;
+  }): ApiResult<RpcResult & {
+    request_id?: string;
+    status?: string;
+    payload?: Record<string, unknown>;
+    expires_at?: string;
+    approver_id?: string | null;
+    decision_note?: string | null;
+  }> {
+    return rpc('manual_payment_approval_status', p);
+  },
+
+  processSaleManualPayment(p: {
+    p_approval_request_id: string;
+    p_manual_reference: string;
+    p_invoice_number: string;
+    p_branch_id: string;
+    p_shift_id: string | null;
+    p_warehouse_id: string | null;
+    p_customer_id: string | null;
+    p_salesperson_id: string | null;
+    p_subtotal: number;
+    p_discount_amount: number;
+    p_discount_type: 'percent' | 'amount';
+    p_tax_amount: number;
+    p_bonus_amount: number;
+    p_total: number;
+    p_payment_method: 'instapay' | 'bank_transfer';
+    p_status: string;
+    p_items: SaleItemInput[];
+    p_order_type?: OrderType;
+    p_table_id?: string | null;
+    p_order_id?: string | null;
+    p_guest_count?: number | null;
+  }): ApiResult<RpcResult> {
+    return rpc<RpcResult>('process_sale_manual_payment', p);
+  },
+
   reconcileOfflineSale(p: {
     p_invoice_number: string;
     p_branch_id: string;
