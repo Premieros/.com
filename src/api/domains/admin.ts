@@ -38,4 +38,39 @@ export const admin = {
   getOrganizationModuleCatalog(p: { p_organization_id: string }): ApiResult<Array<{ feature_key: string; feature_name: string; category: string; enabled: boolean; source: string }>> { return rpc('get_organization_module_catalog', p); },
   setOrganizationModule(p: { p_organization_id: string; p_feature_key: string; p_enabled: boolean; p_reason?: string | null }): ApiResult<{ success?: boolean; error?: string; organization_id?: string; feature_key?: string; enabled?: boolean }> { return rpc('super_admin_set_organization_module', p); },
   getSystemHealthSnapshot(p: { p_branch_id: string | null }): ApiResult<Record<string, unknown>> { return rpc('get_system_health_snapshot', p); },
+  getSubscriptionSettings(): ApiResult<{
+    id: boolean;
+    instapay_id: string | null;
+    beneficiary_name: string | null;
+    qr_code_url: string | null;
+    instructions_ar: string | null;
+    instructions_en: string | null;
+    trial_days: number;
+    warning_days: number;
+    grace_days: number;
+    require_receipt: boolean;
+    allow_monthly: boolean;
+    allow_yearly: boolean;
+    updated_at: string;
+  }> { return rpc('subscription_settings_get', {}); },
+  updateSubscriptionSettings(p: {
+    p_instapay_id: string;
+    p_beneficiary_name: string;
+    p_qr_code_url: string;
+    p_instructions_ar: string;
+    p_instructions_en: string;
+    p_trial_days: number;
+    p_warning_days: number;
+    p_grace_days: number;
+    p_require_receipt: boolean;
+    p_allow_monthly: boolean;
+    p_allow_yearly: boolean;
+  }): ApiResult<RpcResult> { return rpc('subscription_settings_update', p); },
+  changeTenantSubscription(p: {
+    p_tenant_id: string;
+    p_plan_id: string;
+    p_status: string;
+    p_current_period_end: string | null;
+    p_trial_ends_at: string | null;
+  }): ApiResult<RpcResult> { return rpc('super_admin_change_subscription', p); },
 };

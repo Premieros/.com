@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T08:45:00.000Z",
+  "generated_at": "2026-10-07T09:29:00.000Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -1194,6 +1194,32 @@
       ]
     },
     {
+      "name": "subscription_settings_update",
+      "params": [
+        "allow_monthly",
+        "allow_yearly",
+        "beneficiary_name",
+        "grace_days",
+        "instapay_id",
+        "instructions_ar",
+        "instructions_en",
+        "qr_code_url",
+        "require_receipt",
+        "trial_days",
+        "warning_days"
+      ]
+    },
+    {
+      "name": "super_admin_change_subscription",
+      "params": [
+        "current_period_end",
+        "plan_id",
+        "status",
+        "tenant_id",
+        "trial_ends_at"
+      ]
+    },
+    {
       "name": "super_admin_create_organization_from_profile",
       "params": [
         "address",
@@ -1381,6 +1407,8 @@
     "orders",
     "organization_members",
     "organizations",
+    "plan_prices",
+    "plans",
     "product_components",
     "product_unit_links",
     "product_units",
@@ -1400,6 +1428,7 @@
     "sale_payments",
     "sales",
     "settings",
+    "subscriptions",
     "suppliers",
     "system_settings",
     "treasury_accounts",

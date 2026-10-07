@@ -19,6 +19,7 @@ import {
   Unlock,
   Sliders,
   History,
+  WalletCards,
 } from 'lucide-react';
 import { supabase, admin } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -37,6 +38,7 @@ import { ORGANIZATION_MODULE_KEYS, ORGANIZATION_MODULES, type OrganizationModule
 import { notifyOrganizationRuntimeChanged } from '@/core/modules/OrganizationModulesContext';
 import { notifyBranchesChanged } from '@/hooks/useBranches';
 import { OrganizationCreateWizard } from '@/features/admin/components/OrganizationCreateWizard';
+import { SubscriptionManagementTab } from './SubscriptionManagementTab';
 
 interface TenantStats {
   organization_id: string;
@@ -83,6 +85,7 @@ interface OrganizationModuleRow {
 
 type SuperTab =
   | 'tenants'
+  | 'subscriptions'
   | 'system_controls'
   | 'general'
   | 'branches_override'
@@ -105,6 +108,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
   const queryTab = searchParams.get('tab') as SuperTab | null;
 
   const [activeTab, setActiveTab] = useState<SuperTab>(defaultTab || queryTab || 'tenants');
+  const [subscriptionRefreshKey, setSubscriptionRefreshKey] = useState(0);
 
   // Tenants state
   const [tenants, setTenants] = useState<TenantStats[]>([]);
@@ -528,6 +532,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
 
   const TABS: { key: SuperTab; label: string; icon: React.ReactNode }[] = [
     { key: 'tenants', label: ar ? 'المستأجرون والمنظمات' : 'Tenants & Organizations', icon: <Building2 className="w-4 h-4" /> },
+    { key: 'subscriptions', label: ar ? 'إدارة الاشتراكات' : 'Subscriptions', icon: <WalletCards className="w-4 h-4" /> },
     { key: 'system_controls', label: ar ? 'التحكم في النظام ومستخدمي المنصة' : 'System Controls & Users', icon: <Sliders className="w-4 h-4" /> },
     { key: 'general', label: ar ? 'إعدادات المنشأة والمتجر المركزية' : 'Enterprise Settings', icon: <Store className="w-4 h-4" /> },
     { key: 'branches_override', label: ar ? 'تخصيصات الفروع' : 'Branch Overrides', icon: <SlidersHorizontal className="w-4 h-4" /> },
@@ -563,8 +568,8 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
             </div>
             <p className="text-xs text-ui-subtle">
               {ar
-                ? 'مركز إدارة جميع المنظمات، التحكم المركزي في إنشاء المستخدمين، الإعدادات العامة، الصلاحيات، وسجل التدقيق'
-                : 'Centralized master hub for tenants, internal user creation controls, enterprise settings, permissions, and audit logs'}
+                ? 'مركز إدارة جميع المنظمات والاشتراكات، التحكم المركزي في إنشاء المستخدمين، الإعدادات العامة، الصلاحيات، وسجل التدقيق'
+                : 'Centralized master hub for tenants, subscriptions, internal user creation controls, enterprise settings, permissions, and audit logs'}
             </p>
           </div>
         </div>
@@ -575,6 +580,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
             size="sm"
             onClick={() => {
               if (activeTab === 'tenants') void loadTenants();
+              if (activeTab === 'subscriptions') setSubscriptionRefreshKey((value) => value + 1);
               if (activeTab === 'system_controls') void loadSystemControls();
               if (activeTab === 'users_audit') void loadUsersAndAudit();
               if (activeTab === 'health') void runHealthChecks();
@@ -685,6 +691,13 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
             </div>
           </Card>
         </div>
+      )}
+
+      {/* ───────────────────────────────────────────────────────────── */}
+      {/* الاشتراكات وإعداداتها                                         */}
+      {/* ───────────────────────────────────────────────────────────── */}
+      {activeTab === 'subscriptions' && (
+        <SubscriptionManagementTab key={subscriptionRefreshKey} />
       )}
 
       {/* ───────────────────────────────────────────────────────────── */}
