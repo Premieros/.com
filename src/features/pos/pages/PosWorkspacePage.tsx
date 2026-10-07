@@ -43,6 +43,8 @@ import { orderOperatorName } from '../utils/operatorName';
 import { VoidItemModal } from '../components/order/VoidItemModal';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
 import { resolvePosBusinessSurface } from '../businessSurface';
+import { useCan } from '@/lib/permissions';
+import { ManualPaymentApprovalsModal } from '../components/checkout/ManualPaymentApprovalsModal';
 
 const EMPTY_POS_STOCK_MAP: Record<string, number> = {};
 
@@ -67,6 +69,8 @@ export function PosWorkspacePage() {
   const { branches: sharedBranches } = useBranches();
   const { show } = useToast();
   const perms = usePosPermissions();
+  const can = useCan();
+  const canReviewManualPayments = can('approvals.review');
   const { runtime } = useOrganizationModules();
   const posSurface = useMemo(() => resolvePosBusinessSurface(runtime), [runtime]);
   const {
@@ -108,6 +112,7 @@ export function PosWorkspacePage() {
   const [transferOrder, setTransferOrder] = useState<Order | null>(null);
   const [transferSourceTable, setTransferSourceTable] = useState<DiningTable | null>(null);
   const [voidModalOpen, setVoidModalOpen] = useState(false);
+  const [manualPaymentApprovalsOpen, setManualPaymentApprovalsOpen] = useState(false);
   const [voidItem, setVoidItem] = useState<CartItem | null>(null);
   const [voidSentQty, setVoidSentQty] = useState(1);
 
@@ -786,6 +791,8 @@ export function PosWorkspacePage() {
           if (orderIdParam) navigate('/pos');
         }}
         onExit={() => navigate('/dashboard')}
+        canReviewManualPayments={canReviewManualPayments}
+        onReviewManualPayments={() => setManualPaymentApprovalsOpen(true)}
       />
 
       {loadWarning && (
@@ -1224,6 +1231,15 @@ export function PosWorkspacePage() {
         selectedTableId={pos.activeTable?.id || null}
         onSelectTable={(table) => pos.setTableId(table.id)}
       />
+      )}
+
+      {canReviewManualPayments && (
+        <ManualPaymentApprovalsModal
+          open={manualPaymentApprovalsOpen}
+          branchId={effectiveBranch}
+          currency={pos.effCurrency}
+          onClose={() => setManualPaymentApprovalsOpen(false)}
+        />
       )}
 
       {/* Transfer Order Modal */}
