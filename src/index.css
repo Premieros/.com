@@ -436,3 +436,32 @@
     display: none;
   }
 }
+
+
+/* Branded loading feedback for route transitions. */
+.premier-wait {
+  position: relative;
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+}
+.premier-wait-mark { animation: premier-breathe 2.4s ease-in-out infinite; }
+.premier-wait-orbit {
+  position: absolute;
+  inset: -6px;
+  border: 2px solid rgb(var(--ui-primary) / 0.08);
+  border-top-color: rgb(var(--ui-primary) / 0.45);
+  border-radius: 50%;
+  animation: premier-orbit 1.8s linear infinite;
+}
+@keyframes premier-breathe {
+  0%, 100% { transform: scale(0.94); opacity: 0.85; }
+  50% { transform: scale(1); opacity: 1; }
+}
+@keyframes premier-orbit {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .premier-wait-mark, .premier-wait-orbit { animation: none; }
+}
