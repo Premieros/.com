@@ -1,4 +1,4 @@
-export type PosPaymentMethod = 'cash' | 'card' | 'transfer' | 'credit';
+export type PosPaymentMethod = 'cash' | 'card' | 'transfer' | 'instapay' | 'bank_transfer' | 'credit';
 
 export interface PosLine {
   quantity: number;
