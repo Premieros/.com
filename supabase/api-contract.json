@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-10-07T09:29:00.000Z",
+  "generated_at": "2026-10-07T11:45:00.000Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -126,6 +126,12 @@
       "name": "complete_bank_reconciliation",
       "params": [
         "reconciliation_id"
+      ]
+    },
+    {
+      "name": "complete_stale_kitchen_orders",
+      "params": [
+        "branch_id"
       ]
     },
     {
@@ -566,6 +572,16 @@
         "reference_type",
         "search",
         "to_date"
+      ]
+    },
+    {
+      "name": "get_kitchen_completed_history",
+      "params": [
+        "branch_id",
+        "from_ts",
+        "page",
+        "station",
+        "to_ts"
       ]
     },
     {
