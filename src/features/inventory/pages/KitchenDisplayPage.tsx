@@ -11,6 +11,7 @@ import { supabase } from '@/api';
 import { catalog } from '@/api/domains/catalog';
 import { subscribePosRealtime } from '@/features/pos/services/posRealtime';
 import type { KitchenQueueItem, KitchenStation } from '@/lib/types';
+import { KitchenCompletedHistory } from '../components/KitchenCompletedHistory';
 
 function elapsedColor(seconds: number): string {
   if (seconds > 600) return 'text-ui-danger font-bold';
@@ -52,6 +53,7 @@ export function KitchenDisplayPage() {
   const canViewKds = can('pos.kds_view');
   const canUpdateKds = can('pos.kds_update');
   const [station, setStation] = useState('');
+  const [view, setView] = useState<'active' | 'completed'>('active');
   const [items, setItems] = useState<KitchenQueueItem[]>([]);
   const [stations, setStations] = useState<KitchenStation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,6 +90,12 @@ export function KitchenDisplayPage() {
         setLoadError(userFacingErrorMessage(!canViewKds ? 'POS_KDS_VIEW_REQUIRED' : 'BRANCH_REQUIRED', ar ? 'ar' : 'en'));
         return;
       }
+      const { data: completeResult, error: completeError } = await catalog.completeStaleKitchenOrders({
+        p_branch_id: branchFilter,
+      });
+      if (completeError) throw completeError;
+      if (completeResult?.success === false) throw new Error(completeResult.error || 'KDS_AUTO_COMPLETE_FAILED');
+
       const { data, error } = await supabase.rpc('get_kitchen_queue', {
         p_station: station || null,
         p_branch_id: branchFilter,
@@ -196,6 +204,37 @@ export function KitchenDisplayPage() {
           <span className="w-full text-xs text-ui-muted sm:w-auto sm:text-sm"><span className="me-1 inline-block h-2 w-2 rounded-full bg-ui-success animate-pulse" />{items.length} {ar ? 'طلب/محطة نشطة' : 'active order/station cards'}</span>
         </div>
 
+        <div role="tablist" aria-label={ar ? 'عرض طلبات المطبخ' : 'Kitchen order views'} className="flex flex-wrap gap-2">
+          <button
+            role="tab"
+            aria-selected={view === 'active'}
+            onClick={() => setView('active')}
+            className="rounded-lg border border-ui-border px-4 py-2 text-sm font-black aria-selected:bg-ui-primary aria-selected:text-white"
+          >
+            {ar ? 'نشطة' : 'Active'} ({items.length})
+          </button>
+          <button
+            role="tab"
+            aria-selected={view === 'completed'}
+            onClick={() => setView('completed')}
+            className="rounded-lg border border-ui-border px-4 py-2 text-sm font-black aria-selected:bg-ui-primary aria-selected:text-white"
+          >
+            {ar ? 'مكتمل' : 'Completed'}
+          </button>
+        </div>
+
+        {view === 'active' && (
+          <p className="text-xs font-medium text-ui-muted">
+            {ar
+              ? 'أي طلب يبقى في المطبخ 40 دقيقة ينتقل تلقائيًا إلى مكتمل.'
+              : 'Any kitchen order remaining for 40 minutes is automatically moved to Completed.'}
+          </p>
+        )}
+
+        {view === 'completed' && branchFilter && canViewKds && (
+          <KitchenCompletedHistory key={`${branchFilter}:${station}`} branchId={branchFilter} station={station} ar={ar} />
+        )}
+
         {loadError && (
           <div data-testid="kds-load-error" className="flex flex-col gap-3 rounded-2xl border border-ui-danger/30 bg-ui-danger/10 p-4 text-ui-danger sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-2">
@@ -213,7 +252,7 @@ export function KitchenDisplayPage() {
 
         {loading && !items.length && !loadError && <div className="text-ui-muted py-8 text-center">{ar ? 'جاري التحميل...' : 'Loading...'}</div>}
 
-        <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {view === 'active' && <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {items.map(item => {
             const context = orderContext[item.order_id];
             const tableLabel = context?.table_name || (item.table_number ? `Table ${String(item.table_number).padStart(2, '0')}` : null);
@@ -259,14 +298,14 @@ export function KitchenDisplayPage() {
               {canUpdateKds && <div className="flex gap-2 border-t border-ui-border pt-3">
                 {item.kitchen_status === 'sent' && <button onClick={() => void handleKitchenStatus(item.order_id, 'cooking')} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-ui-warning text-white py-2.5 px-3 text-sm font-bold active:scale-95 transition-all min-h-11"><ChefHat className="h-5 w-5" /> {ar ? 'بدء التحضير' : 'Start Cooking'}</button>}
                 {item.kitchen_status === 'cooking' && <button onClick={() => void handleKitchenStatus(item.order_id, 'ready')} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-ui-success text-white py-2.5 px-3 text-sm font-bold active:scale-95 transition-all min-h-11"><CheckCircle2 className="h-5 w-5" /> {ar ? 'جاهز للتقديم' : 'Mark Ready'}</button>}
-                {item.kitchen_status === 'ready' && <button onClick={() => void handleKitchenStatus(item.order_id, 'served')} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-ui-info text-white py-2.5 px-3 text-sm font-bold active:scale-95 transition-all min-h-11"><UtensilsCrossed className="h-5 w-5" /> {ar ? 'تم التقديم' : 'Served'}</button>}
+                {item.kitchen_status === 'ready' && <button onClick={() => void handleKitchenStatus(item.order_id, 'served')} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-ui-info text-white py-2.5 px-3 text-sm font-bold active:scale-95 transition-all min-h-11"><UtensilsCrossed className="h-5 w-5" /> {ar ? 'مكتمل' : 'Completed'}</button>}
               </div>}
             </div>
             );
           })}
-        </div>
+        </div>}
 
-        {!loading && !items.length && !loadError && <div className="text-center py-16 text-ui-muted"><ChefHat className="h-12 w-12 mx-auto mb-3 opacity-30" /><div className="text-lg">{ar ? 'لا توجد طلبات نشطة ضمن المحطات المسموح بها' : 'No active orders in your allowed stations'}</div></div>}
+        {view === 'active' && !loading && !items.length && !loadError && <div className="text-center py-16 text-ui-muted"><ChefHat className="h-12 w-12 mx-auto mb-3 opacity-30" /><div className="text-lg">{ar ? 'لا توجد طلبات نشطة ضمن المحطات المسموح بها' : 'No active orders in your allowed stations'}</div></div>}
       </div>
     </DesignSurface>
   );
