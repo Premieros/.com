@@ -9,6 +9,7 @@ import { useOrganizationModules } from '@/core/modules/OrganizationModulesContex
 import { moduleForPath, moduleForRoute, type OrganizationModuleKey } from '@/core/modules/module.config';
 
 const LoginPage = lazy(() => import('../features/auth/pages/LoginPage').then(m => ({ default: m.LoginPage })));
+const RegisterPage = lazy(() => import('../features/auth/pages/RegisterPage').then(m => ({ default: m.RegisterPage })));
 const DashboardPage = lazy(() => import('../features/dashboard/pages/DashboardEnhancedPage').then(m => ({ default: m.DashboardEnhancedPage })));
 const V2GatewayPage = lazy(() => import('../v2/pages/V2GatewayPage').then(m => ({ default: m.V2GatewayPage })));
 const OperationsCenterPage = lazy(() => import('../features/operations/pages/OperationsCenterPage').then(m => ({ default: m.OperationsCenterPage })));
@@ -146,7 +147,7 @@ export function AppRoutes() {
     <Suspense fallback={<PageLoader />}>
       <Routes>
         <Route path={APP_ROUTES.login} element={<PublicRoute><LoginPage /></PublicRoute>} />
-        <Route path={APP_ROUTES.register} element={<Navigate to={APP_ROUTES.login} replace />} />
+        <Route path={APP_ROUTES.register} element={<PublicRoute><RegisterPage /></PublicRoute>} />
         <Route path={APP_ROUTES.frontendV2} element={<ProtectedRoute fullscreen><V2GatewayPage /></ProtectedRoute>} />
         <Route path={`${APP_ROUTES.frontendV2}/pos`} element={<ProtectedRoute permission="pos.view" fullscreen><Navigate to={APP_ROUTES.pos} replace /></ProtectedRoute>} />
         <Route path={`${APP_ROUTES.frontendV2}/shifts`} element={<ProtectedRoute permission="shifts.view" fullscreen><Navigate to={APP_ROUTES.shifts} replace /></ProtectedRoute>} />
