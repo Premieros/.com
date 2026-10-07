@@ -978,12 +978,12 @@ export function PosWorkspacePage() {
               </button>
               <div className="min-w-0 flex-1 text-center">
                 <p className="truncate text-sm font-black text-ui-text">
-                  {isCheckout ? (isAr ? 'الدفع' : 'Checkout') : (isAr ? 'الطلب الحالي' : 'Current order')}
+                  {isCheckout ? (isAr ? 'الدفع' : 'Checkout') : (isAr ? posSurface.currentSaleLabel.ar : posSurface.currentSaleLabel.en)}
                 </p>
                 <p className="truncate text-[11px] font-bold text-ui-muted">
-                  {pos.activeOrderNumber ? `#${pos.activeOrderNumber}` : (isAr ? 'طلب جديد' : 'New order')}
+                  {pos.activeOrderNumber ? `#${pos.activeOrderNumber}` : (isAr ? posSurface.newSaleLabel.ar : posSurface.newSaleLabel.en)}
                   {' · '}
-                  {pos.cart.reduce((sum, item) => sum + item.quantity, 0)} {isAr ? 'صنف' : 'items'}
+                  {pos.cart.reduce((sum, item) => sum + item.quantity, 0)} {isAr ? posSurface.itemLabel.ar : posSurface.itemLabel.en}
                 </p>
               </div>
               <span className="max-w-[34vw] truncate text-sm font-black text-ui-accent">
@@ -999,7 +999,7 @@ export function PosWorkspacePage() {
 
       <nav
         data-testid="pos-mobile-command-dock"
-        className="fixed bottom-0 start-0 end-0 z-40 grid grid-cols-4 border-t border-ui-border bg-ui-surface/95 px-1 pt-1 shadow-[0_-10px_30px_rgba(0,0,0,0.10)] backdrop-blur-xl lg:hidden`}
+        className={`fixed bottom-0 start-0 end-0 z-40 grid ${posSurface.showRestaurantOrderControls ? 'grid-cols-4' : 'grid-cols-2'} border-t border-ui-border bg-ui-surface/95 px-1 pt-1 shadow-[0_-10px_30px_rgba(0,0,0,0.10)] backdrop-blur-xl lg:hidden`}
         aria-label={isAr ? 'تحكم شاشة البيع' : 'POS mobile controls'}
       >
         <button
