@@ -38,6 +38,7 @@ describe('business-aware POS surface', () => {
     expect(surface.customerEmphasis).toBe(true);
     expect(surface.newSaleLabel.en).toBe('New deal');
     expect(surface.catalogLabel.en).toBe('Available vehicles');
+    expect(surface.customerRequired).toBe(true);
   });
 
   it('turns food manufacturing into a sales desk without restaurant operations', () => {
