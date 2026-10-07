@@ -13,8 +13,12 @@ import { ProductImageAdjustModal, type ProductImageView } from '@/features/catal
 import { uploadProductImage } from '@/features/catalog/services/productImages';
 import { invalidatePosCatalogCache } from '@/core/offline/invalidatePosCatalogCache';
 import type { Category, Product } from '@/lib/types';
+import { MobileStationCategories } from './MobileStationCategories';
 
 interface ProductBrowserProps {
+  branchId?: string | null;
+  userId?: string | null;
+  enableStationNavigation?: boolean;
   products: Product[];
   categories: Category[];
   search: string;
@@ -31,7 +35,7 @@ interface ProductBrowserProps {
   inputRef?: React.Ref<HTMLInputElement>;
 }
 
-export function ProductBrowser({ products, categories, search, selectedCategory, currency, hasBranch, canModifyOrder, shiftChecked, shiftOpen, onSearch, onSelectCategory, onAddToCart, onConfigureProduct, inputRef }: ProductBrowserProps) {
+export function ProductBrowser({ branchId = null, userId = null, enableStationNavigation = false, products, categories, search, selectedCategory, currency, hasBranch, canModifyOrder, shiftChecked, shiftOpen, onSearch, onSelectCategory, onAddToCart, onConfigureProduct, inputRef }: ProductBrowserProps) {
   const { t, lang } = useLanguage();
   const { show } = useToast();
   const isAr = lang === 'ar';
@@ -175,7 +179,17 @@ export function ProductBrowser({ products, categories, search, selectedCategory,
           </div>
         )}
         {renderSearch(true)}
-        <div className="mt-3">{renderCategories(true)}</div>
+        <div className="mt-3">
+          {enableStationNavigation ? (
+            <MobileStationCategories
+              branchId={branchId}
+              userId={userId}
+              categories={categories}
+              selectedCategory={selectedCategory}
+              onSelectCategory={onSelectCategory}
+            />
+          ) : renderCategories(true)}
+        </div>
       </div>
 
       <div className="hidden lg:block z-10 flex-shrink-0 border-b border-ui-border bg-ui-surface/95 px-4 py-3 backdrop-blur">
