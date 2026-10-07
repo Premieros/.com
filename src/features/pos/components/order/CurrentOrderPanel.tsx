@@ -26,8 +26,10 @@ import { OrderTypePill } from './OrderTypePill';
 import { OrderStageBadge } from './OrderStageBadge';
 import { TransferItemModal } from '../tables/TransferItemModal';
 import { TransferItemsModal, type TransferItemLine } from '../tables/TransferItemsModal';
+import type { PosBusinessSurface } from '../../businessSurface';
 
 interface CurrentOrderPanelProps {
+  surface: PosBusinessSurface;
   cart: CartItem[];
   currency: string;
   subtotal: number;
@@ -77,6 +79,7 @@ interface CurrentOrderPanelProps {
 }
 
 export function CurrentOrderPanel({
+  surface,
   cart,
   currency,
   subtotal,
@@ -213,15 +216,15 @@ export function CurrentOrderPanel({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
-              <p className="truncate text-sm font-black text-ui-text">{activeOrderNumber ? `#${activeOrderNumber}` : t('newOrder')}</p>
-              <OrderStageBadge stage={stage} />
+              <p className="truncate text-sm font-black text-ui-text">{activeOrderNumber ? `#${activeOrderNumber}` : (isAr ? surface.currentSaleLabel.ar : surface.currentSaleLabel.en)}</p>
+              {surface.showRestaurantOrderControls && <OrderStageBadge stage={stage} />}
             </div>
             <p className="text-[11px] font-bold text-ui-muted">{cart.length} {isAr ? 'صنف' : 'items'}</p>
           </div>
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-          {activeOrderNumber ? (
+          {surface.showRestaurantOrderControls && (activeOrderNumber ? (
             <OrderTypePill type={orderType} />
           ) : (
             <div className="flex items-center gap-1 rounded-xl bg-ui-page-alt p-1">
@@ -239,16 +242,16 @@ export function CurrentOrderPanel({
                 </button>
               ))}
             </div>
-          )}
+          ))}
 
-          {orderType === 'dine_in' && (
+          {surface.showRestaurantOrderControls && orderType === 'dine_in' && (
             <button type="button" disabled={!perms.canEditOrder} onClick={onOpenTableModal} className="flex items-center gap-1 rounded-lg bg-ui-page-alt px-2 py-1 text-[10px] font-black text-ui-muted transition hover:text-ui-text disabled:cursor-not-allowed disabled:opacity-40">
               <UtensilsCrossed className="h-3 w-3 text-ui-success" />
               <span className="max-w-[100px] truncate">{activeTable?.name || (isAr ? 'اختر طاولة' : 'Select table')}</span>
             </button>
           )}
 
-          {orderType === 'dine_in' && (
+          {surface.showRestaurantOrderControls && orderType === 'dine_in' && (
             <label className="flex items-center gap-1 text-[10px] font-bold text-ui-muted">
               {isAr ? 'أفراد' : 'Guests'}
               <input type="number" min={1} disabled={!perms.canEditOrder} value={guestCount || ''} onChange={(event) => onGuestCountChange(parseInt(event.target.value) || null)} className="w-12 rounded-lg border border-ui-border bg-ui-surface-raised px-1.5 py-1 text-center text-xs font-black text-ui-text outline-none focus:border-ui-primary disabled:cursor-not-allowed disabled:opacity-40" />
@@ -346,7 +349,7 @@ export function CurrentOrderPanel({
           <div data-testid="pos-empty-cart-state" className="rounded-2xl border border-dashed border-ui-border bg-ui-page-alt/60 px-4 py-5 text-center text-ui-subtle">
             <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-ui-surface"><ShoppingCart className="h-5 w-5 opacity-40" /></div>
             <p className="text-sm font-black text-ui-text">{t('emptyCart')}</p>
-            <p className="mt-1 text-[10px] font-bold">{isAr ? 'اختر منتجًا من القائمة لبدء الطلب' : 'Choose a product to start the order'}</p>
+            <p className="mt-1 text-[10px] font-bold">{isAr ? `اختر ${surface.itemLabel.ar} لبدء ${surface.transactionLabel.ar}` : `Choose a ${surface.itemLabel.en} to start the ${surface.transactionLabel.en.toLowerCase()}`}</p>
             {onAddItem && perms.canEditOrder && (
               <button
                 type="button"
@@ -355,7 +358,7 @@ export function CurrentOrderPanel({
                 className="mt-3 inline-flex items-center gap-1.5 rounded-xl bg-ui-primary px-3 py-2 text-[11px] font-black text-ui-primary-fg shadow-ui-xs transition hover:bg-ui-primary-hover active:scale-95"
               >
                 <Plus className="h-3.5 w-3.5" />
-                {isAr ? 'إضافة صنف' : 'Add item'}
+                {isAr ? `إضافة ${surface.itemLabel.ar}` : `Add ${surface.itemLabel.en}`}
               </button>
             )}
           </div>
@@ -418,9 +421,11 @@ export function CurrentOrderPanel({
                     ><Minus className="h-3.5 w-3.5" /></button>
                     <span data-testid={`pos-cart-qty-${item.product.id}`} className="w-7 text-center text-xs font-black text-ui-text">{item.quantity}</span>
                     <button data-testid={`pos-cart-qty-increase-${item.product.id}`} aria-label={isAr ? `زيادة كمية ${item.product.name}` : `Increase quantity ${item.product.name}`} disabled={!perms.canEditOrder} onClick={() => onUpdateQty(lineKey, 1)} className="flex h-7 w-7 items-center justify-center rounded-lg bg-ui-primary text-ui-primary-fg disabled:cursor-not-allowed disabled:opacity-40"><Plus className="h-3.5 w-3.5" /></button>
-                    <span className="ms-auto text-[10px] font-bold text-ui-muted">
-                      {sent.sentQty > 0 ? (isAr ? `مرسل ${sent.sentQty}` : `Sent ${sent.sentQty}`) : (isAr ? 'غير مرسل' : 'Unsent')}
-                    </span>
+                    {surface.showRestaurantOrderControls && (
+                      <span className="ms-auto text-[10px] font-bold text-ui-muted">
+                        {sent.sentQty > 0 ? (isAr ? `مرسل ${sent.sentQty}` : `Sent ${sent.sentQty}`) : (isAr ? 'غير مرسل' : 'Unsent')}
+                      </span>
+                    )}
                   </div>
                 </div>
               );
