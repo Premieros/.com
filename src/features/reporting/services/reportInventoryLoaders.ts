@@ -18,30 +18,35 @@ const fetchRows = <T,>(query: unknown): Promise<T[]> =>
 
 export async function loadSalesByProductItems(args: {
   branchId: string | null;
+  branchIds?: string[];
   filters: ReportFilters;
 }): Promise<Record<string, unknown>[]> {
   let q = supabase
     .from('sale_items')
     .select('sale_id, quantity, refunded_quantity, total, refunded_amount, product:products(name), sale:sales(id, created_at, branch_id, status, order_type, warehouse_id, cashier_id, customer_id, payment_method, total, refunded_amount)');
-  if (args.branchId) q = q.eq('sale.branch_id', args.branchId);
+  if (args.branchIds?.length) q = q.in('sale.branch_id', args.branchIds);
+  else if (args.branchId) q = q.eq('sale.branch_id', args.branchId);
   q = filterQ(q, args.filters, applySaleItemFilters);
   return fetchRows<Record<string, unknown>>(q);
 }
 
 export async function loadTopConsumedProductItems(args: {
   branchId: string | null;
+  branchIds?: string[];
   filters: ReportFilters;
 }): Promise<Record<string, unknown>[]> {
   let q = supabase
     .from('sale_items')
     .select('quantity, refunded_quantity, product:products(name), sale:sales(created_at, branch_id, order_type, warehouse_id, cashier_id, customer_id)');
-  if (args.branchId) q = q.eq('sale.branch_id', args.branchId);
+  if (args.branchIds?.length) q = q.in('sale.branch_id', args.branchIds);
+  else if (args.branchId) q = q.eq('sale.branch_id', args.branchId);
   q = filterQ(q, args.filters, applySaleItemFilters);
   return fetchRows<Record<string, unknown>>(q);
 }
 
 export async function loadComponentConsumptionRows(args: {
   branchId: string | null;
+  branchIds?: string[];
   fromTs: string;
   toExclusiveTs: string;
   filters: ReportFilters;
@@ -53,13 +58,15 @@ export async function loadComponentConsumptionRows(args: {
     .eq('transaction_type', 'sale')
     .gte('created_at', args.fromTs)
     .lt('created_at', args.toExclusiveTs);
-  if (args.branchId) q = q.eq('branch_id', args.branchId);
+  if (args.branchIds?.length) q = q.in('branch_id', args.branchIds);
+  else if (args.branchId) q = q.eq('branch_id', args.branchId);
   q = filterQ(q, args.filters, applyProductScopedFilters);
   return fetchRows<Record<string, unknown>>(q);
 }
 
 export async function loadTopConsumedComponentRows(args: {
   branchId: string | null;
+  branchIds?: string[];
   fromTs: string;
   toExclusiveTs: string;
   filters: ReportFilters;
@@ -71,7 +78,8 @@ export async function loadTopConsumedComponentRows(args: {
     .eq('transaction_type', 'sale')
     .gte('created_at', args.fromTs)
     .lt('created_at', args.toExclusiveTs);
-  if (args.branchId) q = q.eq('branch_id', args.branchId);
+  if (args.branchIds?.length) q = q.in('branch_id', args.branchIds);
+  else if (args.branchId) q = q.eq('branch_id', args.branchId);
   q = filterQ(q, args.filters, applyProductScopedFilters);
   return fetchRows<Record<string, unknown>>(q);
 }
@@ -82,7 +90,7 @@ export async function loadProductBranchRows(productIds: string[]): Promise<Array
   return (data || []) as Array<{ id: string; branch_id: string }>;
 }
 
-export async function loadLowStockSources(branchId: string | null): Promise<{
+export async function loadLowStockSources(branchId: string | null, branchIds?: string[]): Promise<{
   rawMasters: Record<string, unknown>[];
   rawBalances: Record<string, unknown>[];
   unitMasters: Record<string, unknown>[];
@@ -93,7 +101,12 @@ export async function loadLowStockSources(branchId: string | null): Promise<{
   let unitMasterQuery = supabase.from('inventory_units').select('id,branch_id,name,barcode,min_stock,low_stock_threshold,is_active').eq('is_active', true);
   let unitBatchQuery = supabase.from('inventory_unit_batches').select('unit_id,branch_id,quantity');
 
-  if (branchId) {
+  if (branchIds?.length) {
+    rawMasterQuery = rawMasterQuery.in('branch_id', branchIds);
+    rawBalanceQuery = rawBalanceQuery.in('branch_id', branchIds);
+    unitMasterQuery = unitMasterQuery.in('branch_id', branchIds);
+    unitBatchQuery = unitBatchQuery.in('branch_id', branchIds);
+  } else if (branchId) {
     rawMasterQuery = rawMasterQuery.eq('branch_id', branchId);
     rawBalanceQuery = rawBalanceQuery.eq('branch_id', branchId);
     unitMasterQuery = unitMasterQuery.eq('branch_id', branchId);
@@ -112,6 +125,7 @@ export async function loadLowStockSources(branchId: string | null): Promise<{
 
 export async function loadWasteRows(args: {
   branchId: string | null;
+  branchIds?: string[];
   fromTs: string;
   toExclusiveTs: string;
 }): Promise<Record<string, unknown>[]> {
@@ -120,13 +134,15 @@ export async function loadWasteRows(args: {
     .select('id, branch_id, created_at, quantity, unit_cost, total_cost, reason, product:products(name), warehouse:warehouses(name)')
     .gte('created_at', args.fromTs)
     .lt('created_at', args.toExclusiveTs);
-  if (args.branchId) q = q.eq('branch_id', args.branchId);
+  if (args.branchIds?.length) q = q.in('branch_id', args.branchIds);
+  else if (args.branchId) q = q.eq('branch_id', args.branchId);
   return fetchRows<Record<string, unknown>>(q);
 }
 
 
 export async function loadInventoryBatchRows(args: {
   branchId: string | null;
+  branchIds?: string[];
   warehouseId?: string;
 }): Promise<{
   rawRows: Record<string, unknown>[];
@@ -139,7 +155,10 @@ export async function loadInventoryBatchRows(args: {
     .from('inventory_unit_batches')
     .select('branch_id,warehouse_id,quantity,unit:inventory_units(id,name,barcode,min_stock,low_stock_threshold),warehouse:warehouses(name)');
 
-  if (args.branchId) {
+  if (args.branchIds?.length) {
+    rawQuery = rawQuery.in('branch_id', args.branchIds);
+    unitQuery = unitQuery.in('branch_id', args.branchIds);
+  } else if (args.branchId) {
     rawQuery = rawQuery.eq('branch_id', args.branchId);
     unitQuery = unitQuery.eq('branch_id', args.branchId);
   }

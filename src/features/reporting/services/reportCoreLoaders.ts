@@ -19,6 +19,7 @@ const fetchRows = <T,>(query: unknown): Promise<T[]> =>
 
 export async function loadSalesReportRows(args: {
   branchId: string | null;
+  branchIds?: string[];
   fromTs: string;
   toExclusiveTs: string;
   filters: ReportFilters;
@@ -29,13 +30,15 @@ export async function loadSalesReportRows(args: {
     .gte('created_at', args.fromTs)
     .lt('created_at', args.toExclusiveTs)
     .order('created_at', { ascending: false });
-  if (args.branchId) q = q.eq('branch_id', args.branchId);
+  if (args.branchIds?.length) q = q.in('branch_id', args.branchIds);
+  else if (args.branchId) q = q.eq('branch_id', args.branchId);
   q = filterQ(q, args.filters, applySalesFilters);
   return fetchRows<Record<string, unknown>>(q);
 }
 
 export async function loadPurchaseReportRows(args: {
   branchId: string | null;
+  branchIds?: string[];
   fromTs: string;
   toExclusiveTs: string;
   filters: ReportFilters;
@@ -46,13 +49,15 @@ export async function loadPurchaseReportRows(args: {
     .gte('created_at', args.fromTs)
     .lt('created_at', args.toExclusiveTs)
     .order('created_at', { ascending: false });
-  if (args.branchId) q = q.eq('branch_id', args.branchId);
+  if (args.branchIds?.length) q = q.in('branch_id', args.branchIds);
+  else if (args.branchId) q = q.eq('branch_id', args.branchId);
   q = filterQ(q, args.filters, applyPurchaseFilters);
   return fetchRows<Record<string, unknown>>(q);
 }
 
 export async function loadExpenseReportRows(args: {
   branchId: string | null;
+  branchIds?: string[];
   from: string;
   to: string;
   filters: ReportFilters;
@@ -64,7 +69,8 @@ export async function loadExpenseReportRows(args: {
     .gte('expense_date', args.from)
     .lte('expense_date', args.to)
     .order('expense_date', { ascending: false });
-  if (args.branchId) q = q.eq('branch_id', args.branchId);
+  if (args.branchIds?.length) q = q.in('branch_id', args.branchIds);
+  else if (args.branchId) q = q.eq('branch_id', args.branchId);
   q = filterQ(q, args.filters, applyExpenseFilters);
   return fetchRows<Record<string, unknown>>(q);
 }

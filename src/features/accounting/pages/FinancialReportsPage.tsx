@@ -11,6 +11,8 @@ import { Input, Select } from '@/components/Input';
 import { formatCurrency, todayISO, formatDate } from '@/lib/format';
 import { exportToExcelAdvanced } from '@/lib/excel';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
+import { useBranches } from '@/hooks/useBranches';
 import { useSettings } from '@/context/SettingsContext';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { businessMetricLabel } from '@/lib/businessMetrics';
@@ -22,10 +24,21 @@ import type {
 } from '@/lib/types';
 
 type View = 'trial_balance' | 'ledger' | 'treasury_statement' | 'inventory_movement' | 'income' | 'balance_sheet' | 'ar_aging' | 'ap_aging' | 'aging_summary' | 'cash_flow' | 'party_statement';
+type BranchScopedTrialBalanceRow = TrialBalanceRow & { branch_id: string; branch_name: string };
+type BranchScopedArAgingRow = ArAgingRow & { branch_id: string; branch_name: string };
+type BranchScopedApAgingRow = ApAgingRow & { branch_id: string; branch_name: string };
+type BranchScopedCashFlowRow = CashFlowRow & { branch_id: string; branch_name: string };
 
 export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicker?: boolean } = {}) {
   const { t, lang } = useLanguage();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
+  const { branches } = useBranches();
+  const summaryBranchIds = branchScope.selectedBranchIds;
+  const branchName = useCallback((branchId: string) => {
+    const branch = branches.find((item) => item.id === branchId);
+    return (lang === 'ar' ? branch?.name : (branch?.name_en || branch?.name)) || branchId;
+  }, [branches, lang]);
   const isAr = lang === 'ar';
   const accountingDebitLabel = isAr ? 'مدين' : 'Debit';
   const accountingCreditLabel = isAr ? 'دائن' : 'Credit';
@@ -64,15 +77,15 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
   const currency = effectiveSettings(effectiveBranchFilter)?.currency || 'EGP';
   const selectorContextKey = `${effectiveBranchFilter || ''}|${view}|${partySide}|${inventoryItemType}`;
 
-  const [tb, setTb] = useState<TrialBalanceRow[]>([]);
+  const [tb, setTb] = useState<BranchScopedTrialBalanceRow[]>([]);
   const [tbSummary, setTbSummary] = useState<TrialBalanceSummary | null>(null);
   const [gl, setGl] = useState<GeneralLedgerRow[]>([]);
   const [income, setIncome] = useState<IncomeStatementResult | null>(null);
   const [sheet, setSheet] = useState<BalanceSheetResult | null>(null);
-  const [arAging, setArAging] = useState<ArAgingRow[]>([]);
-  const [apAging, setApAging] = useState<ApAgingRow[]>([]);
+  const [arAging, setArAging] = useState<BranchScopedArAgingRow[]>([]);
+  const [apAging, setApAging] = useState<BranchScopedApAgingRow[]>([]);
   const [agingSummary, setAgingSummary] = useState<AgingSummaryResult | null>(null);
-  const [cashFlow, setCashFlow] = useState<CashFlowRow[]>([]);
+  const [cashFlow, setCashFlow] = useState<BranchScopedCashFlowRow[]>([]);
   const [partyStmt, setPartyStmt] = useState<PartyStatementResult | null>(null);
   const [treasuryStmt, setTreasuryStmt] = useState<TreasuryStatementResult | null>(null);
   const [inventoryStmt, setInventoryStmt] = useState<InventoryItemStatementResult | null>(null);
@@ -172,7 +185,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
   }, [effectiveBranchFilter, view, partySide, inventoryItemType, selectorContextKey]);
 
   const load = useCallback(async () => {
-    if (!effectiveBranchFilter) {
+    if (summaryBranchIds.length === 0) {
       setTb([]); setTbSummary(null); setGl([]); setIncome(null); setSheet(null);
       setArAging([]); setApAging([]); setAgingSummary(null); setCashFlow([]); setPartyStmt(null); setTreasuryStmt(null); setInventoryStmt(null);
       return;
@@ -183,7 +196,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
       || view === 'treasury_statement'
       || view === 'inventory_movement'
       || view === 'party_statement';
-    if (selectorDependentView && loadedSelectorContextKey !== selectorContextKey) {
+    if (selectorDependentView && (!effectiveBranchFilter || loadedSelectorContextKey !== selectorContextKey)) {
       return;
     }
 
@@ -195,11 +208,18 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
       const safeFrom = allowed.from;
       const safeTo = allowed.to;
       if (view === 'trial_balance') {
-        const { data } = await api.reporting.getTrialBalance({
-          p_branch_id: effectiveBranchFilter,
-          p_to_date: safeTo,
-        });
-        const rows = (data as TrialBalanceRow[]) || [];
+        const results = await Promise.all(summaryBranchIds.map(async (branchId) => {
+          const { data } = await api.reporting.getTrialBalance({
+            p_branch_id: branchId,
+            p_to_date: safeTo,
+          });
+          return ((data as TrialBalanceRow[]) || []).map((row) => ({
+            ...row,
+            branch_id: branchId,
+            branch_name: branchName(branchId),
+          }));
+        }));
+        const rows = results.flat();
         const totals = rows.reduce(
           (acc, row) => ({
             debit: acc.debit + Number(row.debit || 0),
@@ -245,23 +265,73 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
         });
         setInventoryStmt((data as InventoryItemStatementResult) || null);
       } else if (view === 'income') {
-        const { data } = await api.reporting.getIncomeStatement( { p_branch_id: effectiveBranchFilter, p_from_date: safeFrom, p_to_date: safeTo });
-        setIncome((data as IncomeStatementResult) || null);
+        const results = await Promise.all(summaryBranchIds.map((branchId) =>
+          api.reporting.getIncomeStatement({ p_branch_id: branchId, p_from_date: safeFrom, p_to_date: safeTo })
+        ));
+        const rows = results.map((result) => result.data as IncomeStatementResult | null).filter(Boolean) as IncomeStatementResult[];
+        setIncome(rows.reduce<IncomeStatementResult>((acc, row) => ({
+          revenue: acc.revenue + Number(row.revenue || 0),
+          discount: acc.discount + Number(row.discount || 0),
+          net_revenue: acc.net_revenue + Number(row.net_revenue || 0),
+          cogs: acc.cogs + Number(row.cogs || 0),
+          gross_profit: acc.gross_profit + Number(row.gross_profit || 0),
+          expenses: acc.expenses + Number(row.expenses || 0),
+          net_income: acc.net_income + Number(row.net_income || 0),
+        }), { revenue: 0, discount: 0, net_revenue: 0, cogs: 0, gross_profit: 0, expenses: 0, net_income: 0 }));
       } else if (view === 'balance_sheet') {
-        const { data } = await api.reporting.getBalanceSheet( { p_branch_id: effectiveBranchFilter, p_as_of: safeTo });
-        setSheet((data as BalanceSheetResult) || null);
+        const results = await Promise.all(summaryBranchIds.map((branchId) =>
+          api.reporting.getBalanceSheet({ p_branch_id: branchId, p_as_of: safeTo })
+        ));
+        const rows = results.map((result) => result.data as BalanceSheetResult | null).filter(Boolean) as BalanceSheetResult[];
+        setSheet(rows.reduce<BalanceSheetResult>((acc, row) => ({
+          assets: acc.assets + Number(row.assets || 0),
+          liabilities: acc.liabilities + Number(row.liabilities || 0),
+          capital: acc.capital + Number(row.capital || 0),
+          retained: acc.retained + Number(row.retained || 0),
+          net_income: acc.net_income + Number(row.net_income || 0),
+          equity: acc.equity + Number(row.equity || 0),
+          balanced: acc.balanced && row.balanced,
+        }), { assets: 0, liabilities: 0, capital: 0, retained: 0, net_income: 0, equity: 0, balanced: true }));
       } else if (view === 'ar_aging') {
-        const { data } = await api.reporting.getArAging( { p_branch_id: effectiveBranchFilter, p_as_of: safeTo });
-        setArAging((data as ArAgingRow[]) || []);
+        const results = await Promise.all(summaryBranchIds.map(async (branchId) => {
+          const { data } = await api.reporting.getArAging({ p_branch_id: branchId, p_as_of: safeTo });
+          return ((data as ArAgingRow[]) || []).map((row) => ({ ...row, branch_id: branchId, branch_name: branchName(branchId) }));
+        }));
+        setArAging(results.flat());
       } else if (view === 'ap_aging') {
-        const { data } = await api.reporting.getApAging( { p_branch_id: effectiveBranchFilter, p_as_of: safeTo });
-        setApAging((data as ApAgingRow[]) || []);
+        const results = await Promise.all(summaryBranchIds.map(async (branchId) => {
+          const { data } = await api.reporting.getApAging({ p_branch_id: branchId, p_as_of: safeTo });
+          return ((data as ApAgingRow[]) || []).map((row) => ({ ...row, branch_id: branchId, branch_name: branchName(branchId) }));
+        }));
+        setApAging(results.flat());
       } else if (view === 'aging_summary') {
-        const { data } = await api.reporting.getAgingSummary( { p_branch_id: effectiveBranchFilter, p_as_of: safeTo });
-        setAgingSummary((data as AgingSummaryResult) || null);
+        const results = await Promise.all(summaryBranchIds.map((branchId) =>
+          api.reporting.getAgingSummary({ p_branch_id: branchId, p_as_of: safeTo })
+        ));
+        const rows = results.map((result) => result.data as AgingSummaryResult | null).filter(Boolean) as AgingSummaryResult[];
+        setAgingSummary(rows.reduce<AgingSummaryResult>((acc, row) => ({
+          as_of: safeTo,
+          ar_open: acc.ar_open + Number(row.ar_open || 0),
+          ap_open: acc.ap_open + Number(row.ap_open || 0),
+          ar: {
+            '0_30': acc.ar['0_30'] + Number(row.ar?.['0_30'] || 0),
+            '31_60': acc.ar['31_60'] + Number(row.ar?.['31_60'] || 0),
+            '61_90': acc.ar['61_90'] + Number(row.ar?.['61_90'] || 0),
+            '90_plus': acc.ar['90_plus'] + Number(row.ar?.['90_plus'] || 0),
+          },
+          ap: {
+            '0_30': acc.ap['0_30'] + Number(row.ap?.['0_30'] || 0),
+            '31_60': acc.ap['31_60'] + Number(row.ap?.['31_60'] || 0),
+            '61_90': acc.ap['61_90'] + Number(row.ap?.['61_90'] || 0),
+            '90_plus': acc.ap['90_plus'] + Number(row.ap?.['90_plus'] || 0),
+          },
+        }), { as_of: safeTo, ar_open: 0, ap_open: 0, ar: { '0_30': 0, '31_60': 0, '61_90': 0, '90_plus': 0 }, ap: { '0_30': 0, '31_60': 0, '61_90': 0, '90_plus': 0 } }));
       } else if (view === 'cash_flow') {
-        const { data } = await api.reporting.getCashFlow( { p_branch_id: effectiveBranchFilter, p_from_date: safeFrom, p_to_date: safeTo });
-        setCashFlow((data as CashFlowRow[]) || []);
+        const results = await Promise.all(summaryBranchIds.map(async (branchId) => {
+          const { data } = await api.reporting.getCashFlow({ p_branch_id: branchId, p_from_date: safeFrom, p_to_date: safeTo });
+          return ((data as CashFlowRow[]) || []).map((row) => ({ ...row, branch_id: branchId, branch_name: branchName(branchId) }));
+        }));
+        setCashFlow(results.flat());
       } else if (view === 'party_statement') {
         const { data } = await api.reporting.getPartyStatement( {
           p_branch_id: effectiveBranchFilter,
@@ -275,7 +345,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
     } finally {
       setLoading(false);
     }
-  }, [effectiveBranchFilter, view, to, accountId, from, partySide, partyId, treasuryId, inventoryItemType, inventoryItemId, warehouseId, history.unlimited, loadedSelectorContextKey, selectorContextKey]);
+  }, [effectiveBranchFilter, branchScope.scopeKey, branchName, view, to, accountId, from, partySide, partyId, treasuryId, inventoryItemType, inventoryItemId, warehouseId, history.unlimited, loadedSelectorContextKey, selectorContextKey]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -501,6 +571,14 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
         </div>
       )}
 
+      {branchScope.isAggregate && (
+        <div className="mb-3 rounded-xl border border-ui-primary/25 bg-ui-primary-soft px-4 py-3 text-sm text-ui-text">
+          {isAr
+            ? 'الملخصات المالية تجمع الفروع المحددة. التقارير التي تعتمد حسابًا أو خزنة أو صنفًا أو طرفًا محددًا تعمل على فرع الإجراء المختار أعلى الشاشة.'
+            : 'Financial summaries combine selected branches. Reports tied to a specific account, treasury, item, or party use the action branch selected above.'}
+        </div>
+      )}
+
       <DesignPanel testId="financial-reports-filters" className="ui-accent-finance">
         <div className="flex flex-col gap-4">
           {!hideViewPicker && (
@@ -577,6 +655,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ui-border">
+                  {branchScope.isAggregate && <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('branch')}</th>}
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('accountCode')}</th>
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('accountName')}</th>
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('accountType')}</th>
@@ -586,9 +665,10 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
                 </tr>
               </thead>
               <tbody>
-                {tb.length === 0 && <tr><td colSpan={6} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
+                {tb.length === 0 && <tr><td colSpan={branchScope.isAggregate ? 7 : 6} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
                 {tb.map((r) => (
-                  <tr key={r.code} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                  <tr key={`${r.branch_id}:${r.code}`} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                    {branchScope.isAggregate && <td className="px-4 py-3 font-semibold text-ui-muted">{r.branch_name}</td>}
                     <td className="px-4 py-3 font-mono text-ui-text">{r.code}</td>
                     <td className="px-4 py-3 text-ui-text">{isAr ? r.name : (r.name_en || r.name)}</td>
                     <td className="px-4 py-3 text-ui-subtle dark:text-ui-subtle">{r.account_type}</td>
@@ -599,7 +679,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
                 ))}
                 {tb.length > 0 && (
                   <tr className="bg-ui-page-alt/60 font-semibold text-ui-text">
-                    <td className="px-4 py-3" colSpan={3}>{t('total')}</td>
+                    <td className="px-4 py-3" colSpan={branchScope.isAggregate ? 4 : 3}>{t('total')}</td>
                     <td className="px-4 py-3 text-end">{formatCurrency(tbTotals.debit, currency, lang)}</td>
                     <td className="px-4 py-3 text-end">{formatCurrency(tbTotals.credit, currency, lang)}</td>
                     <td className="px-4 py-3 text-end">{formatCurrency(tbTotals.debit - tbTotals.credit, currency, lang)}</td>
@@ -771,6 +851,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ui-border">
+                  {branchScope.isAggregate && <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('branch')}</th>}
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('customer')}</th>
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('phone')}</th>
                   <th className="px-4 py-3 text-end font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('openBalance')}</th>
@@ -781,9 +862,10 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
                 </tr>
               </thead>
               <tbody>
-                {arAging.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
+                {arAging.length === 0 && <tr><td colSpan={branchScope.isAggregate ? 8 : 7} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
                 {arAging.map((r) => (
-                  <tr key={r.customer_id} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                  <tr key={`${r.branch_id}:${r.customer_id}`} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                    {branchScope.isAggregate && <td className="px-4 py-3 font-semibold text-ui-muted">{r.branch_name}</td>}
                     <td className="px-4 py-3 font-medium text-ui-text">{r.name}</td>
                     <td className="px-4 py-3 text-ui-subtle dark:text-ui-subtle">{r.phone || '-'}</td>
                     <td className="px-4 py-3 text-end font-semibold text-ui-danger">{formatCurrency(r.open_amount, currency, lang)}</td>
@@ -803,6 +885,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ui-border">
+                  {branchScope.isAggregate && <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('branch')}</th>}
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('supplier')}</th>
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('phone')}</th>
                   <th className="px-4 py-3 text-end font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('openBalance')}</th>
@@ -813,9 +896,10 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
                 </tr>
               </thead>
               <tbody>
-                {apAging.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
+                {apAging.length === 0 && <tr><td colSpan={branchScope.isAggregate ? 8 : 7} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
                 {apAging.map((r) => (
-                  <tr key={r.supplier_id} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                  <tr key={`${r.branch_id}:${r.supplier_id}`} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                    {branchScope.isAggregate && <td className="px-4 py-3 font-semibold text-ui-muted">{r.branch_name}</td>}
                     <td className="px-4 py-3 font-medium text-ui-text">{r.name}</td>
                     <td className="px-4 py-3 text-ui-subtle dark:text-ui-subtle">{r.phone || '-'}</td>
                     <td className="px-4 py-3 text-end font-semibold text-ui-danger">{formatCurrency(r.open_amount, currency, lang)}</td>
@@ -880,6 +964,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-ui-border">
+                  {branchScope.isAggregate && <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('branch')}</th>}
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('accountName')}</th>
                   <th className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('accountType')}</th>
                   <th className="px-4 py-3 text-end font-semibold text-ui-muted text-xs uppercase tracking-wider">{t('inflow')}</th>
@@ -888,9 +973,10 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
                 </tr>
               </thead>
               <tbody>
-                {cashFlow.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
+                {cashFlow.length === 0 && <tr><td colSpan={branchScope.isAggregate ? 6 : 5} className="px-4 py-8 text-center text-ui-subtle">{t('noData')}</td></tr>}
                 {cashFlow.map((r) => (
-                  <tr key={r.treasury_account_id} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                  <tr key={`${r.branch_id}:${r.treasury_account_id}`} className="border-b border-ui-border hover:bg-ui-page-alt/50">
+                    {branchScope.isAggregate && <td className="px-4 py-3 font-semibold text-ui-muted">{r.branch_name}</td>}
                     <td className="px-4 py-3 font-medium text-ui-text">{r.account_name}</td>
                     <td className="px-4 py-3 text-ui-subtle dark:text-ui-subtle">{r.account_type === 'cash' ? t('cash') : t('bank')}</td>
                     <td className="px-4 py-3 text-end text-ui-success dark:text-ui-success">{formatCurrency(r.inflow, currency, lang)}</td>

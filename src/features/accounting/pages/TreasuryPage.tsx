@@ -13,6 +13,7 @@ import { Modal } from '@/components/Modal';
 import { formatCurrency, formatDateTime } from '@/lib/format';
 import { logAudit } from '@/lib/audit';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { isAdminRole } from '@/lib/permissions';
@@ -62,7 +63,9 @@ interface TreasuryDayCloseRow {
   movement_details: TreasuryMovementRow[];
 }
 
-interface TreasuryDailyDisplayRow extends TreasuryDayCloseRow {
+interface ScopedTreasuryDayCloseRow extends TreasuryDayCloseRow { branch_id: string; }
+
+interface TreasuryDailyDisplayRow extends ScopedTreasuryDayCloseRow {
   opening_balance: number;
   day_net: number;
   closing_balance: number;
@@ -73,6 +76,7 @@ export function TreasuryPage() {
   const { show } = useToast();
   const { user } = useAuth();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const can = useCan();
   const history = useHistoryAccess();
   const { effectiveSettings } = useSettings();
@@ -83,7 +87,7 @@ export function TreasuryPage() {
   const [accounts, setAccounts] = useState<TreasurySource[]>([]);
   const [loading, setLoading] = useState(true);
   const [adminBranchFilter, setAdminBranchFilter] = useState('');
-  const [dayCloses, setDayCloses] = useState<TreasuryDayCloseRow[]>([]);
+  const [dayCloses, setDayCloses] = useState<ScopedTreasuryDayCloseRow[]>([]);
   const [treasuryView, setTreasuryView] = useState<TreasuryScopeView>('branch');
 
   useEffect(() => {
@@ -94,14 +98,15 @@ export function TreasuryPage() {
     setAdminBranchFilter(preferred);
   }, [user?.role, user?.branch_id, branches, adminBranchFilter]);
 
-  const effectiveBranchFilter = isAdminRole(user?.role) ? (adminBranchFilter || null) : branchFilter;
+  const effectiveBranchFilter = branchFilter || (isAdminRole(user?.role) ? (adminBranchFilter || null) : null);
   const currency = effectiveSettings(effectiveBranchFilter)?.currency || 'EGP';
   const mainTreasury = balances.find((b) => b.scope === 'organization' && b.kind === 'main_cash');
   const mainTreasuryBalance = Number(mainTreasury?.balance || 0);
+  const scopedBranchList = branchScope.selectedBranchIds.join(',');
   const transactionScope = treasuryView === 'main'
     ? (mainTreasury?.id ? `from_account_id.eq.${mainTreasury.id},to_account_id.eq.${mainTreasury.id}` : undefined)
-    : (effectiveBranchFilter
-      ? `branch_id.eq.${effectiveBranchFilter},from_branch_id.eq.${effectiveBranchFilter},to_branch_id.eq.${effectiveBranchFilter}`
+    : (branchScope.selectedBranchIds.length > 0
+      ? `branch_id.in.(${scopedBranchList}),from_branch_id.in.(${scopedBranchList}),to_branch_id.in.(${scopedBranchList})`
       : undefined);
   const { rows: transactions, loading: txLoading, error: txError, total: txTotal, hasMore: txHasMore, loadMore: loadMoreTx, loadingMore: loadingMoreTx, refresh: reloadTx } = usePaginatedRows<TreasuryTransaction>({
     table: 'treasury_transactions',
@@ -110,7 +115,7 @@ export function TreasuryPage() {
     or: transactionScope,
     min: history.minIso ? { column: 'created_at', value: history.minIso } : undefined,
     pageSize: 100,
-    enabled: treasuryView === 'main' ? !!mainTreasury?.id : !!effectiveBranchFilter,
+    enabled: treasuryView === 'main' ? !!mainTreasury?.id : branchScope.selectedBranchIds.length > 0,
   });
 
   const [modal, setModal] = useState<ModalType>(null);
@@ -120,35 +125,49 @@ export function TreasuryPage() {
   const loadOverview = useCallback(async () => {
     setLoading(true);
     try {
-      if (effectiveBranchFilter) {
-        const { data } = await api.accounting.getAccessibleTreasuryAccounts({
-          p_branch_id: effectiveBranchFilter,
-        });
-        const sourceRows = (data as TreasurySource[]) || [];
-        setBalances(sourceRows);
-        setAccounts(sourceRows);
-        const { data: closeData } = await api.accounting.getBranchTreasuryDayCloseReconciliation({
-          p_branch_id: effectiveBranchFilter,
-          p_limit: 60,
-        });
-        const closePayload = closeData as { success?: boolean; rows?: TreasuryDayCloseRow[] } | null;
-        setDayCloses(closePayload?.success ? (closePayload.rows || []) : []);
-      } else {
+      if (branchScope.selectedBranchIds.length === 0) {
         setBalances([]);
         setAccounts([]);
         setDayCloses([]);
+        return;
       }
+
+      const overviewResults = await Promise.all(branchScope.selectedBranchIds.map(async (branchId) => {
+        const [accountsResult, closeResult] = await Promise.all([
+          api.accounting.getAccessibleTreasuryAccounts({ p_branch_id: branchId }),
+          api.accounting.getBranchTreasuryDayCloseReconciliation({ p_branch_id: branchId, p_limit: 60 }),
+        ]);
+        const closePayload = closeResult.data as { success?: boolean; rows?: TreasuryDayCloseRow[] } | null;
+        return {
+          branchId,
+          sources: (accountsResult.data as TreasurySource[]) || [],
+          closes: closePayload?.success ? (closePayload.rows || []) : [],
+        };
+      }));
+
+      const sourceMap = new Map<string, TreasurySource>();
+      for (const result of overviewResults) {
+        for (const source of result.sources) sourceMap.set(source.id, source);
+      }
+      setBalances([...sourceMap.values()]);
+      setDayCloses(
+        overviewResults
+          .flatMap((result) => result.closes.map((row) => ({ ...row, branch_id: result.branchId })))
+          .sort((a, b) => String(b.closed_at).localeCompare(String(a.closed_at))),
+      );
+
+      const actionSources = overviewResults.find((result) => result.branchId === effectiveBranchFilter)?.sources || [];
+      setAccounts(actionSources);
     } finally {
       setLoading(false);
     }
-  }, [effectiveBranchFilter]);
+  }, [branchScope.scopeKey, branchScope.selectedBranchIds, effectiveBranchFilter]);
 
   useEffect(() => { void loadOverview(); }, [loadOverview]);
 
-  const openDayCloseDetail = async (row: TreasuryDayCloseRow) => {
-    if (!effectiveBranchFilter) return;
+  const openDayCloseDetail = async (row: ScopedTreasuryDayCloseRow) => {
     try {
-      const report = await fetchDayClosingReportServer(effectiveBranchFilter, row.business_date);
+      const report = await fetchDayClosingReportServer(row.branch_id, row.business_date);
       const html = buildA4DayClosingReportHtml(report, currency, lang);
       const w = window.open('', '_blank', 'width=1000,height=850');
       if (!w) {
@@ -209,8 +228,8 @@ export function TreasuryPage() {
     reloadTx();
   };
 
-  const localAccounts = accounts.filter(
-    (a) => a.scope === 'branch' && a.branch_id === effectiveBranchFilter,
+  const localAccounts = balances.filter(
+    (a) => a.scope === 'branch' && branchScope.selectedBranchSet.has(a.branch_id),
   );
   const totalCash = localAccounts.filter((b) => b.account_type === 'cash').reduce((s, b) => s + Number(b.balance), 0);
   const totalBank = localAccounts.filter((b) => b.account_type === 'bank').reduce((s, b) => s + Number(b.balance), 0);

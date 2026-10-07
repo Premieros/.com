@@ -1,5 +1,7 @@
 import { type ChangeEvent, type ReactNode, isValidElement, useMemo, useRef, useState } from 'react';
 import { downloadTemplate, exportToExcel } from '@/lib/excel';
+import { BranchBadge } from './BranchBadge';
+import { useBranchScope } from '@/lib/branchScope';
 
 export interface Column<T> {
   key: string;
@@ -78,8 +80,8 @@ function filterValueForRow<T>(row: T, column: Column<T>): string {
 }
 
 export function DataTable<T extends { id?: string }>({
-  columns,
-  data,
+  columns: inputColumns,
+  data: inputData,
   loading,
   error,
   emptyMessage,
@@ -98,6 +100,52 @@ export function DataTable<T extends { id?: string }>({
   onImportFile,
   importAccept = '.xlsx,.xls,.csv',
 }: DataTableProps<T>) {
+  const branchScope = useBranchScope();
+  const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
+  const branchNameById = useMemo(
+    () => new Map(branchScope.branches.map((branch) => [
+      branch.id,
+      isRtl ? branch.name : (branch.name_en || branch.name),
+    ])),
+    [branchScope.branches, isRtl],
+  );
+  const hasBranchRows = useMemo(
+    () => inputData.some((row) => typeof (row as Record<string, unknown>).branch_id === 'string'),
+    [inputData],
+  );
+  const hasExplicitBranchColumn = inputColumns.some((column) =>
+    ['branch', 'branch_id', 'branch_name', '__branch'].includes(column.key.toLowerCase()),
+  );
+  const columns = useMemo<Column<T>[]>(() => {
+    if (!hasBranchRows || hasExplicitBranchColumn || branchScope.branches.length <= 1) return inputColumns;
+    const branchColumn: Column<T> = {
+      key: '__branch',
+      header: isRtl ? 'الفرع' : 'Branch',
+      render: (row) => {
+        const branchId = (row as Record<string, unknown>).branch_id;
+        const label = typeof branchId === 'string' ? branchNameById.get(branchId) : null;
+        return <BranchBadge name={label || (typeof branchId === 'string' ? branchId : null)} />;
+      },
+      filterValue: (row) => {
+        const branchId = (row as Record<string, unknown>).branch_id;
+        return typeof branchId === 'string' ? (branchNameById.get(branchId) || branchId) : '';
+      },
+      exportValue: (row) => {
+        const branchId = (row as Record<string, unknown>).branch_id;
+        return typeof branchId === 'string' ? (branchNameById.get(branchId) || branchId) : '';
+      },
+    };
+    return [branchColumn, ...inputColumns];
+  }, [branchNameById, branchScope.branches.length, hasBranchRows, hasExplicitBranchColumn, inputColumns, isRtl]);
+
+  const data = useMemo(() => {
+    if (!hasBranchRows || branchScope.selectedBranchIds.length === 0) return inputData;
+    return inputData.filter((row) => {
+      const branchId = (row as Record<string, unknown>).branch_id;
+      return typeof branchId !== 'string' || branchScope.selectedBranchSet.has(branchId);
+    });
+  }, [branchScope.scopeKey, branchScope.selectedBranchIds.length, branchScope.selectedBranchSet, hasBranchRows, inputData]);
+
   const storageKey = tableId ? `datatable:${tableId}:hidden-columns` : null;
   const [filters, setFilters] = useState<Record<string, ColumnFilterState>>({});
   const [filterSearches, setFilterSearches] = useState<Record<string, string>>({});
@@ -114,7 +162,6 @@ export function DataTable<T extends { id?: string }>({
     }
   });
 
-  const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
   const labels = isRtl
     ? {
         filter: 'فلتر', columns: 'الأعمدة', clear: 'مسح كل الفلاتر', clearColumn: 'مسح فلتر العمود',
@@ -179,7 +226,12 @@ export function DataTable<T extends { id?: string }>({
   );
 
   const applyCurrentViewToRows = (source: T[]): T[] => {
-    let next = source;
+    let next = hasBranchRows
+      ? source.filter((row) => {
+          const branchId = (row as Record<string, unknown>).branch_id;
+          return typeof branchId !== 'string' || branchScope.selectedBranchSet.has(branchId);
+        })
+      : source;
     if (enableColumnFilters) {
       const activeFilters = Object.entries(filters).filter(([, state]) => state.query.trim() || state.selectedValues !== null);
       if (activeFilters.length > 0) {

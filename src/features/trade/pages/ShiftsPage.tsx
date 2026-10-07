@@ -6,6 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useSettings } from '@/context/SettingsContext';
@@ -73,6 +74,7 @@ export function ShiftsPage() {
   const { show } = useToast();
   const { user } = useAuth();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const can = useCan();
   const history = useHistoryAccess();
   const isAr = lang === 'ar';
@@ -81,7 +83,7 @@ export function ShiftsPage() {
     table: 'shifts',
     select: 'id, branch_id, cashier_id, opened_at, closed_at, opening_amount, expected_amount, actual_amount, difference, status, notes, created_at',
     order: { column: 'opened_at', ascending: false },
-    branch_id: branchFilter,
+    branch_ids: branchScope.selectedBranchIds,
     or: history.minIso ? `opened_at.gte.${history.minIso},status.eq.open` : undefined,
     pageSize: 100,
   });

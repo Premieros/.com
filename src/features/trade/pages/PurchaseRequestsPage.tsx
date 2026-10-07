@@ -6,6 +6,7 @@ import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useAuth } from '@/context/AuthContext';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useToast } from '@/components/Toast';
 import { DesignSurface, DesignPageHeader, DesignSearch, DesignPanel } from '@/components/design';
@@ -45,6 +46,7 @@ export function PurchaseRequestsPage() {
   const { t, lang } = useLanguage();
   const { user } = useAuth();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const history = useHistoryAccess();
   const { show } = useToast();
   const can = useCan();
@@ -54,7 +56,7 @@ export function PurchaseRequestsPage() {
     table: 'purchase_requests',
     select: '*, supplier:suppliers(name)',
     order: { column: 'created_at', ascending: false },
-    branch_id: branchFilter,
+    branch_ids: branchScope.selectedBranchIds,
     or: history.minIso ? `created_at.gte.${history.minIso},status.in.(draft,submitted,approved)` : undefined,
     pageSize: 100,
   });
@@ -91,7 +93,7 @@ export function PurchaseRequestsPage() {
   const filtered = items.filter((r) => !search || r.request_number.toLowerCase().includes(search.toLowerCase()) || (r.supplier?.name || '').toLowerCase().includes(search.toLowerCase()));
 
   const openAdd = () => {
-    setForm({ branch_id: user?.branch_id || '', supplier_id: '', priority: 'normal', expected_date: '', notes: '' });
+    setForm({ branch_id: branchFilter || user?.branch_id || '', supplier_id: '', priority: 'normal', expected_date: '', notes: '' });
     setLineItems([{ ...EMPTY_LINE }]);
     setModalOpen(true);
   };

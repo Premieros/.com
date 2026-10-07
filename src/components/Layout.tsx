@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity, AlertTriangle, ArrowLeft, ArrowLeftRight, ArrowRight, BarChart3, BadgeDollarSign, Boxes, BookOpenText, Building2, Calculator, ChefHat,
@@ -12,8 +12,7 @@ import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import { useCan, isAdminRole } from '../lib/permissions';
 import { useBranchFilter } from '../lib/useBranchFilter';
-import { useActiveBranchId } from '../lib/activeBranch';
-import { useBranches } from '@/hooks/useBranches';
+import { BranchScopeSelector } from './BranchScopeSelector';
 import { useActiveOrderCount } from '../features/pos/hooks/useActiveOrderCount';
 import { Logo } from './Logo';
 import { ApprovalInbox } from './ApprovalInbox';
@@ -27,6 +26,7 @@ import { ReturnContextBanner } from '@/core/guard/ReturnContextBanner';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
 import { businessGroupLabel, businessMenuLabel } from '@/core/organizations/businessRuntime';
 import { moduleForRoute } from '@/core/modules/module.config';
+import { useBranchScope } from '@/lib/branchScope';
 
 const ICONS: Record<MenuIcon, ReactNode> = {
   dashboard: <LayoutDashboard className="h-5 w-5" />,
@@ -104,6 +104,7 @@ export function Layout({ children }: { children: ReactNode }) {
   });
   const ar = lang === 'ar';
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const { canAccessModule, canAccessPath, runtime } = useOrganizationModules();
   const isPosRoute = location.pathname === APP_ROUTES.pos || location.pathname.startsWith(`${APP_ROUTES.pos}/`);
   const orderTrackingEnabled = canAccessModule('pos') && canAccessPath(APP_ROUTES.floorPlan) && !isPosRoute;
@@ -112,33 +113,9 @@ export function Layout({ children }: { children: ReactNode }) {
   const isAdmin = isAdminRole(user?.role);
   const canViewFloorPlan = can('floor_plan.view') && canAccessPath(APP_ROUTES.floorPlan);
   const canOpenSettings = can('settings.manage');
-  const { branches } = useBranches();
-  const [, setActiveBranchId] = useActiveBranchId();
-  const [branchMenuOpen, setBranchMenuOpen] = useState(false);
-  const branchMenuRef = useRef<HTMLDivElement>(null);
-  const canSelectBranch = branches.length > 1;
-  const effectiveBranch = branchFilter ?? null;
-  const activeBranch = branches.find((b) => b.id === effectiveBranch) ?? null;
-  const branchLabel = activeBranch
-    ? (lang === 'ar' ? activeBranch.name : activeBranch.name_en || activeBranch.name)
-    : (ar ? 'اختر الفرع' : 'Select branch');
+
   const showBackButton = location.pathname !== APP_ROUTES.dashboard;
   const fullWidthContent = location.pathname === APP_ROUTES.dashboard;
-
-  useEffect(() => {
-    if (!branchMenuOpen) return;
-    const onPointerDown = (e: MouseEvent | TouchEvent) => {
-      if (branchMenuRef.current && !branchMenuRef.current.contains(e.target as Node)) {
-        setBranchMenuOpen(false);
-      }
-    };
-    document.addEventListener('mousedown', onPointerDown);
-    document.addEventListener('touchstart', onPointerDown);
-    return () => {
-      document.removeEventListener('mousedown', onPointerDown);
-      document.removeEventListener('touchstart', onPointerDown);
-    };
-  }, [branchMenuOpen]);
 
   const visibleItems = useMemo(() => {
     const order = new Map(runtime.navigation.order.map((id, index) => [id, index]));
@@ -242,31 +219,8 @@ export function Layout({ children }: { children: ReactNode }) {
           <CommandPaletteTrigger />
         </div>
 
-        <div className="relative flex items-center gap-1.5 sm:gap-2" ref={branchMenuRef}>
-          <div className="relative">
-            <button
-              data-testid="branch-indicator"
-              type="button"
-              onClick={canSelectBranch ? () => setBranchMenuOpen((v) => !v) : undefined}
-              aria-expanded={canSelectBranch ? branchMenuOpen : undefined}
-              aria-label={ar ? 'الفرع النشط' : 'Active branch'}
-              className={`flex items-center gap-2 rounded-xl border border-ui-border px-3 py-1.5 text-xs font-semibold text-ui-text transition-colors ${canSelectBranch ? 'hover:bg-ui-page-alt' : 'cursor-default'}`}
-            >
-              <Building2 className="h-4 w-4 shrink-0 text-ui-primary" />
-              <span className="max-w-[140px] truncate">{branchLabel}</span>
-              {canSelectBranch && <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-ui-muted transition-transform duration-150 ${branchMenuOpen ? 'rotate-180' : ''}`} />}
-            </button>
-            {canSelectBranch && branchMenuOpen && (
-              <div data-testid="branch-menu" className="absolute end-0 top-full z-50 mt-2 w-56 overflow-hidden rounded-xl border border-ui-border bg-ui-surface py-1 shadow-ui-lg animate-slide-down">
-                {branches.map((b) => (
-                  <button key={b.id} data-testid={`branch-option-${b.id}`} type="button" onClick={() => { setActiveBranchId(b.id); setBranchMenuOpen(false); }} className={`flex w-full items-center gap-2 px-3 py-2 text-sm transition-colors ${effectiveBranch === b.id ? 'bg-ui-primary-soft font-bold text-ui-primary' : 'text-ui-muted hover:bg-ui-page-alt'}`}>
-                    <span className="truncate">{lang === 'ar' ? b.name : (b.name_en || b.name)}</span>
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
+        <div className="relative flex items-center gap-1.5 sm:gap-2">
+          <BranchScopeSelector compact />
           <div className="hidden sm:flex"><OfflineStatusIndicator /></div>
           <ApprovalInbox ar={ar} />
           {canViewFloorPlan && (
@@ -335,27 +289,7 @@ export function Layout({ children }: { children: ReactNode }) {
               </div>
             </div>
 
-            <label className="grid gap-1">
-              <span className="text-[11px] font-bold text-ui-subtle">
-                {ar ? 'الفرع النشط' : 'Active branch'}
-              </span>
-              <select
-                data-testid="mobile-branch-select"
-                value={effectiveBranch || ''}
-                onChange={(event) => {
-                  if (event.target.value) setActiveBranchId(event.target.value);
-                }}
-                disabled={branches.length === 0 || !canSelectBranch}
-                className="min-h-11 w-full rounded-xl border border-ui-border bg-ui-page px-3 text-sm font-semibold text-ui-text outline-none focus:border-ui-primary disabled:cursor-default disabled:opacity-70"
-              >
-                {!effectiveBranch && <option value="">{ar ? 'اختر الفرع' : 'Select branch'}</option>}
-                {branches.map((branch) => (
-                  <option key={branch.id} value={branch.id}>
-                    {lang === 'ar' ? branch.name : (branch.name_en || branch.name)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <BranchScopeSelector mobile />
 
             <div className="grid grid-cols-3 gap-2">
               <button
@@ -445,6 +379,41 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <div data-testid="app-content-shell" className={`min-h-screen pt-[64px] transition-all duration-200 ${desktopSidebarHidden ? 'lg:ms-0' : 'lg:ms-[260px]'}`}>
         <ReturnContextBanner />
+        {branchScope.isAggregate && (
+          <div data-testid="aggregate-branch-action-banner" className="border-b border-ui-warning/30 bg-ui-warning/10 px-4 py-2.5 sm:px-6 lg:px-7">
+            <div className="mx-auto flex max-w-[1600px] flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="min-w-0">
+                <p className="text-xs font-black text-ui-text">
+                  {ar
+                    ? `عرض مجمع لـ ${branchScope.selectedBranchIds.length} فروع`
+                    : `Combined view for ${branchScope.selectedBranchIds.length} branches`}
+                </p>
+                <p className="text-[11px] font-semibold text-ui-muted">
+                  {ar
+                    ? 'حدد فرع الإجراء قبل الإنشاء أو التعديل أو الحذف. العرض يبقى مجمعًا للفروع المحددة.'
+                    : 'Choose the action branch before create, edit, or delete. The view remains combined for selected branches.'}
+                </p>
+              </div>
+              <label className="flex shrink-0 items-center gap-2">
+                <span className="text-[11px] font-black text-ui-warning">{ar ? 'فرع الإجراء' : 'Action branch'}</span>
+                <select
+                  data-testid="aggregate-action-branch-select"
+                  value={branchScope.actionBranchId || ''}
+                  onChange={(event) => branchScope.setActionBranchId(event.target.value)}
+                  className="min-h-9 min-w-[180px] rounded-xl border border-ui-warning/40 bg-ui-surface px-3 text-xs font-black text-ui-text outline-none focus:border-ui-primary"
+                >
+                  {branchScope.organizationBranches
+                    .filter((branch) => branchScope.selectedBranchSet.has(branch.id))
+                    .map((branch) => (
+                      <option key={branch.id} value={branch.id}>
+                        {lang === 'ar' ? branch.name : branch.name_en || branch.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            </div>
+          </div>
+        )}
         <main data-testid="app-main" className="min-h-[calc(100vh-64px)] bg-ui-page p-4 sm:p-6 lg:p-7">
           <div
             data-testid="design-content-surface"

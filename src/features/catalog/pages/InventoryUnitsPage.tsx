@@ -14,6 +14,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { logAudit } from '@/lib/audit';
 import { formatNumber } from '@/lib/format';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
 import type { InventoryUnit } from '@/lib/types';
@@ -59,9 +60,10 @@ export function InventoryUnitsPage() {
   const { show } = useToast();
   const can = useCan();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const isAr = lang === 'ar';
   const { rows: items, loading, total, hasMore, loadMore, loadingMore, refresh: reloadItems } = usePaginatedRows<InventoryUnit>({
-    table: 'inventory_units', select: '*', order: { column: 'name', ascending: true }, branch_id: branchFilter,
+    table: 'inventory_units', select: '*', order: { column: 'name', ascending: true }, branch_ids: branchScope.selectedBranchIds,
     filters: [{ column: 'unit_type', value: 'manufactured' }], pageSize: 100,
   });
 

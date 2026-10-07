@@ -13,6 +13,7 @@ import { Modal } from '@/components/Modal';
 import { formatCurrency, formatDateTime, todayISO } from '@/lib/format';
 import { logAudit } from '@/lib/audit';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useCan } from '@/lib/permissions';
 import { isAdminRole } from '@/lib/permissions';
@@ -29,6 +30,7 @@ export function ReconciliationPage() {
   const { show } = useToast();
   const { user } = useAuth();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const history = useHistoryAccess();
   const can = useCan();
   const { effectiveSettings } = useSettings();
@@ -43,10 +45,10 @@ export function ReconciliationPage() {
     table: 'bank_reconciliations',
     select: '*, treasury_account:treasury_accounts(account_name, account_type)',
     order: { column: 'created_at', ascending: false },
-    branch_id: effectiveBranchFilter,
+    branch_ids: branchScope.selectedBranchIds,
     or: history.minIso ? `created_at.gte.${history.minIso},status.eq.open` : undefined,
     pageSize: 100,
-    enabled: !!effectiveBranchFilter,
+    enabled: branchScope.selectedBranchIds.length > 0,
   });
 
   const [createOpen, setCreateOpen] = useState(false);

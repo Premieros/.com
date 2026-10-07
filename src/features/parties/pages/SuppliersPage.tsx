@@ -18,6 +18,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { formatDate, formatCurrency } from '@/lib/format';
 import { logAudit } from '@/lib/audit';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
@@ -32,6 +33,7 @@ export function SuppliersPage() {
   const { show } = useToast();
   const can = useCan();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const { runtime } = useOrganizationModules();
   const supplierLabel = runtime.terminology.supplier[lang === 'ar' ? 'ar' : 'en'];
   const { guidedContext, completePrerequisiteAndReturn } = useGuidedWorkflow();
@@ -39,7 +41,7 @@ export function SuppliersPage() {
     table: 'suppliers',
     select: '*',
     order: { column: 'created_at', ascending: false },
-    branch_id: branchFilter,
+    branch_ids: branchScope.selectedBranchIds,
     pageSize: 100,
   });
   const [search, setSearch] = useState('');
@@ -60,7 +62,7 @@ export function SuppliersPage() {
   useEffect(() => {
     let cancelled = false;
     const loadOpenBalances = async () => {
-      const branchIds = branchFilter ? [branchFilter] : branches.map((branch) => branch.id);
+      const branchIds = branchScope.selectedBranchIds;
       if (!branchIds.length) {
         if (!cancelled) setOpenBalances({});
         return;
@@ -76,7 +78,7 @@ export function SuppliersPage() {
     };
     void loadOpenBalances();
     return () => { cancelled = true; };
-  }, [branchFilter, branches]);
+  }, [branchScope.scopeKey]);
 
   const balanceFor = (supplier: Supplier) => Number(openBalances[supplier.id] || 0);
   const filtered = items.filter((s) => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.phone?.includes(search));

@@ -13,6 +13,7 @@ const fetchRows = <T,>(query: unknown): Promise<T[]> =>
 
 export async function loadSalesByEmployeeRows(args: {
   branchId: string | null;
+  branchIds?: string[];
   fromTs: string;
   toExclusiveTs: string;
   filters: ReportFilters;
@@ -22,13 +23,15 @@ export async function loadSalesByEmployeeRows(args: {
     .select('branch_id, cashier_id, total, refunded_amount, users:users!fk_sales_cashier(full_name, email)')
     .gte('created_at', args.fromTs)
     .lt('created_at', args.toExclusiveTs);
-  if (args.branchId) q = q.eq('branch_id', args.branchId);
+  if (args.branchIds?.length) q = q.in('branch_id', args.branchIds);
+  else if (args.branchId) q = q.eq('branch_id', args.branchId);
   q = filterQ(q, args.filters, applySalesFilters);
   return fetchRows<Record<string, unknown>>(q);
 }
 
 export async function loadDetailedInvoiceRows(args: {
   branchId: string | null;
+  branchIds?: string[];
   fromTs: string;
   toExclusiveTs: string;
   filters: ReportFilters;
@@ -39,13 +42,15 @@ export async function loadDetailedInvoiceRows(args: {
     .gte('created_at', args.fromTs)
     .lt('created_at', args.toExclusiveTs)
     .order('created_at', { ascending: false });
-  if (args.branchId) q = q.eq('branch_id', args.branchId);
+  if (args.branchIds?.length) q = q.in('branch_id', args.branchIds);
+  else if (args.branchId) q = q.eq('branch_id', args.branchId);
   q = filterQ(q, args.filters, applySalesFilters);
   return fetchRows<Record<string, unknown>>(q);
 }
 
 export async function loadCashierPerformanceRows(args: {
   branchId: string | null;
+  branchIds?: string[];
   fromTs: string;
   toExclusiveTs: string;
 }): Promise<Record<string, unknown>[]> {
@@ -54,12 +59,14 @@ export async function loadCashierPerformanceRows(args: {
     .select('branch_id, cashier_id, warehouse_id, total, refunded_amount, payment_method, status, created_at, users:users!fk_sales_cashier(full_name, email)')
     .gte('created_at', args.fromTs)
     .lt('created_at', args.toExclusiveTs);
-  if (args.branchId) q = q.eq('branch_id', args.branchId);
+  if (args.branchIds?.length) q = q.in('branch_id', args.branchIds);
+  else if (args.branchId) q = q.eq('branch_id', args.branchId);
   return fetchRows<Record<string, unknown>>(q);
 }
 
 export async function loadReturnRows(args: {
   branchId: string | null;
+  branchIds?: string[];
   fromTs: string;
   toExclusiveTs: string;
 }): Promise<Record<string, unknown>[]> {
@@ -69,6 +76,7 @@ export async function loadReturnRows(args: {
     .gte('created_at', args.fromTs)
     .lt('created_at', args.toExclusiveTs)
     .or('refunded_amount.gt.0,status.in.(returned,refunded,cancelled)');
-  if (args.branchId) q = q.eq('branch_id', args.branchId);
+  if (args.branchIds?.length) q = q.in('branch_id', args.branchIds);
+  else if (args.branchId) q = q.eq('branch_id', args.branchId);
   return fetchRows<Record<string, unknown>>(q);
 }

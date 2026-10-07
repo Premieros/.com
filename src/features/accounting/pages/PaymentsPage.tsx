@@ -13,6 +13,7 @@ import { Modal } from '@/components/Modal';
 import { formatCurrency, formatDateTime } from '@/lib/format';
 import { logAudit } from '@/lib/audit';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useCan } from '@/lib/permissions';
 import { useSettings } from '@/context/SettingsContext';
@@ -20,17 +21,20 @@ import { usePaginatedRows } from '@/hooks/usePaginatedRows';
 import type { ArAgingRow, ApAgingRow, CustomerPayment, SupplierPayment, TreasurySource } from '@/lib/types';
 
 type Tab = 'ar' | 'ap';
+type ScopedArAgingRow = ArAgingRow & { branch_id: string };
+type ScopedApAgingRow = ApAgingRow & { branch_id: string };
 
 export function PaymentsPage() {
   const { t, lang } = useLanguage();
   const { show } = useToast();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const history = useHistoryAccess();
   const can = useCan();
   const { effectiveSettings } = useSettings();
   const [tab, setTab] = useState<Tab>('ar');
-  const [rows, setRows] = useState<ArAgingRow[]>([]);
-  const [apRows, setApRows] = useState<ApAgingRow[]>([]);
+  const [rows, setRows] = useState<ScopedArAgingRow[]>([]);
+  const [apRows, setApRows] = useState<ScopedApAgingRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const effectiveBranchFilter = branchFilter;
@@ -38,29 +42,29 @@ export function PaymentsPage() {
   const canUseMainTreasury = can('accounting.treasury.main_cash.pay') || can('accounting.treasury.transfer');
   const { rows: payments, loading: paymentsLoading, error: paymentsError, total: paymentsTotal, hasMore: paymentsHasMore, loadMore: loadMorePayments, loadingMore: loadingMorePayments, refresh: reloadPayments } = usePaginatedRows<CustomerPayment>({
     table: 'customer_payments',
-    select: 'id, amount, payment_method, reference_number, notes, created_at, customer:customers(name)',
+    select: 'id, branch_id, amount, payment_method, reference_number, notes, created_at, customer:customers(name)',
     order: { column: 'created_at', ascending: false },
-    branch_id: effectiveBranchFilter,
+    branch_ids: branchScope.selectedBranchIds,
     min: history.minIso ? { column: 'created_at', value: history.minIso } : undefined,
     pageSize: 100,
-    enabled: !!effectiveBranchFilter && tab === 'ar',
+    enabled: branchScope.selectedBranchIds.length > 0 && tab === 'ar',
   });
   const { rows: supplierPayments, loading: supplierPaymentsLoading, error: supplierPaymentsError, total: supplierPaymentsTotal, hasMore: supplierPaymentsHasMore, loadMore: loadMoreSupplierPayments, loadingMore: loadingMoreSupplierPayments, refresh: reloadSupplierPayments } = usePaginatedRows<SupplierPayment>({
     table: 'supplier_payments',
-    select: 'id, amount, payment_method, reference_number, notes, created_at, treasury_account_id, treasury_transaction_id, supplier:suppliers(name), treasury_account:treasury_accounts(account_name,kind,scope)',
+    select: 'id, branch_id, amount, payment_method, reference_number, notes, created_at, treasury_account_id, treasury_transaction_id, supplier:suppliers(name), treasury_account:treasury_accounts(account_name,kind,scope)',
     order: { column: 'created_at', ascending: false },
-    branch_id: effectiveBranchFilter,
+    branch_ids: branchScope.selectedBranchIds,
     min: history.minIso ? { column: 'created_at', value: history.minIso } : undefined,
     pageSize: 100,
-    enabled: !!effectiveBranchFilter && tab === 'ap',
+    enabled: branchScope.selectedBranchIds.length > 0 && tab === 'ap',
   });
 
-  const [collecting, setCollecting] = useState<ArAgingRow | null>(null);
+  const [collecting, setCollecting] = useState<ScopedArAgingRow | null>(null);
   const [openInvoices, setOpenInvoices] = useState<{ id: string; invoice_number: string; open: number }[]>([]);
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState({ sale_id: '', amount: '', payment_method: 'cash', notes: '' });
 
-  const [paying, setPaying] = useState<ApAgingRow | null>(null);
+  const [paying, setPaying] = useState<ScopedApAgingRow | null>(null);
   const [openApInvoices, setOpenApInvoices] = useState<{ id: string; invoice_number: string; open: number }[]>([]);
   const [treasurySources, setTreasurySources] = useState<TreasurySource[]>([]);
   const [apForm, setApForm] = useState({ purchase_id: '', amount: '', treasury_account_id: '', notes: '' });
@@ -68,29 +72,29 @@ export function PaymentsPage() {
   const loadAging = useCallback(async () => {
     setLoading(true);
     try {
-      if (effectiveBranchFilter) {
-        const asOf = new Date().toISOString().slice(0, 10);
-        if (tab === 'ar') {
-          const { data: aging } = await api.accounting.getArAging({
-            p_branch_id: effectiveBranchFilter,
-            p_as_of: asOf,
-          });
-          setRows(((aging as ArAgingRow[]) || []).map((r) => ({ ...r, id: r.customer_id })));
-        } else {
-          const { data: apAging } = await api.accounting.getApAging({
-            p_branch_id: effectiveBranchFilter,
-            p_as_of: asOf,
-          });
-          setApRows(((apAging as ApAgingRow[]) || []).map((r) => ({ ...r, id: r.supplier_id })));
-        }
-      } else {
+      if (branchScope.selectedBranchIds.length === 0) {
         setRows([]);
         setApRows([]);
+        return;
+      }
+      const asOf = new Date().toISOString().slice(0, 10);
+      if (tab === 'ar') {
+        const results = await Promise.all(branchScope.selectedBranchIds.map(async (branchId) => {
+          const { data } = await api.accounting.getArAging({ p_branch_id: branchId, p_as_of: asOf });
+          return ((data as ArAgingRow[]) || []).map((row) => ({ ...row, id: row.customer_id, branch_id: branchId }));
+        }));
+        setRows(results.flat());
+      } else {
+        const results = await Promise.all(branchScope.selectedBranchIds.map(async (branchId) => {
+          const { data } = await api.accounting.getApAging({ p_branch_id: branchId, p_as_of: asOf });
+          return ((data as ApAgingRow[]) || []).map((row) => ({ ...row, id: row.supplier_id, branch_id: branchId }));
+        }));
+        setApRows(results.flat());
       }
     } finally {
       setLoading(false);
     }
-  }, [effectiveBranchFilter, tab]);
+  }, [branchScope.scopeKey, branchScope.selectedBranchIds, tab]);
 
   useEffect(() => { void loadAging(); }, [loadAging]);
 
@@ -109,7 +113,11 @@ export function PaymentsPage() {
   const filtered = rows.filter((r) => !search || r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || '').includes(search));
   const filteredAp = apRows.filter((r) => !search || r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || '').includes(search));
 
-  async function openCollect(row: ArAgingRow) {
+  async function openCollect(row: ScopedArAgingRow) {
+    if (row.branch_id !== effectiveBranchFilter) {
+      show(lang === 'ar' ? 'حدد فرع هذا الصف كفرع الإجراء أولاً.' : 'Select this row\'s branch as the action branch first.', 'warning');
+      return;
+    }
     setCollecting(row);
     setForm({ sale_id: '', amount: String(row.open_amount), payment_method: 'cash', notes: '' });
     const { data } = await supabase
@@ -125,7 +133,11 @@ export function PaymentsPage() {
     setOpenInvoices(inv);
   }
 
-  async function openPay(row: ApAgingRow) {
+  async function openPay(row: ScopedApAgingRow) {
+    if (row.branch_id !== effectiveBranchFilter) {
+      show(lang === 'ar' ? 'حدد فرع هذا الصف كفرع الإجراء أولاً.' : 'Select this row\'s branch as the action branch first.', 'warning');
+      return;
+    }
     setPaying(row);
     const preferredSource =
       treasurySources.find((source) => source.branch_id === effectiveBranchFilter && source.kind === 'branch_cash')
@@ -212,7 +224,7 @@ export function PaymentsPage() {
     }).then(({ data: sources }) => setTreasurySources((sources as TreasurySource[]) || []));
   };
 
-  const columns: Column<ArAgingRow>[] = [
+  const columns: Column<ScopedArAgingRow>[] = [
     { key: 'name', header: t('customer'), render: (r) => <span className="font-medium text-ui-text">{r.name}</span> },
     { key: 'phone', header: t('phone'), render: (r) => r.phone || '-' },
     { key: 'open_amount', header: t('openBalance'), render: (r) => <span className="font-semibold text-ui-danger">{formatCurrency(r.open_amount, currency, lang)}</span> },
@@ -223,7 +235,7 @@ export function PaymentsPage() {
     { key: 'actions', header: t('actions'), render: (r) => <Button size="sm" onClick={() => openCollect(r)}><HandCoins className="w-4 h-4" /> {t('collect')}</Button> },
   ];
 
-  const apColumns: Column<ApAgingRow>[] = [
+  const apColumns: Column<ScopedApAgingRow>[] = [
     { key: 'name', header: t('supplier'), render: (r) => <span className="font-medium text-ui-text">{r.name}</span> },
     { key: 'phone', header: t('phone'), render: (r) => r.phone || '-' },
     { key: 'open_amount', header: t('openBalance'), render: (r) => <span className="font-semibold text-ui-danger">{formatCurrency(r.open_amount, currency, lang)}</span> },

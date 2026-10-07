@@ -17,6 +17,8 @@ export interface PaginatedQueryOptions {
   order?: { column: string; ascending?: boolean };
   /** Equality filter on branch_id (skipped when null/undefined). */
   branch_id?: string | null;
+  /** Multi-branch filter. When provided, it takes precedence over branch_id. */
+  branch_ids?: string[] | null;
   /** Optional PostgREST OR expression for trusted page-defined compound scopes. */
   or?: string;
   /** Additional equality filters: [{ column: 'status', value: 'open' }]. */
@@ -88,7 +90,8 @@ function safeSearchTerm(value: string): string {
 
 export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRowsResult<T> {
   const { user } = useAuth();
-  const { table, select = '*', order, branch_id, or, filters, search, min, pageSize = 50, enabled = true } = opts;
+  const { table, select = '*', order, branch_id, branch_ids, or, filters, search, min, pageSize = 50, enabled = true } = opts;
+  const branchIdsKey = JSON.stringify([...(branch_ids || [])].sort());
   const filterKey = JSON.stringify(filters ?? []);
   const searchKey = JSON.stringify({ term: search?.term ?? '', columns: search?.columns ?? [] });
   const orderKey = order?.column ?? '';
@@ -103,6 +106,7 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
       orderKey,
       orderAsc,
       branch_id: branch_id ?? null,
+      branch_ids: branchIdsKey,
       or: or ?? null,
       filterKey,
       searchKey,
@@ -110,7 +114,7 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
       minValue: min?.value ?? null,
       pageSize,
     }),
-    [userId, table, select, orderKey, orderAsc, branch_id, or, filterKey, searchKey, min?.column, min?.value, pageSize],
+    [userId, table, select, orderKey, orderAsc, branch_id, branchIdsKey, or, filterKey, searchKey, min?.column, min?.value, pageSize],
   );
 
   const initialCache = readSessionCache<T>(queryKey);
@@ -140,7 +144,9 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
   const applyFilters = useCallback(
     (q: FilterBuilder): FilterBuilder => {
       let bq = q;
-      if (branch_id) bq = bq.eq('branch_id', branch_id);
+      const scopedBranchIds = (branch_ids || []).filter(Boolean);
+      if (scopedBranchIds.length > 0) bq = bq.in('branch_id', scopedBranchIds);
+      else if (branch_id) bq = bq.eq('branch_id', branch_id);
       if (or) bq = bq.or(or);
       for (const f of filters ?? []) bq = bq.eq(f.column, f.value);
       if (min?.column && min.value) bq = bq.gte(min.column, min.value);
@@ -153,7 +159,7 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
       return bq;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by stable serialized option values
-    [branch_id, or, filterKey, searchKey, min?.column, min?.value]
+    [branch_id, branchIdsKey, or, filterKey, searchKey, min?.column, min?.value]
   );
 
   const buildDataQuery = useCallback(

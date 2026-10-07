@@ -10,6 +10,7 @@ import { reportDateRangeUtc } from '@/lib/businessTime';
 import { exportToExcelAdvanced } from '@/lib/excel';
 import { downloadCSV, openPrintWindow } from '@/lib/reportExport';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useColumnPreferences } from '../useColumnPreferences';
@@ -22,7 +23,7 @@ import { ReportFilterBar } from '../ReportFilterBar';
 import { loadExpenseCategoryOptions, loadReportFilterOptions } from '../services/reportFilterOptions';
 import { loadExpenseReportRows, loadPurchaseReportRows, loadSalesReportRows } from '../services/reportCoreLoaders';
 import { loadCashierPerformanceRows, loadDetailedInvoiceRows, loadReturnRows, loadSalesByEmployeeRows } from '../services/reportSalesLoaders';
-import { loadComponentConsumptionRows, loadInventoryBatchRows, loadLowStockSources, loadProductBranchRows, loadSalesByProductItems, loadTopConsumedComponentRows, loadTopConsumedProductItems, loadWasteRows } from '../services/reportInventoryLoaders';
+import { loadComponentConsumptionRows, loadInventoryBatchRows, loadLowStockSources, loadSalesByProductItems, loadTopConsumedComponentRows, loadTopConsumedProductItems, loadWasteRows } from '../services/reportInventoryLoaders';
 import { useBranches } from '@/hooks/useBranches';
 import { useSettings } from '@/context/SettingsContext';
 import {
@@ -59,6 +60,8 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
   const history = useHistoryAccess();
   const navigate = useNavigate();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
+  const reportBranchIds = branchScope.selectedBranchIds;
   const [reportType, setReportType] = useState<ReportType>('sales');
   const [from, setFrom] = useState(() => history.minDate || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
   const [to, setTo] = useState(todayISO());
@@ -95,8 +98,10 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
     }
   }, [controlledReportType, onReportTypeChange]);
 
-  const effectiveBranchFilter = branchFilter;
+  const effectiveBranchFilter = reportBranchIds.length === 1 ? reportBranchIds[0] : null;
   const { branches } = useBranches();
+  const reportBranchSet = new Set(reportBranchIds);
+  const reportBranches = branches.filter((branch) => reportBranchSet.has(branch.id));
   const branchColumn = lang === 'ar' ? 'الفرع' : 'Branch';
   const branchNameById = (branchId: unknown): string => {
     const id = typeof branchId === 'string' ? branchId : '';
@@ -108,12 +113,14 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
     [branchColumn]: branchNameById(branchId),
   });
   const { effectiveSettings } = useSettings();
-  const currency = effectiveSettings(effectiveBranchFilter)?.currency || 'EGP';
+  const currency = effectiveSettings(branchFilter)?.currency || 'EGP';
   const { visibleColumns, toggleColumn, showAllColumns } = useColumnPreferences(reportType);
   const { savedReports, saveReport, deleteReport } = useCustomReports();
-  const reportBranchLabel = effectiveBranchFilter
-    ? branchNameById(effectiveBranchFilter)
-    : (lang === 'ar' ? 'كل الفروع المتاحة' : 'All accessible branches');
+  const reportBranchLabel = reportBranchIds.length === 1
+    ? branchNameById(reportBranchIds[0])
+    : branchScope.allBranchesSelected
+      ? (lang === 'ar' ? `إجمالي الفروع (${reportBranchIds.length})` : `All branches (${reportBranchIds.length})`)
+      : (lang === 'ar' ? `${reportBranchIds.length} فروع محددة` : `${reportBranchIds.length} selected branches`);
 
   const financialTypes: { key: FinancialReportType; label: string }[] = [
     { key: 'trial_balance', label: t('trialBalance') },
@@ -186,7 +193,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
   }
 
   useEffect(() => {
-    if (!effectiveBranchFilter) {
+    if (reportBranchIds.length === 0) {
       setOptions({ warehouses: [], cashiers: [], customers: [], suppliers: [], products: [], categories: [], tables: [], expenseCategories: [] });
       return;
     }
@@ -202,7 +209,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       const needsCategory = dims.has('category') && reportType !== 'expenses';
       const needsTable = dims.has('table');
 
-      const options = await loadReportFilterOptions(effectiveBranchFilter, {
+      const options = await loadReportFilterOptions(reportBranchIds, {
         warehouse: needsWarehouse,
         cashier: needsCashier,
         customer: needsCustomer,
@@ -217,22 +224,22 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
     })();
 
     return () => { cancelled = true; };
-  }, [reportType, effectiveBranchFilter]);
+  }, [reportType, branchScope.scopeKey]);
 
   useEffect(() => {
-    if (reportType !== 'expenses' || !effectiveBranchFilter) return;
+    if (reportType !== 'expenses' || reportBranchIds.length === 0) return;
     (async () => {
-      const unique = await loadExpenseCategoryOptions(effectiveBranchFilter);
+      const unique = await loadExpenseCategoryOptions(reportBranchIds);
       setOptions((prev) => ({ ...prev, expenseCategories: unique }));
     })();
-  }, [reportType, effectiveBranchFilter]);
+  }, [reportType, branchScope.scopeKey]);
 
   useEffect(() => {
     void loadReport();
     // Date/filter edits are intentionally applied only when the user presses
     // "Run report". This avoids repeated report queries while configuring filters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportType, effectiveBranchFilter, branches, history.unlimited, queryVersion]);
+  }, [reportType, branchScope.scopeKey, branches, history.unlimited, queryVersion]);
 
   async function loadReport() {
     setLoading(true);
@@ -245,6 +252,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       if (reportType === 'sales') {
         const sales = await loadSalesReportRows({
           branchId: effectiveBranchFilter || null,
+          branchIds: reportBranchIds,
           fromTs,
           toExclusiveTs,
           filters,
@@ -277,6 +285,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       } else if (reportType === 'purchases') {
         const purchases = await loadPurchaseReportRows({
           branchId: effectiveBranchFilter || null,
+          branchIds: reportBranchIds,
           fromTs,
           toExclusiveTs,
           filters,
@@ -295,6 +304,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       } else if (reportType === 'expenses') {
         const expenses = await loadExpenseReportRows({
           branchId: effectiveBranchFilter || null,
+          branchIds: reportBranchIds,
           from,
           to,
           filters,
@@ -311,9 +321,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
         setChartData(Array.from(catMap.entries()).map(([name, value]) => ({ name: name || (lang === 'ar' ? 'غير محدد' : 'Other'), value })));
         setSummary({ total: expenses.reduce((sum: number, expense: Record<string, unknown>) => sum + Number(expense.amount || 0), 0), count: expenses.length });
       } else if (reportType === 'profit') {
-        const targetBranches = effectiveBranchFilter
-          ? branches.filter((branch) => branch.id === effectiveBranchFilter)
-          : branches;
+        const targetBranches = reportBranches;
         const results = await Promise.all(targetBranches.map(async (branch) => {
           const { data: statement } = await reporting.getIncomeStatement({ p_branch_id: branch.id, p_from_date: from, p_to_date: to });
           return { branch, statement };
@@ -333,6 +341,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       } else if (reportType === 'inventory') {
         const { rawRows, unitRows } = await loadInventoryBatchRows({
           branchId: effectiveBranchFilter || null,
+          branchIds: reportBranchIds,
           warehouseId: filters.warehouse,
         });
         const stockMap = new Map<string, { branchId: string; warehouse: string; item: string; code: string; type: string; quantity: number }>();
@@ -385,9 +394,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
         setChartData(rows.slice(0, 10).map((row) => ({ name: String(row[lang === 'ar' ? 'الصنف' : 'Item']), value: Number(row[lang === 'ar' ? 'الكمية' : 'Quantity']) })));
         setSummary({ total: rows.reduce((sum, row) => sum + Number(row[lang === 'ar' ? 'الكمية' : 'Quantity'] || 0), 0), count: rows.length });
       } else if (reportType === 'sales_by_payment') {
-        const targetBranchIds = effectiveBranchFilter
-          ? [effectiveBranchFilter]
-          : branches.map((branch) => branch.id);
+        const targetBranchIds = reportBranchIds;
         const results = await Promise.all(targetBranchIds.map((branchId) => reporting.getSalesByPaymentReport({
           p_branch_id: branchId,
           p_from: fromTs,
@@ -450,6 +457,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       } else if (reportType === 'sales_by_employee') {
         const sales = await loadSalesByEmployeeRows({
           branchId: effectiveBranchFilter || null,
+          branchIds: reportBranchIds,
           fromTs,
           toExclusiveTs,
           filters,
@@ -477,6 +485,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       } else if (reportType === 'sales_by_product') {
         const items = await loadSalesByProductItems({
           branchId: effectiveBranchFilter || null,
+          branchIds: reportBranchIds,
           filters,
         });
         const filtered = items.filter((item: Record<string, unknown>) => {
@@ -515,6 +524,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       } else if (reportType === 'detailed_invoices') {
         const sales = await loadDetailedInvoiceRows({
           branchId: effectiveBranchFilter || null,
+          branchIds: reportBranchIds,
           fromTs,
           toExclusiveTs,
           filters,
@@ -541,6 +551,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       } else if (reportType === 'component_consumption') {
         const tx = await loadComponentConsumptionRows({
           branchId: effectiveBranchFilter || null,
+          branchIds: reportBranchIds,
           fromTs,
           toExclusiveTs,
           filters,
@@ -570,6 +581,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       } else if (reportType === 'top_consumed_components') {
         const tx = await loadTopConsumedComponentRows({
           branchId: effectiveBranchFilter || null,
+          branchIds: reportBranchIds,
           fromTs,
           toExclusiveTs,
           filters,
@@ -594,6 +606,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       } else if (reportType === 'top_consumed_products') {
         const items = await loadTopConsumedProductItems({
           branchId: effectiveBranchFilter || null,
+          branchIds: reportBranchIds,
           filters,
         });
         const filtered = items.filter((item: Record<string, unknown>) => {
@@ -619,17 +632,24 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
         setChartData(rows.slice(0, 10).map((row) => ({ name: String(row[lang === 'ar' ? 'المنتج' : 'Product']), value: Number(row[lang === 'ar' ? 'صافي الكمية' : 'Net Quantity']) })));
         setSummary({ total: rows.length, count: rows.length });
       } else if (reportType === 'recipe_costs') {
-        const result = await costing.getOverview({ p_branch_id: effectiveBranchFilter });
-        if (result.error) { setData([]); setChartData([]); setSummary({ total: 0, count: 0 }); return; }
+        const overviewResults = await Promise.all(
+          reportBranchIds.map(async (branchId) => ({
+            branchId,
+            result: await costing.getOverview({ p_branch_id: branchId }),
+          })),
+        );
+        if (overviewResults.some(({ result }) => result.error)) {
+          setData([]); setChartData([]); setSummary({ total: 0, count: 0 }); return;
+        }
         const catName = filters.category ? options.categories.find((category) => category.id === filters.category)?.name ?? filters.category : '';
-        const productIds = (result.data || []).map((row) => row.product_id);
-        const productBranchRows = await loadProductBranchRows(productIds);
-        const productBranches = new Map(productBranchRows.map((product) => [product.id, product.branch_id]));
-        const rows = (result.data || [])
+        const overviewRows = overviewResults.flatMap(({ branchId, result }) =>
+          (result.data || []).map((row) => ({ ...row, __branch_id: branchId })),
+        );
+        const rows = overviewRows
           .filter((row) => row.recipe_item_count > 0)
           .filter((row) => !filters.product || row.product_id === filters.product)
           .filter((row) => !catName || row.category_name === catName)
-          .map((row) => withBranch(productBranches.get(row.product_id) || effectiveBranchFilter, {
+          .map((row) => withBranch(row.__branch_id, {
             [lang === 'ar' ? 'المنتج' : 'Product']: row.product_name,
             [lang === 'ar' ? 'تكلفة المكونات' : 'Component Cost']: Number(row.actual_cost),
             [lang === 'ar' ? 'سعر البيع' : 'Sale Price']: Number(row.sale_price),
@@ -641,6 +661,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       } else if (reportType === 'low_stock') {
         const { rawMasters, rawBalances, unitMasters, unitBatches } = await loadLowStockSources(
           effectiveBranchFilter || null,
+          reportBranchIds,
         );
         const rawQty = new Map<string, number>();
         rawBalances.forEach((row: Record<string, unknown>) => {
@@ -693,6 +714,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       } else if (reportType === 'cashier_performance') {
         const sales = await loadCashierPerformanceRows({
           branchId: effectiveBranchFilter || null,
+          branchIds: reportBranchIds,
           fromTs,
           toExclusiveTs,
         });
@@ -724,6 +746,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       } else if (reportType === 'returns') {
         const returns = await loadReturnRows({
           branchId: effectiveBranchFilter || null,
+          branchIds: reportBranchIds,
           fromTs,
           toExclusiveTs,
         });
@@ -747,9 +770,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
         setChartData([]);
         setSummary({ total: rows.reduce((sum, row) => sum + Number(row[lang === 'ar' ? 'المبلغ المرتجع' : 'Refunded Amount'] || 0), 0), count: rows.length });
       } else if (reportType === 'financial_reconciliation') {
-        const targetBranchIds = effectiveBranchFilter
-          ? [effectiveBranchFilter]
-          : branches.map((branch) => branch.id);
+        const targetBranchIds = reportBranchIds;
         const results = await Promise.all(targetBranchIds.map((branchId) => reporting.getFinancialReconciliationReport({
           p_branch_id: branchId,
           p_from: fromTs,
@@ -795,9 +816,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
         setChartData([]);
         setSummary({ total: totalNetSales, count: mismatchCount });
       } else if (reportType === 'daily_closing_range') {
-        const targetBranches = effectiveBranchFilter
-          ? branches.filter((branch) => branch.id === effectiveBranchFilter)
-          : branches;
+        const targetBranches = reportBranches;
         const results = await Promise.all(targetBranches.map(async (branch) => {
           const result = await reporting.getDayClosingRangeReport({
             p_branch_id: branch.id,
@@ -841,9 +860,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
           count: rows.length,
         });
       } else if (reportType === 'raw_material_consumption') {
-        const targetBranches = effectiveBranchFilter
-          ? branches.filter((branch) => branch.id === effectiveBranchFilter)
-          : branches;
+        const targetBranches = reportBranches;
         const results = await Promise.all(targetBranches.map(async (branch) => {
           const result = await reporting.getRawMaterialConsumptionReport({
             p_branch_id: branch.id,
@@ -875,9 +892,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
           count: rows.length,
         });
       } else if (reportType === 'raw_material_current_cost') {
-        const targetBranches = effectiveBranchFilter
-          ? branches.filter((branch) => branch.id === effectiveBranchFilter)
-          : branches;
+        const targetBranches = reportBranches;
         const results = await Promise.all(targetBranches.map(async (branch) => {
           const result = await reporting.getCurrentRawMaterialValuation({ p_branch_id: branch.id });
           if (result.error) throw result.error;
@@ -901,9 +916,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
           count: rows.length,
         });
       } else if (reportType === 'raw_material_financial') {
-        const targetBranches = effectiveBranchFilter
-          ? branches.filter((branch) => branch.id === effectiveBranchFilter)
-          : branches;
+        const targetBranches = reportBranches;
         const results = await Promise.all(targetBranches.map(async (branch) => {
           const result = await reporting.getRawMaterialFinancialReport({
             p_branch_id: branch.id,
@@ -950,9 +963,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
           count: results.reduce((sum, result) => sum + result.rows.length, 0),
         });
       } else if (reportType === 'sales_component_reconciliation') {
-        const targetBranches = effectiveBranchFilter
-          ? branches.filter((branch) => branch.id === effectiveBranchFilter)
-          : branches;
+        const targetBranches = reportBranches;
         const results = await Promise.all(targetBranches.map(async (branch) => {
           const result = await reporting.getSalesComponentReconciliationReport({
             p_branch_id: branch.id,
@@ -1013,6 +1024,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       } else if (reportType === 'production_waste') {
         const waste = await loadWasteRows({
           branchId: effectiveBranchFilter || null,
+          branchIds: reportBranchIds,
           fromTs,
           toExclusiveTs,
         });

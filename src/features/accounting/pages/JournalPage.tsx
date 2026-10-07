@@ -14,11 +14,14 @@ import { Button } from '@/components/Button';
 import { formatCurrency, formatDateTime } from '@/lib/format';
 import { logAudit } from '@/lib/audit';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
 import type { JournalDto, ChartOfAccount } from '@/lib/types';
+
+type ScopedJournalDto = JournalDto & { branch_id: string };
 
 interface ManualLine {
   account_id: string;
@@ -51,23 +54,22 @@ export function JournalPage() {
   const { user } = useAuth();
   const { show } = useToast();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const can = useCan();
   const history = useHistoryAccess();
   const { effectiveSettings } = useSettings();
   const { branches } = useBranches();
-  const [items, setItems] = useState<JournalDto[]>([]);
+  const [items, setItems] = useState<ScopedJournalDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [refType, setRefType] = useState('');
-  const [viewing, setViewing] = useState<JournalDto | null>(null);
-  const [selectedBranchFilter, setSelectedBranchFilter] = useState('');
+  const [viewing, setViewing] = useState<ScopedJournalDto | null>(null);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const primaryBranchId = user?.branch_id && branches.some((branch) => branch.id === user.branch_id)
     ? user.branch_id
     : null;
-  const effectiveBranchFilter = selectedBranchFilter
-    || branchFilter
+  const effectiveBranchFilter = branchFilter
     || primaryBranchId
     || (branches.length === 1 ? branches[0].id : null);
   const currency = effectiveSettings(effectiveBranchFilter)?.currency || 'EGP';
@@ -82,25 +84,28 @@ export function JournalPage() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      if (effectiveBranchFilter) {
+      if (branchScope.selectedBranchIds.length > 0) {
         const allowed = history.clampRange(from, to);
         if (allowed.from !== from) setFrom(allowed.from);
         if (allowed.to !== to) setTo(allowed.to);
-        const { data } = await api.accounting.getJournals({
-          p_branch_id: effectiveBranchFilter,
-          p_from_date: allowed.from || null,
-          p_to_date: allowed.to || null,
-          p_reference_type: refType || null,
-          p_search: search || null,
-        });
-        setItems((data as JournalDto[]) || []);
+        const results = await Promise.all(branchScope.selectedBranchIds.map(async (branchId) => {
+          const { data } = await api.accounting.getJournals({
+            p_branch_id: branchId,
+            p_from_date: allowed.from || null,
+            p_to_date: allowed.to || null,
+            p_reference_type: refType || null,
+            p_search: search || null,
+          });
+          return ((data as JournalDto[]) || []).map((row) => ({ ...row, branch_id: branchId }));
+        }));
+        setItems(results.flat().sort((a, b) => String(b.entry_date).localeCompare(String(a.entry_date))));
       } else {
         setItems([]);
       }
     } finally {
       setLoading(false);
     }
-  }, [effectiveBranchFilter, from, to, refType, search, history.unlimited]);
+  }, [branchScope.scopeKey, branchScope.selectedBranchIds, from, to, refType, search, history.unlimited]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -126,7 +131,7 @@ export function JournalPage() {
     return t(key as never);
   };
 
-  const columns: Column<JournalDto>[] = [
+  const columns: Column<ScopedJournalDto>[] = [
     { key: 'entry_number', header: t('entryNumber'), render: (e) => <span className="font-mono font-semibold text-ui-text">{e.entry_number}</span> },
     { key: 'entry_date', header: t('date'), render: (e) => formatDateTime(e.entry_date, lang) },
     { key: 'reference_type', header: t('referenceType'), render: (e) => (
@@ -209,15 +214,6 @@ export function JournalPage() {
             </Select>
             <Input label={t('from')} type="date" value={from} min={history.minDate} onChange={(e) => setFrom(history.clampRange(e.target.value, to).from)} />
             <Input label={t('to')} type="date" value={to} onChange={(e) => { const allowed = history.clampRange(from, e.target.value); setFrom(allowed.from); setTo(allowed.to); }} />
-            {branches.length > 1 && (
-              <div>
-                <label className="block text-sm font-medium text-ui-muted mb-1">{t('filterByBranch')}</label>
-                <select value={selectedBranchFilter || effectiveBranchFilter || ''} onChange={(e) => setSelectedBranchFilter(e.target.value)}
-                  className="px-3 py-2 rounded-lg text-sm border border-ui-border bg-ui-surface text-ui-text">
-                  {branches.map((b) => <option key={b.id} value={b.id}>{isAr ? b.name : (b.name_en || b.name)}</option>)}
-                </select>
-              </div>
-            )}
           </div>
         </div>
       </DesignPanel>
