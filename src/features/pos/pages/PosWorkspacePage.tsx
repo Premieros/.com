@@ -650,7 +650,11 @@ export function PosWorkspacePage() {
 
   const rightPanel = isCheckout ? (
     <PaymentPanel
+      branchId={effectiveBranch}
       currentBranchName={currentBranchName}
+      manualTransferEnabled={effSettings?.manual_transfer_enabled === true}
+      instapayHandle={effSettings?.instapay_handle ?? null}
+      bankTransferDetails={effSettings?.bank_transfer_details ?? null}
       orderType={pos.orderType}
       activeTable={pos.activeTable}
       activeOrderNumber={pos.activeOrderNumber}
