@@ -7,6 +7,7 @@ import { useCan, isAdminRole, type Permission } from '../lib/permissions';
 import { APP_ROUTES, type AppRoute } from '@/core/navigation/routes';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
 import { moduleForPath, moduleForRoute, type OrganizationModuleKey } from '@/core/modules/module.config';
+import { PageLoadFallback } from '@/components/PageProgressLoader';
 
 const LoginPage = lazy(() => import('../features/auth/pages/LoginPage').then(m => ({ default: m.LoginPage })));
 const RegisterPage = lazy(() => import('../features/auth/pages/RegisterPage').then(m => ({ default: m.RegisterPage })));
@@ -68,7 +69,7 @@ const SystemHealthPage = lazy(() => import('../features/admin/pages/SystemHealth
 const ImportExportCenterPage = lazy(() => import('../features/import-export/pages/ImportExportCenterPage').then(m => ({ default: m.ImportExportCenterPage })));
 
 function PageLoader() {
-  return <div className="min-h-screen flex items-center justify-center bg-ui-page"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-ui-primary" /></div>;
+  return <PageLoadFallback />;
 }
 
 function NoAccessPage() {
