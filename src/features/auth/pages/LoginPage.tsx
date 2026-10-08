@@ -3,8 +3,6 @@ import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowRight,
-  ChevronLeft,
-  ChevronRight,
   Loader2,
   LockKeyhole,
 } from 'lucide-react';
@@ -34,9 +32,11 @@ export function LoginPage() {
 
   const slides = useMemo(
     () => [
-      '/auth/login-scene-pos.jpg',
-      '/auth/login-scene-tables.jpg',
-      '/auth/login-scene-dashboard.jpg',
+      '/auth/exact/login-art-1.png',
+      '/auth/exact/login-art-2.png',
+      '/auth/exact/login-art-3.png',
+      '/auth/exact/login-art-4.png',
+      '/auth/exact/login-art-5.png',
     ],
     [],
   );
@@ -49,9 +49,6 @@ export function LoginPage() {
     return () => window.clearInterval(timer);
   }, [slides.length]);
 
-  const goToSlide = (index: number) => {
-    setSlideIndex((index + slides.length) % slides.length);
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,71 +86,31 @@ export function LoginPage() {
     }
   };
 
-  const activeSlide = slides[slideIndex];
 
   return (
     <DesignSurface testId="login-surface">
       <div className="min-h-[100dvh] bg-white text-slate-950 lg:grid lg:grid-cols-[56%_44%]" dir="ltr">
-        <section className="relative hidden h-[100dvh] min-h-[680px] overflow-hidden bg-[#0b1220] lg:flex lg:items-center lg:justify-center">
+        <section className="relative hidden h-[100dvh] min-h-[680px] overflow-hidden bg-slate-950 lg:block">
           {slides.map((slide, index) => (
-            <div
+            <img
               key={slide}
+              src={slide}
+              alt=""
               aria-hidden={index !== slideIndex}
-              className={`absolute inset-0 transition-opacity duration-700 ${
+              loading={index === 0 ? 'eager' : 'lazy'}
+              decoding="async"
+              draggable={false}
+              className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-700 ${
                 index === slideIndex ? 'opacity-100' : 'pointer-events-none opacity-0'
               }`}
-            >
-              <div className="absolute inset-0 flex items-center justify-center p-6 xl:p-8">
-                <img
-                  src={slide}
-                  alt=""
-                  className="max-h-full max-w-full rounded-[28px] object-contain shadow-2xl shadow-black/35"
-                  draggable={false}
-                />
-              </div>
-            </div>
+            />
           ))}
-
-          <button
-            type="button"
-            aria-label={isAr ? 'الصورة السابقة' : 'Previous image'}
-            onClick={() => goToSlide(slideIndex - 1)}
-            className="absolute left-5 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur-md transition hover:bg-black/55"
-          >
-            <ChevronLeft className="h-5 w-5" />
-          </button>
-
-          <button
-            type="button"
-            aria-label={isAr ? 'الصورة التالية' : 'Next image'}
-            onClick={() => goToSlide(slideIndex + 1)}
-            className="absolute right-5 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur-md transition hover:bg-black/55"
-          >
-            <ChevronRight className="h-5 w-5" />
-          </button>
-
-          <div className="absolute inset-x-0 bottom-6 z-20 flex justify-center gap-2">
-            {slides.map((slide, index) => (
-              <button
-                key={slide}
-                type="button"
-                aria-label={isAr ? `انتقل للصورة ${index + 1}` : `Go to image ${index + 1}`}
-                onClick={() => goToSlide(index)}
-                className={`h-2 rounded-full shadow transition-all ${
-                  index === slideIndex ? 'w-8 bg-blue-500' : 'w-2 bg-white/65 hover:bg-white'
-                }`}
-              />
-            ))}
-          </div>
         </section>
 
         <section
           className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-white px-6 py-8 sm:px-10 lg:border-s lg:border-slate-100 lg:px-12 xl:px-16"
           dir={isAr ? 'rtl' : 'ltr'}
         >
-          <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-50/70 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-slate-100/80 blur-3xl" />
-
           <div className="relative z-10 w-full max-w-[470px]">
             <div className="mb-10 flex items-center justify-between gap-4">
               <Logo variant="horizontal" size={62} tone="navy" showTagline={false} />
@@ -302,29 +259,6 @@ export function LoginPage() {
               <span>Premier © 2026</span>
             </div>
 
-            <div className="relative mt-8 overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 shadow-xl lg:hidden">
-              <div className="relative aspect-[16/8]">
-                <img
-                  src={activeSlide}
-                  alt=""
-                  className="absolute inset-0 h-full w-full object-contain object-center"
-                  draggable={false}
-                />
-              </div>
-
-              <div className="absolute inset-x-0 bottom-3 flex justify-center gap-2">
-                {slides.map((slide, index) => (
-                  <button
-                    key={slide}
-                    type="button"
-                    onClick={() => goToSlide(index)}
-                    className={`h-2 rounded-full transition-all ${
-                      index === slideIndex ? 'w-7 bg-blue-500' : 'w-2 bg-white/70'
-                    }`}
-                  />
-                ))}
-              </div>
-            </div>
           </div>
         </section>
       </div>
