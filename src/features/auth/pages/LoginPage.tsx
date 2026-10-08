@@ -71,8 +71,10 @@ export function LoginPage() {
     () => [
       '/auth/hq/tables.webp',
       '/auth/hq/pos.webp',
+      '/auth/exact/login-art-1.webp',
       '/auth/hq/kitchen.webp',
       '/auth/hq/dashboard.webp',
+      '/auth/exact/login-art-4.webp',
       '/auth/hq/exit.webp',
     ],
     [],
