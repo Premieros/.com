@@ -86,7 +86,6 @@ export function LoginPage() {
     }
   };
 
-  const activeSlide = slides[slideIndex];
 
   return (
     <DesignSurface testId="login-surface">
