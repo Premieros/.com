@@ -387,45 +387,164 @@ export function LoginPage() {
 
 function RestaurantDevice({ preview, isAr }: { preview: LoginPreview; isAr: boolean }) {
   return (
-    <div className="relative mx-auto h-[355px] w-full max-w-[780px] [perspective:1200px]">
-      <div className="absolute inset-x-[-10%] bottom-0 h-24 rounded-[50%] bg-gradient-to-b from-[#8b5a35]/95 via-[#5a3520]/95 to-[#2b170f]/95 shadow-[0_24px_60px_rgba(0,0,0,0.42)]" />
-      <div className="absolute inset-x-[5%] bottom-8 h-6 rounded-[50%] bg-black/45 blur-xl" />
+    <div className="relative mx-auto h-[330px] w-full max-w-[820px] [perspective:1200px]">
+      <div className="absolute inset-x-[-7%] bottom-0 h-24 rounded-[52%] bg-gradient-to-b from-[#9a6238] via-[#6c3f24] to-[#30190f] shadow-[0_28px_70px_rgba(0,0,0,0.42)]" />
+      <div className="absolute inset-x-[4%] bottom-7 h-7 rounded-[50%] bg-black/35 blur-2xl" />
 
-      <div className="absolute bottom-10 left-1/2 w-[88%] -translate-x-1/2 [transform:translateX(-50%)_rotateX(2deg)_rotateY(-2.5deg)]">
-        <div className="absolute -inset-4 rounded-[36px] bg-black/30 blur-2xl" />
-        <div className="relative rounded-[28px] border border-white/10 bg-[#111827] p-3 shadow-[0_28px_55px_rgba(0,0,0,0.48)]">
-          <div className="overflow-hidden rounded-[19px] border border-slate-700 bg-slate-50">
-            <div className="flex h-8 items-center justify-between border-b border-slate-200 bg-white px-3 text-[8px] font-bold text-slate-500">
-              <div className="flex items-center gap-2">
-                <span className="flex h-4 w-4 items-center justify-center rounded-md bg-blue-600 text-[7px] font-black text-white">P</span>
-                <span>Premier</span>
-              </div>
-              <div className="flex gap-1">
-                <span className="rounded bg-emerald-50 px-2 py-0.5 text-emerald-700">{isAr ? 'متصل' : 'Online'}</span>
-                <span className="rounded bg-slate-100 px-2 py-0.5">{isAr ? 'الفرع الرئيسي' : 'Main branch'}</span>
-              </div>
+      {preview === 'pos' && (
+        <>
+          <div className="absolute bottom-12 left-[15%] w-[54%] [transform:rotateY(-4deg)]">
+            <DeviceMonitor isAr={isAr} compact>
+              <PosPreview isAr={isAr} />
+            </DeviceMonitor>
+          </div>
+          <ReceiptPrinter isAr={isAr} className="absolute bottom-8 right-[14%]" />
+          <CardTerminal className="absolute bottom-8 right-[5%]" />
+        </>
+      )}
+
+      {preview === 'tables' && (
+        <>
+          <div className="absolute bottom-12 left-[8%] w-[47%] [transform:rotateY(4deg)]">
+            <DeviceMonitor isAr={isAr} compact>
+              <TablesPreview isAr={isAr} />
+            </DeviceMonitor>
+          </div>
+          <HandheldDevice className="absolute bottom-10 right-[22%]" isAr={isAr} />
+          <ReceiptPrinter isAr={isAr} className="absolute bottom-8 right-[7%]" />
+        </>
+      )}
+
+      {preview === 'dashboard' && (
+        <>
+          <div className="absolute bottom-11 left-[10%] w-[56%]">
+            <LaptopDevice isAr={isAr}>
+              <DashboardPreview isAr={isAr} />
+            </LaptopDevice>
+          </div>
+          <PhoneDevice className="absolute bottom-11 right-[19%]" />
+          <CardTerminal className="absolute bottom-8 right-[6%]" />
+        </>
+      )}
+
+      {preview === 'kitchen' && (
+        <>
+          <div className="absolute bottom-11 left-[12%] w-[58%] [transform:rotateY(-3deg)]">
+            <DeviceMonitor isAr={isAr}>
+              <KitchenPreview isAr={isAr} />
+            </DeviceMonitor>
+          </div>
+          <HandheldDevice className="absolute bottom-10 right-[19%]" isAr={isAr} kitchen />
+          <ReceiptPrinter isAr={isAr} className="absolute bottom-8 right-[6%]" />
+        </>
+      )}
+    </div>
+  );
+}
+
+function DeviceMonitor({ children, isAr, compact = false }: { children: React.ReactNode; isAr: boolean; compact?: boolean }) {
+  return (
+    <div className="relative">
+      <div className="absolute -inset-3 rounded-[26px] bg-black/25 blur-xl" />
+      <div className="relative rounded-[22px] border border-white/10 bg-[#111827] p-2.5 shadow-[0_24px_48px_rgba(0,0,0,0.5)]">
+        <div className="overflow-hidden rounded-[14px] border border-slate-700 bg-slate-50">
+          <div className="flex h-7 items-center justify-between border-b border-slate-200 bg-white px-2.5 text-[7px] font-bold text-slate-500">
+            <div className="flex items-center gap-1.5">
+              <span className="flex h-3.5 w-3.5 items-center justify-center rounded bg-blue-600 text-[6px] font-black text-white">P</span>
+              <span>Premier</span>
             </div>
-            <div className="h-[224px] bg-slate-50 sm:h-[244px]">
-              {preview === 'pos' && <PosPreview isAr={isAr} />}
-              {preview === 'tables' && <TablesPreview isAr={isAr} />}
-              {preview === 'dashboard' && <DashboardPreview isAr={isAr} />}
-              {preview === 'kitchen' && <KitchenPreview isAr={isAr} />}
+            <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-emerald-700">{isAr ? 'متصل' : 'Online'}</span>
+          </div>
+          <div className={compact ? "h-[170px] bg-slate-50" : "h-[186px] bg-slate-50"}>
+            <div className="h-full origin-top-left scale-[0.78] overflow-hidden" style={{ width: '128.2%', height: '128.2%' }}>
+              {children}
             </div>
           </div>
-          <div className="mx-auto mt-2 h-1.5 w-16 rounded-full bg-slate-700" />
         </div>
-        <div className="mx-auto h-8 w-28 rounded-b-[20px] bg-gradient-to-b from-slate-900 to-slate-950 shadow-lg" />
-        <div className="mx-auto h-3 w-44 rounded-[50%] bg-slate-950/85" />
       </div>
+      <div className="mx-auto h-7 w-20 rounded-b-[16px] bg-gradient-to-b from-slate-900 to-slate-950" />
+      <div className="mx-auto h-2.5 w-32 rounded-[50%] bg-slate-950/90" />
+    </div>
+  );
+}
 
-      <div className="absolute bottom-5 right-[4%] hidden sm:block">
-        <div className="h-24 w-16 rounded-t-xl bg-slate-900 shadow-xl">
-          <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-slate-600" />
-          <div className="mx-auto mt-3 h-10 w-11 rounded bg-white p-1 text-[5px] text-slate-500">
-            <p className="font-black text-slate-700">Premier</p>
-            <p className="mt-1">#1042</p>
-            <p className="mt-1">{isAr ? 'إجمالي' : 'Total'} 735.30</p>
+function LaptopDevice({ children, isAr }: { children: React.ReactNode; isAr: boolean }) {
+  return (
+    <div className="relative">
+      <div className="rounded-t-[20px] border-[7px] border-slate-900 bg-slate-900 shadow-2xl">
+        <div className="overflow-hidden rounded-[10px] bg-slate-50">
+          <div className="flex h-6 items-center justify-between bg-white px-2 text-[7px] font-bold text-slate-500">
+            <span>Premier</span><span>{isAr ? 'لوحة التحكم' : 'Dashboard'}</span>
           </div>
+          <div className="h-[165px]">
+            <div className="h-full origin-top-left scale-[0.72]" style={{ width: '138.9%', height: '138.9%' }}>{children}</div>
+          </div>
+        </div>
+      </div>
+      <div className="h-4 rounded-b-[60%] bg-gradient-to-b from-slate-300 to-slate-500 shadow-xl" />
+    </div>
+  );
+}
+
+function ReceiptPrinter({ isAr, className = '' }: { isAr: boolean; className?: string }) {
+  return (
+    <div className={`${className} w-16`}>
+      <div className="rounded-t-xl bg-slate-900 p-2 shadow-xl">
+        <div className="mx-auto h-1 w-10 rounded-full bg-slate-600" />
+        <div className="mx-auto mt-2 h-9 w-11 rounded bg-white p-1 text-[4px] leading-tight text-slate-500 shadow">
+          <p className="font-black text-slate-700">Premier</p>
+          <p>#1042</p>
+          <p>{isAr ? 'إجمالي' : 'Total'} 735.30</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function CardTerminal({ className = '' }: { className?: string }) {
+  return (
+    <div className={`${className} w-12 rotate-[4deg]`}>
+      <div className="rounded-[13px] bg-slate-800 p-1.5 shadow-xl">
+        <div className="h-8 rounded-lg bg-blue-500/20 p-1 text-[5px] text-blue-100">VISA<br/>735.30</div>
+        <div className="mt-1 grid grid-cols-3 gap-0.5">{Array.from({length:9},(_,i)=><span key={i} className="h-1.5 rounded-sm bg-slate-600" />)}</div>
+      </div>
+    </div>
+  );
+}
+
+function HandheldDevice({ className = '', isAr, kitchen = false }: { className?: string; isAr: boolean; kitchen?: boolean }) {
+  return (
+    <div className={`${className} w-[72px] rotate-[7deg]`}>
+      <div className="rounded-[18px] border border-slate-700 bg-slate-950 p-1.5 shadow-2xl">
+        <div className="overflow-hidden rounded-[13px] bg-white p-1.5 text-[5px] text-slate-700">
+          <div className="mb-1 flex justify-between font-black"><span>Premier</span><span className="text-emerald-600">●</span></div>
+          {kitchen ? (
+            <div className="space-y-1">
+              {['#2436','#2437','#2438'].map((x,i)=><div key={x} className="rounded bg-slate-100 p-1"><b>{x}</b><br/>{i+1} × Pancake</div>)}
+            </div>
+          ) : (
+            <>
+              <p className="font-black">{isAr ? 'الطاولات' : 'Tables'}</p>
+              <div className="mt-1 grid grid-cols-2 gap-1">
+                {Array.from({length:6},(_,i)=><div key={i} className={`rounded p-1 text-center ${i<2?'bg-blue-50 text-blue-700':'bg-emerald-50 text-emerald-700'}`}>{i+1}</div>)}
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PhoneDevice({ className = '' }: { className?: string }) {
+  return (
+    <div className={`${className} w-[66px] -rotate-[5deg]`}>
+      <div className="rounded-[20px] bg-slate-950 p-1.5 shadow-2xl">
+        <div className="rounded-[15px] bg-white p-2 text-[5px] text-slate-600">
+          <p className="font-black text-blue-700">Premier</p>
+          <p className="mt-1">Sales</p>
+          <p className="text-[10px] font-black text-slate-900">18.4K</p>
+          <div className="mt-1 flex h-10 items-end gap-0.5">{[2,4,3,6,5,8].map((h,i)=><span key={i} className="flex-1 rounded-t bg-blue-500" style={{height:`${h*4}px`}} />)}</div>
         </div>
       </div>
     </div>
