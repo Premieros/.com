@@ -1,0 +1,46 @@
+name: Import HQ login scenes
+
+on:
+  push:
+    branches:
+      - fix/login-hq-scenes
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: fix/login-hq-scenes
+          fetch-depth: 0
+
+      - name: Fetch HQ scenes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public/auth/hq
+          TABLES='aHR0cHM6Ly9kMmpxcm02b3phOG5iNi5jbG91ZGZyb250Lm5ldC9kYXRhc2V0cy9mZDQyNDZmZS1mOTNhLTRiOTYtYjZkOS0wMzBlOGEyYmQ5OGEud2VicD9fand0PWV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUpyWlhsSVlYTm9Jam9pTldZek9HVXdOVFUwWkRZek1qRmlZaUlzSW1KMVkydGxkQ0k2SW5KMWJuZGhlUzFrWVhSaGMyVjBjeUlzSW5OMFlXZGxJam9pY0hKdlpDSXNJbVY0Y0NJNk1UYzVNVFl4TnpNMk5YMC5hME5BbHE4WV9XSGc4UFRSYjhHT2lLY3M2TTBuaUdRYVdhZFlNbUdHeEVz'
+          POS='aHR0cHM6Ly9kMmpxcm02b3phOG5iNi5jbG91ZGZyb250Lm5ldC9kYXRhc2V0cy80ZGVkYTRiMi0yOGE0LTRiOGEtOGI5MS05MWJiYjUzNGI2Njcud2VicD9fand0PWV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUpyWlhsSVlYTm9Jam9pWWpBMU5UUTBZbU5rTXpBNE1UWmhNQ0lzSW1KMVkydGxkQ0k2SW5KMWJuZGhlUzFrWVhSaGMyVjBjeUlzSW5OMFlXZGxJam9pY0hKdlpDSXNJbVY0Y0NJNk1UYzVNVFl6TWpVM01uMC43VDh5UjI5RUpNSjlDM045cS0zWlJWQmFHTWpXR3pkdDIyUWNwMGZxc1I4'
+          DASH='aHR0cHM6Ly9kMmpxcm02b3phOG5iNi5jbG91ZGZyb250Lm5ldC9kYXRhc2V0cy83NTgxYjQ1NC0yNmIwLTQ0ZTQtYWE0Ny0yZjdhNGQwYTliMDUud2VicD9fand0PWV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUpyWlhsSVlYTm9Jam9pTjJGbU5tVmhOekppT1RFMk9UZGpNQ0lzSW1KMVkydGxkQ0k2SW5KMWJuZGhlUzFrWVhSaGMyVjBjeUlzSW5OMFlXZGxJam9pY0hKdlpDSXNJbVY0Y0NJNk1UYzVNVFl4T1RneU5uMC5JVDRpRVltbDFycUJsdkxWWXIzWjNSRjhHU2RpQlQ1am1VUlN2YUttbWxz'
+          KITCHEN='aHR0cHM6Ly9kMmpxcm02b3phOG5iNi5jbG91ZGZyb250Lm5ldC9kYXRhc2V0cy83YWQ0YjNhYS04NWYyLTQyZTYtODBjYS0wNmYzOGVhNWU2ZTMud2VicD9fand0PWV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUpyWlhsSVlYTm9Jam9pT0RrNVlqWmxZVFUzTW1Sa1lUUXpZaUlzSW1KMVkydGxkQ0k2SW5KMWJuZGhlUzFrWVhSaGMyVjBjeUlzSW5OMFlXZGxJam9pY0hKdlpDSXNJbVY0Y0NJNk1UYzVNVFkwTnpNNU4zMC5wQ01DOUNfbERpbjcyc2hfcFJQZEtwa2UwTENqWjFNVUEtc2QySHJvWm1J'
+          EXIT='aHR0cHM6Ly9kMmpxcm02b3phOG5iNi5jbG91ZGZyb250Lm5ldC9kYXRhc2V0cy8wYTAzMGU0MS0wYTYxLTQxNDEtYmY2Ni02OGQ1MzJjNzI1MDcud2VicD9fand0PWV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUpyWlhsSVlYTm9Jam9pTkRGaU56bG1ZekJtWmpNME5ETTJZaUlzSW1KMVkydGxkQ0k2SW5KMWJuZGhlUzFrWVhSaGMyVjBjeUlzSW5OMFlXZGxJam9pY0hKdlpDSXNJbVY0Y0NJNk1UYzVNVFU1TXpBeU5IMC5lQjEyRU1FU0NrUjVlOWZxYldxWHl0RG5OVUtOajNnWVlyTEpOS0U4UXdF'
+          curl -L --fail --retry 3 "$(printf '%s' "$TABLES" | base64 -d)" -o public/auth/hq/tables.webp
+          curl -L --fail --retry 3 "$(printf '%s' "$POS" | base64 -d)" -o public/auth/hq/pos.webp
+          curl -L --fail --retry 3 "$(printf '%s' "$DASH" | base64 -d)" -o public/auth/hq/dashboard.webp
+          curl -L --fail --retry 3 "$(printf '%s' "$KITCHEN" | base64 -d)" -o public/auth/hq/kitchen.webp
+          curl -L --fail --retry 3 "$(printf '%s' "$EXIT" | base64 -d)" -o public/auth/hq/exit.webp
+
+      - name: Commit HQ scenes
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/auth/hq/*.webp
+          git diff --cached --quiet && exit 0
+          git commit -m "assets: add high-quality login scenes"
+          git push origin HEAD:fix/login-hq-scenes
