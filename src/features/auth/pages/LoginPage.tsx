@@ -34,9 +34,9 @@ export function LoginPage() {
 
   const slides = useMemo(
     () => [
-      '/auth/user-screen-1.webp',
-      '/auth/user-screen-2.webp',
-      '/auth/user-screen-3.webp',
+      '/auth/login-scene-pos.jpg',
+      '/auth/login-scene-tables.jpg',
+      '/auth/login-scene-dashboard.jpg',
     ],
     [],
   );
@@ -106,13 +106,7 @@ export function LoginPage() {
               <img
                 src={slide}
                 alt=""
-                className="absolute inset-0 h-full w-full scale-110 object-cover opacity-25 blur-3xl"
-              />
-              <div className="absolute inset-0 bg-slate-950/35" />
-              <img
-                src={slide}
-                alt=""
-                className="absolute inset-0 h-full w-full object-contain object-center"
+                className="absolute inset-0 h-full w-full object-cover object-center"
               />
             </div>
           ))}
@@ -310,12 +304,7 @@ export function LoginPage() {
                 <img
                   src={activeSlide}
                   alt=""
-                  className="absolute inset-0 h-full w-full scale-110 object-cover opacity-25 blur-2xl"
-                />
-                <img
-                  src={activeSlide}
-                  alt=""
-                  className="absolute inset-0 h-full w-full object-contain"
+                  className="absolute inset-0 h-full w-full object-cover object-center"
                 />
               </div>
 
