@@ -37,6 +37,18 @@ type OperationalIngredient = { raw_material_id: string; quantity: number; wastag
 type RawMaterialOption = { id: string; name: string; branch_id: string | null };
 type LinkedInventoryUnit = { unit_id: string; quantity: number; unit?: { id: string; name: string; unit_type: 'ready' | 'manufactured'; cost_price: number } | null };
 type ManufacturedInventoryUnit = { id: string; name: string; unit_type: 'manufactured'; cost_price: number; branch_id: string | null };
+type LinkedUnitLiveCost = { unit_id: string; unit_name: string; quantity: number; unit_cost: number; line_cost: number };
+type ExpandedUnitRawMaterial = {
+  root_unit_id: string;
+  unit_id: string;
+  unit_name: string;
+  depth: number;
+  raw_material_id: string;
+  raw_material_name: string;
+  effective_quantity: number;
+  raw_unit_cost: number;
+  line_cost: number;
+};
 
 export function ProductsPage() {
   const { t, lang } = useLanguage();
@@ -96,6 +108,23 @@ export function ProductsPage() {
   const [manufacturedInventoryUnits, setManufacturedInventoryUnits] = useState<ManufacturedInventoryUnit[]>([]);
   const [linkedUnitSel, setLinkedUnitSel] = useState('');
   const [linkedUnitQty, setLinkedUnitQty] = useState(1);
+  const [liveProductCosts, setLiveProductCosts] = useState<Record<string, number>>({});
+  const [liveCompositionCost, setLiveCompositionCost] = useState<number | null>(null);
+  const [linkedUnitLiveCosts, setLinkedUnitLiveCosts] = useState<Record<string, LinkedUnitLiveCost>>({});
+  const [expandedUnitRawMaterials, setExpandedUnitRawMaterials] = useState<ExpandedUnitRawMaterial[]>([]);
+
+  const loadLiveProductCosts = useCallback(async () => {
+    try {
+      const { data, error } = await api.catalog.getProductLiveCosts({ p_branch_id: branchFilter || null });
+      if (error) throw error;
+      const next: Record<string, number> = {};
+      for (const row of data || []) next[row.product_id] = Number(row.calculated_cost) || 0;
+      setLiveProductCosts(next);
+    } catch {
+      // Keep the stored product cost as a safe display fallback.
+      setLiveProductCosts({});
+    }
+  }, [branchFilter]);
 
   const loadStockComponents = useCallback(async () => {
     if (!supportsComposition) {
@@ -128,6 +157,7 @@ export function ProductsPage() {
   }, [branchFilter]);
 
   useEffect(() => { loadMeta(); }, [loadMeta]);
+  useEffect(() => { loadLiveProductCosts(); }, [loadLiveProductCosts]);
 
   const filtered = products;
   const availableToAdd = stockComponents.filter((s) => s.product_id !== editing?.id && !productComponents.some((c) => c.component_product_id === s.product_id));
@@ -151,6 +181,41 @@ export function ProductsPage() {
     setUnits((u.data as ProductUnit[]) || [{ id: '', product_id: p.id, unit_name: 'piece', unit_name_en: 'piece', conversion_factor: 1, sale_price: p.sale_price, cost_price: p.cost_price, barcode: p.barcode || '', is_base: true, created_at: '' }]);
     setProductComponents(((comps.data as { component_product_id: string; quantity: number }[] | null) || []).map((c) => ({ component_product_id: c.component_product_id, quantity: Number(c.quantity) || 1 })));
     const effectiveProductBranch = p.branch_id || branchFilter || '';
+    setLiveCompositionCost(null);
+    setLinkedUnitLiveCosts({});
+    setExpandedUnitRawMaterials([]);
+    if (supportsComposition && effectiveProductBranch) {
+      try {
+        const { data: compositionDetail, error: compositionDetailError } = await api.catalog.getProductOperationalComposition({
+          p_product_id: p.id,
+          p_branch_id: effectiveProductBranch,
+        });
+        if (compositionDetailError) throw compositionDetailError;
+        if (compositionDetail?.success !== false) {
+          setLiveCompositionCost(Number(compositionDetail?.calculated_cost) || 0);
+          const unitCostMap: Record<string, LinkedUnitLiveCost> = {};
+          for (const row of compositionDetail?.linked_units || []) {
+            unitCostMap[row.unit_id] = {
+              unit_id: row.unit_id,
+              unit_name: row.unit_name,
+              quantity: Number(row.quantity) || 0,
+              unit_cost: Number(row.unit_cost) || 0,
+              line_cost: Number(row.line_cost) || 0,
+            };
+          }
+          setLinkedUnitLiveCosts(unitCostMap);
+          setExpandedUnitRawMaterials((compositionDetail?.expanded_unit_raw_materials || []).map((row) => ({
+            ...row,
+            depth: Number(row.depth) || 0,
+            effective_quantity: Number(row.effective_quantity) || 0,
+            raw_unit_cost: Number(row.raw_unit_cost) || 0,
+            line_cost: Number(row.line_cost) || 0,
+          })));
+        }
+      } catch {
+        // Editing still works if the live-cost helper is unavailable.
+      }
+    }
     let recipeRows: OperationalIngredient[] = [];
     let currentYield = 1;
     if (effectiveProductBranch && supportsRawComposition) {
@@ -291,6 +356,7 @@ export function ProductsPage() {
     show(t('saveSuccess'), 'success');
     setModalOpen(false);
     await invalidatePosCatalogCache();
+    await loadLiveProductCosts();
     reloadProducts();
   };
 
@@ -367,7 +433,10 @@ export function ProductsPage() {
     { key: 'name', header: t('productName'), render: (p) => <div className="flex items-center gap-2"><div className="w-9 h-9 rounded-lg bg-ui-page-alt flex items-center justify-center flex-shrink-0">{p.image_url ? <ProductImage src={p.image_url} name={p.name} category={productCategoryName(p)} className="h-full w-full rounded-lg bg-white" imgClassName="h-full w-full rounded-lg bg-white object-contain p-0.5" positionX={p.image_position_x} positionY={p.image_position_y} zoom={p.image_zoom} /> : <BarcodeIcon className="w-4 h-4 text-ui-subtle" />}</div><div><p className="font-medium text-ui-text">{p.name}</p><p className="text-xs text-ui-subtle">{p.barcode || '-'}</p></div>{p.product_type === 'manufactured' && <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">{lang === 'ar' ? 'بمكونات' : 'With components'}</span>}</div> },
     { key: 'category', header: t('category'), render: (p) => productCategoryName(p) || '-' },
     { key: 'branch', header: t('branch'), render: (p) => <BranchBadge name={branchLabel(p.branch_id)} /> },
-    { key: 'cost_price', header: t('costPrice'), render: (p) => formatCurrency(p.cost_price, currency, lang) },
+    { key: 'cost_price', header: t('costPrice'), render: (p) => {
+      const cost = p.product_type === 'manufactured' ? (liveProductCosts[p.id] ?? p.cost_price) : p.cost_price;
+      return <span title={p.product_type === 'manufactured' ? (lang === 'ar' ? 'تكلفة محسوبة من المكونات الحالية' : 'Calculated from current components') : undefined}>{formatCurrency(cost, currency, lang)}</span>;
+    } },
     { key: 'sale_price', header: t('salePrice'), render: (p) => <span className="font-semibold text-brand-600 dark:text-brand-400">{formatCurrency(p.sale_price, currency, lang)}</span> },
     { key: 'wholesale_price', header: t('wholesalePrice'), render: (p) => formatCurrency(p.wholesale_price, currency, lang) },
     { key: 'is_active', header: t('status'), render: (p) => <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${p.is_active ? 'bg-ui-success-soft text-ui-success' : 'bg-ui-page-alt text-ui-subtle dark:text-ui-subtle'}`}>{p.is_active ? t('active') : t('inactive')}</span> },
