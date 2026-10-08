@@ -30,6 +30,43 @@ export function LoginPage() {
 
   const isAr = lang === 'ar';
 
+  useEffect(() => {
+    const html = document.documentElement;
+    const body = document.body;
+    const root = document.getElementById('root');
+
+    const previous = {
+      htmlOverflow: html.style.overflow,
+      htmlHeight: html.style.height,
+      bodyOverflow: body.style.overflow,
+      bodyHeight: body.style.height,
+      rootOverflow: root?.style.overflow ?? '',
+      rootHeight: root?.style.height ?? '',
+    };
+
+    html.style.overflow = 'hidden';
+    html.style.height = '100%';
+    body.style.overflow = 'hidden';
+    body.style.height = '100%';
+
+    if (root) {
+      root.style.overflow = 'hidden';
+      root.style.height = '100%';
+    }
+
+    return () => {
+      html.style.overflow = previous.htmlOverflow;
+      html.style.height = previous.htmlHeight;
+      body.style.overflow = previous.bodyOverflow;
+      body.style.height = previous.bodyHeight;
+
+      if (root) {
+        root.style.overflow = previous.rootOverflow;
+        root.style.height = previous.rootHeight;
+      }
+    };
+  }, []);
+
   const slides = useMemo(
     () => [
       '/auth/hq/tables.webp',
@@ -94,7 +131,7 @@ export function LoginPage() {
 
 
   return (
-    <DesignSurface testId="login-surface">
+    <DesignSurface testId="login-surface" className="h-[100dvh] overflow-hidden !space-y-0">
       <style>{`
         @keyframes login-scene-zoom-out {
           0% {
