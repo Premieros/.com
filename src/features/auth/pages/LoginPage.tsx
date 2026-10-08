@@ -126,7 +126,7 @@ export function LoginPage() {
 
   return (
     <DesignSurface testId="login-surface">
-      <div className="min-h-screen overflow-hidden bg-white text-slate-950 lg:grid lg:grid-cols-[58%_42%]" dir="ltr">
+      <div className="min-h-screen overflow-hidden bg-[#0d1117] text-slate-950 lg:grid lg:grid-cols-[60%_40%]" dir="ltr">
         <section className="relative hidden min-h-screen overflow-hidden lg:block">
           {slides.map((slide, index) => (
             <img
@@ -140,7 +140,7 @@ export function LoginPage() {
             />
           ))}
 
-          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/25 to-slate-950/10" />
+          <div className="absolute inset-0 bg-gradient-to-t from-slate-950/82 via-slate-950/30 to-slate-950/12" />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950/20 via-transparent to-slate-950/10" />
 
           <div className="absolute inset-0 z-10 flex items-center justify-center px-12 xl:px-16" dir={isAr ? 'rtl' : 'ltr'}>
@@ -157,7 +157,7 @@ export function LoginPage() {
                 </p>
               </div>
 
-              <div className="mx-auto mt-7 max-w-4xl">
+              <div className="mx-auto mt-6 max-w-4xl">
                 <RestaurantDevice preview={activeSlide.preview} isAr={isAr} />
               </div>
 
@@ -215,13 +215,9 @@ export function LoginPage() {
         </section>
 
         <section
-          className="relative flex min-h-screen items-center justify-center bg-white px-6 py-8 sm:px-10 lg:px-12 xl:px-16"
+          className="relative z-30 flex min-h-screen items-center justify-center bg-white px-6 py-8 sm:px-10 lg:-ml-10 lg:rounded-l-[68px] lg:px-12 lg:shadow-[-28px_0_80px_-42px_rgba(15,23,42,0.55)] xl:px-16"
           dir={isAr ? 'rtl' : 'ltr'}
         >
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-y-0 -left-20 hidden w-32 bg-white lg:block [clip-path:polygon(70%_0,100%_0,100%_100%,0_100%)]"
-          />
           <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-blue-50/80 blur-3xl" />
           <div className="pointer-events-none absolute -bottom-24 -left-10 h-72 w-72 rounded-full bg-slate-100 blur-3xl" />
 
@@ -391,30 +387,47 @@ export function LoginPage() {
 
 function RestaurantDevice({ preview, isAr }: { preview: LoginPreview; isAr: boolean }) {
   return (
-    <div className="relative mx-auto w-full max-w-[760px]">
-      <div className="absolute -inset-5 rounded-[38px] bg-black/25 blur-2xl" />
-      <div className="relative rounded-[30px] border border-white/15 bg-[#111827] p-3 shadow-2xl shadow-black/50">
-        <div className="overflow-hidden rounded-[22px] border border-slate-700 bg-slate-50">
-          <div className="flex h-8 items-center justify-between border-b border-slate-200 bg-white px-3 text-[8px] font-bold text-slate-500">
-            <div className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
-              <span>Premier</span>
+    <div className="relative mx-auto h-[355px] w-full max-w-[780px] [perspective:1200px]">
+      <div className="absolute inset-x-[-10%] bottom-0 h-24 rounded-[50%] bg-gradient-to-b from-[#8b5a35]/95 via-[#5a3520]/95 to-[#2b170f]/95 shadow-[0_24px_60px_rgba(0,0,0,0.42)]" />
+      <div className="absolute inset-x-[5%] bottom-8 h-6 rounded-[50%] bg-black/45 blur-xl" />
+
+      <div className="absolute bottom-10 left-1/2 w-[88%] -translate-x-1/2 [transform:translateX(-50%)_rotateX(2deg)_rotateY(-2.5deg)]">
+        <div className="absolute -inset-4 rounded-[36px] bg-black/30 blur-2xl" />
+        <div className="relative rounded-[28px] border border-white/10 bg-[#111827] p-3 shadow-[0_28px_55px_rgba(0,0,0,0.48)]">
+          <div className="overflow-hidden rounded-[19px] border border-slate-700 bg-slate-50">
+            <div className="flex h-8 items-center justify-between border-b border-slate-200 bg-white px-3 text-[8px] font-bold text-slate-500">
+              <div className="flex items-center gap-2">
+                <span className="flex h-4 w-4 items-center justify-center rounded-md bg-blue-600 text-[7px] font-black text-white">P</span>
+                <span>Premier</span>
+              </div>
+              <div className="flex gap-1">
+                <span className="rounded bg-emerald-50 px-2 py-0.5 text-emerald-700">{isAr ? 'متصل' : 'Online'}</span>
+                <span className="rounded bg-slate-100 px-2 py-0.5">{isAr ? 'الفرع الرئيسي' : 'Main branch'}</span>
+              </div>
             </div>
-            <div className="flex gap-1">
-              <span className="rounded bg-emerald-50 px-2 py-0.5 text-emerald-700">{isAr ? 'متصل' : 'Online'}</span>
-              <span className="rounded bg-slate-100 px-2 py-0.5">{isAr ? 'الفرع الرئيسي' : 'Main branch'}</span>
+            <div className="h-[224px] bg-slate-50 sm:h-[244px]">
+              {preview === 'pos' && <PosPreview isAr={isAr} />}
+              {preview === 'tables' && <TablesPreview isAr={isAr} />}
+              {preview === 'dashboard' && <DashboardPreview isAr={isAr} />}
+              {preview === 'kitchen' && <KitchenPreview isAr={isAr} />}
             </div>
           </div>
-          <div className="h-[250px] bg-slate-50 sm:h-[280px]">
-            {preview === 'pos' && <PosPreview isAr={isAr} />}
-            {preview === 'tables' && <TablesPreview isAr={isAr} />}
-            {preview === 'dashboard' && <DashboardPreview isAr={isAr} />}
-            {preview === 'kitchen' && <KitchenPreview isAr={isAr} />}
+          <div className="mx-auto mt-2 h-1.5 w-16 rounded-full bg-slate-700" />
+        </div>
+        <div className="mx-auto h-8 w-28 rounded-b-[20px] bg-gradient-to-b from-slate-900 to-slate-950 shadow-lg" />
+        <div className="mx-auto h-3 w-44 rounded-[50%] bg-slate-950/85" />
+      </div>
+
+      <div className="absolute bottom-5 right-[4%] hidden sm:block">
+        <div className="h-24 w-16 rounded-t-xl bg-slate-900 shadow-xl">
+          <div className="mx-auto mt-2 h-1 w-10 rounded-full bg-slate-600" />
+          <div className="mx-auto mt-3 h-10 w-11 rounded bg-white p-1 text-[5px] text-slate-500">
+            <p className="font-black text-slate-700">Premier</p>
+            <p className="mt-1">#1042</p>
+            <p className="mt-1">{isAr ? 'إجمالي' : 'Total'} 735.30</p>
           </div>
         </div>
       </div>
-      <div className="mx-auto h-5 w-24 rounded-b-xl bg-slate-900 shadow-lg" />
-      <div className="mx-auto h-2 w-40 rounded-full bg-black/35 blur-[1px]" />
     </div>
   );
 }
