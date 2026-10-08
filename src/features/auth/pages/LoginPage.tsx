@@ -3,13 +3,10 @@ import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowRight,
-  BarChart3,
   ChevronLeft,
   ChevronRight,
   Loader2,
   LockKeyhole,
-  ShoppingCart,
-  UtensilsCrossed,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -19,14 +16,6 @@ import { Logo } from '@/components/Logo';
 import { useToast } from '@/components/Toast';
 import { DesignSurface } from '@/components/design/DesignSurface';
 import { APP_ROUTES } from '@/core/navigation/routes';
-
-type LoginSlide = {
-  image: string;
-  titleAr: string;
-  titleEn: string;
-  descriptionAr: string;
-  descriptionEn: string;
-};
 
 export function LoginPage() {
   const { signIn, signInWithUsername } = useAuth();
@@ -43,34 +32,20 @@ export function LoginPage() {
 
   const isAr = lang === 'ar';
 
-  const slides = useMemo<LoginSlide[]>(() => [
-    {
-      image: '/auth/login-scene-pos.jpg',
-      titleAr: 'إدارة مطعمك بأسلوب أسهل وأذكى',
-      titleEn: 'Run your restaurant in a simpler, smarter way',
-      descriptionAr: 'نقطة بيع سريعة وواضحة داخل بيئة مطعم حقيقية',
-      descriptionEn: 'A fast, clear point of sale inside a real restaurant environment',
-    },
-    {
-      image: '/auth/login-scene-tables.jpg',
-      titleAr: 'كل الطاولات والطلبات أمامك',
-      titleEn: 'Every table and order in front of you',
-      descriptionAr: 'تابع حالة الطاولات وافتح الطلبات بدون تعقيد',
-      descriptionEn: 'Track table status and open orders without friction',
-    },
-    {
-      image: '/auth/login-scene-dashboard.jpg',
-      titleAr: 'قرارات أفضل من أرقام أوضح',
-      titleEn: 'Better decisions from clearer numbers',
-      descriptionAr: 'مبيعات، مخزون، تكلفة وربحية في لوحة تحكم واحدة',
-      descriptionEn: 'Sales, inventory, cost, and profitability in one dashboard',
-    },
-  ], []);
+  const slides = useMemo(
+    () => [
+      '/auth/user-screen-1.webp',
+      '/auth/user-screen-2.webp',
+      '/auth/user-screen-3.webp',
+    ],
+    [],
+  );
 
   useEffect(() => {
     const timer = window.setInterval(() => {
       setSlideIndex((value) => (value + 1) % slides.length);
     }, 5600);
+
     return () => window.clearInterval(timer);
   }, [slides.length]);
 
@@ -88,9 +63,10 @@ export function LoginPage() {
 
     setLoading(true);
     try {
-      const result = mode === 'pin'
-        ? await signInWithUsername(username, pin)
-        : await signIn(email, password);
+      const result =
+        mode === 'pin'
+          ? await signInWithUsername(username, pin)
+          : await signIn(email, password);
 
       if (result.error) {
         const code = result.error.code;
@@ -98,8 +74,9 @@ export function LoginPage() {
 
         if (code === 'invalid_credentials') msg = t('invalidCredentials');
         else if (code === 'email_not_confirmed') msg = t('emailNotConfirmed');
-        else if (code === 'user_not_found') msg = mode === 'pin' ? t('usernameNotFound') : t('userNotFound');
-        else if (code === 'user_inactive') msg = t('userInactive');
+        else if (code === 'user_not_found') {
+          msg = mode === 'pin' ? t('usernameNotFound') : t('userNotFound');
+        } else if (code === 'user_inactive') msg = t('userInactive');
         else if (code === 'user_locked') msg = t('userLocked');
         else if (code === 'over_request_rate_limit') msg = t('rateLimited');
         else if (code === 'email_address_invalid') msg = t('invalidCredentials');
@@ -116,85 +93,57 @@ export function LoginPage() {
 
   return (
     <DesignSurface testId="login-surface">
-      <div className="min-h-screen overflow-hidden bg-[#0b1220] text-slate-950 lg:grid lg:grid-cols-[62%_38%]" dir="ltr">
+      <div className="min-h-[100dvh] bg-white text-slate-950 lg:grid lg:grid-cols-[58%_42%]" dir="ltr">
         <section className="relative hidden h-[100dvh] min-h-[680px] overflow-hidden bg-slate-950 lg:block">
           {slides.map((slide, index) => (
             <div
-              key={slide.image}
+              key={slide}
               aria-hidden={index !== slideIndex}
-              className={`absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000 ease-out ${
-                index === slideIndex ? 'scale-100 opacity-100' : 'scale-[1.018] opacity-0'
+              className={`absolute inset-0 transition-opacity duration-700 ${
+                index === slideIndex ? 'opacity-100' : 'pointer-events-none opacity-0'
               }`}
-              style={{ backgroundImage: `url("${slide.image}")` }}
-            />
-          ))}
-
-          <div className="absolute inset-0 bg-gradient-to-b from-slate-950/62 via-slate-950/12 to-slate-950/45" />
-          <div className="absolute inset-0 bg-gradient-to-r from-slate-950/48 via-transparent to-transparent" />
-
-          <div className="absolute inset-x-0 top-0 z-10 p-8 xl:p-10" dir={isAr ? 'rtl' : 'ltr'}>
-            <div className="max-w-[720px]">
-              <p className="text-sm font-black tracking-wide text-white/90">
-                {isAr ? 'نظام Premier لإدارة المطاعم والكافيهات' : 'Premier Restaurant & Café Management'}
-              </p>
-
-              <h1 className="mt-3 max-w-[620px] text-3xl font-black leading-[1.12] tracking-tight text-white drop-shadow-2xl xl:text-5xl">
-                {isAr ? activeSlide.titleAr : activeSlide.titleEn}
-              </h1>
-
-              <p className="mt-3 max-w-xl text-sm font-semibold leading-7 text-white/85 xl:text-base">
-                {isAr ? activeSlide.descriptionAr : activeSlide.descriptionEn}
-              </p>
-
-              <div className="mt-5 grid max-w-xl grid-cols-3 gap-2.5">
-                {[
-                  [BarChart3, isAr ? 'تقارير فورية' : 'Live reports'],
-                  [UtensilsCrossed, isAr ? 'إدارة الطلبات' : 'Order management'],
-                  [ShoppingCart, isAr ? 'تشغيل أسرع' : 'Faster service'],
-                ].map(([Icon, label]) => {
-                  const FeatureIcon = Icon as typeof BarChart3;
-                  return (
-                    <div key={String(label)} className="rounded-xl border border-white/15 bg-slate-950/32 px-3 py-2.5 text-white shadow-lg backdrop-blur-md">
-                      <div className="flex items-center gap-2.5">
-                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/95">
-                          <FeatureIcon className="h-4 w-4" />
-                        </span>
-                        <span className="text-xs font-black">{String(label)}</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+            >
+              <img
+                src={slide}
+                alt=""
+                className="absolute inset-0 h-full w-full scale-110 object-cover opacity-25 blur-3xl"
+              />
+              <div className="absolute inset-0 bg-slate-950/35" />
+              <img
+                src={slide}
+                alt=""
+                className="absolute inset-0 h-full w-full object-contain object-center"
+              />
             </div>
-          </div>
+          ))}
 
           <button
             type="button"
             aria-label={isAr ? 'الصورة السابقة' : 'Previous image'}
             onClick={() => goToSlide(slideIndex - 1)}
-            className="absolute left-6 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-slate-950/35 text-white shadow-xl backdrop-blur-md transition hover:bg-slate-950/55"
+            className="absolute left-5 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur-md transition hover:bg-black/55"
           >
-            <ChevronLeft className="h-6 w-6" />
+            <ChevronLeft className="h-5 w-5" />
           </button>
 
           <button
             type="button"
             aria-label={isAr ? 'الصورة التالية' : 'Next image'}
             onClick={() => goToSlide(slideIndex + 1)}
-            className="absolute right-6 top-1/2 z-20 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full border border-white/25 bg-slate-950/35 text-white shadow-xl backdrop-blur-md transition hover:bg-slate-950/55"
+            className="absolute right-5 top-1/2 z-20 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-black/35 text-white shadow-lg backdrop-blur-md transition hover:bg-black/55"
           >
-            <ChevronRight className="h-6 w-6" />
+            <ChevronRight className="h-5 w-5" />
           </button>
 
-          <div className="absolute inset-x-0 bottom-7 z-20 flex justify-center gap-2.5">
+          <div className="absolute inset-x-0 bottom-6 z-20 flex justify-center gap-2">
             {slides.map((slide, index) => (
               <button
-                key={slide.image}
+                key={slide}
                 type="button"
                 aria-label={isAr ? `انتقل للصورة ${index + 1}` : `Go to image ${index + 1}`}
                 onClick={() => goToSlide(index)}
-                className={`h-2.5 rounded-full transition-all ${
-                  index === slideIndex ? 'w-9 bg-blue-500' : 'w-2.5 bg-white/70 hover:bg-white'
+                className={`h-2 rounded-full shadow transition-all ${
+                  index === slideIndex ? 'w-8 bg-blue-500' : 'w-2 bg-white/65 hover:bg-white'
                 }`}
               />
             ))}
@@ -202,14 +151,14 @@ export function LoginPage() {
         </section>
 
         <section
-          className="relative z-30 flex min-h-[100dvh] items-center justify-center bg-white px-6 py-8 sm:px-10 lg:-ml-8 lg:h-[100dvh] lg:rounded-l-[56px] lg:px-10 lg:shadow-[-26px_0_70px_-36px_rgba(15,23,42,0.5)] xl:px-14"
+          className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-white px-6 py-8 sm:px-10 lg:border-s lg:border-slate-100 lg:px-12 xl:px-16"
           dir={isAr ? 'rtl' : 'ltr'}
         >
-          <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-blue-50/80 blur-3xl" />
-          <div className="pointer-events-none absolute -bottom-24 -left-10 h-72 w-72 rounded-full bg-slate-100 blur-3xl" />
+          <div className="pointer-events-none absolute -right-24 -top-24 h-64 w-64 rounded-full bg-blue-50/70 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-24 -left-24 h-64 w-64 rounded-full bg-slate-100/80 blur-3xl" />
 
           <div className="relative z-10 w-full max-w-[470px]">
-            <div className="mb-8 flex items-center justify-between gap-4">
+            <div className="mb-10 flex items-center justify-between gap-4">
               <Logo variant="horizontal" size={62} tone="navy" showTagline={false} />
 
               <button
@@ -222,20 +171,23 @@ export function LoginPage() {
               </button>
             </div>
 
-            <div className="mb-7">
-              <h2 className="text-4xl font-black tracking-tight text-slate-950">
+            <div className="mb-8">
+              <h1 className="text-4xl font-black tracking-tight text-slate-950">
                 {isAr ? 'مرحبًا بعودتك' : 'Welcome back'}
-              </h2>
+              </h1>
               <p className="mt-3 text-base font-semibold leading-7 text-slate-500">
-                {isAr ? 'سجّل دخولك إلى نظام إدارة المطعم' : 'Sign in to your restaurant management system'}
+                {isAr ? 'سجّل دخولك إلى نظام Premier' : 'Sign in to Premier'}
               </p>
             </div>
 
-            <div data-testid="login-mode-toggle" className="mb-5 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
+            <div
+              data-testid="login-mode-toggle"
+              className="mb-6 grid grid-cols-2 rounded-2xl bg-slate-100 p-1"
+            >
               <button
                 type="button"
                 onClick={() => setMode('pin')}
-                className={`rounded-xl py-2.5 text-sm font-black transition ${
+                className={`rounded-xl py-3 text-sm font-black transition ${
                   mode === 'pin' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'
                 }`}
               >
@@ -244,7 +196,7 @@ export function LoginPage() {
               <button
                 type="button"
                 onClick={() => setMode('password')}
-                className={`rounded-xl py-2.5 text-sm font-black transition ${
+                className={`rounded-xl py-3 text-sm font-black transition ${
                   mode === 'password' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'
                 }`}
               >
@@ -303,7 +255,7 @@ export function LoginPage() {
                 data-testid="login-submit"
                 type="submit"
                 size="lg"
-                className="mt-2 min-h-14 w-full rounded-2xl text-base font-black shadow-xl shadow-blue-600/20"
+                className="mt-2 min-h-14 w-full rounded-2xl text-base font-black shadow-lg shadow-blue-600/20"
                 disabled={loading}
               >
                 {loading ? (
@@ -311,7 +263,11 @@ export function LoginPage() {
                 ) : (
                   <span className="inline-flex items-center gap-2">
                     {t('signIn')}
-                    {isAr ? <ArrowLeft className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
+                    {isAr ? (
+                      <ArrowLeft className="h-5 w-5" />
+                    ) : (
+                      <ArrowRight className="h-5 w-5" />
+                    )}
                   </span>
                 )}
               </Button>
@@ -326,12 +282,16 @@ export function LoginPage() {
             <button
               type="button"
               onClick={() => setMode(mode === 'pin' ? 'password' : 'pin')}
-              className="flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl border border-blue-200 bg-blue-50/50 px-4 text-sm font-black text-slate-800 transition hover:border-blue-300 hover:bg-blue-50"
+              className="flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:border-blue-300 hover:bg-blue-50/40"
             >
               <LockKeyhole className="h-5 w-5 text-blue-600" />
               {mode === 'pin'
-                ? (isAr ? 'الدخول بالبريد الإلكتروني' : 'Sign in with email')
-                : (isAr ? 'الدخول برمز الموظف' : 'Sign in with staff PIN')}
+                ? isAr
+                  ? 'الدخول بالبريد الإلكتروني'
+                  : 'Sign in with email'
+                : isAr
+                  ? 'الدخول برمز الموظف'
+                  : 'Sign in with staff PIN'}
             </button>
 
             <div className="mt-8 flex items-center justify-between gap-4 border-t border-slate-100 pt-5 text-xs font-bold text-slate-500">
@@ -345,23 +305,31 @@ export function LoginPage() {
               <span>Premier © 2026</span>
             </div>
 
-            <div className="relative mt-8 overflow-hidden rounded-3xl lg:hidden">
-              <img src={activeSlide.image} alt="" className="h-52 w-full object-cover" />
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/25 to-transparent" />
-              <div className="absolute inset-x-0 bottom-0 p-5 text-white">
-                <p className="text-lg font-black">{isAr ? activeSlide.titleAr : activeSlide.titleEn}</p>
-                <div className="mt-3 flex gap-2">
-                  {slides.map((slide, index) => (
-                    <button
-                      key={slide.image}
-                      type="button"
-                      onClick={() => goToSlide(index)}
-                      className={`h-2.5 rounded-full transition-all ${
-                        index === slideIndex ? 'w-8 bg-blue-400' : 'w-2.5 bg-white/65'
-                      }`}
-                    />
-                  ))}
-                </div>
+            <div className="relative mt-8 overflow-hidden rounded-3xl border border-slate-200 bg-slate-950 shadow-xl lg:hidden">
+              <div className="relative aspect-[16/8]">
+                <img
+                  src={activeSlide}
+                  alt=""
+                  className="absolute inset-0 h-full w-full scale-110 object-cover opacity-25 blur-2xl"
+                />
+                <img
+                  src={activeSlide}
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-contain"
+                />
+              </div>
+
+              <div className="absolute inset-x-0 bottom-3 flex justify-center gap-2">
+                {slides.map((slide, index) => (
+                  <button
+                    key={slide}
+                    type="button"
+                    onClick={() => goToSlide(index)}
+                    className={`h-2 rounded-full transition-all ${
+                      index === slideIndex ? 'w-7 bg-blue-500' : 'w-2 bg-white/70'
+                    }`}
+                  />
+                ))}
               </div>
             </div>
           </div>
