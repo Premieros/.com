@@ -32,18 +32,11 @@ export function LoginPage() {
 
   const slides = useMemo(
     () => [
-      '/auth/storyboard/scene-01.webp',
-      '/auth/storyboard/scene-02.webp',
-      '/auth/storyboard/scene-03.webp',
-      '/auth/storyboard/scene-04.webp',
-      '/auth/storyboard/scene-05.webp',
-      '/auth/storyboard/scene-06.webp',
-      '/auth/storyboard/scene-07.webp',
-      '/auth/storyboard/scene-08.webp',
-      '/auth/storyboard/scene-09.webp',
-      '/auth/storyboard/scene-10.webp',
-      '/auth/storyboard/scene-11.webp',
-      '/auth/storyboard/scene-12.webp',
+      '/auth/hq/tables.webp',
+      '/auth/hq/pos.webp',
+      '/auth/hq/kitchen.webp',
+      '/auth/hq/dashboard.webp',
+      '/auth/hq/exit.webp',
     ],
     [],
   );
@@ -51,7 +44,7 @@ export function LoginPage() {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setSlideIndex((value) => (value + 1) % slides.length);
-    }, 2000);
+    }, 4200);
 
     return () => window.clearInterval(timer);
   }, [slides.length]);
@@ -105,10 +98,10 @@ export function LoginPage() {
       <style>{`
         @keyframes login-scene-zoom-out {
           0% {
-            transform: scale(1.035);
+            transform: scale(1.025);
             opacity: 0;
           }
-          8% {
+          10% {
             opacity: 1;
           }
           92% {
@@ -139,7 +132,7 @@ export function LoginPage() {
             fetchPriority="high"
             draggable={false}
             className="absolute inset-0 h-full w-full object-cover object-center will-change-transform"
-            style={{ animation: 'login-scene-zoom-out 2000ms ease-out both' }}
+            style={{ animation: 'login-scene-zoom-out 4200ms ease-out both' }}
           />
         </section>
 
