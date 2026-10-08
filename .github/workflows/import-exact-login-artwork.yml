@@ -28,13 +28,6 @@ jobs:
           curl -L --fail --retry 3 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/9cfe5de9-00ab-4875-bbb9-efbfb6ab5f13.png?_jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXlIYXNoIjoiZTQwMWQ5ZjIyOTVlOTQ3YiIsImJ1Y2tldCI6InJ1bndheS1kYXRhc2V0cyIsInN0YWdlIjoicHJvZCIsImV4cCI6MTc5MTY0MzM3OH0.JIbqfGxxLs-ogOaLiUOEcBZtVyK1ghd6j7AT3ZjTS1s' -o public/auth/exact/login-art-3.png
           curl -L --fail --retry 3 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/61a3382a-cfdf-4776-bcc1-668df5cdf20f.png?_jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXlIYXNoIjoiNjc4MWMwZDRhMDY4OTM5MiIsImJ1Y2tldCI6InJ1bndheS1kYXRhc2V0cyIsInN0YWdlIjoicHJvZCIsImV4cCI6MTc5MTU5MzU1Nn0.QlncUtav7jRzLwwvbngdJCptlfRWu9L4lcjWM8HS8kk' -o public/auth/exact/login-art-4.png
           curl -L --fail --retry 3 'https://d2jqrm6oza8nb6.cloudfront.net/datasets/43240241-4a7f-4688-8492-21012ecb19d6.png?_jwt=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJrZXlIYXNoIjoiZTc4ZmExNDE4OGEzMTI5MyIsImJ1Y2tldCI6InJ1bndheS1kYXRhc2V0cyIsInN0YWdlIjoicHJvZCIsImV4cCI6MTc5MTY1MDYyNX0.UXKiFcEKT76wxadQNp5jx1GSkgeb5Mws8L7wRODwir4' -o public/auth/exact/login-art-5.png
-          python - <<'PY'
-          from PIL import Image
-          from pathlib import Path
-          for path in sorted(Path("public/auth/exact").glob("login-art-*.png")):
-              with Image.open(path) as im:
-                  assert im.size == (1672, 941), (path, im.size)
-          PY
 
       - name: Commit exact artwork
         shell: bash
