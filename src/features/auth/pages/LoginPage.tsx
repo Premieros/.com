@@ -93,8 +93,8 @@ export function LoginPage() {
 
   return (
     <DesignSurface testId="login-surface">
-      <div className="min-h-[100dvh] bg-white text-slate-950 lg:grid lg:grid-cols-[58%_42%]" dir="ltr">
-        <section className="relative hidden h-[100dvh] min-h-[680px] overflow-hidden bg-slate-950 lg:block">
+      <div className="min-h-[100dvh] bg-white text-slate-950 lg:grid lg:grid-cols-[56%_44%]" dir="ltr">
+        <section className="relative hidden h-[100dvh] min-h-[680px] overflow-hidden bg-[#0b1220] lg:flex lg:items-center lg:justify-center">
           {slides.map((slide, index) => (
             <div
               key={slide}
@@ -103,11 +103,14 @@ export function LoginPage() {
                 index === slideIndex ? 'opacity-100' : 'pointer-events-none opacity-0'
               }`}
             >
-              <img
-                src={slide}
-                alt=""
-                className="absolute inset-0 h-full w-full object-cover object-center"
-              />
+              <div className="absolute inset-0 flex items-center justify-center p-6 xl:p-8">
+                <img
+                  src={slide}
+                  alt=""
+                  className="max-h-full max-w-full rounded-[28px] object-contain shadow-2xl shadow-black/35"
+                  draggable={false}
+                />
+              </div>
             </div>
           ))}
 
@@ -304,7 +307,8 @@ export function LoginPage() {
                 <img
                   src={activeSlide}
                   alt=""
-                  className="absolute inset-0 h-full w-full object-cover object-center"
+                  className="absolute inset-0 h-full w-full object-contain object-center"
+                  draggable={false}
                 />
               </div>
 
