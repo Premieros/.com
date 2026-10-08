@@ -94,7 +94,7 @@ export function LoginPage() {
 
   return (
     <DesignSurface testId="login-surface">
-      <div className="min-h-[100dvh] bg-white text-slate-950 lg:grid lg:grid-cols-[56%_44%]" dir="ltr">
+      <div className="min-h-[100dvh] bg-white text-slate-950 lg:grid lg:grid-cols-[64%_36%]" dir="ltr">
         <section className="relative hidden h-[100dvh] min-h-[680px] overflow-hidden bg-slate-950 lg:block">
           <img
             key={slides[slideIndex]}
@@ -109,10 +109,10 @@ export function LoginPage() {
         </section>
 
         <section
-          className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-white px-6 py-8 sm:px-10 lg:border-s lg:border-slate-100 lg:px-12 xl:px-16"
+          className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-white px-6 py-8 sm:px-10 lg:border-s lg:border-slate-100 lg:px-9 xl:px-12"
           dir={isAr ? 'rtl' : 'ltr'}
         >
-          <div className="relative z-10 w-full max-w-[470px]">
+          <div className="relative z-10 w-full max-w-[430px]">
             <div className="mb-10 flex items-center justify-between gap-4">
               <Logo variant="horizontal" size={62} tone="navy" showTagline={false} />
 
