@@ -32,8 +32,10 @@ export function LoginPage() {
 
   const slides = useMemo(
     () => [
-      '/auth/exact/login-art-1.webp',
-      '/auth/exact/login-art-4.webp',
+      '/auth/creative/tables.webp',
+      '/auth/creative/pos.webp',
+      '/auth/creative/dashboard.webp',
+      '/auth/creative/kitchen.webp',
     ],
     [],
   );
