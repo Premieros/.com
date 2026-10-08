@@ -97,23 +97,23 @@ export function LoginPage() {
       <style>{`
         @keyframes login-scene-zoom-out {
           0% {
-            transform: scale(1.08);
-            opacity: 0.72;
-          }
-          12% {
-            opacity: 1;
-          }
-          100% {
             transform: scale(1);
             opacity: 1;
+            border-radius: 0;
+          }
+          100% {
+            transform: scale(0.88);
+            opacity: 1;
+            border-radius: 28px;
           }
         }
 
         @media (prefers-reduced-motion: reduce) {
           [style*='login-scene-zoom-out'] {
             animation: none !important;
-            transform: scale(1) !important;
+            transform: scale(0.88) !important;
             opacity: 1 !important;
+            border-radius: 28px !important;
           }
         }
       `}</style>
@@ -127,8 +127,8 @@ export function LoginPage() {
             decoding="async"
             fetchPriority="high"
             draggable={false}
-            className="absolute inset-0 h-full w-full object-cover object-center will-change-transform"
-            style={{ animation: 'login-scene-zoom-out 5600ms cubic-bezier(0.22, 1, 0.36, 1) both' }}
+            className="absolute inset-0 h-full w-full object-cover object-center shadow-2xl shadow-black/30 will-change-transform"
+            style={{ animation: 'login-scene-zoom-out 5600ms cubic-bezier(0.16, 1, 0.3, 1) both' }}
           />
         </section>
 
