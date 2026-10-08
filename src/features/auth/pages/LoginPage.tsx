@@ -32,11 +32,8 @@ export function LoginPage() {
 
   const slides = useMemo(
     () => [
-      '/auth/exact/login-art-1.png',
-      '/auth/exact/login-art-2.png',
-      '/auth/exact/login-art-3.png',
-      '/auth/exact/login-art-4.png',
-      '/auth/exact/login-art-5.png',
+      '/auth/exact/login-art-1.webp',
+      '/auth/exact/login-art-4.webp',
     ],
     [],
   );
@@ -48,6 +45,12 @@ export function LoginPage() {
 
     return () => window.clearInterval(timer);
   }, [slides.length]);
+
+  useEffect(() => {
+    const nextSlide = slides[(slideIndex + 1) % slides.length];
+    const preload = new Image();
+    preload.src = nextSlide;
+  }, [slideIndex, slides]);
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -91,20 +94,16 @@ export function LoginPage() {
     <DesignSurface testId="login-surface">
       <div className="min-h-[100dvh] bg-white text-slate-950 lg:grid lg:grid-cols-[56%_44%]" dir="ltr">
         <section className="relative hidden h-[100dvh] min-h-[680px] overflow-hidden bg-slate-950 lg:block">
-          {slides.map((slide, index) => (
-            <img
-              key={slide}
-              src={slide}
-              alt=""
-              aria-hidden={index !== slideIndex}
-              loading={index === 0 ? 'eager' : 'lazy'}
-              decoding="async"
-              draggable={false}
-              className={`absolute inset-0 h-full w-full object-cover object-center transition-opacity duration-700 ${
-                index === slideIndex ? 'opacity-100' : 'pointer-events-none opacity-0'
-              }`}
-            />
-          ))}
+          <img
+            key={slides[slideIndex]}
+            src={slides[slideIndex]}
+            alt=""
+            loading="eager"
+            decoding="async"
+            fetchPriority="high"
+            draggable={false}
+            className="absolute inset-0 h-full w-full object-cover object-center"
+          />
         </section>
 
         <section
