@@ -1,0 +1,38 @@
+name: Import login storyboard sprite
+
+on:
+  push:
+    branches:
+      - feat/login-storyboard-sequence
+
+permissions:
+  contents: write
+
+jobs:
+  import:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: feat/login-storyboard-sequence
+          fetch-depth: 0
+
+      - name: Fetch storyboard sprite
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public/auth/storyboard
+          U='aHR0cHM6Ly9kMmpxcm02b3phOG5iNi5jbG91ZGZyb250Lm5ldC9kYXRhc2V0cy9kZDRiOGUwNi1mODJkLTQyMTgtYjE4YS0yZDMzZTA3MjE2NWEud2VicD9fand0PWV5SmhiR2NpT2lKSVV6STFOaUlzSW5SNWNDSTZJa3BYVkNKOS5leUpyWlhsSVlYTm9Jam9pWTJNMllXSTFPVE0zT1RBeFptRXhPU0lzSW1KMVkydGxkQ0k2SW5KMWJuZGhlUzFrWVhSaGMyVjBjeUlzSW5OMFlXZGxJam9pY0hKdlpDSXNJbVY0Y0NJNk1UYzVNVFkyTURVMk0zMC41dkRIMmZkVk41NUNGYzF0WlJxazh5dF9jUlRyZUV6UEYwZ2UwUWxRS3Nr'
+          curl -L --fail --retry 3 "$(printf '%s' "$U" | base64 -d)" -o public/auth/storyboard/premier-storyboard.webp
+
+      - name: Commit sprite
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/auth/storyboard/premier-storyboard.webp
+          git diff --cached --quiet && exit 0
+          git commit -m "assets: add login storyboard sprite"
+          git push origin HEAD:feat/login-storyboard-sequence
