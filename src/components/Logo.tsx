@@ -18,8 +18,8 @@ interface LogoProps {
 }
 
 function Mark({ tone, size }: { tone: LogoTone; size: number }) {
-  const primary = tone === 'white' ? WHITE : tone === 'mono' ? 'currentColor' : BLUE;
-  const accent = tone === 'white' || tone === 'mono' ? 'currentColor' : GOLD;
+  const primary = tone === 'white' ? WHITE : BLUE;
+  const accent = tone === 'white' ? WHITE : GOLD;
 
   return (
     <svg
@@ -54,9 +54,7 @@ export function Logo({
   const textCls =
     tone === 'white'
       ? 'text-white'
-      : tone === 'mono'
-        ? 'text-current'
-        : 'text-blue-600';
+      : 'text-blue-600';
 
   const mark = <Mark tone={tone} size={size} />;
 
