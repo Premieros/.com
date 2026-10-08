@@ -20,8 +20,11 @@ import { useToast } from '@/components/Toast';
 import { DesignSurface } from '@/components/design/DesignSurface';
 import { APP_ROUTES } from '@/core/navigation/routes';
 
+type LoginPreview = 'pos' | 'tables' | 'dashboard' | 'kitchen';
+
 type LoginSlide = {
   image: string;
+  preview: LoginPreview;
   titleAr: string;
   titleEn: string;
   descriptionAr: string;
@@ -44,6 +47,7 @@ export function LoginPage() {
   const slides = useMemo<LoginSlide[]>(() => [
     {
       image: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1800&q=90',
+      preview: 'pos',
       titleAr: 'إدارة مطعمك بأسلوب أسهل وأذكى',
       titleEn: 'Run your restaurant in a simpler, smarter way',
       descriptionAr: 'من الطلبات حتى التقارير، كل ما تحتاجه في مكان واحد',
@@ -51,6 +55,7 @@ export function LoginPage() {
     },
     {
       image: 'https://images.unsplash.com/photo-1555396273-367ea4eb4db5?auto=format&fit=crop&w=1800&q=90',
+      preview: 'tables',
       titleAr: 'كل الطلبات تحت السيطرة',
       titleEn: 'Keep every order under control',
       descriptionAr: 'اربط الصالة والمطبخ والكاشير في تجربة تشغيل واحدة',
@@ -58,6 +63,7 @@ export function LoginPage() {
     },
     {
       image: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1800&q=90',
+      preview: 'dashboard',
       titleAr: 'أسرع في الخدمة.. أدق في الإدارة',
       titleEn: 'Faster service. Better control.',
       descriptionAr: 'نقطة بيع حديثة مصممة لسرعة الخدمة ووضوح التشغيل',
@@ -65,6 +71,7 @@ export function LoginPage() {
     },
     {
       image: 'https://images.unsplash.com/photo-1414235077428-338989a2e8c0?auto=format&fit=crop&w=1800&q=90',
+      preview: 'kitchen',
       titleAr: 'اعرف أرقام مطعمك لحظة بلحظة',
       titleEn: 'Know your restaurant numbers in real time',
       descriptionAr: 'مبيعات، مخزون، تكلفة وربحية في تقارير واضحة',
@@ -136,37 +143,36 @@ export function LoginPage() {
           <div className="absolute inset-0 bg-gradient-to-t from-slate-950/75 via-slate-950/25 to-slate-950/10" />
           <div className="absolute inset-0 bg-gradient-to-r from-slate-950/20 via-transparent to-slate-950/10" />
 
-          <div className="absolute inset-0 z-10 flex items-center justify-center px-16 xl:px-24" dir={isAr ? 'rtl' : 'ltr'}>
-            <div className="w-full max-w-4xl text-center text-white">
-              <p className="mb-5 text-sm font-black tracking-wide text-white/90">
-                {isAr ? 'نظام Premier لإدارة المطاعم' : 'Premier Restaurant Management System'}
-              </p>
+          <div className="absolute inset-0 z-10 flex items-center justify-center px-12 xl:px-16" dir={isAr ? 'rtl' : 'ltr'}>
+            <div className="w-full max-w-5xl text-white">
+              <div className="mx-auto max-w-3xl text-center">
+                <p className="mb-3 text-sm font-black tracking-wide text-white/90">
+                  {isAr ? 'نظام Premier لإدارة المطاعم' : 'Premier Restaurant Management System'}
+                </p>
+                <h1 className="text-4xl font-black leading-[1.12] tracking-tight drop-shadow-2xl xl:text-5xl">
+                  {isAr ? activeSlide.titleAr : activeSlide.titleEn}
+                </h1>
+                <p className="mx-auto mt-3 max-w-2xl text-base font-semibold leading-7 text-white/90">
+                  {isAr ? activeSlide.descriptionAr : activeSlide.descriptionEn}
+                </p>
+              </div>
 
-              <h1 className="text-5xl font-black leading-[1.12] tracking-tight drop-shadow-2xl xl:text-7xl">
-                {isAr ? activeSlide.titleAr : activeSlide.titleEn}
-              </h1>
+              <div className="mx-auto mt-7 max-w-4xl">
+                <RestaurantDevice preview={activeSlide.preview} isAr={isAr} />
+              </div>
 
-              <p className="mx-auto mt-5 max-w-3xl text-lg font-semibold leading-8 text-white/90 xl:text-xl">
-                {isAr ? activeSlide.descriptionAr : activeSlide.descriptionEn}
-              </p>
-
-              <div className="mx-auto mt-8 grid max-w-3xl grid-cols-3 gap-3">
+              <div className="mx-auto mt-5 grid max-w-3xl grid-cols-3 gap-3">
                 {[
-                  [BarChart3, isAr ? 'تقارير فورية' : 'Live reports', isAr ? 'لقرارات أفضل' : 'Better decisions'],
-                  [UtensilsCrossed, isAr ? 'إدارة الطلبات' : 'Order management', isAr ? 'الصالة والمطبخ' : 'Dining & kitchen'],
-                  [ShoppingCart, isAr ? 'تجربة عملاء مميزة' : 'Better guest experience', isAr ? 'سريعة وسلسة' : 'Fast and smooth'],
-                ].map(([Icon, title, subtitle]) => {
+                  [BarChart3, isAr ? 'تقارير فورية' : 'Live reports'],
+                  [UtensilsCrossed, isAr ? 'الصالة والمطبخ' : 'Dining & kitchen'],
+                  [ShoppingCart, isAr ? 'نقطة بيع سريعة' : 'Fast POS'],
+                ].map(([Icon, title]) => {
                   const FeatureIcon = Icon as typeof BarChart3;
                   return (
-                    <div key={String(title)} className="rounded-2xl border border-white/20 bg-slate-950/35 px-4 py-4 text-start backdrop-blur-md">
-                      <div className="flex items-center gap-3">
-                        <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-blue-600/90 text-white">
-                          <FeatureIcon className="h-5 w-5" />
-                        </span>
-                        <div>
-                          <p className="text-sm font-black">{String(title)}</p>
-                          <p className="mt-1 text-xs font-semibold text-white/70">{String(subtitle)}</p>
-                        </div>
+                    <div key={String(title)} className="rounded-2xl border border-white/20 bg-slate-950/35 px-4 py-3 backdrop-blur-md">
+                      <div className="flex items-center justify-center gap-2">
+                        <FeatureIcon className="h-4 w-4 text-blue-300" />
+                        <p className="text-xs font-black">{String(title)}</p>
                       </div>
                     </div>
                   );
@@ -382,4 +388,138 @@ export function LoginPage() {
       </div>
     </DesignSurface>
   );
+
+function RestaurantDevice({ preview, isAr }: { preview: LoginPreview; isAr: boolean }) {
+  return (
+    <div className="relative mx-auto w-full max-w-[760px]">
+      <div className="absolute -inset-5 rounded-[38px] bg-black/25 blur-2xl" />
+      <div className="relative rounded-[30px] border border-white/15 bg-[#111827] p-3 shadow-2xl shadow-black/50">
+        <div className="overflow-hidden rounded-[22px] border border-slate-700 bg-slate-50">
+          <div className="flex h-8 items-center justify-between border-b border-slate-200 bg-white px-3 text-[8px] font-bold text-slate-500">
+            <div className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full bg-blue-600" />
+              <span>Premier</span>
+            </div>
+            <div className="flex gap-1">
+              <span className="rounded bg-emerald-50 px-2 py-0.5 text-emerald-700">{isAr ? 'متصل' : 'Online'}</span>
+              <span className="rounded bg-slate-100 px-2 py-0.5">{isAr ? 'الفرع الرئيسي' : 'Main branch'}</span>
+            </div>
+          </div>
+          <div className="h-[250px] bg-slate-50 sm:h-[280px]">
+            {preview === 'pos' && <PosPreview isAr={isAr} />}
+            {preview === 'tables' && <TablesPreview isAr={isAr} />}
+            {preview === 'dashboard' && <DashboardPreview isAr={isAr} />}
+            {preview === 'kitchen' && <KitchenPreview isAr={isAr} />}
+          </div>
+        </div>
+      </div>
+      <div className="mx-auto h-5 w-24 rounded-b-xl bg-slate-900 shadow-lg" />
+      <div className="mx-auto h-2 w-40 rounded-full bg-black/35 blur-[1px]" />
+    </div>
+  );
+}
+
+function PosPreview({ isAr }: { isAr: boolean }) {
+  const products = [
+    ['Pancake Nutella', '130'], ['Pancake Lotus', '120'], ['Seafood chowder', '250'],
+    ['Club Sandwich', '170'], ['Tomato soup', '90'], ['Fries', '60'],
+  ];
+  return (
+    <div className="grid h-full grid-cols-[34%_66%] text-[8px]" dir={isAr ? 'rtl' : 'ltr'}>
+      <div className="border-e border-slate-200 bg-white p-2">
+        <div className="mb-2 rounded-lg bg-blue-50 p-2 text-xs font-black text-slate-800">{isAr ? 'طلب جديد' : 'New order'}</div>
+        <div className="space-y-1.5">
+          {products.slice(0, 4).map(([name, price], index) => (
+            <div key={name} className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+              <div className="flex items-center justify-between gap-2">
+                <span className="truncate font-black text-slate-700">{name}</span>
+                <span className="font-black text-blue-700">{price}</span>
+              </div>
+              <div className="mt-1 flex items-center justify-between text-slate-400"><span>{index + 1}</span><span>− 1 +</span></div>
+            </div>
+          ))}
+        </div>
+        <div className="mt-2 rounded-lg bg-blue-600 p-2 text-center font-black text-white">{isAr ? 'دفع' : 'Pay'} · 660</div>
+      </div>
+      <div className="p-2">
+        <div className="mb-2 flex gap-1 overflow-hidden">
+          {['الكل','Coffee','Burger','Dessert','Fries'].map((x,i)=><span key={x} className={`rounded-lg px-2 py-1 ${i===0?'bg-blue-600 text-white':'bg-white text-slate-500'}`}>{x}</span>)}
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {products.map(([name, price], index) => (
+            <div key={name} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+              <div className={`h-12 bg-gradient-to-br ${['from-orange-100 to-amber-300','from-rose-100 to-pink-300','from-emerald-100 to-lime-300'][index%3]}`} />
+              <div className="p-2"><p className="truncate font-black text-slate-800">{name}</p><div className="mt-1 flex justify-between"><span className="font-black text-blue-700">{price}</span><span className="flex h-4 w-4 items-center justify-center rounded bg-blue-600 text-white">+</span></div></div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TablesPreview({ isAr }: { isAr: boolean }) {
+  return (
+    <div className="h-full p-3 text-[8px]" dir={isAr ? 'rtl' : 'ltr'}>
+      <div className="mb-2 flex items-center justify-between">
+        <div><p className="text-sm font-black text-slate-900">{isAr ? 'الطاولات' : 'Tables'}</p><p className="text-slate-400">{isAr ? 'اختر طاولة لفتح الطلب' : 'Choose a table to open an order'}</p></div>
+        <span className="rounded-lg bg-blue-600 px-3 py-1.5 font-black text-white">{isAr ? 'طلب جديد +' : '+ New order'}</span>
+      </div>
+      <div className="mb-2 flex gap-2"><span className="rounded bg-blue-600 px-3 py-1 text-white">{isAr ? 'الكل 50' : 'All 50'}</span><span className="rounded bg-white px-3 py-1 text-slate-500">{isAr ? 'متاحة 44' : 'Available 44'}</span><span className="rounded bg-white px-3 py-1 text-slate-500">{isAr ? 'مشغولة 6' : 'Occupied 6'}</span></div>
+      <div className="grid grid-cols-4 gap-2">
+        {Array.from({length:12},(_,i)=>i+1).map((n)=>(
+          <div key={n} className={`rounded-xl border p-2 ${n<=2?'border-blue-300 bg-blue-50':'border-emerald-300 bg-emerald-50'}`}>
+            <div className="flex items-center justify-between"><span className="font-black text-slate-900">Table {String(n).padStart(2,'0')}</span><span className={n<=2?'text-blue-700':'text-emerald-700'}>{n<=2?(isAr?'بالمطبخ':'Kitchen'):(isAr?'متاحة':'Free')}</span></div>
+            <div className="mt-4 text-slate-500">{n<=2 ? `${n*35} EGP · ${n+2} items` : (isAr?'اضغط لفتح طلب':'Tap to open')}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DashboardPreview({ isAr }: { isAr: boolean }) {
+  const cards = [
+    [isAr?'صافي المبيعات':'Net sales','566,671'],
+    [isAr?'متوسط الفاتورة':'Avg ticket','625'],
+    [isAr?'عدد الفواتير':'Invoices','936'],
+    [isAr?'المصروفات':'Expenses','66,768'],
+    [isAr?'المشتريات':'Purchases','244,443'],
+    [isAr?'المرتجعات':'Returns','1,365'],
+  ];
+  return (
+    <div className="h-full p-3 text-[8px]" dir={isAr ? 'rtl' : 'ltr'}>
+      <div className="mb-3"><p className="text-sm font-black text-slate-900">{isAr?'ملخص السنة':'Year summary'}</p><p className="text-slate-400">{isAr?'مؤشرات المبيعات والربحية':'Sales and profitability overview'}</p></div>
+      <div className="grid grid-cols-3 gap-2">
+        {cards.map(([label,value],i)=>(
+          <div key={label} className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex items-center justify-between"><span className="text-slate-500">{label}</span><span className={`h-5 w-5 rounded-lg ${i%2?'bg-blue-50':'bg-emerald-50'}`} /></div>
+            <p className="mt-3 text-base font-black text-slate-950">{value}</p>
+            <p className="mt-1 text-slate-400">EGP</p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function KitchenPreview({ isAr }: { isAr: boolean }) {
+  return (
+    <div className="h-full bg-slate-100 p-3 text-[8px]" dir={isAr ? 'rtl' : 'ltr'}>
+      <div className="mb-3 flex items-center justify-between">
+        <div><p className="text-sm font-black text-slate-900">{isAr?'شاشة المطبخ':'Kitchen display'}</p><p className="text-slate-400">KDS · Live orders</p></div>
+        <span className="rounded-lg bg-emerald-100 px-3 py-1 font-black text-emerald-700">{isAr?'متصل':'Online'}</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        {Array.from({length:6},(_,i)=>(
+          <div key={i} className="rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex items-center justify-between"><span className="font-black text-slate-900">#{2436+i}</span><span className={`rounded px-2 py-0.5 ${i<2?'bg-amber-100 text-amber-700':'bg-blue-100 text-blue-700'}`}>{i<2?(isAr?'جديد':'New'):(isAr?'تحضير':'Prep')}</span></div>
+            <div className="mt-3 space-y-1 text-slate-600"><p>2 × Turkish Coffee</p><p>1 × Pancake Lotus</p><p>1 × Water</p></div>
+            <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-blue-500" style={{width:`${35+i*9}%`}} /></div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 }
