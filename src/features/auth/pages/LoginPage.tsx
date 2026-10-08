@@ -32,10 +32,18 @@ export function LoginPage() {
 
   const slides = useMemo(
     () => [
-      '/auth/creative/tables.webp',
-      '/auth/creative/pos.webp',
-      '/auth/creative/dashboard.webp',
-      '/auth/creative/kitchen.webp',
+      '/auth/storyboard/scene-01.webp',
+      '/auth/storyboard/scene-02.webp',
+      '/auth/storyboard/scene-03.webp',
+      '/auth/storyboard/scene-04.webp',
+      '/auth/storyboard/scene-05.webp',
+      '/auth/storyboard/scene-06.webp',
+      '/auth/storyboard/scene-07.webp',
+      '/auth/storyboard/scene-08.webp',
+      '/auth/storyboard/scene-09.webp',
+      '/auth/storyboard/scene-10.webp',
+      '/auth/storyboard/scene-11.webp',
+      '/auth/storyboard/scene-12.webp',
     ],
     [],
   );
@@ -43,7 +51,7 @@ export function LoginPage() {
   useEffect(() => {
     const timer = window.setInterval(() => {
       setSlideIndex((value) => (value + 1) % slides.length);
-    }, 5600);
+    }, 2000);
 
     return () => window.clearInterval(timer);
   }, [slides.length]);
@@ -97,23 +105,26 @@ export function LoginPage() {
       <style>{`
         @keyframes login-scene-zoom-out {
           0% {
-            transform: scale(1);
+            transform: scale(1.035);
+            opacity: 0;
+          }
+          8% {
             opacity: 1;
-            border-radius: 0;
+          }
+          92% {
+            opacity: 1;
           }
           100% {
-            transform: scale(0.88);
-            opacity: 1;
-            border-radius: 28px;
+            transform: scale(1);
+            opacity: 0;
           }
         }
 
         @media (prefers-reduced-motion: reduce) {
           [style*='login-scene-zoom-out'] {
             animation: none !important;
-            transform: scale(0.88) !important;
+            transform: scale(1) !important;
             opacity: 1 !important;
-            border-radius: 28px !important;
           }
         }
       `}</style>
@@ -127,8 +138,8 @@ export function LoginPage() {
             decoding="async"
             fetchPriority="high"
             draggable={false}
-            className="absolute inset-0 h-full w-full object-cover object-center shadow-2xl shadow-black/30 will-change-transform"
-            style={{ animation: 'login-scene-zoom-out 5600ms cubic-bezier(0.16, 1, 0.3, 1) both' }}
+            className="absolute inset-0 h-full w-full object-cover object-center will-change-transform"
+            style={{ animation: 'login-scene-zoom-out 2000ms ease-out both' }}
           />
         </section>
 
