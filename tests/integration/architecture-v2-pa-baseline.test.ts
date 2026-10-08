@@ -47,12 +47,7 @@ describe('Architecture V2 P-A safety baseline', () => {
   });
 
   it('does not allow unexpected PUBLIC/anon execution of SECURITY DEFINER functions', async () => {
-    const temporaryBaselineAllowlist = [
-      '_raw_inventory_actual_avg_cost_guard',
-      '_raw_price_oversold_batch_from_fifo',
-      'register_trial_tenant',
-      'treasury_accounts_fill_model_defaults',
-    ];
+    const temporaryBaselineAllowlist = ['register_trial_tenant'];
 
     const { rows } = await client.query<{ function_name: string }>(
       `select distinct p.proname as function_name
@@ -70,6 +65,42 @@ describe('Architecture V2 P-A safety baseline', () => {
     );
 
     expect(rows).toEqual([]);
+  });
+
+  it('keeps internal low-level helpers unreachable by anon/authenticated clients', async () => {
+    const internalHelpers = [
+      '_raw_inventory_actual_avg_cost_guard',
+      '_raw_price_oversold_batch_from_fifo',
+      'treasury_accounts_fill_model_defaults',
+      '_deduct_sale_inventory_with_modifiers_core',
+      '_effective_branch_tax',
+      '_normalize_raw_purchase_uom',
+      '_normalize_thermal_print_payload',
+      '_product_inv_add',
+      '_product_inv_move',
+      '_product_inv_remove_fifo',
+      '_treasury_guard',
+    ];
+
+    const { rows } = await client.query<{
+      function_name: string;
+      anon_exec: boolean;
+      authenticated_exec: boolean;
+    }>(
+      `select distinct
+         p.proname as function_name,
+         has_function_privilege('anon', p.oid, 'EXECUTE') as anon_exec,
+         has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_exec
+       from pg_proc p
+       join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public'
+         and p.proname = any($1::text[])
+       order by p.proname`,
+      [internalHelpers],
+    );
+
+    expect(rows).toHaveLength(internalHelpers.length);
+    expect(rows.every((row) => !row.anon_exec && !row.authenticated_exec)).toBe(true);
   });
 
   it('does not increase duplicate permissive RLS policy groups above the P-A baseline', async () => {
