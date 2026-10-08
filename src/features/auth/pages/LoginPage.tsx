@@ -117,16 +117,15 @@ export function LoginPage() {
   return (
     <DesignSurface testId="login-surface">
       <div className="min-h-screen overflow-hidden bg-[#0b1220] text-slate-950 lg:grid lg:grid-cols-[62%_38%]" dir="ltr">
-        <section className="relative hidden min-h-screen overflow-hidden lg:block">
+        <section className="relative hidden h-[100dvh] min-h-[680px] overflow-hidden bg-slate-950 lg:block">
           {slides.map((slide, index) => (
-            <img
+            <div
               key={slide.image}
-              src={slide.image}
-              alt=""
               aria-hidden={index !== slideIndex}
-              className={`absolute inset-0 h-full w-full object-cover object-center transition-all duration-1000 ease-out ${
+              className={`absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000 ease-out ${
                 index === slideIndex ? 'scale-100 opacity-100' : 'scale-[1.018] opacity-0'
               }`}
+              style={{ backgroundImage: `url("${slide.image}")` }}
             />
           ))}
 
@@ -139,15 +138,15 @@ export function LoginPage() {
                 {isAr ? 'نظام Premier لإدارة المطاعم والكافيهات' : 'Premier Restaurant & Café Management'}
               </p>
 
-              <h1 className="mt-4 max-w-[690px] text-4xl font-black leading-[1.08] tracking-tight text-white drop-shadow-2xl xl:text-6xl">
+              <h1 className="mt-3 max-w-[620px] text-3xl font-black leading-[1.12] tracking-tight text-white drop-shadow-2xl xl:text-5xl">
                 {isAr ? activeSlide.titleAr : activeSlide.titleEn}
               </h1>
 
-              <p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-white/85 xl:text-lg">
+              <p className="mt-3 max-w-xl text-sm font-semibold leading-7 text-white/85 xl:text-base">
                 {isAr ? activeSlide.descriptionAr : activeSlide.descriptionEn}
               </p>
 
-              <div className="mt-6 grid max-w-2xl grid-cols-3 gap-3">
+              <div className="mt-5 grid max-w-xl grid-cols-3 gap-2.5">
                 {[
                   [BarChart3, isAr ? 'تقارير فورية' : 'Live reports'],
                   [UtensilsCrossed, isAr ? 'إدارة الطلبات' : 'Order management'],
@@ -155,9 +154,9 @@ export function LoginPage() {
                 ].map(([Icon, label]) => {
                   const FeatureIcon = Icon as typeof BarChart3;
                   return (
-                    <div key={String(label)} className="rounded-2xl border border-white/15 bg-slate-950/32 px-4 py-3 text-white shadow-lg backdrop-blur-md">
+                    <div key={String(label)} className="rounded-xl border border-white/15 bg-slate-950/32 px-3 py-2.5 text-white shadow-lg backdrop-blur-md">
                       <div className="flex items-center gap-2.5">
-                        <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-600/95">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-blue-600/95">
                           <FeatureIcon className="h-4 w-4" />
                         </span>
                         <span className="text-xs font-black">{String(label)}</span>
@@ -203,7 +202,7 @@ export function LoginPage() {
         </section>
 
         <section
-          className="relative z-30 flex min-h-screen items-center justify-center bg-white px-6 py-8 sm:px-10 lg:-ml-8 lg:rounded-l-[56px] lg:px-10 lg:shadow-[-26px_0_70px_-36px_rgba(15,23,42,0.5)] xl:px-14"
+          className="relative z-30 flex min-h-[100dvh] items-center justify-center bg-white px-6 py-8 sm:px-10 lg:-ml-8 lg:h-[100dvh] lg:rounded-l-[56px] lg:px-10 lg:shadow-[-26px_0_70px_-36px_rgba(15,23,42,0.5)] xl:px-14"
           dir={isAr ? 'rtl' : 'ltr'}
         >
           <div className="pointer-events-none absolute -right-20 -top-20 h-72 w-72 rounded-full bg-blue-50/80 blur-3xl" />
