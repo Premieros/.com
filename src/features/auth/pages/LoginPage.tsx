@@ -113,6 +113,21 @@ export function LoginPage() {
           }
         }
 
+        @media (max-height: 760px) and (min-width: 1024px) {
+          .login-panel-shell {
+            transform: scale(0.9);
+            transform-origin: center;
+            width: 111.111%;
+          }
+        }
+
+        @media (max-height: 680px) and (min-width: 1024px) {
+          .login-panel-shell {
+            transform: scale(0.82);
+            width: 121.951%;
+          }
+        }
+
         @media (prefers-reduced-motion: reduce) {
           [style*='login-scene-zoom-out'] {
             animation: none !important;
@@ -121,8 +136,8 @@ export function LoginPage() {
           }
         }
       `}</style>
-      <div className="min-h-[100dvh] bg-white text-slate-950 lg:grid lg:grid-cols-[64%_36%]" dir="ltr">
-        <section className="relative hidden h-[100dvh] min-h-[680px] overflow-hidden bg-slate-950 lg:block">
+      <div className="h-[100dvh] overflow-hidden bg-white text-slate-950 lg:grid lg:grid-cols-[64%_36%]" dir="ltr">
+        <section className="relative hidden h-full min-h-0 overflow-hidden bg-slate-950 lg:block">
           <img
             key={slides[slideIndex]}
             src={slides[slideIndex]}
@@ -137,11 +152,11 @@ export function LoginPage() {
         </section>
 
         <section
-          className="relative flex min-h-[100dvh] items-center justify-center overflow-hidden bg-white px-6 py-8 sm:px-10 lg:border-s lg:border-slate-100 lg:px-9 xl:px-12"
+          className="relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-white px-6 py-4 sm:px-10 lg:border-s lg:border-slate-100 lg:px-9 xl:px-12"
           dir={isAr ? 'rtl' : 'ltr'}
         >
-          <div className="relative z-10 w-full max-w-[430px]">
-            <div className="mb-10 flex items-center justify-between gap-4">
+          <div className="login-panel-shell relative z-10 w-full max-w-[430px]">
+            <div className="mb-6 flex items-center justify-between gap-4">
               <Logo variant="horizontal" size={62} tone="navy" showTagline={false} />
 
               <button
@@ -154,18 +169,18 @@ export function LoginPage() {
               </button>
             </div>
 
-            <div className="mb-8">
+            <div className="mb-5">
               <h1 className="text-4xl font-black tracking-tight text-slate-950">
                 {isAr ? 'مرحبًا بعودتك' : 'Welcome back'}
               </h1>
-              <p className="mt-3 text-base font-semibold leading-7 text-slate-500">
+              <p className="mt-2 text-base font-semibold leading-6 text-slate-500">
                 {isAr ? 'سجّل دخولك إلى نظام Premier' : 'Sign in to Premier'}
               </p>
             </div>
 
             <div
               data-testid="login-mode-toggle"
-              className="mb-6 grid grid-cols-2 rounded-2xl bg-slate-100 p-1"
+              className="mb-4 grid grid-cols-2 rounded-2xl bg-slate-100 p-1"
             >
               <button
                 type="button"
@@ -256,7 +271,7 @@ export function LoginPage() {
               </Button>
             </form>
 
-            <div className="my-5 flex items-center gap-4">
+            <div className="my-3 flex items-center gap-4">
               <div className="h-px flex-1 bg-slate-200" />
               <span className="text-xs font-black text-slate-400">{isAr ? 'أو' : 'OR'}</span>
               <div className="h-px flex-1 bg-slate-200" />
@@ -277,7 +292,7 @@ export function LoginPage() {
                   : 'Sign in with staff PIN'}
             </button>
 
-            <div className="mt-8 flex items-center justify-between gap-4 border-t border-slate-100 pt-5 text-xs font-bold text-slate-500">
+            <div className="mt-5 flex items-center justify-between gap-4 border-t border-slate-100 pt-3 text-xs font-bold text-slate-500">
               <Link
                 data-testid="login-register-link"
                 to={APP_ROUTES.register}
