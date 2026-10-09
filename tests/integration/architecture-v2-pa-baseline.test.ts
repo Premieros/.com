@@ -623,6 +623,34 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(state?.authenticated_select).toBe(false);
   });
 
+  it('keeps inventory review cases evidence-classified and manual-only', async () => {
+    const { rows } = await client.query<{
+      total_rows: string;
+      unclassified_rows: string;
+      unsafe_repair_policy_rows: string;
+      nonreview_rows: string;
+      anon_select: boolean;
+      authenticated_select: boolean;
+    }>(
+      `select
+         count(*)::text as total_rows,
+         count(*) filter (where evidence_reason='UNCLASSIFIED_REVIEW')::text as unclassified_rows,
+         count(*) filter (where repair_policy<>'NO_AUTOMATIC_REPAIR')::text as unsafe_repair_policy_rows,
+         count(*) filter (where not requires_human_review)::text as nonreview_rows,
+         has_table_privilege('anon', 'private.canonical_inventory_review_cases', 'SELECT') as anon_select,
+         has_table_privilege('authenticated', 'private.canonical_inventory_review_cases', 'SELECT') as authenticated_select
+       from private.canonical_inventory_review_cases`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.total_rows ?? 0)).toBeGreaterThan(0);
+    expect(Number(state?.unclassified_rows ?? -1)).toBe(0);
+    expect(Number(state?.unsafe_repair_policy_rows ?? -1)).toBe(0);
+    expect(Number(state?.nonreview_rows ?? -1)).toBe(0);
+    expect(state?.anon_select).toBe(false);
+    expect(state?.authenticated_select).toBe(false);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
