@@ -103,7 +103,7 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(rows.every((row) => !row.anon_exec && !row.authenticated_exec)).toBe(true);
   });
 
-  it('does not increase duplicate permissive RLS policy groups above the P-A baseline', async () => {
+  it('keeps exact same-role same-command permissive policy duplicates at zero', async () => {
     const { rows } = await client.query<{ duplicate_groups: string }>(
       `select count(*)::text as duplicate_groups
        from (
