@@ -116,7 +116,26 @@ describe('Architecture V2 P-A safety baseline', () => {
        ) q`,
     );
 
-    expect(Number(rows[0]?.duplicate_groups ?? 0)).toBeLessThanOrEqual(5);
+    expect(Number(rows[0]?.duplicate_groups ?? 0)).toBe(0);
+  });
+
+  it('keeps consolidated kitchen write policies in place', async () => {
+    const expected = [
+      'auth_insert_order_kitchen_sends_combined',
+      'auth_update_order_kitchen_sends_combined',
+    ];
+
+    const { rows } = await client.query<{ policyname: string }>(
+      `select policyname
+       from pg_policies
+       where schemaname = 'public'
+         and tablename = 'order_kitchen_sends'
+         and policyname = any($1::text[])
+       order by policyname`,
+      [expected],
+    );
+
+    expect(rows.map((row) => row.policyname)).toEqual(expected);
   });
 
   it('keeps the redundant deny-only kitchen delete policy removed', async () => {
