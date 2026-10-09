@@ -199,67 +199,107 @@ export const catalog = {
   },
 
   async compareCanonicalCatalog(branch_id?: string | null): Promise<CanonicalCatalogComparison> {
-    const canonicalQuery = supabase.from('canonical_item_catalog').select(
-      'branch_id,item_type,code,sku,barcode,name,base_uom_id,is_active,min_stock,max_stock,reorder_point',
-    );
-    const productsQuery = supabase.from('products').select(
-      'branch_id,product_type,sku,barcode,name,is_active,min_stock,max_stock,reorder_point',
-    );
-    const rawsQuery = supabase.from('raw_materials').select(
-      'branch_id,code,name,unit_id,is_active,min_stock',
-    );
-    const unitsQuery = supabase.from('inventory_units').select(
-      'branch_id,code,sku,barcode,name,is_active,min_stock,max_stock,reorder_point',
-    );
+    const pageSize = 1000;
 
-    const scopedCanonical = branch_id ? canonicalQuery.eq('branch_id', branch_id) : canonicalQuery;
-    const scopedProducts = branch_id ? productsQuery.eq('branch_id', branch_id) : productsQuery;
-    const scopedRaws = branch_id ? rawsQuery.eq('branch_id', branch_id) : rawsQuery;
-    const scopedUnits = branch_id ? unitsQuery.eq('branch_id', branch_id) : unitsQuery;
+    const loadCanonical = async () => {
+      const rows: Array<Pick<CanonicalItemCatalogRow,
+        'branch_id' | 'item_type' | 'code' | 'sku' | 'barcode' | 'name' | 'base_uom_id' | 'is_active' | 'min_stock' | 'max_stock' | 'reorder_point'
+      >> = [];
+      for (let from = 0; ; from += pageSize) {
+        let q = supabase.from('canonical_item_catalog').select(
+          'branch_id,item_type,code,sku,barcode,name,base_uom_id,is_active,min_stock,max_stock,reorder_point',
+        ).range(from, from + pageSize - 1);
+        if (branch_id) q = q.eq('branch_id', branch_id);
+        const { data, error } = await q;
+        if (error) throw error;
+        const page = (data || []) as typeof rows;
+        rows.push(...page);
+        if (page.length < pageSize) break;
+      }
+      return rows;
+    };
 
-    const [canonicalResult, productsResult, rawsResult, unitsResult] = await Promise.all([
-      scopedCanonical,
-      scopedProducts,
-      scopedRaws,
-      scopedUnits,
+    const loadProducts = async () => {
+      const rows: Array<{
+        branch_id: string;
+        product_type: string;
+        sku: string | null;
+        barcode: string | null;
+        name: string;
+        is_active: boolean;
+        min_stock: number;
+        max_stock: number;
+        reorder_point: number;
+      }> = [];
+      for (let from = 0; ; from += pageSize) {
+        let q = supabase.from('products').select(
+          'branch_id,product_type,sku,barcode,name,is_active,min_stock,max_stock,reorder_point',
+        ).range(from, from + pageSize - 1);
+        if (branch_id) q = q.eq('branch_id', branch_id);
+        const { data, error } = await q;
+        if (error) throw error;
+        const page = (data || []) as typeof rows;
+        rows.push(...page);
+        if (page.length < pageSize) break;
+      }
+      return rows;
+    };
+
+    const loadRaws = async () => {
+      const rows: Array<{
+        branch_id: string;
+        code: string | null;
+        name: string;
+        unit_id: string | null;
+        is_active: boolean;
+        min_stock: number;
+      }> = [];
+      for (let from = 0; ; from += pageSize) {
+        let q = supabase.from('raw_materials').select(
+          'branch_id,code,name,unit_id,is_active,min_stock',
+        ).range(from, from + pageSize - 1);
+        if (branch_id) q = q.eq('branch_id', branch_id);
+        const { data, error } = await q;
+        if (error) throw error;
+        const page = (data || []) as typeof rows;
+        rows.push(...page);
+        if (page.length < pageSize) break;
+      }
+      return rows;
+    };
+
+    const loadInventoryUnits = async () => {
+      const rows: Array<{
+        branch_id: string;
+        code: string | null;
+        sku: string | null;
+        barcode: string | null;
+        name: string;
+        is_active: boolean;
+        min_stock: number;
+        max_stock: number;
+        reorder_point: number;
+      }> = [];
+      for (let from = 0; ; from += pageSize) {
+        let q = supabase.from('inventory_units').select(
+          'branch_id,code,sku,barcode,name,is_active,min_stock,max_stock,reorder_point',
+        ).range(from, from + pageSize - 1);
+        if (branch_id) q = q.eq('branch_id', branch_id);
+        const { data, error } = await q;
+        if (error) throw error;
+        const page = (data || []) as typeof rows;
+        rows.push(...page);
+        if (page.length < pageSize) break;
+      }
+      return rows;
+    };
+
+    const [canonicalRows, products, raws, units] = await Promise.all([
+      loadCanonical(),
+      loadProducts(),
+      loadRaws(),
+      loadInventoryUnits(),
     ]);
-
-    const firstError = canonicalResult.error || productsResult.error || rawsResult.error || unitsResult.error;
-    if (firstError) throw firstError;
-
-    const canonicalRows = (canonicalResult.data || []) as Array<Pick<CanonicalItemCatalogRow,
-      'branch_id' | 'item_type' | 'code' | 'sku' | 'barcode' | 'name' | 'base_uom_id' | 'is_active' | 'min_stock' | 'max_stock' | 'reorder_point'
-    >>;
-    const products = (productsResult.data || []) as Array<{
-      branch_id: string;
-      product_type: string;
-      sku: string | null;
-      barcode: string | null;
-      name: string;
-      is_active: boolean;
-      min_stock: number;
-      max_stock: number;
-      reorder_point: number;
-    }>;
-    const raws = (rawsResult.data || []) as Array<{
-      branch_id: string;
-      code: string | null;
-      name: string;
-      unit_id: string | null;
-      is_active: boolean;
-      min_stock: number;
-    }>;
-    const units = (unitsResult.data || []) as Array<{
-      branch_id: string;
-      code: string | null;
-      sku: string | null;
-      barcode: string | null;
-      name: string;
-      is_active: boolean;
-      min_stock: number;
-      max_stock: number;
-      reorder_point: number;
-    }>;
 
     const key = (parts: unknown[]) => parts.map((value) => value ?? '').join('\u001f');
     const mismatchCount = (legacyKeys: string[], canonicalKeys: string[]) => {
