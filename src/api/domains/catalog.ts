@@ -117,6 +117,16 @@ export type CanonicalItemCatalogRow = {
   created_at: string;
   updated_at: string;
 };
+
+export type CanonicalCatalogComparison = {
+  branch_id: string | null;
+  healthy: boolean;
+  legacy_total: number;
+  canonical_total: number;
+  products: { legacy: number; canonical: number; mismatches: number };
+  raw_materials: { legacy: number; canonical: number; mismatches: number };
+  inventory_units: { legacy: number; canonical: number; mismatches: number };
+};
 export type KitchenOrderContextRow = { order_id: string; table_name: string | null; operator_name: string | null };
 export type KitchenCompletedHistoryRow = {
   order_id: string;
@@ -186,6 +196,166 @@ export const catalog = {
     const { data, error } = await q;
     if (error) throw error;
     return (data || []) as CanonicalItemCatalogRow[];
+  },
+
+  async compareCanonicalCatalog(branch_id?: string | null): Promise<CanonicalCatalogComparison> {
+    const canonicalQuery = supabase.from('canonical_item_catalog').select(
+      'branch_id,item_type,code,sku,barcode,name,base_uom_id,is_active,min_stock,max_stock,reorder_point',
+    );
+    const productsQuery = supabase.from('products').select(
+      'branch_id,product_type,sku,barcode,name,is_active,min_stock,max_stock,reorder_point',
+    );
+    const rawsQuery = supabase.from('raw_materials').select(
+      'branch_id,code,name,unit_id,is_active,min_stock',
+    );
+    const unitsQuery = supabase.from('inventory_units').select(
+      'branch_id,code,sku,barcode,name,is_active,min_stock,max_stock,reorder_point',
+    );
+
+    const scopedCanonical = branch_id ? canonicalQuery.eq('branch_id', branch_id) : canonicalQuery;
+    const scopedProducts = branch_id ? productsQuery.eq('branch_id', branch_id) : productsQuery;
+    const scopedRaws = branch_id ? rawsQuery.eq('branch_id', branch_id) : rawsQuery;
+    const scopedUnits = branch_id ? unitsQuery.eq('branch_id', branch_id) : unitsQuery;
+
+    const [canonicalResult, productsResult, rawsResult, unitsResult] = await Promise.all([
+      scopedCanonical,
+      scopedProducts,
+      scopedRaws,
+      scopedUnits,
+    ]);
+
+    const firstError = canonicalResult.error || productsResult.error || rawsResult.error || unitsResult.error;
+    if (firstError) throw firstError;
+
+    const canonicalRows = (canonicalResult.data || []) as Array<Pick<CanonicalItemCatalogRow,
+      'branch_id' | 'item_type' | 'code' | 'sku' | 'barcode' | 'name' | 'base_uom_id' | 'is_active' | 'min_stock' | 'max_stock' | 'reorder_point'
+    >>;
+    const products = (productsResult.data || []) as Array<{
+      branch_id: string;
+      product_type: string;
+      sku: string | null;
+      barcode: string | null;
+      name: string;
+      is_active: boolean;
+      min_stock: number;
+      max_stock: number;
+      reorder_point: number;
+    }>;
+    const raws = (rawsResult.data || []) as Array<{
+      branch_id: string;
+      code: string | null;
+      name: string;
+      unit_id: string | null;
+      is_active: boolean;
+      min_stock: number;
+    }>;
+    const units = (unitsResult.data || []) as Array<{
+      branch_id: string;
+      code: string | null;
+      sku: string | null;
+      barcode: string | null;
+      name: string;
+      is_active: boolean;
+      min_stock: number;
+      max_stock: number;
+      reorder_point: number;
+    }>;
+
+    const key = (parts: unknown[]) => parts.map((value) => value ?? '').join('\u001f');
+    const mismatchCount = (legacyKeys: string[], canonicalKeys: string[]) => {
+      const counts = new Map<string, number>();
+      for (const value of legacyKeys) counts.set(value, (counts.get(value) || 0) + 1);
+      for (const value of canonicalKeys) counts.set(value, (counts.get(value) || 0) - 1);
+      let mismatches = 0;
+      for (const count of counts.values()) mismatches += Math.abs(count);
+      return mismatches;
+    };
+
+    const canonicalProducts = canonicalRows.filter((row) => row.item_type === 'FINISHED_GOOD' || row.item_type === 'RETAIL_ITEM');
+    const canonicalRaws = canonicalRows.filter((row) => row.item_type === 'RAW_MATERIAL');
+    const canonicalUnits = canonicalRows.filter((row) => row.item_type === 'SEMI_FINISHED');
+
+    const productMismatches = mismatchCount(
+      products.map((row) => key([
+        row.branch_id,
+        row.product_type === 'manufactured' ? 'FINISHED_GOOD' : 'RETAIL_ITEM',
+        row.sku,
+        row.sku,
+        row.barcode,
+        row.name,
+        row.is_active,
+        Number(row.min_stock),
+        Number(row.max_stock),
+        Number(row.reorder_point),
+      ])),
+      canonicalProducts.map((row) => key([
+        row.branch_id,
+        row.item_type,
+        row.code,
+        row.sku,
+        row.barcode,
+        row.name,
+        row.is_active,
+        Number(row.min_stock),
+        Number(row.max_stock),
+        Number(row.reorder_point),
+      ])),
+    );
+
+    const rawMismatches = mismatchCount(
+      raws.map((row) => key([
+        row.branch_id,
+        row.code,
+        row.name,
+        row.unit_id,
+        row.is_active,
+        Number(row.min_stock),
+      ])),
+      canonicalRaws.map((row) => key([
+        row.branch_id,
+        row.code,
+        row.name,
+        row.base_uom_id,
+        row.is_active,
+        Number(row.min_stock),
+      ])),
+    );
+
+    const unitMismatches = mismatchCount(
+      units.map((row) => key([
+        row.branch_id,
+        row.code,
+        row.sku,
+        row.barcode,
+        row.name,
+        row.is_active,
+        Number(row.min_stock),
+        Number(row.max_stock),
+        Number(row.reorder_point),
+      ])),
+      canonicalUnits.map((row) => key([
+        row.branch_id,
+        row.code,
+        row.sku,
+        row.barcode,
+        row.name,
+        row.is_active,
+        Number(row.min_stock),
+        Number(row.max_stock),
+        Number(row.reorder_point),
+      ])),
+    );
+
+    const result: CanonicalCatalogComparison = {
+      branch_id: branch_id || null,
+      healthy: productMismatches === 0 && rawMismatches === 0 && unitMismatches === 0,
+      legacy_total: products.length + raws.length + units.length,
+      canonical_total: canonicalRows.length,
+      products: { legacy: products.length, canonical: canonicalProducts.length, mismatches: productMismatches },
+      raw_materials: { legacy: raws.length, canonical: canonicalRaws.length, mismatches: rawMismatches },
+      inventory_units: { legacy: units.length, canonical: canonicalUnits.length, mismatches: unitMismatches },
+    };
+    return result;
   },
 
   async listInventoryUnits(filters?: { branch_id?: string; unit_type?: string; is_active?: boolean }) {
