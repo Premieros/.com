@@ -379,6 +379,47 @@ describe('Architecture V2 P-A safety baseline', () => {
     )).toBe(true);
   });
 
+  it('keeps canonical item catalog security-invoker and count-equivalent to legacy sources', async () => {
+    const { rows } = await client.query<{
+      security_invoker: boolean;
+      anon_select: boolean;
+      authenticated_select: boolean;
+      canonical_products: string;
+      legacy_products: string;
+      canonical_raws: string;
+      legacy_raws: string;
+      canonical_units: string;
+      legacy_units: string;
+    }>(
+      `select
+         exists (
+           select 1
+           from pg_class c
+           join pg_namespace n on n.oid = c.relnamespace
+           where n.nspname = 'public'
+             and c.relname = 'canonical_item_catalog'
+             and c.relkind = 'v'
+             and coalesce(array_to_string(c.reloptions, ','), '') like '%security_invoker=true%'
+         ) as security_invoker,
+         has_table_privilege('anon', 'public.canonical_item_catalog', 'SELECT') as anon_select,
+         has_table_privilege('authenticated', 'public.canonical_item_catalog', 'SELECT') as authenticated_select,
+         (select count(*) from public.canonical_item_catalog where item_type in ('FINISHED_GOOD','RETAIL_ITEM'))::text as canonical_products,
+         (select count(*) from public.products)::text as legacy_products,
+         (select count(*) from public.canonical_item_catalog where item_type = 'RAW_MATERIAL')::text as canonical_raws,
+         (select count(*) from public.raw_materials)::text as legacy_raws,
+         (select count(*) from public.canonical_item_catalog where item_type = 'SEMI_FINISHED')::text as canonical_units,
+         (select count(*) from public.inventory_units)::text as legacy_units`,
+    );
+
+    const state = rows[0];
+    expect(state?.security_invoker).toBe(true);
+    expect(state?.anon_select).toBe(false);
+    expect(state?.authenticated_select).toBe(true);
+    expect(Number(state?.canonical_products ?? -1)).toBe(Number(state?.legacy_products ?? -2));
+    expect(Number(state?.canonical_raws ?? -1)).toBe(Number(state?.legacy_raws ?? -2));
+    expect(Number(state?.canonical_units ?? -1)).toBe(Number(state?.legacy_units ?? -2));
+  });
+
   it('keeps canonical item tables read-only for authenticated clients during compatibility phase', async () => {
     const { rows } = await client.query<{
       items_select: boolean;
