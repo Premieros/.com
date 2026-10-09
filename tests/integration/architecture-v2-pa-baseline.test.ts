@@ -485,6 +485,73 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(state?.legacy_links_any).toBe(false);
   });
 
+  it('keeps canonical inventory movement read model complete and private', async () => {
+    const { rows } = await client.query<{
+      source_rows: string;
+      canonical_rows: string;
+      missing_item_id: string;
+      missing_branch: string;
+      missing_warehouse: string;
+      duplicate_source_rows: string;
+      missing_ledger_rows: string;
+      missing_unit_rows: string;
+      anon_select: boolean;
+      authenticated_select: boolean;
+    }>(
+      `select
+         (
+           (select count(*) from public.inventory_ledger)
+           + (select count(*) from public.inventory_unit_entries)
+         )::text as source_rows,
+         (select count(*) from private.canonical_inventory_movements)::text as canonical_rows,
+         (select count(*) from private.canonical_inventory_movements where item_id is null)::text as missing_item_id,
+         (select count(*) from private.canonical_inventory_movements where branch_id is null)::text as missing_branch,
+         (select count(*) from private.canonical_inventory_movements where warehouse_id is null)::text as missing_warehouse,
+         (
+           select count(*)
+           from (
+             select source_stream, source_entry_id
+             from private.canonical_inventory_movements
+             group by source_stream, source_entry_id
+             having count(*) > 1
+           ) d
+         )::text as duplicate_source_rows,
+         (
+           select count(*)
+           from public.inventory_ledger il
+           where not exists (
+             select 1
+             from private.canonical_inventory_movements c
+             where c.source_stream = 'inventory_ledger'
+               and c.source_entry_id = il.id::text
+           )
+         )::text as missing_ledger_rows,
+         (
+           select count(*)
+           from public.inventory_unit_entries iue
+           where not exists (
+             select 1
+             from private.canonical_inventory_movements c
+             where c.source_stream = 'inventory_unit_entries'
+               and c.source_entry_id = iue.id::text
+           )
+         )::text as missing_unit_rows,
+         has_table_privilege('anon', 'private.canonical_inventory_movements', 'SELECT') as anon_select,
+         has_table_privilege('authenticated', 'private.canonical_inventory_movements', 'SELECT') as authenticated_select`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.canonical_rows ?? -1)).toBe(Number(state?.source_rows ?? -2));
+    expect(Number(state?.missing_item_id ?? -1)).toBe(0);
+    expect(Number(state?.missing_branch ?? -1)).toBe(0);
+    expect(Number(state?.missing_warehouse ?? -1)).toBe(0);
+    expect(Number(state?.duplicate_source_rows ?? -1)).toBe(0);
+    expect(Number(state?.missing_ledger_rows ?? -1)).toBe(0);
+    expect(Number(state?.missing_unit_rows ?? -1)).toBe(0);
+    expect(state?.anon_select).toBe(false);
+    expect(state?.authenticated_select).toBe(false);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
