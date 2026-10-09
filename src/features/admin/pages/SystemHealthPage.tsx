@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, CheckCircle2, Database, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
-import { admin } from '@/api';
+import { admin, catalog } from '@/api';
 import { Card } from '@/components/PageHeader';
 import { Button } from '@/components/Button';
 import { useLanguage } from '@/context/LanguageContext';
@@ -81,13 +81,16 @@ export function SystemHealthPage() {
     const targetBranchIds = branchScope.selectedBranchIds.length > 0
       ? branchScope.selectedBranchIds
       : (branchFilter ? [branchFilter] : []);
-    const [remoteResults, offline] = await Promise.all([
+    const [remoteResults, offline, canonicalReconciliation] = await Promise.all([
       Promise.all(
         (targetBranchIds.length > 0 ? targetBranchIds : [null]).map((branchId) =>
           admin.getSystemHealthSnapshot({ p_branch_id: branchId }),
         ),
       ),
       getAllOfflineSales().catch(() => []),
+      catalog.listCanonicalItemReconciliation({
+        branch_ids: targetBranchIds.length > 0 ? targetBranchIds : undefined,
+      }).catch(() => null),
     ]);
 
     const failedRemote = remoteResults.find((result) => result.error || !result.data || typeof result.data !== 'object');
@@ -155,6 +158,8 @@ export function SystemHealthPage() {
 
     const blockedOffline = offline.filter((row) => row.status === 'failed').length;
     const retryingOffline = offline.filter((row) => row.status === 'pending' || row.status === 'syncing').length;
+    const canonicalMismatchRows = canonicalReconciliation?.filter((row) => !row.is_match) || [];
+    const canonicalAbsoluteDelta = canonicalMismatchRows.reduce((sum, row) => sum + Math.abs(n(row.delta)), 0);
 
     const next: Check[] = [
       {
@@ -163,6 +168,22 @@ export function SystemHealthPage() {
         en: 'Database',
         status: snapshot.database_ok ? 'ok' : 'error',
         detail: snapshot.database_ok ? (ar ? 'الاتصال والفحص المركزي يعملان' : 'Central operational check is reachable') : (ar ? 'فشل الفحص المركزي' : 'Central check failed'),
+      },
+      {
+        key: 'canonical_catalog',
+        ar: 'تطابق كتالوج V2 مع البيانات الحالية',
+        en: 'Canonical catalog dual-read',
+        status: canonicalReconciliation === null ? 'error' : (canonicalMismatchRows.length > 0 ? 'error' : 'ok'),
+        detail: canonicalReconciliation === null
+          ? (ar ? 'تعذر تنفيذ فحص المقارنة بين النموذج الحالي وCanonical Item' : 'Canonical/legacy reconciliation query failed')
+          : canonicalMismatchRows.length > 0
+            ? (ar
+                ? `${canonicalMismatchRows.length} مجموعات غير متطابقة، فرق مطلق ${canonicalAbsoluteDelta}`
+                : `${canonicalMismatchRows.length} mismatched groups, absolute delta ${canonicalAbsoluteDelta}`)
+            : (ar
+                ? `متطابق عبر ${canonicalReconciliation.length} مجموعات فرع/نوع`
+                : `Matched across ${canonicalReconciliation.length} branch/type groups`),
+        count: canonicalMismatchRows.length,
       },
       {
         key: 'active_shifts',
