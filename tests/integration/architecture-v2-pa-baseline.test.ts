@@ -379,6 +379,39 @@ describe('Architecture V2 P-A safety baseline', () => {
     )).toBe(true);
   });
 
+  it('keeps canonical dual-read reconciliation green and security-invoker', async () => {
+    const { rows } = await client.query<{
+      mismatches: string;
+      absolute_delta: string;
+      security_invoker: boolean;
+      anon_select: boolean;
+      authenticated_select: boolean;
+    }>(
+      `select
+         count(*) filter (where not is_match)::text as mismatches,
+         coalesce(sum(abs(delta)), 0)::text as absolute_delta,
+         exists (
+           select 1
+           from pg_class c
+           join pg_namespace n on n.oid = c.relnamespace
+           where n.nspname = 'public'
+             and c.relname = 'canonical_item_reconciliation'
+             and c.relkind = 'v'
+             and coalesce(array_to_string(c.reloptions, ','), '') like '%security_invoker=true%'
+         ) as security_invoker,
+         has_table_privilege('anon', 'public.canonical_item_reconciliation', 'SELECT') as anon_select,
+         has_table_privilege('authenticated', 'public.canonical_item_reconciliation', 'SELECT') as authenticated_select
+       from public.canonical_item_reconciliation`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.mismatches ?? -1)).toBe(0);
+    expect(Number(state?.absolute_delta ?? -1)).toBe(0);
+    expect(state?.security_invoker).toBe(true);
+    expect(state?.anon_select).toBe(false);
+    expect(state?.authenticated_select).toBe(true);
+  });
+
   it('keeps canonical item catalog security-invoker and count-equivalent to legacy sources', async () => {
     const { rows } = await client.query<{
       security_invoker: boolean;
