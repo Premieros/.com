@@ -333,6 +333,52 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(Number(state?.duplicate_item_links ?? -1)).toBe(0);
   });
 
+  it('keeps canonical item sync triggers private and attached', async () => {
+    const { rows } = await client.query<{
+      table_name: string;
+      trigger_name: string;
+      function_signature: string;
+      anon_exec: boolean;
+      authenticated_exec: boolean;
+      security_definer: boolean;
+      has_search_path: boolean;
+    }>(
+      `select
+         c.relname as table_name,
+         t.tgname as trigger_name,
+         p.oid::regprocedure::text as function_signature,
+         has_function_privilege('anon', p.oid, 'EXECUTE') as anon_exec,
+         has_function_privilege('authenticated', p.oid, 'EXECUTE') as authenticated_exec,
+         p.prosecdef as security_definer,
+         exists (
+           select 1
+           from unnest(coalesce(p.proconfig, '{}'::text[])) cfg
+           where cfg like 'search_path=%'
+         ) as has_search_path
+       from pg_trigger t
+       join pg_class c on c.oid = t.tgrelid
+       join pg_proc p on p.oid = t.tgfoid
+       join pg_namespace n on n.oid = c.relnamespace
+       where n.nspname = 'public'
+         and t.tgname = any($1::text[])
+       order by c.relname`,
+      [[
+        'trg_sync_product_canonical_item',
+        'trg_sync_raw_material_canonical_item',
+        'trg_sync_inventory_unit_canonical_item',
+      ]],
+    );
+
+    expect(rows).toHaveLength(3);
+    expect(rows.every((row) =>
+      row.security_definer
+      && row.has_search_path
+      && !row.anon_exec
+      && !row.authenticated_exec
+      && row.function_signature.startsWith('private.')
+    )).toBe(true);
+  });
+
   it('keeps canonical item tables read-only for authenticated clients during compatibility phase', async () => {
     const { rows } = await client.query<{
       items_select: boolean;
