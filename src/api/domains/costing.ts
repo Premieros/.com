@@ -22,7 +22,68 @@ export type RawConsumptionCostBreakdownRow = {
   displayed_cost: number;
 };
 
+export type CostingV2Row = {
+  item_id: string;
+  organization_id: string;
+  branch_id: string;
+  item_type: string;
+  name: string;
+  code: string | null;
+  inventory_cost: number | null;
+  costing_reference_cost: number | null;
+  theoretical_cost: number | null;
+  standard_cost: number | null;
+  standard_effective_from: string | null;
+  standard_effective_to: string | null;
+  theoretical_cost_basis: string;
+  theoretical_cost_status: 'AVAILABLE' | 'MISSING_INPUT';
+};
+
+export type StandardCostHistoryRow = {
+  id: string;
+  standard_cost: number;
+  effective_from: string;
+  effective_to: string | null;
+  notes: string | null;
+  created_by: string | null;
+  created_at: string;
+};
+
+export type SetStandardCostResult = {
+  success: boolean;
+  error?: string;
+  permission?: string;
+  standard_cost_id?: string;
+  item_id?: string;
+  branch_id?: string;
+  standard_cost?: number;
+  effective_from?: string;
+  effective_to?: string | null;
+};
+
 export const costing = {
+  getItemCostingV2(p_branch_id: string): ApiResult<CostingV2Row[]> {
+    return rpc('get_item_costing_v2', { p_branch_id });
+  },
+  getItemStandardCostHistory(p: { p_item_id: string; p_branch_id: string }): ApiResult<StandardCostHistoryRow[]> {
+    return rpc('get_item_standard_cost_history', p);
+  },
+  setItemStandardCost(p: {
+    p_item_id: string;
+    p_branch_id: string;
+    p_standard_cost: number;
+    p_reason: string;
+    p_effective_from?: string | null;
+  }): ApiResult<SetStandardCostResult> {
+    const args: Record<string, unknown> = {
+      p_item_id: p.p_item_id,
+      p_branch_id: p.p_branch_id,
+      p_standard_cost: p.p_standard_cost,
+      p_reason: p.p_reason,
+    };
+    if (p.p_effective_from) args.p_effective_from = p.p_effective_from;
+    return rpc('set_item_standard_cost', args);
+  },
   getOverview(p: { p_branch_id?: string | null }): ApiResult<CostingOverviewRow[]> { return rpc('get_costing_overview', p); },
   getProductDetail(p: { p_product_id: string; p_branch_id?: string | null }): ApiResult<ProductCostingDetail> { return rpc('get_product_costing_detail', p); },
   getCostHistory(p: { p_product_id: string; p_limit?: number }): ApiResult<CostHistoryRow[]> { return rpc('get_cost_history', p); },
