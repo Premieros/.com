@@ -595,6 +595,34 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(state?.authenticated_select).toBe(false);
   });
 
+  it('classifies raw batch diagnostics without unknown states', async () => {
+    const { rows } = await client.query<{
+      total_rows: string;
+      unknown_rows: string;
+      operational_mismatch: string;
+      missing_scope: string;
+      anon_select: boolean;
+      authenticated_select: boolean;
+    }>(
+      `select
+         count(*)::text as total_rows,
+         count(*) filter (where classification='UNKNOWN')::text as unknown_rows,
+         count(*) filter (where reconciliation_status<>'MATCH')::text as operational_mismatch,
+         count(*) filter (where item_id is null or branch_id is null or warehouse_id is null)::text as missing_scope,
+         has_table_privilege('anon', 'private.canonical_raw_batch_diagnostics', 'SELECT') as anon_select,
+         has_table_privilege('authenticated', 'private.canonical_raw_batch_diagnostics', 'SELECT') as authenticated_select
+       from private.canonical_raw_batch_diagnostics`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.total_rows ?? 0)).toBeGreaterThan(0);
+    expect(Number(state?.unknown_rows ?? -1)).toBe(0);
+    expect(Number(state?.operational_mismatch ?? -1)).toBe(0);
+    expect(Number(state?.missing_scope ?? -1)).toBe(0);
+    expect(state?.anon_select).toBe(false);
+    expect(state?.authenticated_select).toBe(false);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
