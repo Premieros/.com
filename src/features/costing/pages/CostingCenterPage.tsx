@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, History } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
+import type { SaleCostVarianceV2Row, PurchaseCostVarianceV2Row, CostVarianceSummaryV2Row } from '@/api/domains/costing';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
 import { useBranchFilter } from '@/lib/useBranchFilter';
@@ -20,7 +21,7 @@ import type {
   RawMaterialCostOverviewRow, RawMaterialCostHistoryRow, RawMaterialPriceSource,
 } from '@/lib/types';
 
-type Tab = 'overview' | 'raw_prices' | 'orders' | 'supplier';
+type Tab = 'overview' | 'raw_prices' | 'orders' | 'variance' | 'supplier';
 type SalesCostSummary = { sales_count: number; net_sales: number; cogs: number; ratio: number };
 
 export function CostingCenterPage() {
@@ -39,6 +40,9 @@ export function CostingCenterPage() {
   const [rawHistoryTarget, setRawHistoryTarget] = useState<RawMaterialCostOverviewRow | null>(null);
   const [rawHistoryLoading, setRawHistoryLoading] = useState(false);
   const [salesCostSummary, setSalesCostSummary] = useState<SalesCostSummary>({ sales_count: 0, net_sales: 0, cogs: 0, ratio: 0 });
+  const [saleVariances, setSaleVariances] = useState<SaleCostVarianceV2Row[]>([]);
+  const [purchaseVariances, setPurchaseVariances] = useState<PurchaseCostVarianceV2Row[]>([]);
+  const [varianceSummary, setVarianceSummary] = useState<CostVarianceSummaryV2Row | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -149,6 +153,57 @@ export function CostingCenterPage() {
     setLoading(false);
   }, [effBranch, show]);
 
+  const loadVariance = useCallback(async () => {
+    if (!effBranch) {
+      setSaleVariances([]);
+      setPurchaseVariances([]);
+      setVarianceSummary(null);
+      setError(null);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    const allowed = history.clampRange(fromDate, toDate);
+    if (allowed.from !== fromDate) setFromDate(allowed.from);
+    if (allowed.to !== toDate) setToDate(allowed.to);
+
+    const [summaryRes, salesRes, purchasesRes] = await Promise.all([
+      api.costing.getCostVarianceSummaryV2({
+        p_branch_id: effBranch,
+        p_from: allowed.from || null,
+        p_to: allowed.to || null,
+      }),
+      api.costing.getSaleCostVarianceV2({
+        p_branch_id: effBranch,
+        p_from: allowed.from || null,
+        p_to: allowed.to || null,
+        p_limit: 500,
+        p_offset: 0,
+      }),
+      api.costing.getPurchaseCostVarianceV2({
+        p_branch_id: effBranch,
+        p_from: allowed.from || null,
+        p_to: allowed.to || null,
+        p_limit: 500,
+        p_offset: 0,
+      }),
+    ]);
+
+    const firstError = summaryRes.error || salesRes.error || purchasesRes.error;
+    if (firstError) {
+      setError(firstError.message);
+      setLoading(false);
+      show(firstError.message, 'error');
+      return;
+    }
+
+    setVarianceSummary(summaryRes.data?.[0] || null);
+    setSaleVariances(salesRes.data || []);
+    setPurchaseVariances(purchasesRes.data || []);
+    setLoading(false);
+  }, [effBranch, fromDate, toDate, history, show]);
+
   const openRawHistory = useCallback(async (row: RawMaterialCostOverviewRow) => {
     setRawHistoryTarget(row);
     setRawHistory([]);
@@ -173,8 +228,9 @@ export function CostingCenterPage() {
     if (tab === 'overview') void loadOverview();
     else if (tab === 'raw_prices') void loadRawCosts();
     else if (tab === 'orders') void loadOrders();
+    else if (tab === 'variance') void loadVariance();
     else void loadSupplierImpact();
-  }, [tab, loadOverview, loadRawCosts, loadOrders, loadSupplierImpact]);
+  }, [tab, loadOverview, loadRawCosts, loadOrders, loadVariance, loadSupplierImpact]);
 
   const openDetail = async (productId: string) => {
     setDetailLoading(true);
@@ -223,6 +279,17 @@ export function CostingCenterPage() {
       : 0;
     return { estimatedNegativeCost, unpricedNegativeQuantity, estimatedCogs, estimatedRatio };
   }, [rawCosts, salesCostSummary]);
+
+  const varianceCoverage = useMemo(() => {
+    if (!varianceSummary) return { salesPct: 0, netSalesPct: 0 };
+    const salesPct = varianceSummary.sales_count > 0
+      ? varianceSummary.comparable_sales_count * 100 / varianceSummary.sales_count
+      : 0;
+    const netSalesPct = varianceSummary.total_net_sales > 0
+      ? varianceSummary.comparable_net_sales * 100 / varianceSummary.total_net_sales
+      : 0;
+    return { salesPct, netSalesPct };
+  }, [varianceSummary]);
 
   const visibleBranches = branchFilter ? branches.filter((b) => b.id === branchFilter) : branches;
   const money = (v: number | undefined | null) => formatCurrency(Number(v || 0), 'EGP', lang);
@@ -304,6 +371,43 @@ export function CostingCenterPage() {
     { key: 'history', header: isAr ? 'التاريخ' : 'History', render: (r) => <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); void openRawHistory(r); }}><History className="w-4 h-4" /> {formatNumber(r.event_count, 0)}</Button> },
   ];
 
+  const saleVarianceColumns: Column<SaleCostVarianceV2Row & { id: string }>[] = [
+    { key: 'invoice', header: t('invoiceNumber'), render: (r) => <span className="font-medium">{r.invoice_number || '-'}</span> },
+    { key: 'date', header: t('date'), render: (r) => formatDateTime(r.sale_created_at, lang) },
+    { key: 'net', header: isAr ? 'صافي المبيعات' : 'Net sales', render: (r) => money(r.net_sales) },
+    { key: 'actual', header: isAr ? 'COGS الفعلي' : 'Actual COGS', render: (r) => r.actual_cogs == null ? '-' : money(r.actual_cogs) },
+    { key: 'theoretical', header: isAr ? 'التكلفة النظرية' : 'Theoretical cost', render: (r) => r.theoretical_cost == null ? '-' : money(r.theoretical_cost) },
+    { key: 'variance', header: isAr ? 'الانحراف' : 'Variance', render: (r) => {
+      if (r.actual_vs_theoretical_variance == null) return '-';
+      const v = Number(r.actual_vs_theoretical_variance);
+      return <span className={v > 0 ? 'font-semibold text-ui-danger' : v < 0 ? 'font-semibold text-ui-success' : 'font-semibold text-ui-muted'}>{v > 0 ? '+' : ''}{money(v)}</span>;
+    } },
+    { key: 'foodCost', header: isAr ? 'فعلي / نظري %' : 'Actual / theoretical %', render: (r) => <span className="text-xs">{r.actual_food_cost_pct == null ? '-' : formatNumber(r.actual_food_cost_pct, 2) + '%'} / {r.theoretical_food_cost_pct == null ? '-' : formatNumber(r.theoretical_food_cost_pct, 2) + '%'}</span> },
+    { key: 'basis', header: isAr ? 'أساس النظرية' : 'Theoretical basis', render: (r) => {
+      if (r.theoretical_basis === 'IMMUTABLE_SALE_SNAPSHOT_V1') return pill(isAr ? 'Snapshot تاريخي' : 'Historical snapshot', 'bg-ui-success-soft text-ui-success');
+      if (r.theoretical_basis === 'CURRENT_RECIPE_REFERENCE_NOT_HISTORICAL') return pill(isAr ? 'مرجع حالي' : 'Current reference', 'bg-ui-warning-soft text-ui-warning');
+      if (r.theoretical_basis === 'MIXED_SNAPSHOT_AND_CURRENT_REFERENCE') return pill(isAr ? 'مختلط' : 'Mixed', 'bg-ui-info-soft text-ui-info');
+      return pill(isAr ? 'غير مكتمل' : 'Incomplete', 'bg-ui-danger-soft text-ui-danger');
+    } },
+  ];
+
+  const purchaseVarianceColumns: Column<PurchaseCostVarianceV2Row & { id: string }>[] = [
+    { key: 'invoice', header: t('invoiceNumber'), render: (r) => <span className="font-medium">{r.invoice_number || '-'}</span> },
+    { key: 'date', header: t('date'), render: (r) => formatDateTime(r.purchase_created_at, lang) },
+    { key: 'qty', header: isAr ? 'الكمية الأساسية' : 'Base quantity', render: (r) => r.received_base_quantity == null ? '-' : formatNumber(r.received_base_quantity, 3) },
+    { key: 'actual', header: isAr ? 'تكلفة الشراء / وحدة' : 'Actual purchase / unit', render: (r) => r.actual_base_unit_cost == null ? '-' : rawUnitMoney(r.actual_base_unit_cost) },
+    { key: 'reference', header: isAr ? 'المرجع السابق / وحدة' : 'Prior reference / unit', render: (r) => r.prior_reference_unit_cost == null ? '-' : rawUnitMoney(r.prior_reference_unit_cost) },
+    { key: 'variance', header: isAr ? 'انحراف الشراء' : 'Purchase variance', render: (r) => {
+      if (r.actual_vs_reference_total_variance == null) return '-';
+      const v = Number(r.actual_vs_reference_total_variance);
+      return <span className={v > 0 ? 'font-semibold text-ui-danger' : v < 0 ? 'font-semibold text-ui-success' : 'font-semibold text-ui-muted'}>{v > 0 ? '+' : ''}{money(v)}</span>;
+    } },
+    { key: 'standard', header: isAr ? 'التكلفة القياسية' : 'Standard cost', render: (r) => r.standard_unit_cost == null ? '-' : rawUnitMoney(r.standard_unit_cost) },
+    { key: 'status', header: isAr ? 'الحالة' : 'Status', render: (r) => r.actual_cost_status === 'LEDGER_NORMALIZED'
+      ? pill(isAr ? 'مطبّع من Ledger' : 'Ledger normalized', 'bg-ui-success-soft text-ui-success')
+      : pill(isAr ? 'Ledger مفقود' : 'Missing ledger', 'bg-ui-danger-soft text-ui-danger') },
+  ];
+
   const rawHistoryColumns: Column<RawMaterialCostHistoryRow & { id: string }>[] = [
     { key: 'date', header: t('date'), render: (r) => formatDateTime(r.priced_at, lang) },
     { key: 'source', header: isAr ? 'المصدر' : 'Source', render: (r) => rawPriceSourcePill(r.price_source) },
@@ -320,15 +424,28 @@ export function CostingCenterPage() {
   const handleExportRawCosts = () => exportToExcel(filteredRawCosts.map((r) => ({ RawMaterial: r.raw_material_name, Code: r.raw_material_code || '', StockQuantity: r.stock_quantity, KnownUnitCost: r.latest_cost, ActualPositiveStockValue: r.actual_stock_value, NegativeQuantity: r.negative_quantity, EstimatedNegativeCost: r.estimated_negative_value, UnpricedNegativeQuantity: r.unpriced_negative_quantity, EstimatedValueIncludingNegative: r.estimated_net_stock_value, PreviousCost: r.previous_cost ?? '', ChangePct: r.change_pct ?? '', Source: rawPriceSourceLabel(r.price_source), PriceDate: r.priced_at || '', Reference: r.reference_number || '', Detail: r.source_detail || '' })), 'raw-material-cost-valuation');
   const handleExportOrders = () => exportToExcel(orders.map((r) => ({ Invoice: r.invoice_number, Date: r.sale_date, Total: r.total, Discount: r.discount_amount, COGS: r.cogs, GrossMargin: r.gross_margin })), 'order-margin');
   const handleExportSupplier = () => exportToExcel(supplierImpact.map((r) => ({ Item: r.item_name, Type: r.item_type, FirstCost: r.first_cost, LastCost: r.last_cost, AvgCost: r.avg_cost, ChangePct: r.change_pct, PurchaseCount: r.purchase_count })), 'supplier-price-impact');
+  const handleExportVariance = () => exportToExcel(saleVariances.map((r) => ({
+    Invoice: r.invoice_number || '',
+    Date: r.sale_created_at,
+    NetSales: r.net_sales,
+    ActualCOGS: r.actual_cogs ?? '',
+    TheoreticalCost: r.theoretical_cost ?? '',
+    Variance: r.actual_vs_theoretical_variance ?? '',
+    ActualFoodCostPct: r.actual_food_cost_pct ?? '',
+    TheoreticalFoodCostPct: r.theoretical_food_cost_pct ?? '',
+    TheoreticalBasis: r.theoretical_basis,
+    CoverageStatus: r.theoretical_coverage_status,
+  })), 'cost-variance-sales');
 
   return (
     <DesignSurface testId="costing-center-page">
-      <DesignPageHeader title={t('costingCenter')} subtitle={isAr ? 'تكلفة المنتجات وربحية المبيعات وآخر أسعار الخامات' : 'Product costing, sales margin and latest raw-material prices'} actions={<Button variant="outline" size="sm" onClick={() => { if (tab === 'overview') handleExportOverview(); else if (tab === 'raw_prices') handleExportRawCosts(); else if (tab === 'orders') handleExportOrders(); else handleExportSupplier(); }}><Download className="w-4 h-4" /> {t('exportExcel')}</Button>} />
+      <DesignPageHeader title={t('costingCenter')} subtitle={isAr ? 'تكلفة المنتجات وربحية المبيعات وآخر أسعار الخامات' : 'Product costing, sales margin and latest raw-material prices'} actions={<Button variant="outline" size="sm" onClick={() => { if (tab === 'overview') handleExportOverview(); else if (tab === 'raw_prices') handleExportRawCosts(); else if (tab === 'orders') handleExportOrders(); else if (tab === 'variance') handleExportVariance(); else handleExportSupplier(); }}><Download className="w-4 h-4" /> {t('exportExcel')}</Button>} />
 
       <div className="flex gap-1.5 liquid-glass rounded-2xl p-1.5 w-fit mb-4" role="tablist">
         {tabBtn('overview', t('costingOverview'))}
         {tabBtn('raw_prices', isAr ? 'أسعار الخامات' : 'Raw Material Prices')}
         {tabBtn('orders', t('orderMargin'))}
+        {tabBtn('variance', isAr ? 'انحرافات التكلفة' : 'Cost Variance')}
         {tabBtn('supplier', t('supplierImpact'))}
       </div>
 
@@ -372,6 +489,78 @@ export function CostingCenterPage() {
         <div className="flex flex-col sm:flex-row gap-3 mb-4"><input type="date" value={fromDate} min={history.minDate} onChange={(e) => setFromDate(history.clampRange(e.target.value, toDate).from)} className="border border-ui-border rounded-lg px-3 py-2 bg-ui-page text-sm" /><input type="date" value={toDate} onChange={(e) => { const allowed = history.clampRange(fromDate, e.target.value); setFromDate(allowed.from); setToDate(allowed.to); }} className="border border-ui-border rounded-lg px-3 py-2 bg-ui-page text-sm" /><Select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="sm:w-44"><option value="">{t('allBranches')}</option>{visibleBranches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select><Button size="sm" onClick={() => void loadOrders()}>{t('search')}</Button></div>
         <DataTable columns={orderColumns} data={orders.map((r) => ({ ...r, id: r.sale_id }))} loading={loading} error={error} emptyMessage={t('noData')} />
       </DesignPanel>}
+
+      {tab === 'variance' && <>
+        <DesignPanel testId="cost-variance-filters">
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <input type="date" value={fromDate} min={history.minDate} onChange={(e) => setFromDate(history.clampRange(e.target.value, toDate).from)} className="border border-ui-border rounded-lg px-3 py-2 bg-ui-page text-sm" />
+            <input type="date" value={toDate} onChange={(e) => { const allowed = history.clampRange(fromDate, e.target.value); setFromDate(allowed.from); setToDate(allowed.to); }} className="border border-ui-border rounded-lg px-3 py-2 bg-ui-page text-sm" />
+            <Select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="sm:w-56">
+              <option value="">{isAr ? 'اختر فرعًا' : 'Select a branch'}</option>
+              {visibleBranches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </Select>
+            <Button size="sm" onClick={() => void loadVariance()} disabled={!effBranch}>{t('search')}</Button>
+          </div>
+          {!effBranch && <p className="mt-3 text-sm text-ui-warning">{isAr ? 'اختر فرعًا لعرض انحرافات التكلفة. يتم الحساب على مستوى الفرع لضمان دقة المخزون والمحاسبة.' : 'Select a branch to view cost variance. Calculations are branch-scoped for inventory and accounting accuracy.'}</p>}
+        </DesignPanel>
+
+        {effBranch && varianceSummary && <DesignPanel testId="cost-variance-summary">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+            <div className="rounded-xl border border-ui-border bg-ui-surface/60 p-4">
+              <p className="text-xs font-medium text-ui-subtle">{isAr ? 'تغطية المقارنة' : 'Comparable coverage'}</p>
+              <p className="mt-1 text-2xl font-bold text-ui-primary">{formatNumber(varianceCoverage.netSalesPct, 1)}%</p>
+              <p className="mt-1 text-[11px] text-ui-subtle">{varianceSummary.comparable_sales_count}/{varianceSummary.sales_count} {isAr ? 'فاتورة' : 'sales'} · {formatNumber(varianceCoverage.salesPct, 1)}%</p>
+            </div>
+            <div className="rounded-xl border border-ui-border bg-ui-surface/60 p-4">
+              <p className="text-xs font-medium text-ui-subtle">{isAr ? 'Food Cost فعلي' : 'Actual Food Cost'}</p>
+              <p className="mt-1 text-2xl font-bold text-ui-text">{varianceSummary.actual_food_cost_pct == null ? '-' : formatNumber(varianceSummary.actual_food_cost_pct, 2) + '%'}</p>
+              <p className="mt-1 text-[11px] text-ui-subtle">{money(varianceSummary.comparable_actual_cogs)}</p>
+            </div>
+            <div className="rounded-xl border border-ui-border bg-ui-surface/60 p-4">
+              <p className="text-xs font-medium text-ui-subtle">{isAr ? 'Food Cost نظري' : 'Theoretical Food Cost'}</p>
+              <p className="mt-1 text-2xl font-bold text-ui-text">{varianceSummary.theoretical_food_cost_pct == null ? '-' : formatNumber(varianceSummary.theoretical_food_cost_pct, 2) + '%'}</p>
+              <p className="mt-1 text-[11px] text-ui-subtle">{money(varianceSummary.comparable_theoretical_cost)}</p>
+            </div>
+            <div className="rounded-xl border border-ui-border bg-ui-surface/60 p-4">
+              <p className="text-xs font-medium text-ui-subtle">{isAr ? 'Actual − Theoretical' : 'Actual − Theoretical'}</p>
+              <p className={varianceSummary.actual_vs_theoretical_variance > 0 ? 'mt-1 text-2xl font-bold text-ui-danger' : varianceSummary.actual_vs_theoretical_variance < 0 ? 'mt-1 text-2xl font-bold text-ui-success' : 'mt-1 text-2xl font-bold text-ui-text'}>{varianceSummary.actual_vs_theoretical_variance > 0 ? '+' : ''}{money(varianceSummary.actual_vs_theoretical_variance)}</p>
+              <p className="mt-1 text-[11px] text-ui-subtle">{isAr ? 'الموجب = تكلفة فعلية أعلى' : 'Positive = actual cost above theoretical'}</p>
+            </div>
+            <div className="rounded-xl border border-ui-border bg-ui-surface/60 p-4">
+              <p className="text-xs font-medium text-ui-subtle">{isAr ? 'انحراف سعر الشراء' : 'Purchase price variance'}</p>
+              <p className={varianceSummary.purchase_reference_variance > 0 ? 'mt-1 text-2xl font-bold text-ui-danger' : varianceSummary.purchase_reference_variance < 0 ? 'mt-1 text-2xl font-bold text-ui-success' : 'mt-1 text-2xl font-bold text-ui-text'}>{varianceSummary.purchase_reference_variance > 0 ? '+' : ''}{money(varianceSummary.purchase_reference_variance)}</p>
+              <p className="mt-1 text-[11px] text-ui-subtle">{varianceSummary.purchase_reference_groups}/{varianceSummary.purchase_groups} {isAr ? 'مجموعات قابلة للمقارنة' : 'comparable groups'}</p>
+            </div>
+            <div className="rounded-xl border border-ui-border bg-ui-surface/60 p-4">
+              <p className="text-xs font-medium text-ui-subtle">{isAr ? 'سلامة Snapshot' : 'Snapshot health'}</p>
+              <p className={(varianceSummary.snapshot_failures + varianceSummary.missing_snapshot_without_failure) > 0 ? 'mt-1 text-2xl font-bold text-ui-danger' : 'mt-1 text-2xl font-bold text-ui-success'}>{varianceSummary.snapshot_failures + varianceSummary.missing_snapshot_without_failure}</p>
+              <p className="mt-1 text-[11px] text-ui-subtle">{varianceSummary.immutable_snapshot_sales} {isAr ? 'مبيعات Snapshot' : 'snapshot sales'} · {varianceSummary.current_reference_sales} {isAr ? 'مرجع حالي' : 'current reference'}</p>
+            </div>
+          </div>
+
+          {(varianceSummary.incomplete_theoretical_sales > 0 || varianceSummary.missing_purchase_ledger_groups > 0) && <div className="mt-3 rounded-xl border border-ui-warning/30 bg-ui-warning-soft p-3 text-xs text-ui-warning">
+            {isAr
+              ? 'بيانات غير مكتملة: ' + varianceSummary.incomplete_theoretical_sales + ' مبيعات نظرية غير مكتملة، و' + varianceSummary.missing_purchase_ledger_groups + ' مجموعات شراء بلا Ledger مطبّع. لا تدخل هذه الصفوف في المقارنات التي تحتاج مدخلات كاملة.'
+              : 'Incomplete data: ' + varianceSummary.incomplete_theoretical_sales + ' sales lack complete theoretical inputs and ' + varianceSummary.missing_purchase_ledger_groups + ' purchase groups lack normalized ledger cost. These rows are excluded from comparisons that require complete inputs.'}
+          </div>}
+        </DesignPanel>}
+
+        {effBranch && <DesignPanel testId="sale-cost-variance-panel">
+          <div className="mb-3">
+            <h3 className="font-bold text-ui-text">{isAr ? 'انحراف تكلفة المبيعات' : 'Sales cost variance'}</h3>
+            <p className="text-xs text-ui-subtle">{isAr ? 'آخر 500 صف ضمن الفترة. Snapshot التاريخي أدق من المرجع الحالي للمبيعات القديمة.' : 'Latest 500 rows in the period. Historical snapshots are exact; current reference rows are legacy comparisons.'}</p>
+          </div>
+          <DataTable columns={saleVarianceColumns} data={saleVariances.map((r) => ({ ...r, id: r.sale_id }))} loading={loading} error={error} emptyMessage={t('noData')} />
+        </DesignPanel>}
+
+        {effBranch && <DesignPanel testId="purchase-cost-variance-panel">
+          <div className="mb-3">
+            <h3 className="font-bold text-ui-text">{isAr ? 'انحراف أسعار المشتريات' : 'Purchase price variance'}</h3>
+            <p className="text-xs text-ui-subtle">{isAr ? 'التكلفة الفعلية هنا مطبّعة إلى وحدة المخزون الأساسية قبل مقارنتها بآخر شراء سابق.' : 'Actual purchase cost is normalized to the base inventory unit before comparison with the prior purchase reference.'}</p>
+          </div>
+          <DataTable columns={purchaseVarianceColumns} data={purchaseVariances.map((r) => ({ ...r, id: r.purchase_id + '-' + r.raw_material_id }))} loading={loading} error={error} emptyMessage={t('noData')} />
+        </DesignPanel>}
+      </>}
 
       {tab === 'supplier' && <DesignPanel testId="supplier-impact-panel">
         <div className="flex flex-col sm:flex-row gap-3 mb-4"><Select value={supplierId} onChange={(e) => setSupplierId(e.target.value)} className="sm:w-72">{suppliers.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</Select><Button size="sm" onClick={() => void loadSupplierImpact()}>{t('search')}</Button></div>
