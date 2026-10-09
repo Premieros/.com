@@ -552,6 +552,49 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(state?.authenticated_select).toBe(false);
   });
 
+  it('keeps canonical inventory balances reconciled to operational sources', async () => {
+    const { rows } = await client.query<{
+      rows: string;
+      raw_rows: string;
+      unit_rows: string;
+      missing_item_id: string;
+      missing_branch: string;
+      missing_warehouse: string;
+      reconciliation_mismatch: string;
+      branch_only_scope: string;
+      max_movement_delta: string;
+      anon_select: boolean;
+      authenticated_select: boolean;
+    }>(
+      `select
+         count(*)::text as rows,
+         count(*) filter (where inventory_kind='RAW_MATERIAL')::text as raw_rows,
+         count(*) filter (where inventory_kind='SEMI_FINISHED')::text as unit_rows,
+         count(*) filter (where item_id is null)::text as missing_item_id,
+         count(*) filter (where branch_id is null)::text as missing_branch,
+         count(*) filter (where warehouse_id is null)::text as missing_warehouse,
+         count(*) filter (where reconciliation_status <> 'MATCH')::text as reconciliation_mismatch,
+         count(*) filter (where warehouse_scope = 'LEGACY_BRANCH_ONLY')::text as branch_only_scope,
+         max(abs(coalesce(movement_delta,0)))::text as max_movement_delta,
+         has_table_privilege('anon', 'private.canonical_inventory_balances', 'SELECT') as anon_select,
+         has_table_privilege('authenticated', 'private.canonical_inventory_balances', 'SELECT') as authenticated_select
+       from private.canonical_inventory_balances`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.rows ?? 0)).toBeGreaterThan(0);
+    expect(Number(state?.raw_rows ?? 0)).toBeGreaterThan(0);
+    expect(Number(state?.unit_rows ?? 0)).toBeGreaterThan(0);
+    expect(Number(state?.missing_item_id ?? -1)).toBe(0);
+    expect(Number(state?.missing_branch ?? -1)).toBe(0);
+    expect(Number(state?.missing_warehouse ?? -1)).toBe(0);
+    expect(Number(state?.reconciliation_mismatch ?? -1)).toBe(0);
+    expect(Number(state?.branch_only_scope ?? -1)).toBe(0);
+    expect(Number(state?.max_movement_delta ?? -1)).toBe(0);
+    expect(state?.anon_select).toBe(false);
+    expect(state?.authenticated_select).toBe(false);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
