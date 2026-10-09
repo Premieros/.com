@@ -191,6 +191,180 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(Number(state?.warehouses_without_branch ?? 0)).toBe(0);
   });
 
+  it('keeps measurement_units as the canonical UOM master with units as an exact compatibility view', async () => {
+    const { rows } = await client.query<{
+      measurement_count: string;
+      compatibility_count: string;
+      mismatches: string;
+      units_is_security_invoker: boolean;
+    }>(
+      `select
+         (select count(*) from public.measurement_units)::text as measurement_count,
+         (select count(*) from public.units)::text as compatibility_count,
+         (
+           select count(*)
+           from (
+             (select id, code, name, symbol, is_active from public.measurement_units
+              except
+              select id, code, name, symbol, is_active from public.units)
+             union all
+             (select id, code, name, symbol, is_active from public.units
+              except
+              select id, code, name, symbol, is_active from public.measurement_units)
+           ) d
+         )::text as mismatches,
+         exists (
+           select 1
+           from pg_class c
+           join pg_namespace n on n.oid = c.relnamespace
+           where n.nspname = 'public'
+             and c.relname = 'units'
+             and c.relkind = 'v'
+             and coalesce(array_to_string(c.reloptions, ','), '') like '%security_invoker=true%'
+         ) as units_is_security_invoker`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.measurement_count ?? 0)).toBe(Number(state?.compatibility_count ?? -1));
+    expect(Number(state?.mismatches ?? -1)).toBe(0);
+    expect(state?.units_is_security_invoker).toBe(true);
+  });
+
+  it('keeps canonical item mappings complete and attribute-consistent', async () => {
+    const { rows } = await client.query<{
+      source_total: string;
+      link_total: string;
+      site_total: string;
+      unmapped: string;
+      attribute_mismatches: string;
+      duplicate_item_links: string;
+    }>(
+      `with source_total as (
+         select
+           (select count(*) from public.products)
+           + (select count(*) from public.raw_materials)
+           + (select count(*) from public.inventory_units) as value
+       ),
+       unmapped as (
+         select count(*) as value
+         from (
+           select 'products'::text source_table, p.id source_id from public.products p
+           union all
+           select 'raw_materials', r.id from public.raw_materials r
+           union all
+           select 'inventory_units', u.id from public.inventory_units u
+         ) s
+         where not exists (
+           select 1
+           from private.item_legacy_links l
+           where l.source_table = s.source_table
+             and l.source_id = s.source_id
+         )
+       ),
+       mismatches as (
+         select count(*) as value
+         from (
+           select l.item_id
+           from private.item_legacy_links l
+           join public.products p
+             on l.source_table = 'products' and l.source_id = p.id
+           join public.branches b on b.id = p.branch_id
+           join public.items i on i.id = l.item_id
+           join public.item_sites s on s.item_id = i.id and s.branch_id = p.branch_id
+           where i.organization_id <> b.organization_id
+              or i.name <> p.name
+              or coalesce(i.sku, '') <> coalesce(nullif(p.sku, ''), '')
+              or coalesce(i.barcode, '') <> coalesce(nullif(p.barcode, ''), '')
+              or s.min_stock <> p.min_stock
+              or s.max_stock <> p.max_stock
+              or s.reorder_point <> p.reorder_point
+           union all
+           select l.item_id
+           from private.item_legacy_links l
+           join public.raw_materials r
+             on l.source_table = 'raw_materials' and l.source_id = r.id
+           join public.branches b on b.id = r.branch_id
+           join public.items i on i.id = l.item_id
+           join public.item_sites s on s.item_id = i.id and s.branch_id = r.branch_id
+           where i.organization_id <> b.organization_id
+              or i.name <> r.name
+              or coalesce(i.code, '') <> coalesce(nullif(r.code, ''), '')
+              or i.base_uom_id is distinct from r.unit_id
+              or s.min_stock <> r.min_stock
+           union all
+           select l.item_id
+           from private.item_legacy_links l
+           join public.inventory_units u
+             on l.source_table = 'inventory_units' and l.source_id = u.id
+           join public.branches b on b.id = u.branch_id
+           join public.items i on i.id = l.item_id
+           join public.item_sites s on s.item_id = i.id and s.branch_id = u.branch_id
+           where i.organization_id <> b.organization_id
+              or i.name <> u.name
+              or coalesce(i.code, '') <> coalesce(nullif(u.code, ''), '')
+              or s.min_stock <> u.min_stock
+              or s.max_stock <> u.max_stock
+              or s.reorder_point <> u.reorder_point
+         ) d
+       )
+       select
+         (select value from source_total)::text as source_total,
+         (select count(*) from private.item_legacy_links)::text as link_total,
+         (select count(*) from public.item_sites)::text as site_total,
+         (select value from unmapped)::text as unmapped,
+         (select value from mismatches)::text as attribute_mismatches,
+         (
+           select count(*)
+           from (
+             select item_id
+             from private.item_legacy_links
+             group by item_id
+             having count(*) > 1
+           ) d
+         )::text as duplicate_item_links`,
+    );
+
+    const state = rows[0];
+    const total = Number(state?.source_total ?? 0);
+    expect(Number(state?.link_total ?? -1)).toBe(total);
+    expect(Number(state?.site_total ?? -1)).toBe(total);
+    expect(Number(state?.unmapped ?? -1)).toBe(0);
+    expect(Number(state?.attribute_mismatches ?? -1)).toBe(0);
+    expect(Number(state?.duplicate_item_links ?? -1)).toBe(0);
+  });
+
+  it('keeps canonical item tables read-only for authenticated clients during compatibility phase', async () => {
+    const { rows } = await client.query<{
+      items_select: boolean;
+      items_insert: boolean;
+      items_update: boolean;
+      items_delete: boolean;
+      sites_select: boolean;
+      sites_insert: boolean;
+      sites_update: boolean;
+      sites_delete: boolean;
+      legacy_links_any: boolean;
+    }>(
+      `select
+         has_table_privilege('authenticated', 'public.items', 'SELECT') as items_select,
+         has_table_privilege('authenticated', 'public.items', 'INSERT') as items_insert,
+         has_table_privilege('authenticated', 'public.items', 'UPDATE') as items_update,
+         has_table_privilege('authenticated', 'public.items', 'DELETE') as items_delete,
+         has_table_privilege('authenticated', 'public.item_sites', 'SELECT') as sites_select,
+         has_table_privilege('authenticated', 'public.item_sites', 'INSERT') as sites_insert,
+         has_table_privilege('authenticated', 'public.item_sites', 'UPDATE') as sites_update,
+         has_table_privilege('authenticated', 'public.item_sites', 'DELETE') as sites_delete,
+         has_table_privilege('authenticated', 'private.item_legacy_links', 'SELECT,INSERT,UPDATE,DELETE') as legacy_links_any`,
+    );
+
+    const state = rows[0];
+    expect(state?.items_select).toBe(true);
+    expect(state?.sites_select).toBe(true);
+    expect(state?.items_insert || state?.items_update || state?.items_delete).toBe(false);
+    expect(state?.sites_insert || state?.sites_update || state?.sites_delete).toBe(false);
+    expect(state?.legacy_links_any).toBe(false);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
