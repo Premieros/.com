@@ -84,6 +84,39 @@ export type ProductLiveCostRow = {
   product_id: string;
   calculated_cost: number;
 };
+
+export type CanonicalItemType =
+  | 'RAW_MATERIAL'
+  | 'SEMI_FINISHED'
+  | 'FINISHED_GOOD'
+  | 'RETAIL_ITEM'
+  | 'PACKAGING'
+  | 'SERVICE'
+  | 'NON_STOCK';
+
+export type CanonicalItemCatalogRow = {
+  item_id: string;
+  organization_id: string;
+  branch_id: string;
+  item_type: CanonicalItemType;
+  code: string | null;
+  sku: string | null;
+  barcode: string | null;
+  name: string;
+  name_en: string | null;
+  base_uom_id: string | null;
+  base_uom_code: string | null;
+  base_uom_name: string | null;
+  base_uom_symbol: string | null;
+  is_active: boolean;
+  preferred_warehouse_id: string | null;
+  min_stock: number;
+  max_stock: number;
+  reorder_point: number;
+  lead_time_days: number | null;
+  created_at: string;
+  updated_at: string;
+};
 export type KitchenOrderContextRow = { order_id: string; table_name: string | null; operator_name: string | null };
 export type KitchenCompletedHistoryRow = {
   order_id: string;
@@ -139,6 +172,20 @@ export const catalog = {
   },
   archiveModifierGroup(p_group_id: string) {
     return supabase.rpc('archive_modifier_group', { p_group_id });
+  },
+
+  async listCanonicalItems(filters?: {
+    branch_id?: string;
+    item_types?: CanonicalItemType[];
+    is_active?: boolean;
+  }): Promise<CanonicalItemCatalogRow[]> {
+    let q = supabase.from('canonical_item_catalog').select('*').order('name');
+    if (filters?.branch_id) q = q.eq('branch_id', filters.branch_id);
+    if (filters?.item_types?.length) q = q.in('item_type', filters.item_types);
+    if (filters?.is_active !== undefined) q = q.eq('is_active', filters.is_active);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data || []) as CanonicalItemCatalogRow[];
   },
 
   async listInventoryUnits(filters?: { branch_id?: string; unit_type?: string; is_active?: boolean }) {
