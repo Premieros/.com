@@ -908,6 +908,207 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(state?.authenticated_select).toBe(false);
   });
 
+  it('keeps one immutable private sale-cost snapshot path', async () => {
+    const { rows } = await client.query<{
+      theoretical_columns_on_sale_items: string;
+      snapshot_trigger_count: string;
+      snapshot_trigger_private: boolean;
+      snapshot_trigger_security_definer: boolean;
+      snapshot_trigger_has_search_path: boolean;
+      authenticated_snapshot_select: boolean;
+      service_snapshot_select: boolean;
+      service_snapshot_insert: boolean;
+      service_snapshot_update: boolean;
+      service_snapshot_delete: boolean;
+      missing_without_failure: string;
+      snapshot_failures: string;
+    }>(
+      `select
+         (
+           select count(*)
+           from information_schema.columns
+           where table_schema='public'
+             and table_name='sale_items'
+             and column_name like 'theoretical_%'
+         )::text as theoretical_columns_on_sale_items,
+         (
+           select count(*)
+           from pg_trigger t
+           where t.tgrelid='public.sale_items'::regclass
+             and not t.tgisinternal
+             and t.tgname='trg_capture_sale_item_cost_snapshot'
+         )::text as snapshot_trigger_count,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           join pg_namespace n on n.oid=p.pronamespace
+           where t.tgrelid='public.sale_items'::regclass
+             and t.tgname='trg_capture_sale_item_cost_snapshot'
+             and n.nspname='private'
+         ) as snapshot_trigger_private,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           where t.tgrelid='public.sale_items'::regclass
+             and t.tgname='trg_capture_sale_item_cost_snapshot'
+             and p.prosecdef
+         ) as snapshot_trigger_security_definer,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           where t.tgrelid='public.sale_items'::regclass
+             and t.tgname='trg_capture_sale_item_cost_snapshot'
+             and exists (
+               select 1
+               from unnest(coalesce(p.proconfig,'{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as snapshot_trigger_has_search_path,
+         has_table_privilege('authenticated','private.sale_item_cost_snapshots','SELECT') as authenticated_snapshot_select,
+         has_table_privilege('service_role','private.sale_item_cost_snapshots','SELECT') as service_snapshot_select,
+         has_table_privilege('service_role','private.sale_item_cost_snapshots','INSERT') as service_snapshot_insert,
+         has_table_privilege('service_role','private.sale_item_cost_snapshots','UPDATE') as service_snapshot_update,
+         has_table_privilege('service_role','private.sale_item_cost_snapshots','DELETE') as service_snapshot_delete,
+         (
+           select coalesce(sum(missing_snapshot_without_failure),0)
+           from private.sale_item_cost_snapshot_health
+         )::text as missing_without_failure,
+         (
+           select coalesce(sum(snapshot_failures),0)
+           from private.sale_item_cost_snapshot_health
+         )::text as snapshot_failures`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.theoretical_columns_on_sale_items ?? -1)).toBe(0);
+    expect(Number(state?.snapshot_trigger_count ?? -1)).toBe(1);
+    expect(state?.snapshot_trigger_private).toBe(true);
+    expect(state?.snapshot_trigger_security_definer).toBe(true);
+    expect(state?.snapshot_trigger_has_search_path).toBe(true);
+    expect(state?.authenticated_snapshot_select).toBe(false);
+    expect(state?.service_snapshot_select).toBe(true);
+    expect(state?.service_snapshot_insert).toBe(false);
+    expect(state?.service_snapshot_update).toBe(false);
+    expect(state?.service_snapshot_delete).toBe(false);
+    expect(Number(state?.missing_without_failure ?? -1)).toBe(0);
+    expect(Number(state?.snapshot_failures ?? -1)).toBe(0);
+  });
+
+  it('keeps Costing V2 snapshot and variance RPC contracts hardened', async () => {
+    const { rows } = await client.query<{
+      eligible_sales: string;
+      variance_rows: string;
+      invalid_snapshot_basis: string;
+      invalid_current_reference_basis: string;
+      invalid_complete_variance: string;
+      sale_rpc_anon: boolean;
+      sale_rpc_auth: boolean;
+      purchase_rpc_anon: boolean;
+      purchase_rpc_auth: boolean;
+      health_rpc_anon: boolean;
+      health_rpc_auth: boolean;
+      sale_rpc_search_path: boolean;
+      purchase_rpc_search_path: boolean;
+      health_rpc_search_path: boolean;
+    }>(
+      `select
+         (
+           select count(*)
+           from public.sales s
+           where coalesce(s.is_archived,false)=false
+             and coalesce(s.status,'') not in ('returned','cancelled')
+         )::text as eligible_sales,
+         (select count(*) from private.canonical_sale_cost_variance_v2)::text as variance_rows,
+         (
+           select count(*)
+           from private.canonical_sale_cost_variance_v2 v
+           where v.theoretical_basis='IMMUTABLE_SALE_SNAPSHOT_V1'
+             and (
+               v.net_line_count<=0
+               or v.snapshot_line_count<>v.net_line_count
+               or v.theoretical_cost is null
+             )
+         )::text as invalid_snapshot_basis,
+         (
+           select count(*)
+           from private.canonical_sale_cost_variance_v2 v
+           where v.theoretical_basis='CURRENT_RECIPE_REFERENCE_NOT_HISTORICAL'
+             and (
+               v.net_line_count<=0
+               or v.current_reference_line_count<>v.net_line_count
+               or v.snapshot_line_count<>0
+             )
+         )::text as invalid_current_reference_basis,
+         (
+           select count(*)
+           from private.canonical_sale_cost_variance_v2 v
+           where v.actual_vs_theoretical_variance is not null
+             and (
+               v.actual_cogs is null
+               or v.theoretical_cost is null
+               or v.theoretical_coverage_status<>'COMPLETE'
+             )
+         )::text as invalid_complete_variance,
+         has_function_privilege('anon','public.get_sale_cost_variance_v2(uuid,date,date,integer,integer)','EXECUTE') as sale_rpc_anon,
+         has_function_privilege('authenticated','public.get_sale_cost_variance_v2(uuid,date,date,integer,integer)','EXECUTE') as sale_rpc_auth,
+         has_function_privilege('anon','public.get_purchase_cost_variance_v2(uuid,date,date,integer,integer)','EXECUTE') as purchase_rpc_anon,
+         has_function_privilege('authenticated','public.get_purchase_cost_variance_v2(uuid,date,date,integer,integer)','EXECUTE') as purchase_rpc_auth,
+         has_function_privilege('anon','public.get_costing_snapshot_health_v2(uuid)','EXECUTE') as health_rpc_anon,
+         has_function_privilege('authenticated','public.get_costing_snapshot_health_v2(uuid)','EXECUTE') as health_rpc_auth,
+         exists (
+           select 1
+           from pg_proc p
+           join pg_namespace n on n.oid=p.pronamespace
+           where n.nspname='public'
+             and p.proname='get_sale_cost_variance_v2'
+             and exists (
+               select 1 from unnest(coalesce(p.proconfig,'{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as sale_rpc_search_path,
+         exists (
+           select 1
+           from pg_proc p
+           join pg_namespace n on n.oid=p.pronamespace
+           where n.nspname='public'
+             and p.proname='get_purchase_cost_variance_v2'
+             and exists (
+               select 1 from unnest(coalesce(p.proconfig,'{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as purchase_rpc_search_path,
+         exists (
+           select 1
+           from pg_proc p
+           join pg_namespace n on n.oid=p.pronamespace
+           where n.nspname='public'
+             and p.proname='get_costing_snapshot_health_v2'
+             and exists (
+               select 1 from unnest(coalesce(p.proconfig,'{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as health_rpc_search_path`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.variance_rows ?? -1)).toBe(Number(state?.eligible_sales ?? -2));
+    expect(Number(state?.invalid_snapshot_basis ?? -1)).toBe(0);
+    expect(Number(state?.invalid_current_reference_basis ?? -1)).toBe(0);
+    expect(Number(state?.invalid_complete_variance ?? -1)).toBe(0);
+    expect(state?.sale_rpc_anon).toBe(false);
+    expect(state?.sale_rpc_auth).toBe(true);
+    expect(state?.purchase_rpc_anon).toBe(false);
+    expect(state?.purchase_rpc_auth).toBe(true);
+    expect(state?.health_rpc_anon).toBe(false);
+    expect(state?.health_rpc_auth).toBe(true);
+    expect(state?.sale_rpc_search_path).toBe(true);
+    expect(state?.purchase_rpc_search_path).toBe(true);
+    expect(state?.health_rpc_search_path).toBe(true);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
