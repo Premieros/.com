@@ -705,6 +705,94 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(state?.cost_view_auth_select).toBe(false);
   });
 
+  it('keeps Standard Cost history non-overlapping and RPC exposure intentional', async () => {
+    const { rows } = await client.query<{
+      overlapping_periods: string;
+      set_anon: boolean;
+      set_auth: boolean;
+      read_anon: boolean;
+      read_auth: boolean;
+      history_anon: boolean;
+      history_auth: boolean;
+      guard_anon: boolean;
+      guard_auth: boolean;
+      trigger_attached: boolean;
+      set_search_path: boolean;
+      read_search_path: boolean;
+      history_search_path: boolean;
+    }>(
+      `select
+         (
+           select count(*)
+           from public.item_standard_costs a
+           join public.item_standard_costs b
+             on b.item_id = a.item_id
+            and b.branch_id = a.branch_id
+            and b.id > a.id
+            and tstzrange(a.effective_from, coalesce(a.effective_to, 'infinity'::timestamptz), '[)')
+                && tstzrange(b.effective_from, coalesce(b.effective_to, 'infinity'::timestamptz), '[)')
+         )::text as overlapping_periods,
+         has_function_privilege('anon', 'public.set_item_standard_cost(uuid,uuid,numeric,text,timestamptz)', 'EXECUTE') as set_anon,
+         has_function_privilege('authenticated', 'public.set_item_standard_cost(uuid,uuid,numeric,text,timestamptz)', 'EXECUTE') as set_auth,
+         has_function_privilege('anon', 'public.get_item_costing_v2(uuid)', 'EXECUTE') as read_anon,
+         has_function_privilege('authenticated', 'public.get_item_costing_v2(uuid)', 'EXECUTE') as read_auth,
+         has_function_privilege('anon', 'public.get_item_standard_cost_history(uuid,uuid)', 'EXECUTE') as history_anon,
+         has_function_privilege('authenticated', 'public.get_item_standard_cost_history(uuid,uuid)', 'EXECUTE') as history_auth,
+         has_function_privilege('anon', 'private.guard_item_standard_cost_overlap()', 'EXECUTE') as guard_anon,
+         has_function_privilege('authenticated', 'private.guard_item_standard_cost_overlap()', 'EXECUTE') as guard_auth,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_class c on c.oid=t.tgrelid
+           join pg_namespace n on n.oid=c.relnamespace
+           where n.nspname='public'
+             and c.relname='item_standard_costs'
+             and t.tgname='trg_guard_item_standard_cost_overlap'
+             and not t.tgisinternal
+         ) as trigger_attached,
+         exists (
+           select 1 from pg_proc p
+           join pg_namespace n on n.oid=p.pronamespace
+           where n.nspname='public' and p.proname='set_item_standard_cost'
+             and exists (
+               select 1 from unnest(coalesce(p.proconfig, '{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as set_search_path,
+         exists (
+           select 1 from pg_proc p
+           join pg_namespace n on n.oid=p.pronamespace
+           where n.nspname='public' and p.proname='get_item_costing_v2'
+             and exists (
+               select 1 from unnest(coalesce(p.proconfig, '{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as read_search_path,
+         exists (
+           select 1 from pg_proc p
+           join pg_namespace n on n.oid=p.pronamespace
+           where n.nspname='public' and p.proname='get_item_standard_cost_history'
+             and exists (
+               select 1 from unnest(coalesce(p.proconfig, '{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as history_search_path`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.overlapping_periods ?? -1)).toBe(0);
+    expect(state?.set_anon).toBe(false);
+    expect(state?.set_auth).toBe(true);
+    expect(state?.read_anon).toBe(false);
+    expect(state?.read_auth).toBe(true);
+    expect(state?.history_anon).toBe(false);
+    expect(state?.history_auth).toBe(true);
+    expect(state?.guard_anon).toBe(false);
+    expect(state?.guard_auth).toBe(false);
+    expect(state?.trigger_attached).toBe(true);
+    expect(state?.set_search_path && state?.read_search_path && state?.history_search_path).toBe(true);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
