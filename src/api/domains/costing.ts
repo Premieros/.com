@@ -113,6 +113,32 @@ export type CostingSnapshotHealthV2Row = {
   missing_snapshot_without_failure: number;
 };
 
+export type CostVarianceSummaryV2Row = {
+  sales_count: number;
+  comparable_sales_count: number;
+  immutable_snapshot_sales: number;
+  current_reference_sales: number;
+  incomplete_theoretical_sales: number;
+  total_net_sales: number;
+  total_actual_cogs: number;
+  comparable_net_sales: number;
+  comparable_actual_cogs: number;
+  comparable_theoretical_cost: number;
+  actual_vs_theoretical_variance: number;
+  actual_food_cost_pct: number | null;
+  theoretical_food_cost_pct: number | null;
+  standard_comparable_sales_count: number;
+  actual_vs_standard_variance: number;
+  purchase_groups: number;
+  purchase_reference_groups: number;
+  purchase_reference_variance: number;
+  purchase_standard_groups: number;
+  purchase_standard_variance: number;
+  missing_purchase_ledger_groups: number;
+  snapshot_failures: number;
+  missing_snapshot_without_failure: number;
+};
+
 export const costing = {
   getItemCostingV2(p_branch_id: string): ApiResult<CostingV2Row[]> {
     return rpc('get_item_costing_v2', { p_branch_id });
@@ -152,6 +178,18 @@ export const costing = {
 
   getCostingSnapshotHealthV2(p_branch_id: string): ApiResult<CostingSnapshotHealthV2Row[]> {
     return rpc('get_costing_snapshot_health_v2' as any, { p_branch_id } as any);
+  },
+
+  getCostVarianceSummaryV2(p: {
+    p_branch_id: string;
+    p_from?: string | null;
+    p_to?: string | null;
+  }): ApiResult<CostVarianceSummaryV2Row[]> {
+    return rpc('get_cost_variance_summary_v2' as any, {
+      p_branch_id: p.p_branch_id,
+      p_from: p.p_from ?? null,
+      p_to: p.p_to ?? null,
+    } as any);
   },
   getItemStandardCostHistory(p: { p_item_id: string; p_branch_id: string }): ApiResult<StandardCostHistoryRow[]> {
     return rpc('get_item_standard_cost_history', p);
