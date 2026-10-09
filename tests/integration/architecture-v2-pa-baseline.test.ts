@@ -1109,6 +1109,78 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(state?.health_rpc_search_path).toBe(true);
   });
 
+  it('keeps Costing V2 variance summary mathematically consistent and hardened', async () => {
+    const { rows } = await client.query<{
+      branch_id: string;
+      variance_delta: string;
+      invalid_comparable_rows: string;
+      summary_anon: boolean;
+      summary_auth: boolean;
+      summary_search_path: boolean;
+    }>(
+      `with comparable as (
+         select
+           branch_id,
+           actual_cogs,
+           theoretical_cost,
+           actual_vs_theoretical_variance
+         from private.canonical_sale_cost_variance_v2
+         where actual_cogs is not null
+           and theoretical_cost is not null
+           and theoretical_coverage_status='COMPLETE'
+       ),
+       agg as (
+         select
+           branch_id,
+           coalesce(sum(actual_cogs),0)::numeric as actual_total,
+           coalesce(sum(theoretical_cost),0)::numeric as theoretical_total,
+           coalesce(sum(actual_vs_theoretical_variance),0)::numeric as variance_total,
+           count(*) filter (
+             where actual_vs_theoretical_variance is null
+           )::int as invalid_comparable_rows
+         from comparable
+         group by branch_id
+       )
+       select
+         a.branch_id::text,
+         abs(a.variance_total-(a.actual_total-a.theoretical_total))::text as variance_delta,
+         a.invalid_comparable_rows::text,
+         has_function_privilege(
+           'anon',
+           'public.get_cost_variance_summary_v2(uuid,date,date)',
+           'EXECUTE'
+         ) as summary_anon,
+         has_function_privilege(
+           'authenticated',
+           'public.get_cost_variance_summary_v2(uuid,date,date)',
+           'EXECUTE'
+         ) as summary_auth,
+         exists (
+           select 1
+           from pg_proc p
+           join pg_namespace n on n.oid=p.pronamespace
+           where n.nspname='public'
+             and p.proname='get_cost_variance_summary_v2'
+             and exists (
+               select 1
+               from unnest(coalesce(p.proconfig,'{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as summary_search_path
+       from agg a
+       order by a.branch_id`,
+    );
+
+    expect(rows.length).toBeGreaterThan(0);
+    for (const state of rows) {
+      expect(Number(state.variance_delta)).toBeLessThanOrEqual(0.000001);
+      expect(Number(state.invalid_comparable_rows)).toBe(0);
+      expect(state.summary_anon).toBe(false);
+      expect(state.summary_auth).toBe(true);
+      expect(state.summary_search_path).toBe(true);
+    }
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
