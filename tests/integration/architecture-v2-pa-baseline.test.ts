@@ -1181,6 +1181,102 @@ describe('Architecture V2 P-A safety baseline', () => {
     }
   });
 
+  it('keeps journal posting metadata and fiscal periods reconciled', async () => {
+    const { rows } = await client.query<{
+      journals: string;
+      missing_period: string;
+      missing_posted_at: string;
+      missing_correlation: string;
+      invalid_period_scope: string;
+      invalid_period_date: string;
+      unbalanced: string;
+      trigger_count: string;
+      trigger_private: boolean;
+      trigger_security_definer: boolean;
+      trigger_search_path: boolean;
+      auth_period_select: boolean;
+      auth_period_insert: boolean;
+      auth_period_update: boolean;
+      auth_period_delete: boolean;
+    }>(
+      `select
+         (select count(*) from public.journal_entries)::text as journals,
+         (select count(*) from public.journal_entries where period_id is null)::text as missing_period,
+         (select count(*) from public.journal_entries where posted_at is null)::text as missing_posted_at,
+         (select count(*) from public.journal_entries where correlation_id is null)::text as missing_correlation,
+         (
+           select count(*)
+           from public.journal_entries je
+           join public.branches b on b.id=je.branch_id
+           join public.accounting_periods ap on ap.id=je.period_id
+           where ap.organization_id<>b.organization_id
+         )::text as invalid_period_scope,
+         (
+           select count(*)
+           from public.journal_entries je
+           join public.accounting_periods ap on ap.id=je.period_id
+           where je.entry_date<ap.period_start or je.entry_date>ap.period_end
+         )::text as invalid_period_date,
+         (select count(*) from private.canonical_journal_lifecycle where not is_balanced)::text as unbalanced,
+         (
+           select count(*)
+           from pg_trigger t
+           where t.tgrelid='public.journal_entries'::regclass
+             and t.tgname='trg_assign_journal_posting_metadata'
+             and not t.tgisinternal
+         )::text as trigger_count,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           join pg_namespace n on n.oid=p.pronamespace
+           where t.tgrelid='public.journal_entries'::regclass
+             and t.tgname='trg_assign_journal_posting_metadata'
+             and n.nspname='private'
+         ) as trigger_private,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           where t.tgrelid='public.journal_entries'::regclass
+             and t.tgname='trg_assign_journal_posting_metadata'
+             and p.prosecdef
+         ) as trigger_security_definer,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           where t.tgrelid='public.journal_entries'::regclass
+             and t.tgname='trg_assign_journal_posting_metadata'
+             and exists (
+               select 1 from unnest(coalesce(p.proconfig,'{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as trigger_search_path,
+         has_table_privilege('authenticated','public.accounting_periods','SELECT') as auth_period_select,
+         has_table_privilege('authenticated','public.accounting_periods','INSERT') as auth_period_insert,
+         has_table_privilege('authenticated','public.accounting_periods','UPDATE') as auth_period_update,
+         has_table_privilege('authenticated','public.accounting_periods','DELETE') as auth_period_delete`,
+    );
+
+    const state=rows[0];
+    expect(Number(state?.journals ?? 0)).toBeGreaterThan(0);
+    expect(Number(state?.missing_period ?? -1)).toBe(0);
+    expect(Number(state?.missing_posted_at ?? -1)).toBe(0);
+    expect(Number(state?.missing_correlation ?? -1)).toBe(0);
+    expect(Number(state?.invalid_period_scope ?? -1)).toBe(0);
+    expect(Number(state?.invalid_period_date ?? -1)).toBe(0);
+    expect(Number(state?.unbalanced ?? -1)).toBe(0);
+    expect(Number(state?.trigger_count ?? -1)).toBe(1);
+    expect(state?.trigger_private).toBe(true);
+    expect(state?.trigger_security_definer).toBe(true);
+    expect(state?.trigger_search_path).toBe(true);
+    expect(state?.auth_period_select).toBe(true);
+    expect(state?.auth_period_insert).toBe(false);
+    expect(state?.auth_period_update).toBe(false);
+    expect(state?.auth_period_delete).toBe(false);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
