@@ -651,6 +651,60 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(state?.authenticated_select).toBe(false);
   });
 
+  it('keeps Costing V2 concepts separated and canonical coverage complete', async () => {
+    const { rows } = await client.query<{
+      catalog_rows: string;
+      cost_rows: string;
+      duplicate_cost_rows: string;
+      negative_theoretical_rows: string;
+      standard_cost_rls: boolean;
+      standard_auth_select: boolean;
+      standard_auth_insert: boolean;
+      standard_auth_update: boolean;
+      standard_auth_delete: boolean;
+      cost_view_anon_select: boolean;
+      cost_view_auth_select: boolean;
+    }>(
+      `select
+         (select count(*) from public.canonical_item_catalog)::text as catalog_rows,
+         (select count(*) from private.canonical_item_costs)::text as cost_rows,
+         (
+           select count(*)
+           from (
+             select item_id, branch_id
+             from private.canonical_item_costs
+             group by item_id, branch_id
+             having count(*) > 1
+           ) d
+         )::text as duplicate_cost_rows,
+         (select count(*) from private.canonical_item_costs where theoretical_cost < 0)::text as negative_theoretical_rows,
+         (
+           select c.relrowsecurity
+           from pg_class c
+           join pg_namespace n on n.oid = c.relnamespace
+           where n.nspname = 'public'
+             and c.relname = 'item_standard_costs'
+             and c.relkind = 'r'
+         ) as standard_cost_rls,
+         has_table_privilege('authenticated', 'public.item_standard_costs', 'SELECT') as standard_auth_select,
+         has_table_privilege('authenticated', 'public.item_standard_costs', 'INSERT') as standard_auth_insert,
+         has_table_privilege('authenticated', 'public.item_standard_costs', 'UPDATE') as standard_auth_update,
+         has_table_privilege('authenticated', 'public.item_standard_costs', 'DELETE') as standard_auth_delete,
+         has_table_privilege('anon', 'private.canonical_item_costs', 'SELECT') as cost_view_anon_select,
+         has_table_privilege('authenticated', 'private.canonical_item_costs', 'SELECT') as cost_view_auth_select`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.cost_rows ?? -1)).toBe(Number(state?.catalog_rows ?? -2));
+    expect(Number(state?.duplicate_cost_rows ?? -1)).toBe(0);
+    expect(Number(state?.negative_theoretical_rows ?? -1)).toBe(0);
+    expect(state?.standard_cost_rls).toBe(true);
+    expect(state?.standard_auth_select).toBe(true);
+    expect(state?.standard_auth_insert || state?.standard_auth_update || state?.standard_auth_delete).toBe(false);
+    expect(state?.cost_view_anon_select).toBe(false);
+    expect(state?.cost_view_auth_select).toBe(false);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
