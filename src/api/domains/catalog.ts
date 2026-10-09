@@ -117,6 +117,16 @@ export type CanonicalItemCatalogRow = {
   created_at: string;
   updated_at: string;
 };
+
+export type CanonicalItemReconciliationRow = {
+  organization_id: string;
+  branch_id: string;
+  source_type: 'PRODUCTS' | 'RAW_MATERIALS' | 'INVENTORY_UNITS';
+  legacy_count: number;
+  canonical_count: number;
+  delta: number;
+  is_match: boolean;
+};
 export type KitchenOrderContextRow = { order_id: string; table_name: string | null; operator_name: string | null };
 export type KitchenCompletedHistoryRow = {
   order_id: string;
@@ -186,6 +196,18 @@ export const catalog = {
     const { data, error } = await q;
     if (error) throw error;
     return (data || []) as CanonicalItemCatalogRow[];
+  },
+
+  async listCanonicalItemReconciliation(filters?: { branch_ids?: string[] }): Promise<CanonicalItemReconciliationRow[]> {
+    let q = supabase
+      .from('canonical_item_reconciliation')
+      .select('*')
+      .order('branch_id')
+      .order('source_type');
+    if (filters?.branch_ids?.length) q = q.in('branch_id', filters.branch_ids);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data || []) as CanonicalItemReconciliationRow[];
   },
 
   async listInventoryUnits(filters?: { branch_id?: string; unit_type?: string; is_active?: boolean }) {
