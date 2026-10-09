@@ -793,6 +793,121 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(state?.set_search_path && state?.read_search_path && state?.history_search_path).toBe(true);
   });
 
+  it('keeps sale cost variance coverage explicit and internally consistent', async () => {
+    const { rows } = await client.query<{
+      sales: string;
+      eligible_sales: string;
+      actual_missing: string;
+      invalid_actual_basis: string;
+      negative_actual: string;
+      negative_theoretical: string;
+      invalid_variance_rows: string;
+      invalid_modifier_status: string;
+      invalid_theoretical_basis: string;
+      anon_select: boolean;
+      authenticated_select: boolean;
+    }>(
+      `select
+         count(*)::text as sales,
+         (
+           select count(*)
+           from public.sales s
+           where coalesce(s.is_archived,false)=false
+             and coalesce(s.status,'') not in ('returned','cancelled')
+         )::text as eligible_sales,
+         count(*) filter (where actual_cogs_basis='MISSING')::text as actual_missing,
+         count(*) filter (
+           where actual_cogs_basis not in ('JOURNAL_POSTED','KITCHEN_SNAPSHOT','LEGACY_LEDGER','MISSING')
+         )::text as invalid_actual_basis,
+         count(*) filter (where actual_cogs<0)::text as negative_actual,
+         count(*) filter (where current_theoretical_cost<0)::text as negative_theoretical,
+         count(*) filter (
+           where actual_vs_theoretical_variance is not null
+             and (
+               actual_cogs is null
+               or current_theoretical_cost is null
+               or theoretical_coverage_status<>'COMPLETE'
+             )
+         )::text as invalid_variance_rows,
+         count(*) filter (
+           where theoretical_coverage_status='MODIFIER_UNMODELED'
+             and modifier_line_count<=0
+         )::text as invalid_modifier_status,
+         count(*) filter (
+           where theoretical_basis<>'CURRENT_RECIPE_REFERENCE_NOT_HISTORICAL'
+         )::text as invalid_theoretical_basis,
+         has_table_privilege('anon', 'private.canonical_sale_cost_variance', 'SELECT') as anon_select,
+         has_table_privilege('authenticated', 'private.canonical_sale_cost_variance', 'SELECT') as authenticated_select
+       from private.canonical_sale_cost_variance`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.sales ?? -1)).toBe(Number(state?.eligible_sales ?? -2));
+    expect(Number(state?.actual_missing ?? 999999)).toBeLessThanOrEqual(1);
+    expect(Number(state?.invalid_actual_basis ?? -1)).toBe(0);
+    expect(Number(state?.negative_actual ?? -1)).toBe(0);
+    expect(Number(state?.negative_theoretical ?? -1)).toBe(0);
+    expect(Number(state?.invalid_variance_rows ?? -1)).toBe(0);
+    expect(Number(state?.invalid_modifier_status ?? -1)).toBe(0);
+    expect(Number(state?.invalid_theoretical_basis ?? -1)).toBe(0);
+    expect(state?.anon_select).toBe(false);
+    expect(state?.authenticated_select).toBe(false);
+  });
+
+  it('keeps purchase variance based on normalized receipt cost and prior purchase references', async () => {
+    const { rows } = await client.query<{
+      groups: string;
+      expected_groups: string;
+      actual_missing: string;
+      unmapped_items: string;
+      negative_actual_cost: string;
+      negative_received_qty: string;
+      invalid_reference_variance: string;
+      invalid_standard_variance: string;
+      anon_select: boolean;
+      authenticated_select: boolean;
+    }>(
+      `select
+         count(*)::text as groups,
+         (
+           select count(*)
+           from (
+             select p.id, pi.raw_material_id
+             from public.purchases p
+             join public.purchase_items pi on pi.purchase_id=p.id
+             where pi.raw_material_id is not null
+             group by p.id,pi.raw_material_id
+           ) g
+         )::text as expected_groups,
+         count(*) filter (where actual_cost_status='MISSING_LEDGER')::text as actual_missing,
+         count(*) filter (where item_id is null)::text as unmapped_items,
+         count(*) filter (where actual_base_unit_cost<0)::text as negative_actual_cost,
+         count(*) filter (where received_base_quantity<0)::text as negative_received_qty,
+         count(*) filter (
+           where actual_vs_reference_unit_variance is not null
+             and (actual_base_unit_cost is null or prior_reference_unit_cost is null)
+         )::text as invalid_reference_variance,
+         count(*) filter (
+           where actual_vs_standard_unit_variance is not null
+             and (actual_base_unit_cost is null or standard_unit_cost is null)
+         )::text as invalid_standard_variance,
+         has_table_privilege('anon', 'private.canonical_purchase_cost_variance', 'SELECT') as anon_select,
+         has_table_privilege('authenticated', 'private.canonical_purchase_cost_variance', 'SELECT') as authenticated_select
+       from private.canonical_purchase_cost_variance`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.groups ?? -1)).toBe(Number(state?.expected_groups ?? -2));
+    expect(Number(state?.actual_missing ?? 999999)).toBeLessThanOrEqual(12);
+    expect(Number(state?.unmapped_items ?? -1)).toBe(0);
+    expect(Number(state?.negative_actual_cost ?? -1)).toBe(0);
+    expect(Number(state?.negative_received_qty ?? -1)).toBe(0);
+    expect(Number(state?.invalid_reference_variance ?? -1)).toBe(0);
+    expect(Number(state?.invalid_standard_variance ?? -1)).toBe(0);
+    expect(state?.anon_select).toBe(false);
+    expect(state?.authenticated_select).toBe(false);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
