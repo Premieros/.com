@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Activity, AlertTriangle, CheckCircle2, Database, RefreshCw, ShieldCheck, XCircle } from 'lucide-react';
-import { admin } from '@/api';
+import { admin, catalog } from '@/api';
 import { Card } from '@/components/PageHeader';
 import { Button } from '@/components/Button';
 import { useLanguage } from '@/context/LanguageContext';
@@ -81,13 +81,28 @@ export function SystemHealthPage() {
     const targetBranchIds = branchScope.selectedBranchIds.length > 0
       ? branchScope.selectedBranchIds
       : (branchFilter ? [branchFilter] : []);
-    const [remoteResults, offline] = await Promise.all([
+    const checkBranchIds = targetBranchIds.length > 0 ? targetBranchIds : [null];
+    const [remoteResults, offline, catalogComparisons] = await Promise.all([
       Promise.all(
-        (targetBranchIds.length > 0 ? targetBranchIds : [null]).map((branchId) =>
+        checkBranchIds.map((branchId) =>
           admin.getSystemHealthSnapshot({ p_branch_id: branchId }),
         ),
       ),
       getAllOfflineSales().catch(() => []),
+      Promise.all(
+        checkBranchIds.map((branchId) =>
+          catalog.compareCanonicalCatalog(branchId).catch((error) => ({
+            branch_id: branchId,
+            healthy: false,
+            legacy_total: 0,
+            canonical_total: 0,
+            products: { legacy: 0, canonical: 0, mismatches: 0 },
+            raw_materials: { legacy: 0, canonical: 0, mismatches: 0 },
+            inventory_units: { legacy: 0, canonical: 0, mismatches: 0 },
+            error: error instanceof Error ? error.message : String(error),
+          })),
+        ),
+      ),
     ]);
 
     const failedRemote = remoteResults.find((result) => result.error || !result.data || typeof result.data !== 'object');
@@ -156,6 +171,16 @@ export function SystemHealthPage() {
     const blockedOffline = offline.filter((row) => row.status === 'failed').length;
     const retryingOffline = offline.filter((row) => row.status === 'pending' || row.status === 'syncing').length;
 
+    const catalogMismatchCount = catalogComparisons.reduce((sum, row) =>
+      sum + row.products.mismatches + row.raw_materials.mismatches + row.inventory_units.mismatches,
+    0);
+    const catalogReadErrors = catalogComparisons.filter((row) => 'error' in row).length;
+    const canonicalLegacyTotal = catalogComparisons.reduce((sum, row) => sum + row.legacy_total, 0);
+    const canonicalReadTotal = catalogComparisons.reduce((sum, row) => sum + row.canonical_total, 0);
+    const canonicalHealthy = catalogReadErrors === 0
+      && catalogMismatchCount === 0
+      && canonicalLegacyTotal === canonicalReadTotal;
+
     const next: Check[] = [
       {
         key: 'database',
@@ -163,6 +188,22 @@ export function SystemHealthPage() {
         en: 'Database',
         status: snapshot.database_ok ? 'ok' : 'error',
         detail: snapshot.database_ok ? (ar ? 'الاتصال والفحص المركزي يعملان' : 'Central operational check is reachable') : (ar ? 'فشل الفحص المركزي' : 'Central check failed'),
+      },
+      {
+        key: 'canonical_catalog',
+        ar: 'تطابق كتالوج V2 مع البيانات الحالية',
+        en: 'V2 canonical catalog reconciliation',
+        status: canonicalHealthy ? 'ok' : 'error',
+        detail: catalogReadErrors > 0
+          ? (ar ? 'تعذر تنفيذ مقارنة القراءة المزدوجة' : 'Dual-read comparison failed')
+          : (canonicalHealthy
+            ? (ar
+              ? `متطابق: ${canonicalReadTotal} سجل بدون اختلافات`
+              : `Matched: ${canonicalReadTotal} rows with no differences`)
+            : (ar
+              ? `اختلافات: ${catalogMismatchCount} — الحالي ${canonicalLegacyTotal} / V2 ${canonicalReadTotal}`
+              : `Differences: ${catalogMismatchCount} — legacy ${canonicalLegacyTotal} / V2 ${canonicalReadTotal}`)),
+        count: catalogMismatchCount + catalogReadErrors,
       },
       {
         key: 'active_shifts',
