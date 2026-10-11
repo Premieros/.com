@@ -225,6 +225,63 @@ describe('Architecture V2 Phase 5J two-person controlled org account sync', () =
     }
   });
 
+  it('requires organization-wide access for requests from a branch-only accountant', async () => {
+    await db.query('BEGIN');
+    try {
+      const f = await fixture();
+      await as(null);
+      const secondBranch = randomUUID();
+      await db.query(
+        "insert into public.branches(id,name,is_active,organization_id) values($1,'CI 5J Second Branch',true,$2)",
+        [secondBranch, f.org],
+      );
+      await db.query(`update public.users set role='accountant' where id=$1`, [f.proposer]);
+      await as(f.proposer);
+      const result = await call(
+        'select public.request_organization_account_sync_v2($1,$2) result',
+        [f.account, 'Accountant cannot approve org without all branches'],
+      );
+      expect(result?.error).toBe('ORGANIZATION_ACCESS_REQUIRED');
+    } finally {
+      await as(null);
+      await db.query('ROLLBACK');
+    }
+  });
+
+  it('refuses an account-type divergence rather than rewriting a canonical identity', async () => {
+    await db.query('BEGIN');
+    try {
+      const f = await fixture();
+      await db.query(
+        `insert into private.organization_accounts_v2
+         (organization_id,code,name,account_type,is_system,is_active,
+           initial_branch_account_count,initial_readiness_status)
+         values($1,$2,'CI Expense','expense',false,true,1,'CONSISTENT')`,
+        [f.org,f.code],
+      );
+      await db.query(
+        `insert into private.organization_account_branch_links_v2
+          (branch_account_id,organization_account_id,organization_id,branch_id)
+         select $1,oa.id,$2,$3 from private.organization_accounts_v2 oa
+         where oa.organization_id=$2 and oa.code=$4`,
+        [f.account,f.org,f.branch,f.code],
+      );
+      await db.query(
+        "update public.chart_of_accounts set account_type='liability' where id=$1",
+        [f.account],
+      );
+      await as(f.proposer);
+      const denied = await call(
+        'select public.request_organization_account_sync_v2($1,$2) result',
+        [f.account, 'Cannot silently transform posted account types'],
+      );
+      expect(denied?.error).toBe('MANUAL_REVIEW_REQUIRED');
+    } finally {
+      await as(null);
+      await db.query('ROLLBACK');
+    }
+  });
+
   it('denies anonymous invocation and preserves all real journal lines', async () => {
     const { rows } = await db.query<{ before_lines: string }>(
       'select count(*)::text before_lines from public.journal_entry_lines',
