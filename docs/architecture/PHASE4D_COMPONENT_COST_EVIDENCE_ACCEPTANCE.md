@@ -101,3 +101,25 @@ GitHub Actions run 38124046679:
 - the CI-only unexpected PUBLIC/anon SECURITY DEFINER execution finding is resolved.
 - remaining failures are tracked in https://github.com/Premieros/.com/issues/82
 - browser smoke skipped because DB job failed; PR remains a draft.
+
+## Final Phase 4D acceptance gate — 2026-10-11
+
+The baseline CI regressions have been corrected without touching production inventory, FIFO,
+journal or API-authorisation behavior.
+
+GitHub Actions `Verify main` run `38124993100`, commit `93cd3ec871fbd9b88a22bea7bd2c327df70a9f3d`:
+- `verify`: SUCCESS (locked project identity, frontend contract, lint, typechecks, unit tests, application build).
+- `db`: SUCCESS (all migrations applied to ephemeral PostgreSQL 16, schema checks, **44/44 integration and security tests passed**, 4/4 test files).
+- `browser-smoke`: SUCCESS (Playwright smoke verification).
+- Dedicated Phase 4D component-cost-evidence tests: **3/3 PASS**.
+- Transactionally rolled-back production smoke after fail-closed hardening: PASS.
+- No test artifacts remained in production; snapshot writes remain denied to API roles.
+
+Baseline fixes included binding the synthetic full-cycle branch to its organization, preventing
+public invocation of CI-only fixture helpers, validating projections against their operational
+source keys (including the valid empty case), and updating journal/FIFO assertions to match
+the canonical append-only architecture. None of these CI-only changes reduce the permissions
+or posting checks applied to production.
+
+**Historical note:** the earlier CI sections document failures as they appeared during
+development; the final acceptance result above supersedes those incomplete test runs.
