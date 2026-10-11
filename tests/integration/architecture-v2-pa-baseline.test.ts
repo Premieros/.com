@@ -1181,6 +1181,113 @@ describe('Architecture V2 P-A safety baseline', () => {
     }
   });
 
+  it('keeps Accounting V2 posting metadata complete and period-scoped', async () => {
+    const { rows } = await client.query<{
+      journals: string;
+      journals_without_period: string;
+      posted_without_timestamp: string;
+      posted_without_correlation: string;
+      invalid_period_link: string;
+      invalid_status: string;
+      periods_without_rls: string;
+      period_select_auth: boolean;
+      period_insert_auth: boolean;
+      assign_trigger_count: string;
+      assign_trigger_private: boolean;
+      assign_trigger_security_definer: boolean;
+      assign_trigger_search_path: boolean;
+    }>(
+      `select
+         (select count(*) from public.journal_entries)::text as journals,
+         (select count(*) from public.journal_entries where period_id is null)::text as journals_without_period,
+         (
+           select count(*)
+           from public.journal_entries
+           where posting_status='POSTED' and posted_at is null
+         )::text as posted_without_timestamp,
+         (
+           select count(*)
+           from public.journal_entries
+           where posting_status='POSTED' and correlation_id is null
+         )::text as posted_without_correlation,
+         (
+           select count(*)
+           from public.journal_entries je
+           join public.branches b on b.id=je.branch_id
+           join public.accounting_periods ap on ap.id=je.period_id
+           where ap.organization_id<>b.organization_id
+              or je.entry_date<ap.period_start
+              or je.entry_date>ap.period_end
+         )::text as invalid_period_link,
+         (
+           select count(*)
+           from public.journal_entries
+           where posting_status not in ('DRAFT','POSTED','REVERSED')
+         )::text as invalid_status,
+         (
+           select count(*)
+           from pg_class c
+           join pg_namespace n on n.oid=c.relnamespace
+           where n.nspname='public'
+             and c.relname='accounting_periods'
+             and not c.relrowsecurity
+         )::text as periods_without_rls,
+         has_table_privilege('authenticated','public.accounting_periods','SELECT') as period_select_auth,
+         has_table_privilege('authenticated','public.accounting_periods','INSERT') as period_insert_auth,
+         (
+           select count(*)
+           from pg_trigger t
+           where t.tgrelid='public.journal_entries'::regclass
+             and not t.tgisinternal
+             and t.tgname='trg_assign_journal_posting_metadata'
+         )::text as assign_trigger_count,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           join pg_namespace n on n.oid=p.pronamespace
+           where t.tgrelid='public.journal_entries'::regclass
+             and t.tgname='trg_assign_journal_posting_metadata'
+             and n.nspname='private'
+         ) as assign_trigger_private,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           where t.tgrelid='public.journal_entries'::regclass
+             and t.tgname='trg_assign_journal_posting_metadata'
+             and p.prosecdef
+         ) as assign_trigger_security_definer,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           where t.tgrelid='public.journal_entries'::regclass
+             and t.tgname='trg_assign_journal_posting_metadata'
+             and exists (
+               select 1
+               from unnest(coalesce(p.proconfig,'{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as assign_trigger_search_path`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.journals ?? 0)).toBeGreaterThan(0);
+    expect(Number(state?.journals_without_period ?? -1)).toBe(0);
+    expect(Number(state?.posted_without_timestamp ?? -1)).toBe(0);
+    expect(Number(state?.posted_without_correlation ?? -1)).toBe(0);
+    expect(Number(state?.invalid_period_link ?? -1)).toBe(0);
+    expect(Number(state?.invalid_status ?? -1)).toBe(0);
+    expect(Number(state?.periods_without_rls ?? -1)).toBe(0);
+    expect(state?.period_select_auth).toBe(true);
+    expect(state?.period_insert_auth).toBe(false);
+    expect(Number(state?.assign_trigger_count ?? -1)).toBe(1);
+    expect(state?.assign_trigger_private).toBe(true);
+    expect(state?.assign_trigger_security_definer).toBe(true);
+    expect(state?.assign_trigger_search_path).toBe(true);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
