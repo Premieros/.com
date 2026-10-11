@@ -143,6 +143,7 @@ declare
   v_org uuid;
   v_branch uuid;
   v_id uuid;
+  v_expired private.organization_account_sync_requests_v2%rowtype;
 begin
   if v_actor is null then
     return jsonb_build_object('success',false,'error','AUTH_REQUIRED');
@@ -166,6 +167,24 @@ begin
       and public.user_may_access_branch(b.id) is distinct from true
   ) then return jsonb_build_object('success',false,'error','ORGANIZATION_ACCESS_REQUIRED');
   end if;
+
+  -- An expired pending proposal may be superseded without reviewer intervention.
+  -- The old request and its expiration audit are retained permanently.
+  for v_expired in
+    update private.organization_account_sync_requests_v2 r
+       set status='EXPIRED',decided_at=clock_timestamp()
+     where r.branch_account_id=p_branch_account_id
+       and r.status='PENDING' and r.expires_at<=clock_timestamp()
+     returning r.*
+  loop
+    insert into public.audit_log(user_id,action,entity,entity_id,branch_id,details)
+      values(v_actor,'ORG_ACCOUNT_SYNC_EXPIRED','organization_account_sync',
+        v_expired.id,v_expired.branch_id,
+        jsonb_build_object('organization_id',v_expired.organization_id,
+          'requester_id',v_expired.requester_id,
+          'expired_at',v_expired.expires_at,
+          'expiration_observed_by_requester',v_actor));
+  end loop;
 
   -- Duplicate pending proposals are refused (rather than silently reused).
   insert into private.organization_account_sync_requests_v2 (
