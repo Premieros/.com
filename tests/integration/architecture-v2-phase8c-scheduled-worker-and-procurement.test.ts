@@ -124,8 +124,8 @@ describe('ERP Phase 8C scheduled outbox and Phase 6 receiving regressions', () =
         'select documented_received_quantity::text,outstanding_documented_quantity::text,integrity_status ' +
         'from private.procurement_receipt_progress_v2 where purchase_item_id=$1', [itemA],
       );
-      expect(progress.documented_received_quantity).toBe('5');
-      expect(progress.outstanding_documented_quantity).toBe('0');
+      expect(Number(progress.documented_received_quantity)).toBe(5);
+      expect(Number(progress.outstanding_documented_quantity)).toBe(0);
       expect(progress.integrity_status).toBe('LEDGER_RECEIPT_DIFFERENCE');
 
       const { rows: [events] } = await db.query<{ total: string }>(
