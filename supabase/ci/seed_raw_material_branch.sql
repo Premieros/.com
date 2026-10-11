@@ -100,3 +100,8 @@ CREATE TRIGGER ci_normalize_recipe_item_branch
 BEFORE INSERT OR UPDATE ON public.recipe_items
 FOR EACH ROW
 EXECUTE FUNCTION public.ci_normalize_recipe_item_branch();
+
+-- CI-only helpers execute through triggers; they are not public RPC endpoints.
+-- Keep the security-definer surface hardened even in ephemeral test databases.
+revoke execute on function public.ci_default_raw_material_branch() from public,anon,authenticated;
+revoke execute on function public.ci_normalize_recipe_item_branch() from public,anon,authenticated;
