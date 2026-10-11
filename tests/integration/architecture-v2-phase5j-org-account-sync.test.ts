@@ -235,6 +235,8 @@ describe('Architecture V2 Phase 5J two-person controlled org account sync', () =
         "insert into public.branches(id,name,is_active,organization_id) values($1,'CI 5J Second Branch',true,$2)",
         [secondBranch, f.org],
       );
+      // The existing user-role guard requires a real Super Admin for role changes.
+      await as(f.reviewer);
       await db.query(`update public.users set role='accountant' where id=$1`, [f.proposer]);
       await as(f.proposer);
       const result = await call(
