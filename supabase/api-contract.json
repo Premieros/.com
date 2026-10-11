@@ -523,6 +523,12 @@
       ]
     },
     {
+      "name": "get_erp_agent_readiness_context_v2",
+      "params": [
+        "branch_id"
+      ]
+    },
+    {
       "name": "get_expense_routing_rules",
       "params": [
         "branch_id"
