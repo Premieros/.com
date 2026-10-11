@@ -70,6 +70,12 @@ begin
       return jsonb_build_object('status','ALREADY_SYNCED');
     end if;
 
+    -- Also include currently unmapped sibling definitions in the coherence gate.
+    if exists (
+      select 1 from private.organization_chart_account_conflicts_v2 h
+      where h.organization_id=v_org and h.account_code=v_account.code
+    ) then return jsonb_build_object('status','SIBLING_DEFINITION_CONFLICT'); end if;
+
     -- A refresh is safe only when ALL linked branches agree on the new
     -- name, translation and active state. Codes/types/system flag never change here.
     if exists (
@@ -228,6 +234,10 @@ begin
     update private.organization_account_sync_requests_v2
       set status='EXPIRED',reviewer_id=v_actor,decided_at=clock_timestamp()
       where id=v_req.id;
+    insert into public.audit_log(user_id,action,entity,entity_id,branch_id,details)
+      values(v_actor,'ORG_ACCOUNT_SYNC_EXPIRED','organization_account_sync',v_req.id,v_req.branch_id,
+        jsonb_build_object('organization_id',v_req.organization_id,
+          'requester_id',v_req.requester_id,'expired_at',v_req.expires_at));
     return jsonb_build_object('success',false,'error','REQUEST_EXPIRED');
   end if;
   if not coalesce(p_approve,false) then
