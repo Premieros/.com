@@ -38,6 +38,9 @@ declare
 begin
   if tg_table_name='journal_entries' then
     if new.posting_status<>'POSTED' then return new; end if;
+    if tg_op='UPDATE' then
+      if old.posting_status='POSTED' then return new; end if;
+    end if;
     v_type:='JOURNAL_POSTED';
     v_key:='journal.posted:'||new.id::text;
     v_payload:=jsonb_build_object('journal_entry_id',new.id,
@@ -64,7 +67,7 @@ begin
 end;
 $$;
 create trigger trg_journal_domain_outbox_v2
-after insert on public.journal_entries
+after insert or update of posting_status on public.journal_entries
 for each row execute function private.publish_erp_domain_event_v2();
 create trigger trg_receipt_domain_outbox_v2
 after insert on public.purchase_receipts
