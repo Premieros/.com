@@ -138,7 +138,7 @@ describe('Architecture V2 Phase 5J two-person controlled org account sync', () =
       );
       expect(after[0]).toEqual({ status: 'MAPPED_OK', entries: '1', audit_count: '2' });
     } finally {
-      await as(null);
+      // Roll back first: transaction-local config resets itself, including on SQL errors.
       await db.query('ROLLBACK');
     }
   });
@@ -169,7 +169,7 @@ describe('Architecture V2 Phase 5J two-person controlled org account sync', () =
       );
       expect(rows[0]).toEqual({ status: 'STALE', link_count: '0' });
     } finally {
-      await as(null);
+      // Roll back first: transaction-local config resets itself, including on SQL errors.
       await db.query('ROLLBACK');
     }
   });
@@ -220,7 +220,7 @@ describe('Architecture V2 Phase 5J two-person controlled org account sync', () =
         name: 'CI Expense Renamed', is_active: false, mapping_status: 'MAPPED_OK',
       });
     } finally {
-      await as(null);
+      // Roll back first: transaction-local config resets itself, including on SQL errors.
       await db.query('ROLLBACK');
     }
   });
@@ -243,7 +243,7 @@ describe('Architecture V2 Phase 5J two-person controlled org account sync', () =
       );
       expect(result?.error).toBe('ORGANIZATION_ACCESS_REQUIRED');
     } finally {
-      await as(null);
+      // Roll back first: transaction-local config resets itself, including on SQL errors.
       await db.query('ROLLBACK');
     }
   });
@@ -277,7 +277,7 @@ describe('Architecture V2 Phase 5J two-person controlled org account sync', () =
       );
       expect(denied?.error).toBe('MANUAL_REVIEW_REQUIRED');
     } finally {
-      await as(null);
+      // Roll back first: transaction-local config resets itself, including on SQL errors.
       await db.query('ROLLBACK');
     }
   });
@@ -299,7 +299,7 @@ describe('Architecture V2 Phase 5J two-person controlled org account sync', () =
       );
       expect(during[0]?.lines).toBe(rows[0]?.before_lines);
     } finally {
-      await as(null);
+      // Roll back first: transaction-local config resets itself, including on SQL errors.
       await db.query('ROLLBACK');
     }
   });
