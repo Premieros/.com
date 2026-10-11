@@ -30,3 +30,14 @@ Provide an administrative **organization account sync review workbench**, embedd
 
 ### Explicitly deferred
 Bulk auto-sync, changing existing organization account code/type/system status, exposing a privileged private table REST API, and switching journal posting to organization account identifiers. These each require separate risk review and are not part of Phase 5K.
+
+## Production deployment and audit — October 11, 2026
+
+- Applied read-only backend RPC migration: `20261011104816_phase5k_org_account_workbench_read_api`.
+- Applied follow-up display-quality fix: `20261011105332_phase5k_unmapped_existing_master_preview`. The latter lets an unmapped branch account display its existing matching organization shadow identity.
+- Both migration filenames tracked in GitHub exactly match the applied Supabase migration versions.
+- Production baseline remains **126** private organization accounts, **183** account links / **183** original branch accounts, **0** mapping drift, **0** approval requests, **7,259** journal lines, **2,247** POSTED journal headers, **120** account_mappings and **4** fiscal periods — unchanged after both migrations.
+- `anon` and `service_role` cannot EXECUTE the read function; `authenticated` can invoke it only after its active-user/permission/org-wide-branch checks. Direct authenticated private queue SELECT denied. Calling the function without an authenticated user returns `AUTH_REQUIRED`.
+- CI run `38133335326`: Verify PASS, Database **63/63** integration/security tests PASS (8 files), browser-smoke PASS. Includes newly tested *unmapped branch / existing matching master* preview.
+- Production SQL rollback smoke: created two synthetic organizations and their branches, plus a synthetic accountant confined to organization A; the queue returned **only organization A**, the explicit organization B filter returned `ORGANIZATION_ACCESS_REQUIRED`, and the unmapped test branch account surfaced the correct existing organization master and `READY` plan. Entire synthetic fixture and any audit/request data rolled back; **0** residual orgs, branch accounts, masters or requests.
+- No real approval was decided, no source accounts were updated, and no journal/FIFO/posting code changed.
