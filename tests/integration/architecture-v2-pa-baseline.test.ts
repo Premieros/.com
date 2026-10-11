@@ -582,18 +582,34 @@ describe('Architecture V2 P-A safety baseline', () => {
     );
 
     const state = rows[0];
-    // An unseeded CI database has no operational inventory; do not invent it.
-    // When source balances exist, the canonical projection must not disappear.
-    const { rows: inventorySources } = await client.query<{ n: string }>(
-      `select count(*)::text n from public.raw_material_inventory`,
+    // Both source streams can legitimately be empty in a freshly migrated CI DB.
+    // Equality with the mapped source keysets is stronger than assuming prod data.
+    const { rows: sourceRows } = await client.query<{
+      raw_count: string;
+      unit_count: string;
+    }>(`
+      with unit_keys as (
+        select unit_id,branch_id,warehouse_id from public.inventory_unit_entries
+        union
+        select unit_id,branch_id,warehouse_id from public.inventory_unit_batches
+        union
+        select unit_id,branch_id,warehouse_id from public.inventory_unit_stock_debts
+      )
+      select
+        (select count(*)::text from public.raw_material_inventory rmi
+         join private.item_legacy_links l
+           on l.source_table='raw_materials' and l.source_id=rmi.raw_material_id
+        ) raw_count,
+        (select count(*)::text from unit_keys k
+         join private.item_legacy_links l
+           on l.source_table='inventory_units' and l.source_id=k.unit_id
+        ) unit_count
+    `);
+    expect(Number(state?.raw_rows ?? -1)).toBe(Number(sourceRows[0]?.raw_count ?? -2));
+    expect(Number(state?.unit_rows ?? -1)).toBe(Number(sourceRows[0]?.unit_count ?? -2));
+    expect(Number(state?.rows ?? -1)).toBe(
+      Number(state?.raw_rows ?? 0) + Number(state?.unit_rows ?? 0),
     );
-    if (Number(inventorySources[0]?.n ?? 0) > 0) {
-      expect(Number(state?.rows ?? 0)).toBeGreaterThan(0);
-    } else {
-      expect(Number(state?.rows ?? 0)).toBeGreaterThanOrEqual(0);
-    }
-    expect(Number(state?.raw_rows ?? 0)).toBeGreaterThan(0);
-    expect(Number(state?.unit_rows ?? 0)).toBeGreaterThan(0);
     expect(Number(state?.missing_item_id ?? -1)).toBe(0);
     expect(Number(state?.missing_branch ?? -1)).toBe(0);
     expect(Number(state?.missing_warehouse ?? -1)).toBe(0);
