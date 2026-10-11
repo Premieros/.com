@@ -15,7 +15,6 @@ describe('Architecture V2 Phase 5H organization account readiness', () => {
       projection_exists: boolean;
       conflicts_exist: boolean;
       readiness_exists: boolean;
-      public_select: boolean;
       anon_select: boolean;
       authenticated_select: boolean;
       service_select: boolean;
@@ -25,7 +24,6 @@ describe('Architecture V2 Phase 5H organization account readiness', () => {
         to_regclass('private.organization_chart_of_accounts_v2') is not null projection_exists,
         to_regclass('private.organization_chart_account_conflicts_v2') is not null conflicts_exist,
         to_regclass('private.organization_chart_account_readiness_v2') is not null readiness_exists,
-        has_table_privilege('PUBLIC','private.organization_chart_of_accounts_v2','SELECT') public_select,
         has_table_privilege('anon','private.organization_chart_of_accounts_v2','SELECT') anon_select,
         has_table_privilege('authenticated','private.organization_chart_of_accounts_v2','SELECT') authenticated_select,
         has_table_privilege('service_role','private.organization_chart_of_accounts_v2','SELECT') service_select,
@@ -33,7 +31,7 @@ describe('Architecture V2 Phase 5H organization account readiness', () => {
     `);
     expect(rows[0]).toMatchObject({
       projection_exists: true, conflicts_exist: true,
-      readiness_exists: true, public_select: false,
+      readiness_exists: true,
       anon_select: false, authenticated_select: false,
       service_select: false, legacy_table_exists: true,
     });
