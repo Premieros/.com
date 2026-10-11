@@ -1288,6 +1288,169 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(state?.assign_trigger_search_path).toBe(true);
   });
 
+  it('keeps journal tables read-only to API roles outside accounting commands', async () => {
+    const { rows } = await client.query<{
+      auth_entry_insert: boolean;
+      auth_entry_update: boolean;
+      auth_entry_delete: boolean;
+      auth_line_insert: boolean;
+      auth_line_update: boolean;
+      auth_line_delete: boolean;
+      service_entry_insert: boolean;
+      service_entry_update: boolean;
+      service_entry_delete: boolean;
+      service_line_insert: boolean;
+      service_line_update: boolean;
+      service_line_delete: boolean;
+    }>(
+      `select
+         has_table_privilege('authenticated','public.journal_entries','INSERT') as auth_entry_insert,
+         has_table_privilege('authenticated','public.journal_entries','UPDATE') as auth_entry_update,
+         has_table_privilege('authenticated','public.journal_entries','DELETE') as auth_entry_delete,
+         has_table_privilege('authenticated','public.journal_entry_lines','INSERT') as auth_line_insert,
+         has_table_privilege('authenticated','public.journal_entry_lines','UPDATE') as auth_line_update,
+         has_table_privilege('authenticated','public.journal_entry_lines','DELETE') as auth_line_delete,
+         has_table_privilege('service_role','public.journal_entries','INSERT') as service_entry_insert,
+         has_table_privilege('service_role','public.journal_entries','UPDATE') as service_entry_update,
+         has_table_privilege('service_role','public.journal_entries','DELETE') as service_entry_delete,
+         has_table_privilege('service_role','public.journal_entry_lines','INSERT') as service_line_insert,
+         has_table_privilege('service_role','public.journal_entry_lines','UPDATE') as service_line_update,
+         has_table_privilege('service_role','public.journal_entry_lines','DELETE') as service_line_delete`,
+    );
+
+    const state = rows[0];
+    expect(state?.auth_entry_insert || state?.auth_entry_update || state?.auth_entry_delete).toBe(false);
+    expect(state?.auth_line_insert || state?.auth_line_update || state?.auth_line_delete).toBe(false);
+    expect(state?.service_entry_insert || state?.service_entry_update || state?.service_entry_delete).toBe(false);
+    expect(state?.service_line_insert || state?.service_line_update || state?.service_line_delete).toBe(false);
+  });
+
+  it('keeps period-lock and reversal command contracts hardened', async () => {
+    const { rows } = await client.query<{
+      reverse_anon: boolean;
+      reverse_auth: boolean;
+      period_anon: boolean;
+      period_auth: boolean;
+      reverse_search_path: boolean;
+      period_search_path: boolean;
+      assert_private: boolean;
+      assert_anon: boolean;
+      assert_auth: boolean;
+      reversal_duplicates: string;
+      invalid_reversal_links: string;
+      unbalanced_reversals: string;
+    }>(
+      `select
+         has_function_privilege(
+           'anon',
+           'public.reverse_journal_entry(uuid,text,date)',
+           'EXECUTE'
+         ) as reverse_anon,
+         has_function_privilege(
+           'authenticated',
+           'public.reverse_journal_entry(uuid,text,date)',
+           'EXECUTE'
+         ) as reverse_auth,
+         has_function_privilege(
+           'anon',
+           'public.set_accounting_period_status(uuid,text,text)',
+           'EXECUTE'
+         ) as period_anon,
+         has_function_privilege(
+           'authenticated',
+           'public.set_accounting_period_status(uuid,text,text)',
+           'EXECUTE'
+         ) as period_auth,
+         exists (
+           select 1
+           from pg_proc p
+           join pg_namespace n on n.oid=p.pronamespace
+           where n.nspname='public'
+             and p.proname='reverse_journal_entry'
+             and exists (
+               select 1
+               from unnest(coalesce(p.proconfig,'{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as reverse_search_path,
+         exists (
+           select 1
+           from pg_proc p
+           join pg_namespace n on n.oid=p.pronamespace
+           where n.nspname='public'
+             and p.proname='set_accounting_period_status'
+             and exists (
+               select 1
+               from unnest(coalesce(p.proconfig,'{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as period_search_path,
+         exists (
+           select 1
+           from pg_proc p
+           join pg_namespace n on n.oid=p.pronamespace
+           where n.nspname='private'
+             and p.proname='assert_accounting_period_postable'
+         ) as assert_private,
+         has_function_privilege(
+           'anon',
+           'private.assert_accounting_period_postable(uuid,date)',
+           'EXECUTE'
+         ) as assert_anon,
+         has_function_privilege(
+           'authenticated',
+           'private.assert_accounting_period_postable(uuid,date)',
+           'EXECUTE'
+         ) as assert_auth,
+         (
+           select count(*)
+           from (
+             select reversal_of
+             from public.journal_entries
+             where reversal_of is not null
+             group by reversal_of
+             having count(*)>1
+           ) d
+         )::text as reversal_duplicates,
+         (
+           select count(*)
+           from public.journal_entries r
+           left join public.journal_entries o on o.id=r.reversal_of
+           where r.reversal_of is not null
+             and (
+               o.id is null
+               or r.reference_type<>'journal_reversal'
+               or r.posting_status<>'POSTED'
+             )
+         )::text as invalid_reversal_links,
+         (
+           select count(*)
+           from (
+             select r.id
+             from public.journal_entries r
+             join public.journal_entry_lines l on l.journal_entry_id=r.id
+             where r.reversal_of is not null
+             group by r.id
+             having round(sum(l.debit),2)<>round(sum(l.credit),2)
+           ) d
+         )::text as unbalanced_reversals`,
+    );
+
+    const state = rows[0];
+    expect(state?.reverse_anon).toBe(false);
+    expect(state?.reverse_auth).toBe(true);
+    expect(state?.period_anon).toBe(false);
+    expect(state?.period_auth).toBe(true);
+    expect(state?.reverse_search_path).toBe(true);
+    expect(state?.period_search_path).toBe(true);
+    expect(state?.assert_private).toBe(true);
+    expect(state?.assert_anon).toBe(false);
+    expect(state?.assert_auth).toBe(false);
+    expect(Number(state?.reversal_duplicates ?? -1)).toBe(0);
+    expect(Number(state?.invalid_reversal_links ?? -1)).toBe(0);
+    expect(Number(state?.unbalanced_reversals ?? -1)).toBe(0);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
