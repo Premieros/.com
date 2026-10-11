@@ -284,6 +284,42 @@ describe('Architecture V2 Phase 5J two-person controlled org account sync', () =
     }
   });
 
+  it('expires an old pending request with audit trail so a replacement can be proposed', async () => {
+    await db.query('BEGIN');
+    try {
+      const f = await fixture();
+      await as(f.proposer);
+      const initial = await call(
+        'select public.request_organization_account_sync_v2($1,$2) result',
+        [f.account, 'Initial request with eventual expiry'],
+      );
+      expect(initial?.success).toBe(true);
+      await as(null);
+      await db.query(
+        "update private.organization_account_sync_requests_v2 set expires_at=now()-interval '2 minutes' where id=$1",
+        [initial?.request_id],
+      );
+      await as(f.proposer);
+      const renewed = await call(
+        'select public.request_organization_account_sync_v2($1,$2) result',
+        [f.account, 'Fresh replacement for expired org account request'],
+      );
+      expect(renewed?.success).toBe(true);
+      expect(renewed?.request_id).not.toBe(initial?.request_id);
+      const { rows } = await db.query<{ old_status: string; new_status: string; expiry_audits: string }>(
+        `select
+          (select status from private.organization_account_sync_requests_v2 where id=$1) old_status,
+          (select status from private.organization_account_sync_requests_v2 where id=$2) new_status,
+          (select count(*)::text from public.audit_log
+           where entity_id=$1 and action='ORG_ACCOUNT_SYNC_EXPIRED') expiry_audits`,
+        [initial?.request_id,renewed?.request_id],
+      );
+      expect(rows[0]).toEqual({ old_status:'EXPIRED', new_status:'PENDING', expiry_audits:'1' });
+    } finally {
+      await db.query('ROLLBACK');
+    }
+  });
+
   it('denies anonymous invocation and preserves all real journal lines', async () => {
     const { rows } = await db.query<{ before_lines: string }>(
       'select count(*)::text before_lines from public.journal_entry_lines',
