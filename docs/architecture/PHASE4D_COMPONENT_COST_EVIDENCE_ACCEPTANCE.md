@@ -49,6 +49,17 @@ The evidence is at **costing-line resolution**: direct recipe raw-material lines
 
 Do not call Phase 4D fully accepted before those deployment-time checks are met.
 
+## Fail-closed refinement
+Follow-up production migration: `20261011081037_phase4d_fail_closed_missing_component_cost.sql`.
+
+For *new* snapshots where the component evidence is incomplete, its legacy component
+calculation is retained only as `basis.theoretical_partial_unit_cost` and
+`basis.theoretical_partial_total_cost`. The authoritative `theoretical_status`
+is `MISSING_INPUT` and the completed theoretical unit/total fields are null.
+This prevents an underpriced recipe being counted as a completed historical food-cost
+variance. The original cost resolver, FIFO, checkout prices and posted COGS remain
+unchanged. No legacy snapshots are reconstructed.
+
 ## Production execution — 2026-10-11
 - Supabase project: `hvqlkapynjfjikqithvd` (`Premieros/.com` only).
 - Applied migration history: `20261011080408_phase4d_component_cost_evidence`.
@@ -71,3 +82,13 @@ Do not call Phase 4D fully accepted before those deployment-time checks are met.
 - The full `db` CI job fails on several legacy/test-environment baseline checks (empty operating datasets, CI-only SECURITY DEFINER fixture grants, and an unscoped synthetic organization/branch during the full operating cycle).
 - The new migration compiled during the CI migration stage and the dedicated component-evidence integration tests passed; this does **not** imply all unrelated regression checks are green.
 - Keep PR #81 as draft and keep the merge gate closed until these pre-existing CI failures are triaged or genuinely resolved; no baseline checks should be deleted or bypassed to force green.
+
+## Post fail-closed production smoke
+- Applied migration: `20261011081037_phase4d_fail_closed_missing_component_cost`.
+- For both plain and modified sample sale items, missing recipe-cost input correctly makes `theoretical_status=MISSING_INPUT`, with completed theoretical cost null.
+- Partial unit cost is frozen in the private JSON basis: 140.00 (plain) and 233.21 (modified).
+- Full line-level evidence: 2 base recipe lines, 5 modifier effects; both subtotals reconcile.
+- Private write denial and normal refunded quantity update verified again.
+- Transaction rolled back with 0 residual sale rows, 0 snapshot rows, and 0 failures.
+- New dedicated CI Phase 4D tests passed: 3/3 including independent synthetic BOM and real modifier effects inside a rollback transaction.
+- The pre-existing full DB regression suite remains 9 failures in its P-A and full-operating-cycle fixtures; PR remains draft until that separate gate is resolved.
