@@ -1,5 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
-import { Plus, Edit2, Trash2, Coins, Landmark } from 'lucide-react';
+import { Plus, Edit2, Trash2, Coins, Landmark, ShieldCheck } from 'lucide-react';
+import { OrganizationAccountSyncWorkbench } from './OrganizationAccountSyncWorkbench';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -41,6 +42,7 @@ export function AccountsPage() {
   const [editing, setEditing] = useState<ChartOfAccount | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [seeding, setSeeding] = useState(false);
+  const [showOrgSync, setShowOrgSync] = useState(false);
   const [form, setForm] = useState({ code: '', name: '', name_en: '', account_type: 'asset' as AccountType, is_active: true });
 
   const effectiveBranchFilter = branchFilter;
@@ -174,6 +176,12 @@ export function AccountsPage() {
                 <Coins className="w-4 h-4" /> {seeding ? t('loading') : t('seedOpeningBalances')}
               </Button>
             )}
+            {canManage && <Button size="sm" variant="outline" onClick={() => setShowOrgSync(open => !open)}
+              aria-expanded={showOrgSync} aria-controls="organization-account-review-panel"
+              data-testid="organization-account-sync-toggle">
+              <ShieldCheck className="w-4 h-4" />
+              {isAr ? 'مراجعة المزامنة المؤسسية' : 'Organization Sync Review'}
+            </Button>}
             {canManage && <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4" /> {t('add')}</Button>}
           </>
         } />
@@ -184,6 +192,12 @@ export function AccountsPage() {
         <StatCard title={t('typeLiability')} value={String(items.filter((a) => a.account_type === 'liability').length)} icon={<Landmark className="w-5 h-5" />} color="amber" />
         <StatCard title={t('typeExpense')} value={String(items.filter((a) => a.account_type === 'expense').length)} icon={<Landmark className="w-5 h-5" />} color="red" />
       </div>
+
+      {canManage && showOrgSync && (
+        <section id="organization-account-review-panel" className="mb-6">
+          <OrganizationAccountSyncWorkbench />
+        </section>
+      )}
 
       <DesignPanel testId="accounts-search-panel">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
