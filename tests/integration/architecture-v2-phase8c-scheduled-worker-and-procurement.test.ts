@@ -77,8 +77,8 @@ describe('ERP Phase 8C scheduled outbox and Phase 6 receiving regressions', () =
       );
       await db.query(
         "insert into public.purchase_receipts(id,receipt_number,purchase_id,branch_id,warehouse_id) " +
-        "values($1,$3,$5,$7,$9),($2,$4,$5,$7,$9)",
-        [receiptA,receiptA2,'CI8CRA-'+unique,'CI8CRA2-'+unique,purchaseA,purchaseB,branchA,branchB,warehouseA],
+        "values($1,$3,$5,$6,$7),($2,$4,$5,$6,$7)",
+        [receiptA,receiptA2,'CI8CRA-'+unique,'CI8CRA2-'+unique,purchaseA,branchA,warehouseA],
       );
       await db.query(
         'insert into public.purchase_receipt_items(receipt_id,purchase_item_id,quantity_received) values($1,$2,3)',
