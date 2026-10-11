@@ -201,7 +201,7 @@ describe('Architecture V2 Phase 5J two-person controlled org account sync', () =
         'select public.request_organization_account_sync_v2($1,$2) result',
         [f.account, 'Refresh agreed organization expense label'],
       );
-      expect(pending?.operation).toBeUndefined();
+      expect((pending as Result & { operation?: string })?.operation).toBe('REFRESH_LABELS');
       expect(pending?.success).toBe(true);
       await as(f.reviewer);
       const applied = await call(
