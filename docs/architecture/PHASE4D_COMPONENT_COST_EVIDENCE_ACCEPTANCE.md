@@ -16,7 +16,7 @@ The prior `basis` JSON recorded total costs, recipe identifiers, modifier effect
 An immutable total is good enough for top-level historical variance but insufficient to audit the component-level calculation after later recipe or supplier price changes.
 
 ## Additive implementation
-The supplemental migration `20261011080000_phase4d_component_cost_evidence.sql`:
+The supplemental migration `20261011080408_phase4d_component_cost_evidence.sql`:
 - Does not alter canonical/legacy item relationships, sale prices, inventory posting, FIFO, accounting journals, or historical rows.
 - Adds a *private* function to freeze component-level evidence.
 - Adds a call inside the existing AFTER INSERT trigger function; does **not** create a second capture trigger or second snapshot table.
@@ -48,3 +48,26 @@ The evidence is at **costing-line resolution**: direct recipe raw-material lines
 7. No speculative backfill for historical sales.
 
 Do not call Phase 4D fully accepted before those deployment-time checks are met.
+
+## Production execution — 2026-10-11
+- Supabase project: `hvqlkapynjfjikqithvd` (`Premieros/.com` only).
+- Applied migration history: `20261011080408_phase4d_component_cost_evidence`.
+- Production resolver exists and is called by the original single AFTER INSERT sale-item capture trigger.
+- Direct EXECUTE: anon, authenticated, and service_role denied.
+- Transactional smoke inserted 2 temporary sale-items against a real existing sale, product and modifier:
+  - plain theoretical unit cost = 140.00;
+  - selected modifier theoretical unit delta = 93.21;
+  - modified theoretical unit cost = 233.21;
+  - 2 priced base recipe lines; 5 selected modifier effect lines;
+  - detail-to-total reconciliation = true for both base and modifier;
+  - one zero-price recipe component retained as `MISSING_COMPONENT_REFERENCE_COST`;
+  - updating `refunded_quantity` left immutable snapshot unchanged;
+  - service_role UPDATE on private snapshot denied;
+  - intentional subtransaction rollback complete with zero residual sale-items, snapshots and capture failures.
+- Existing canonical snapshot and failure counts remained zero.
+
+## CI limitations
+- `verify` job passed after syncing the existing frontend contract and replacing unsafe `any` casts in Costing V2 RPCs.
+- The full `db` CI job fails on several legacy/test-environment baseline checks (empty operating datasets, CI-only SECURITY DEFINER fixture grants, and an unscoped synthetic organization/branch during the full operating cycle).
+- The new migration compiled during the CI migration stage and the dedicated component-evidence integration tests passed; this does **not** imply all unrelated regression checks are green.
+- Keep PR #81 as draft and keep the merge gate closed until these pre-existing CI failures are triaged or genuinely resolved; no baseline checks should be deleted or bypassed to force green.
