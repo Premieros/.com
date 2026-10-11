@@ -85,7 +85,7 @@ left join public.purchase_receipt_items ri on ri.purchase_item_id=i.id
 group by p.branch_id,p.id,i.id,i.quantity,i.received_quantity;
 
 revoke all on function private.validate_purchase_receipt_scope_v2(),
- function private.validate_purchase_receipt_line_v2()
+ private.validate_purchase_receipt_line_v2()
  from public,anon,authenticated,service_role;
 revoke all on private.procurement_receipt_progress_v2
  from public,anon,authenticated,service_role;
