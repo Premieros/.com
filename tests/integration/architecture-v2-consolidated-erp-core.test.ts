@@ -73,6 +73,29 @@ describe('Consolidated ERP accounting, procurement, domain outbox and agent cont
     }finally{await db.query('ROLLBACK');}
   });
 
+  it('publishes one event when a draft journal transitions to POSTED, without replay duplication',async()=>{
+    await db.query('BEGIN');
+    try{
+      const {branch}=await fixture();
+      const entryId=randomUUID();
+      await db.query(
+        "insert into public.journal_entries(id,entry_number,branch_id,posting_status) values($1,$2,$3,'DRAFT')",
+        [entryId,'CI-DRAFT-'+randomUUID().slice(0,8),branch],
+      );
+      const count=async()=>{
+        const {rows}=await db.query<{n:string}>(
+          'select count(*)::text n from private.erp_domain_outbox_v2 where aggregate_id=$1',[entryId],
+        );
+        return rows[0].n;
+      };
+      expect(await count()).toBe('0');
+      await db.query("update public.journal_entries set posting_status='POSTED' where id=$1",[entryId]);
+      expect(await count()).toBe('1');
+      await db.query("update public.journal_entries set posting_status='POSTED' where id=$1",[entryId]);
+      expect(await count()).toBe('1');
+    }finally{await db.query('ROLLBACK');}
+  });
+
   it('refuses cross-purchase receipt scope and event queue privileges',async()=>{
     const {rows}=await db.query<{
       outbox_rls:boolean;private_outbox_read:boolean;private_outbox_write:boolean;
@@ -112,6 +135,17 @@ describe('Consolidated ERP accounting, procurement, domain outbox and agent cont
       const {rows:events}=await db.query<{count:string}>(
         "select count(*)::text count from private.erp_domain_outbox_v2 where event_type='PURCHASE_RECEIPT_CREATED' and organization_id=$1",[a.org]);
       expect(events[0].count).toBe('0');
+      const receiptId=randomUUID();
+      await db.query(
+        'insert into public.purchase_receipts(id,receipt_number,purchase_id,branch_id) values($1,$2,$3,$4)',
+        [receiptId,'CI-GOOD-RCPT-'+randomUUID().slice(0,10),purchase,a.branch],
+      );
+      const {rows:published}=await db.query<{event_type:string;event_key:string}>(
+        'select event_type,event_key from private.erp_domain_outbox_v2 where aggregate_id=$1',[receiptId],
+      );
+      expect(published).toEqual([{
+        event_type:'PURCHASE_RECEIPT_CREATED',event_key:`purchase.receipt:${receiptId}`,
+      }]);
     }finally{await db.query('ROLLBACK');}
   });
 });
