@@ -20,7 +20,82 @@ export type ReverseJournalResult = RpcResult & {
   already_reversed?: boolean;
 };
 
+export type OrgAccountSyncFields = {
+  code: string;
+  name: string;
+  name_en: string | null;
+  account_type: string;
+  is_system: boolean;
+  is_active: boolean;
+};
+
+export type OrgAccountSyncRequest = {
+  id: string;
+  organization_id: string;
+  organization_name: string;
+  branch_id: string;
+  branch_name: string;
+  branch_account_id: string;
+  operation: 'LINK_NEW' | 'REFRESH_LABELS';
+  status: 'PENDING' | 'APPLIED' | 'REJECTED' | 'STALE' | 'EXPIRED';
+  request_reason: string;
+  requester_id: string;
+  requester_name: string | null;
+  reviewer_id: string | null;
+  reviewer_name: string | null;
+  review_note: string | null;
+  created_at: string;
+  expires_at: string;
+  decided_at: string | null;
+  applied_at: string | null;
+  proposed: OrgAccountSyncFields & { master_id?: string | null; operation?: string };
+  source: OrgAccountSyncFields | null;
+  master: OrgAccountSyncFields | null;
+  live_plan_status: string | null;
+  stale: boolean;
+};
+export type OrgAccountSyncCandidate = {
+  branch_account_id: string;
+  branch_id: string;
+  branch_name: string;
+  organization_id: string;
+  organization_name: string;
+  code: string;
+  mapping_status: string;
+  plan_status: string;
+  operation: 'LINK_NEW' | 'REFRESH_LABELS' | null;
+  source: OrgAccountSyncFields;
+  master: OrgAccountSyncFields | null;
+};
+export type OrgAccountSyncWorkbench = {
+  success: boolean;
+  error?: string;
+  organizations?: Array<{ id: string; name: string }>;
+  requests?: OrgAccountSyncRequest[];
+  candidates?: OrgAccountSyncCandidate[];
+  limit?: number;
+  can_review?: boolean;
+  shadow_only?: boolean;
+};
+export type OrgAccountSyncActionResult = {
+  success: boolean;
+  error?: string;
+  request_id?: string;
+  status?: string;
+  operation?: string;
+  organization_account_id?: string;
+};
+
 export const accounting = {
+  getOrganizationAccountSyncWorkbench(p: { p_organization_id: string | null; p_limit: number }): ApiResult<OrgAccountSyncWorkbench> {
+    return rpc('get_organization_account_sync_workbench_v2',p);
+  },
+  requestOrganizationAccountSync(p: { p_branch_account_id: string; p_reason: string }): ApiResult<OrgAccountSyncActionResult> {
+    return rpc('request_organization_account_sync_v2',p);
+  },
+  decideOrganizationAccountSync(p: { p_request_id: string; p_approve: boolean; p_note: string | null }): ApiResult<OrgAccountSyncActionResult> {
+    return rpc('decide_organization_account_sync_v2',p);
+  },
   postShiftExpense(p: {
     p_idempotency_key: string;
     p_branch_id: string;

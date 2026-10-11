@@ -289,6 +289,14 @@
       ]
     },
     {
+      "name": "decide_organization_account_sync_v2",
+      "params": [
+        "approve",
+        "note",
+        "request_id"
+      ]
+    },
+    {
       "name": "delete_branch_cascade",
       "params": [
         "branch_id"
@@ -624,6 +632,13 @@
         "branch_id",
         "from",
         "to"
+      ]
+    },
+    {
+      "name": "get_organization_account_sync_workbench_v2",
+      "params": [
+        "limit",
+        "organization_id"
       ]
     },
     {
@@ -1216,6 +1231,13 @@
         "note",
         "reference",
         "sender_name"
+      ]
+    },
+    {
+      "name": "request_organization_account_sync_v2",
+      "params": [
+        "branch_account_id",
+        "reason"
       ]
     },
     {
