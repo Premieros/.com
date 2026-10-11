@@ -575,7 +575,7 @@ describe('Architecture V2 P-A safety baseline', () => {
          count(*) filter (where warehouse_id is null)::text as missing_warehouse,
          count(*) filter (where reconciliation_status <> 'MATCH')::text as reconciliation_mismatch,
          count(*) filter (where warehouse_scope = 'LEGACY_BRANCH_ONLY')::text as branch_only_scope,
-         max(abs(coalesce(movement_delta,0)))::text as max_movement_delta,
+         coalesce(max(abs(coalesce(movement_delta,0))),0)::text as max_movement_delta,
          has_table_privilege('anon', 'private.canonical_inventory_balances', 'SELECT') as anon_select,
          has_table_privilege('authenticated', 'private.canonical_inventory_balances', 'SELECT') as authenticated_select
        from private.canonical_inventory_balances`,
