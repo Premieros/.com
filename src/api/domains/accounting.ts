@@ -2,6 +2,24 @@ import type { ApiResult, JournalLineInput } from '../types';
 import type { RpcResult, TreasuryBalance, TreasurySource, TrialBalanceRow, JournalDto, ArAgingRow, ApAgingRow, ReconciliationDetail } from '@/lib/types';
 import { rpc } from '../rpc';
 
+export type AccountingPeriodStatus = 'OPEN' | 'SOFT_CLOSED' | 'CLOSED';
+
+export type AccountingPeriodStatusResult = RpcResult & {
+  period_id?: string;
+  previous_status?: AccountingPeriodStatus;
+  status?: AccountingPeriodStatus;
+  already_set?: boolean;
+};
+
+export type ReverseJournalResult = RpcResult & {
+  entry_id?: string;
+  entry_number?: string;
+  reversal_entry_id?: string;
+  reversal_entry_number?: string;
+  reversal_date?: string;
+  already_reversed?: boolean;
+};
+
 export const accounting = {
   postShiftExpense(p: {
     p_idempotency_key: string;
@@ -64,6 +82,17 @@ export const accounting = {
   seedOpeningBalances(p: { p_branch_id: string | null }): ApiResult<RpcResult> { return rpc('seed_opening_balances', p); },
   getJournals(p: { p_branch_id: string | null; p_from_date: string | null; p_to_date: string | null; p_reference_type: string | null; p_search: string | null }): ApiResult<JournalDto[]> { return rpc('get_journals', p); },
   postManualJournal(p: { p_branch_id: string | null; p_description: string; p_lines: JournalLineInput[] }): ApiResult<RpcResult> { return rpc('post_manual_journal', p); },
+  reverseJournalEntry(p: { p_entry_id: string; p_reason: string; p_reversal_date?: string | null }): ApiResult<ReverseJournalResult> {
+    const args: Record<string, unknown> = {
+      p_entry_id: p.p_entry_id,
+      p_reason: p.p_reason,
+    };
+    if (p.p_reversal_date) args.p_reversal_date = p.p_reversal_date;
+    return rpc('reverse_journal_entry', args);
+  },
+  setAccountingPeriodStatus(p: { p_period_id: string; p_status: AccountingPeriodStatus; p_reason: string }): ApiResult<AccountingPeriodStatusResult> {
+    return rpc('set_accounting_period_status', p);
+  },
   getArAging(p: { p_branch_id: string | null; p_as_of: string }): ApiResult<ArAgingRow[]> { return rpc('get_ar_aging', p); },
   getApAging(p: { p_branch_id: string | null; p_as_of: string }): ApiResult<ApAgingRow[]> { return rpc('get_ap_aging', p); },
   getSupplierStatement(p: { p_supplier_id: string; p_branch_id: string }): ApiResult<unknown> { return rpc('get_supplier_statement', p); },
