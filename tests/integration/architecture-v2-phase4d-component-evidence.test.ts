@@ -1,5 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client } from 'pg';
+import { randomUUID } from 'node:crypto';
 
 const connectionString = process.env.SUPABASE_DB_URL;
 if (!connectionString) {
@@ -51,78 +52,125 @@ describe('Architecture V2 Phase 4D component evidence', () => {
     });
   });
 
-  it('freezes individual recipe and real modifier contributions with reconciled totals', async () => {
-    // Deliberately read-only; never create a sale or guess historical ingredient costs.
-    const { rows } = await client.query<{
-      base_cost: string | null;
-      modifier_delta: string;
-      evidence: {
-        schema_version: number;
-        status: string;
-        base_cost_matches: boolean | null;
-        modifier_cost_matches: boolean;
-        base_component_unit_cost: number;
-        modifier_component_unit_delta: number;
-        base_components: Array<{
-          component_id: string;
-          quantity_per_sale: number;
-          cost_per_unit: number;
-          extended_unit_cost: number;
-          missing_cost_input: boolean;
-        }>;
-        modifier_effects: Array<{
-          effect_id: string;
-          option_id: string;
-          extended_unit_delta: number;
-        }>;
-        base_missing_input_count: number;
-      };
-    }>(`
-      with sample as (
-        select p.id product_id,p.branch_id,e.option_id
-        from public.product_modifier_inventory_effects e
-        join public.product_modifier_options o on o.id=e.option_id
-        join public.product_modifier_groups g on g.id=o.group_id
-        join public.products p on p.id=g.product_id and p.branch_id=e.branch_id
-        where p.product_type='manufactured'
-        order by p.id,e.option_id
-        limit 1
-      ), reference as (
-        select s.*,private.compute_sale_item_cost_snapshot(
-          s.product_id,s.branch_id,array[s.option_id],1,clock_timestamp()
-        ) costing from sample s
-      )
-      select
-        r.costing->>'base_theoretical_unit_cost' base_cost,
-        r.costing->>'modifier_theoretical_unit_delta' modifier_delta,
-        private.compute_sale_item_component_evidence(
-          r.product_id,r.branch_id,array[r.option_id],
-          (r.costing->>'base_theoretical_unit_cost')::numeric,
-          (r.costing->>'modifier_theoretical_unit_delta')::numeric
-        ) evidence
-      from reference r
-    `);
+  it('calculates non-vacuous BOM and modifier evidence in an isolated CI transaction', async () => {
+    const organizationId = randomUUID();
+    const branchId = randomUUID();
+    const materialUnitId = randomUUID();
+    const pricedRawId = randomUUID();
+    const unpricedRawId = randomUUID();
+    const productId = randomUUID();
+    const groupId = randomUUID();
+    const optionId = randomUUID();
+    const token = randomUUID().slice(0, 8);
 
-    // Empty fresh environments have no real product/modifier fixtures to price.
-    if (rows.length === 0) return;
+    await client.query('BEGIN');
+    try {
+      await client.query(
+        'insert into public.organizations(id,name,slug) values($1,$2,$3)',
+        [organizationId, 'CI Cost Snapshot', `ci-cost-${token}`],
+      );
+      await client.query(
+        'insert into public.branches(id,name,is_active,organization_id) values($1,$2,true,$3)',
+        [branchId, 'CI Cost Evidence', organizationId],
+      );
+      await client.query(
+        "insert into public.measurement_units(id,code,name,symbol,is_active) values($1,$2,'CI Cost UOM','u',true)",
+        [materialUnitId, `CI-COST-${token}`],
+      );
+      await client.query(
+        `insert into public.raw_materials(id,code,name,unit_id,default_cost,branch_id,is_active)
+         values($1,$3,'Priced Ingredient',$5,10,$6,true),
+               ($2,$4,'Missing Price Ingredient',$5,0,$6,true)`,
+        [pricedRawId, unpricedRawId, `CI-R1-${token}`, `CI-R2-${token}`,
+          materialUnitId, branchId],
+      );
+      await client.query(
+        `insert into public.products(id,name,sku,cost_price,sale_price,wholesale_price,is_active,product_type,branch_id)
+         values($1,'CI Manufactured Cost Evidence',$2,0,50,50,true,'manufactured',$3)`,
+        [productId, `CI-P-${token}`, branchId],
+      );
+      const recipe = await client.query<{ id: string }>(
+        `insert into public.recipes(product_id,branch_id,name,yield_quantity,is_active)
+         values($1,$2,'CI Exact Cost Recipe',1,true) returning id`,
+        [productId, branchId],
+      );
+      await client.query(
+        `insert into public.recipe_items(recipe_id,raw_material_id,quantity,wastage_percent)
+         values($1,$2,2,0),($1,$3,1,0)`,
+        [recipe.rows[0].id, pricedRawId, unpricedRawId],
+      );
+      await client.query(
+        "insert into public.product_modifier_groups(id,branch_id,name) values($1,$2,'CI Modifier')",
+        [groupId, branchId],
+      );
+      await client.query(
+        "insert into public.product_modifier_group_products(group_id,product_id,branch_id) values($1,$2,$3)",
+        [groupId, productId, branchId],
+      );
+      await client.query(
+        "insert into public.product_modifier_options(id,branch_id,group_id,name) values($1,$2,$3,'CI Extra')",
+        [optionId, branchId, groupId],
+      );
+      await client.query(
+        `insert into public.product_modifier_inventory_effects
+           (branch_id,option_id,target_type,raw_material_id,quantity_delta)
+         values($1,$2,'raw_material',$3,1.5)`,
+        [branchId, optionId, pricedRawId],
+      );
 
-    const { evidence, base_cost, modifier_delta } = rows[0];
-    expect(evidence.schema_version).toBe(1);
-    expect(evidence.base_cost_matches).toBe(true);
-    expect(evidence.modifier_cost_matches).toBe(true);
-    expect(evidence.base_components.length).toBeGreaterThan(0);
-    expect(evidence.modifier_effects.length).toBeGreaterThan(0);
-    expect(Number(evidence.base_component_unit_cost)).toBeCloseTo(Number(base_cost), 2);
-    expect(Number(evidence.modifier_component_unit_delta)).toBeCloseTo(Number(modifier_delta), 5);
-    expect(['RECONCILED', 'MISSING_COMPONENT_REFERENCE_COST',
-      'MISSING_MODIFIER_REFERENCE_COST']).toContain(evidence.status);
-    expect(evidence.base_components.every((line) =>
-      Boolean(line.component_id) && line.quantity_per_sale !== null,
-    )).toBe(true);
-    expect(evidence.modifier_effects.every((effect) =>
-      Boolean(effect.effect_id) && Boolean(effect.option_id),
-    )).toBe(true);
-    expect(evidence.base_missing_input_count).toBeGreaterThanOrEqual(0);
+      const { rows } = await client.query<{
+        costing: { status: string; theoretical_unit_cost: number;
+          base_theoretical_unit_cost: number; modifier_theoretical_unit_delta: number };
+        evidence: {
+          schema_version: number;
+          status: string;
+          base_cost_matches: boolean;
+          modifier_cost_matches: boolean;
+          base_component_unit_cost: number;
+          modifier_component_unit_delta: number;
+          base_missing_input_count: number;
+          base_components: Array<{ source_id: string; quantity_per_sale: number;
+            cost_per_unit: number; extended_unit_cost: number; missing_cost_input: boolean }>;
+          modifier_effects: Array<{ effect_id: string; option_id: string;
+            quantity_delta: number; extended_unit_delta: number }>;
+        };
+      }>(`
+        with reference as (
+          select private.compute_sale_item_cost_snapshot($1,$2,array[$3::uuid],1,now()) costing
+        )
+        select
+          r.costing,
+          private.compute_sale_item_component_evidence(
+            $1,$2,array[$3::uuid],
+            (r.costing->>'base_theoretical_unit_cost')::numeric,
+            (r.costing->>'modifier_theoretical_unit_delta')::numeric
+          ) evidence
+        from reference r
+      `, [productId, branchId, optionId]);
+
+      const { costing, evidence } = rows[0];
+      expect(costing.status).toBe('AVAILABLE');
+      expect(Number(costing.base_theoretical_unit_cost)).toBeCloseTo(20, 5);
+      expect(Number(costing.modifier_theoretical_unit_delta)).toBeCloseTo(15, 5);
+      expect(Number(costing.theoretical_unit_cost)).toBeCloseTo(35, 5);
+      expect(evidence.schema_version).toBe(1);
+      expect(evidence.status).toBe('MISSING_COMPONENT_REFERENCE_COST');
+      expect(evidence.base_cost_matches).toBe(true);
+      expect(evidence.modifier_cost_matches).toBe(true);
+      expect(evidence.base_components).toHaveLength(2);
+      expect(evidence.modifier_effects).toHaveLength(1);
+      expect(Number(evidence.base_component_unit_cost)).toBeCloseTo(20, 5);
+      expect(Number(evidence.modifier_component_unit_delta)).toBeCloseTo(15, 5);
+      expect(evidence.base_missing_input_count).toBe(1);
+      expect(evidence.base_components.some((item) =>
+        item.source_id && item.missing_cost_input && Number(item.cost_per_unit) === 0,
+      )).toBe(true);
+      expect(evidence.modifier_effects[0].option_id).toBe(optionId);
+      expect(Number(evidence.modifier_effects[0].quantity_delta)).toBeCloseTo(1.5, 5);
+      expect(Number(evidence.modifier_effects[0].extended_unit_delta)).toBeCloseTo(15, 5);
+    } finally {
+      await client.query('ROLLBACK');
+    }
   });
 
   it('does not backfill pre-capture history with present-day component costs', async () => {
