@@ -1491,6 +1491,131 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(state?.auth_surface_select).toBe(false);
   });
 
+  it('keeps sale payment-method corrections append-only in accounting', async () => {
+    const { rows } = await client.query<{
+      direct_mutator_rows: string;
+      posted_reclassification_rows: string;
+      auth_change_select: boolean;
+      service_change_select: boolean;
+      service_change_insert: boolean;
+      service_change_update: boolean;
+      service_change_delete: boolean;
+      rpc_anon: boolean;
+      rpc_auth: boolean;
+      rpc_search_path: boolean;
+      orphan_change_journals: string;
+      invalid_change_links: string;
+      unbalanced_change_journals: string;
+    }>(
+      `select
+         (
+           select count(*)
+           from private.journal_mutation_surface
+           where function_signature='change_sale_payment_method(uuid,text,text)'
+         )::text as direct_mutator_rows,
+         (
+           select count(*)
+           from private.journal_mutation_surface
+           where classification='POSTED_RECLASSIFICATION'
+         )::text as posted_reclassification_rows,
+         has_table_privilege(
+           'authenticated',
+           'private.sale_payment_method_changes',
+           'SELECT'
+         ) as auth_change_select,
+         has_table_privilege(
+           'service_role',
+           'private.sale_payment_method_changes',
+           'SELECT'
+         ) as service_change_select,
+         has_table_privilege(
+           'service_role',
+           'private.sale_payment_method_changes',
+           'INSERT'
+         ) as service_change_insert,
+         has_table_privilege(
+           'service_role',
+           'private.sale_payment_method_changes',
+           'UPDATE'
+         ) as service_change_update,
+         has_table_privilege(
+           'service_role',
+           'private.sale_payment_method_changes',
+           'DELETE'
+         ) as service_change_delete,
+         has_function_privilege(
+           'anon',
+           'public.change_sale_payment_method(uuid,text,text)',
+           'EXECUTE'
+         ) as rpc_anon,
+         has_function_privilege(
+           'authenticated',
+           'public.change_sale_payment_method(uuid,text,text)',
+           'EXECUTE'
+         ) as rpc_auth,
+         exists (
+           select 1
+           from pg_proc p
+           join pg_namespace n on n.oid=p.pronamespace
+           where n.nspname='public'
+             and p.proname='change_sale_payment_method'
+             and exists (
+               select 1
+               from unnest(coalesce(p.proconfig,'{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as rpc_search_path,
+         (
+           select count(*)
+           from public.journal_entries je
+           left join private.sale_payment_method_changes ch
+             on ch.id=je.reference_id
+            and ch.journal_entry_id=je.id
+           where je.reference_type='sale_payment_method_change'
+             and ch.id is null
+         )::text as orphan_change_journals,
+         (
+           select count(*)
+           from private.sale_payment_method_changes ch
+           left join public.journal_entries je
+             on je.id=ch.journal_entry_id
+           where ch.journal_entry_id is not null
+             and (
+               je.id is null
+               or je.reference_type<>'sale_payment_method_change'
+               or je.reference_id<>ch.id
+               or je.branch_id<>ch.branch_id
+               or je.posting_status<>'POSTED'
+             )
+         )::text as invalid_change_links,
+         (
+           select count(*)
+           from (
+             select je.id
+             from public.journal_entries je
+             join public.journal_entry_lines jl
+               on jl.journal_entry_id=je.id
+             where je.reference_type='sale_payment_method_change'
+             group by je.id
+             having round(sum(jl.debit),2)<>round(sum(jl.credit),2)
+           ) d
+         )::text as unbalanced_change_journals`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.direct_mutator_rows ?? -1)).toBe(0);
+    expect(Number(state?.posted_reclassification_rows ?? -1)).toBe(0);
+    expect(state?.auth_change_select).toBe(false);
+    expect(state?.service_change_select).toBe(true);
+    expect(state?.service_change_insert || state?.service_change_update || state?.service_change_delete).toBe(false);
+    expect(state?.rpc_anon).toBe(false);
+    expect(state?.rpc_auth).toBe(true);
+    expect(state?.rpc_search_path).toBe(true);
+    expect(Number(state?.orphan_change_journals ?? -1)).toBe(0);
+    expect(Number(state?.invalid_change_links ?? -1)).toBe(0);
+    expect(Number(state?.unbalanced_change_journals ?? -1)).toBe(0);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
