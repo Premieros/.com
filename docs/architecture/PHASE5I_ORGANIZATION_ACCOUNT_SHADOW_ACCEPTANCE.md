@@ -53,3 +53,12 @@ This is a one-time bootstrap snapshot. New accounts/branches, renames and type c
 - The synthetic new-branch test intentionally checks that newly created account codes do **not** auto-attach to the frozen org master and instead produce an unmapped health status.
 - This phase does not activate use of the new account IDs for journal posting; that remains a separately reviewed next step.
 
+
+## Production transactional smoke
+
+A separate live Production transaction created a temporary organization, branch and
+custom expense account. Its new branch account was classified as
+`UNMAPPED_BRANCH_ACCOUNT`; the private master and link tables both contained **zero**
+auto-created rows for it. An intentional exception rolled back the full fixture.
+Verified remaining fixture organization, branch, account and organization-master rows: **0**.
+This confirms no silent canonical identity inference or fixture pollution.
