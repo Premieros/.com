@@ -1616,6 +1616,143 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(Number(state?.unbalanced_change_journals ?? -1)).toBe(0);
   });
 
+  it('keeps FIFO sale COGS reconciliation append-only', async () => {
+    const { rows } = await client.query<{
+      sale_mutator_rows: string;
+      unclassified: string;
+      auth_event_select: boolean;
+      service_event_select: boolean;
+      service_event_insert: boolean;
+      service_event_update: boolean;
+      service_event_delete: boolean;
+      event_helper_anon: boolean;
+      event_helper_auth: boolean;
+      event_helper_search_path: boolean;
+      bad_event_links: string;
+      unbalanced_event_journals: string;
+      duplicate_source_events: string;
+      cogs_reference_unique_excluded: boolean;
+    }>(
+      `select
+         (
+           select count(*)
+           from private.journal_mutation_surface
+           where function_signature='_fifo_adjust_sale_cogs_delta(uuid,numeric)'
+         )::text as sale_mutator_rows,
+         (
+           select count(*)
+           from private.journal_mutation_surface
+           where unclassified
+         )::text as unclassified,
+         has_table_privilege(
+           'authenticated',
+           'private.fifo_reconciliation_events',
+           'SELECT'
+         ) as auth_event_select,
+         has_table_privilege(
+           'service_role',
+           'private.fifo_reconciliation_events',
+           'SELECT'
+         ) as service_event_select,
+         has_table_privilege(
+           'service_role',
+           'private.fifo_reconciliation_events',
+           'INSERT'
+         ) as service_event_insert,
+         has_table_privilege(
+           'service_role',
+           'private.fifo_reconciliation_events',
+           'UPDATE'
+         ) as service_event_update,
+         has_table_privilege(
+           'service_role',
+           'private.fifo_reconciliation_events',
+           'DELETE'
+         ) as service_event_delete,
+         has_function_privilege(
+           'anon',
+           'private.post_fifo_sale_cogs_event(uuid,uuid,text,date,numeric,numeric,numeric,uuid,uuid,uuid)',
+           'EXECUTE'
+         ) as event_helper_anon,
+         has_function_privilege(
+           'authenticated',
+           'private.post_fifo_sale_cogs_event(uuid,uuid,text,date,numeric,numeric,numeric,uuid,uuid,uuid)',
+           'EXECUTE'
+         ) as event_helper_auth,
+         exists (
+           select 1
+           from pg_proc p
+           join pg_namespace n on n.oid=p.pronamespace
+           where n.nspname='private'
+             and p.proname='post_fifo_sale_cogs_event'
+             and exists (
+               select 1
+               from unnest(coalesce(p.proconfig,'{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as event_helper_search_path,
+         (
+           select count(*)
+           from private.fifo_reconciliation_events e
+           left join public.journal_entries je
+             on je.id=e.journal_entry_id
+           where e.adjustment_kind='SALE_COGS'
+             and (
+               e.journal_entry_id is null
+               or je.id is null
+               or je.reference_type<>'fifo_cogs_reconcile'
+               or je.reference_id<>e.business_reference_id
+               or je.source_event_id<>e.id
+               or je.posting_status<>'POSTED'
+             )
+         )::text as bad_event_links,
+         (
+           select count(*)
+           from (
+             select je.id
+             from private.fifo_reconciliation_events e
+             join public.journal_entries je on je.id=e.journal_entry_id
+             join public.journal_entry_lines jl on jl.journal_entry_id=je.id
+             where e.adjustment_kind='SALE_COGS'
+             group by je.id
+             having round(sum(jl.debit),2)<>round(sum(jl.credit),2)
+           ) d
+         )::text as unbalanced_event_journals,
+         (
+           select count(*)
+           from (
+             select source_event_id
+             from public.journal_entries
+             where source_event_id is not null
+             group by source_event_id
+             having count(*)>1
+           ) d
+         )::text as duplicate_source_events,
+         exists (
+           select 1
+           from pg_indexes
+           where schemaname='public'
+             and tablename='journal_entries'
+             and indexname='uq_journal_reference'
+             and indexdef ilike '%reference_type <> ''fifo_cogs_reconcile''%'
+         ) as cogs_reference_unique_excluded`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.sale_mutator_rows ?? -1)).toBe(0);
+    expect(Number(state?.unclassified ?? -1)).toBe(0);
+    expect(state?.auth_event_select).toBe(false);
+    expect(state?.service_event_select).toBe(true);
+    expect(state?.service_event_insert || state?.service_event_update || state?.service_event_delete).toBe(false);
+    expect(state?.event_helper_anon).toBe(false);
+    expect(state?.event_helper_auth).toBe(false);
+    expect(state?.event_helper_search_path).toBe(true);
+    expect(Number(state?.bad_event_links ?? -1)).toBe(0);
+    expect(Number(state?.unbalanced_event_journals ?? -1)).toBe(0);
+    expect(Number(state?.duplicate_source_events ?? -1)).toBe(0);
+    expect(state?.cogs_reference_unique_excluded).toBe(true);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
