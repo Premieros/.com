@@ -1871,6 +1871,181 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(state?.stock_reference_unique_excluded).toBe(true);
   });
 
+  it('keeps purchase correction journal dates assigned at insert time', async () => {
+    const { rows } = await client.query<{
+      purchase_mutator_rows: string;
+      unclassified: string;
+      active_registry_rows: string;
+      entry_trigger_count: string;
+      line_trigger_count: string;
+      entry_trigger_private: boolean;
+      line_trigger_private: boolean;
+      entry_trigger_security_definer: boolean;
+      line_trigger_security_definer: boolean;
+      entry_trigger_search_path: boolean;
+      line_trigger_search_path: boolean;
+      entry_trigger_anon: boolean;
+      entry_trigger_auth: boolean;
+      line_trigger_anon: boolean;
+      line_trigger_auth: boolean;
+      rpc_anon: boolean;
+      rpc_auth: boolean;
+      rpc_search_path: boolean;
+    }>(
+      `select
+         (
+           select count(*)
+           from private.journal_mutation_surface
+           where function_signature like 'update_purchase_invoice(%'
+         )::text as purchase_mutator_rows,
+         (
+           select count(*)
+           from private.journal_mutation_surface
+           where unclassified
+         )::text as unclassified,
+         (
+           select count(*)
+           from private.journal_mutation_registry
+           where active
+             and function_signature like 'update_purchase_invoice(%'
+         )::text as active_registry_rows,
+         (
+           select count(*)
+           from pg_trigger
+           where tgrelid='public.journal_entries'::regclass
+             and not tgisinternal
+             and tgname='trg_00_journal_timestamp_override'
+         )::text as entry_trigger_count,
+         (
+           select count(*)
+           from pg_trigger
+           where tgrelid='public.journal_entry_lines'::regclass
+             and not tgisinternal
+             and tgname='trg_00_journal_line_timestamp_override'
+         )::text as line_trigger_count,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           join pg_namespace n on n.oid=p.pronamespace
+           where t.tgrelid='public.journal_entries'::regclass
+             and t.tgname='trg_00_journal_timestamp_override'
+             and n.nspname='private'
+         ) as entry_trigger_private,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           join pg_namespace n on n.oid=p.pronamespace
+           where t.tgrelid='public.journal_entry_lines'::regclass
+             and t.tgname='trg_00_journal_line_timestamp_override'
+             and n.nspname='private'
+         ) as line_trigger_private,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           where t.tgrelid='public.journal_entries'::regclass
+             and t.tgname='trg_00_journal_timestamp_override'
+             and p.prosecdef
+         ) as entry_trigger_security_definer,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           where t.tgrelid='public.journal_entry_lines'::regclass
+             and t.tgname='trg_00_journal_line_timestamp_override'
+             and p.prosecdef
+         ) as line_trigger_security_definer,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           where t.tgrelid='public.journal_entries'::regclass
+             and t.tgname='trg_00_journal_timestamp_override'
+             and exists (
+               select 1
+               from unnest(coalesce(p.proconfig,'{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as entry_trigger_search_path,
+         exists (
+           select 1
+           from pg_trigger t
+           join pg_proc p on p.oid=t.tgfoid
+           where t.tgrelid='public.journal_entry_lines'::regclass
+             and t.tgname='trg_00_journal_line_timestamp_override'
+             and exists (
+               select 1
+               from unnest(coalesce(p.proconfig,'{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as line_trigger_search_path,
+         has_function_privilege(
+           'anon',
+           'private.apply_journal_timestamp_override()',
+           'EXECUTE'
+         ) as entry_trigger_anon,
+         has_function_privilege(
+           'authenticated',
+           'private.apply_journal_timestamp_override()',
+           'EXECUTE'
+         ) as entry_trigger_auth,
+         has_function_privilege(
+           'anon',
+           'private.apply_journal_line_timestamp_override()',
+           'EXECUTE'
+         ) as line_trigger_anon,
+         has_function_privilege(
+           'authenticated',
+           'private.apply_journal_line_timestamp_override()',
+           'EXECUTE'
+         ) as line_trigger_auth,
+         has_function_privilege(
+           'anon',
+           'public.update_purchase_invoice(uuid,uuid,uuid,numeric,numeric,numeric,numeric,numeric,text,text,jsonb)',
+           'EXECUTE'
+         ) as rpc_anon,
+         has_function_privilege(
+           'authenticated',
+           'public.update_purchase_invoice(uuid,uuid,uuid,numeric,numeric,numeric,numeric,numeric,text,text,jsonb)',
+           'EXECUTE'
+         ) as rpc_auth,
+         exists (
+           select 1
+           from pg_proc p
+           join pg_namespace n on n.oid=p.pronamespace
+           where n.nspname='public'
+             and p.proname='update_purchase_invoice'
+             and exists (
+               select 1
+               from unnest(coalesce(p.proconfig,'{}'::text[])) cfg
+               where cfg like 'search_path=%'
+             )
+         ) as rpc_search_path`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.purchase_mutator_rows ?? -1)).toBe(0);
+    expect(Number(state?.unclassified ?? -1)).toBe(0);
+    expect(Number(state?.active_registry_rows ?? -1)).toBe(0);
+    expect(Number(state?.entry_trigger_count ?? -1)).toBe(1);
+    expect(Number(state?.line_trigger_count ?? -1)).toBe(1);
+    expect(state?.entry_trigger_private).toBe(true);
+    expect(state?.line_trigger_private).toBe(true);
+    expect(state?.entry_trigger_security_definer).toBe(true);
+    expect(state?.line_trigger_security_definer).toBe(true);
+    expect(state?.entry_trigger_search_path).toBe(true);
+    expect(state?.line_trigger_search_path).toBe(true);
+    expect(state?.entry_trigger_anon).toBe(false);
+    expect(state?.entry_trigger_auth).toBe(false);
+    expect(state?.line_trigger_anon).toBe(false);
+    expect(state?.line_trigger_auth).toBe(false);
+    expect(state?.rpc_anon).toBe(false);
+    expect(state?.rpc_auth).toBe(true);
+    expect(state?.rpc_search_path).toBe(true);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
