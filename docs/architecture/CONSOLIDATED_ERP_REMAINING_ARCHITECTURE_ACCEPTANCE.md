@@ -65,3 +65,20 @@ The three files have been renamed on the PR to match applied Supabase history ex
 
 ### Operational scope limitation
 Journal identities are **materialized as immutable evidence** beside (not instead of) source lines. This gives an organization trial balance projection and an auditable bridge, but full canonical writer cutover requires a dedicated compatibility release. The outbox is created and workers can lease it, but no continuously running delivery worker or model provider is deployed. The read-only UI is a safe agent *foundation*, not production autonomous AI.
+
+## Phase 8B — verified internal event consumer (2026-10-11)
+
+Migration: `20261011130910_phase8b_verified_event_consumer.sql` (applied to the configured Supabase project). This adds a database-owner-only consumer to complete the event capture pipeline, without introducing external providers or an automatically scheduled worker.
+
+- `private.erp_domain_event_receipts_v2`: one immutable processed receipt per unique outbox event, including organization/branch identity, event payload hash, verified source projection, worker and processed timestamp; RLS enabled and all direct API roles revoked.
+- `private.erp_verified_event_projection_v2(uuid)`: compares each event against the live journal or purchase receipt source, checks journal debit/credit balance and Phase 5L evidence identity/amounts, or purchase receipt ownership. Rejects missing, malformed or conflicting source records; returns only sanitized aggregate facts.
+- `private.process_erp_domain_outbox_batch_v2(text,integer)`: DB-owner-only limited (up to 100) batch claim, per-event exception isolation, immutable sink insert and delivery acknowledgement in one transaction. Duplicate processing cannot create a second receipt.
+- `private.retry_failed_erp_domain_event_v2(uuid,text)`: DB-owner-only explicit retry with minimum reason, maximum five attempts, no unbounded automatic retry.
+- `private.erp_domain_delivery_health_v2`: private group diagnostic counts for delivered/pending/failed events.
+- **Critical scope:** There is no pg_cron extension installed in the current Supabase database and no scheduled external event worker. A privileged database operator must invoke the worker; do not call this an automatically running event processor.
+
+### CI and Production verification
+- CI run `38141744875`: verify PASS, DB **72/72** integration/security tests PASS (10 files), browser-smoke PASS. The current final head after documentation and migration filename alignment must also be green before merge.
+- Verified production application version `20261011130910`. Post-install source data unchanged: 7,259 original journal lines, 7,259 immutable org evidence rows, 0 unmapped, 2,247 posted journal headers, 183 account links. No synthetic queue or processing receipt remains.
+- Rollback-only production smoke: 3 outbox events created (balanced journal, intentionally incomplete journal, valid purchase receipt). First worker batch: 3 claimed, 2 delivered, 1 rejected with logged reason. After correcting the failed journal and manually reopening it with documented reason: second batch 1 claimed, 1 delivered, 0 failed, for a total of 3 immutable receipts. Synthetic organization, journal lines, event queue and processing receipts all **fully rolled back**.
+- `authenticated` cannot directly SELECT delivery receipts or execute the internal processor. No autonomous financial actions and no outbound network delivery are enabled.
