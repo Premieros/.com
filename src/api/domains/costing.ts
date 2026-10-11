@@ -151,13 +151,13 @@ export const costing = {
     p_limit?: number;
     p_offset?: number;
   }): ApiResult<SaleCostVarianceV2Row[]> {
-    return rpc('get_sale_cost_variance_v2' as any, {
+    return rpc<SaleCostVarianceV2Row[]>('get_sale_cost_variance_v2', {
       p_branch_id: p.p_branch_id,
       p_from: p.p_from ?? null,
       p_to: p.p_to ?? null,
       p_limit: p.p_limit ?? 200,
       p_offset: p.p_offset ?? 0,
-    } as any);
+    });
   },
 
   getPurchaseCostVarianceV2(p: {
@@ -167,17 +167,17 @@ export const costing = {
     p_limit?: number;
     p_offset?: number;
   }): ApiResult<PurchaseCostVarianceV2Row[]> {
-    return rpc('get_purchase_cost_variance_v2' as any, {
+    return rpc<PurchaseCostVarianceV2Row[]>('get_purchase_cost_variance_v2', {
       p_branch_id: p.p_branch_id,
       p_from: p.p_from ?? null,
       p_to: p.p_to ?? null,
       p_limit: p.p_limit ?? 200,
       p_offset: p.p_offset ?? 0,
-    } as any);
+    });
   },
 
   getCostingSnapshotHealthV2(p_branch_id: string): ApiResult<CostingSnapshotHealthV2Row[]> {
-    return rpc('get_costing_snapshot_health_v2' as any, { p_branch_id } as any);
+    return rpc<CostingSnapshotHealthV2Row[]>('get_costing_snapshot_health_v2', { p_branch_id });
   },
 
   getCostVarianceSummaryV2(p: {
@@ -185,11 +185,11 @@ export const costing = {
     p_from?: string | null;
     p_to?: string | null;
   }): ApiResult<CostVarianceSummaryV2Row[]> {
-    return rpc('get_cost_variance_summary_v2' as any, {
+    return rpc<CostVarianceSummaryV2Row[]>('get_cost_variance_summary_v2', {
       p_branch_id: p.p_branch_id,
       p_from: p.p_from ?? null,
       p_to: p.p_to ?? null,
-    } as any);
+    });
   },
   getItemStandardCostHistory(p: { p_item_id: string; p_branch_id: string }): ApiResult<StandardCostHistoryRow[]> {
     return rpc('get_item_standard_cost_history', p);

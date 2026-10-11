@@ -565,6 +565,13 @@
       ]
     },
     {
+      "name": "get_item_standard_cost_history",
+      "params": [
+        "branch_id",
+        "item_id"
+      ]
+    },
+    {
       "name": "get_journals",
       "params": [
         "branch_id",
@@ -637,6 +644,19 @@
     },
     {
       "name": "get_product_costing_detail",
+      "params": [
+        "branch_id",
+        "product_id"
+      ]
+    },
+    {
+      "name": "get_product_live_costs",
+      "params": [
+        "branch_id"
+      ]
+    },
+    {
+      "name": "get_product_operational_composition",
       "params": [
         "branch_id",
         "product_id"
@@ -961,6 +981,32 @@
       ]
     },
     {
+      "name": "process_sale_idempotent",
+      "params": [
+        "bonus_amount",
+        "branch_id",
+        "client_operation_key",
+        "customer_id",
+        "discount_amount",
+        "discount_type",
+        "guest_count",
+        "invoice_number",
+        "items",
+        "order_id",
+        "order_type",
+        "paid_amount",
+        "payment_method",
+        "salesperson_id",
+        "shift_id",
+        "status",
+        "subtotal",
+        "table_id",
+        "tax_amount",
+        "total",
+        "warehouse_id"
+      ]
+    },
+    {
       "name": "process_sale_manual_payment",
       "params": [
         "approval_request_id",
@@ -991,6 +1037,31 @@
       "params": [
         "bonus_amount",
         "branch_id",
+        "customer_id",
+        "discount_amount",
+        "discount_type",
+        "guest_count",
+        "invoice_number",
+        "items",
+        "order_id",
+        "order_type",
+        "payments",
+        "salesperson_id",
+        "shift_id",
+        "status",
+        "subtotal",
+        "table_id",
+        "tax_amount",
+        "total",
+        "warehouse_id"
+      ]
+    },
+    {
+      "name": "process_sale_split_idempotent",
+      "params": [
+        "bonus_amount",
+        "branch_id",
+        "client_operation_key",
         "customer_id",
         "discount_amount",
         "discount_type",
@@ -1177,6 +1248,14 @@
       "params": [
         "order_id",
         "sent_by"
+      ]
+    },
+    {
+      "name": "set_accounting_period_status",
+      "params": [
+        "period_id",
+        "reason",
+        "status"
       ]
     },
     {
@@ -1439,6 +1518,7 @@
     "branch_settings",
     "branches",
     "business_records",
+    "canonical_item_catalog",
     "categories",
     "chart_of_accounts",
     "customers",
