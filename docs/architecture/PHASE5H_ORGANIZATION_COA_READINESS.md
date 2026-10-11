@@ -41,3 +41,13 @@ These are diagnostic views **only**. They are internal to the `private` schema, 
 
 ## Next step
 Phase 5I can introduce a canonical organization-owned account entity and explicit (organization, code) to branch-account identity mappings **only after** a reviewed conversion plan. Do not replace journal account IDs in place. Later stages add cost-center accounting dimensions and AP/AR allocations under the same permission, period and append-only controls.
+
+## Production deployment and acceptance — 2026-10-11
+
+- Applied Supabase migration: `20261011085158_phase5h_organization_coa_readiness`.
+- Read-only projection: **126 distinct (organization, code) pairs** represent **183 legacy branch account rows**; no discarded source rows.
+- **40 PARTIAL_BRANCH_COVERAGE** codes; **0 blocking conflicts**.
+- All 2,247 posted journals retained, no branch-mapping cross-links or orphan journal account links.
+- `anon`, `authenticated` and `service_role`: no direct SELECT on the new private projection.
+- GitHub Actions run `38126067647`: verify passed, **47/47 DB integration checks passed** including three new Phase 5H tests; browser-smoke passed.
+- No production data mutation or legacy account rekeying was performed by the migration.
