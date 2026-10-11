@@ -1,5 +1,6 @@
 import { BarChart3, BookOpenText, Calculator, CircleDollarSign, ClipboardList, Landmark, ReceiptText, Scale, WalletCards } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
+import { ErpAgentReadinessPanel } from '../components/ErpAgentReadinessPanel';
 import { CenterGrid, type CenterTileItem } from '@/components/design/CenterTile';
 import { useLanguage } from '@/context/LanguageContext';
 import { useCan } from '@/lib/permissions';
@@ -30,6 +31,7 @@ export function FinanceCenterPage() {
     <div className="space-y-6">
       <PageHeader title={runtime.navigation.menuLabels['finance-center']?.[ar ? 'ar' : 'en'] || (ar ? 'المركز المالي' : 'Finance Center')} subtitle={ar ? `الحسابات والتدفقات المالية المرتبطة بنشاط ${runtime.title.ar}.` : `Finance and accounting flows for the active ${runtime.title.en} profile.`} />
       <CenterGrid items={actions} testIdPrefix="finance-center" columns={4} />
+      <ErpAgentReadinessPanel />
     </div>
   );
 }
