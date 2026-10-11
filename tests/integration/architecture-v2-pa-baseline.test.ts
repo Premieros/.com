@@ -1753,6 +1753,124 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(state?.cogs_reference_unique_excluded).toBe(true);
   });
 
+  it('keeps orphan-sale and stock FIFO reconciliation append-only', async () => {
+    const { rows } = await client.query<{
+      orphan_mutator_rows: string;
+      stock_mutator_rows: string;
+      transitional_mutators: string;
+      unclassified: string;
+      orphan_helper_anon: boolean;
+      orphan_helper_auth: boolean;
+      stock_helper_anon: boolean;
+      stock_helper_auth: boolean;
+      bad_event_links: string;
+      unbalanced_event_journals: string;
+      stock_reference_unique_excluded: boolean;
+    }>(
+      `select
+         (
+           select count(*)
+           from private.journal_mutation_surface
+           where function_signature='_fifo_adjust_orphan_sale_cogs_delta(uuid,uuid,numeric)'
+         )::text as orphan_mutator_rows,
+         (
+           select count(*)
+           from private.journal_mutation_surface
+           where function_signature='_fifo_adjust_stock_variance_delta(uuid,text,uuid,text,date,numeric)'
+         )::text as stock_mutator_rows,
+         (
+           select count(*)
+           from private.journal_mutation_surface
+           where classification='TRANSITIONAL_RECONCILIATION'
+         )::text as transitional_mutators,
+         (
+           select count(*)
+           from private.journal_mutation_surface
+           where unclassified
+         )::text as unclassified,
+         has_function_privilege(
+           'anon',
+           'private.post_fifo_orphan_sale_cogs_event(uuid,uuid,text,date,numeric,numeric,numeric,uuid,uuid,uuid)',
+           'EXECUTE'
+         ) as orphan_helper_anon,
+         has_function_privilege(
+           'authenticated',
+           'private.post_fifo_orphan_sale_cogs_event(uuid,uuid,text,date,numeric,numeric,numeric,uuid,uuid,uuid)',
+           'EXECUTE'
+         ) as orphan_helper_auth,
+         has_function_privilege(
+           'anon',
+           'private.post_fifo_stock_variance_event(uuid,text,uuid,text,date,numeric,numeric,numeric,uuid,uuid)',
+           'EXECUTE'
+         ) as stock_helper_anon,
+         has_function_privilege(
+           'authenticated',
+           'private.post_fifo_stock_variance_event(uuid,text,uuid,text,date,numeric,numeric,numeric,uuid,uuid)',
+           'EXECUTE'
+         ) as stock_helper_auth,
+         (
+           select count(*)
+           from private.fifo_reconciliation_events e
+           left join public.journal_entries je on je.id=e.journal_entry_id
+           where e.adjustment_kind in ('ORPHAN_SALE_COGS','STOCK_VARIANCE')
+             and (
+               e.journal_entry_id is null
+               or je.id is null
+               or je.source_event_id<>e.id
+               or je.posting_status<>'POSTED'
+               or (
+                 e.adjustment_kind='ORPHAN_SALE_COGS'
+                 and (
+                   je.reference_type<>'fifo_cogs_reconcile'
+                   or je.reference_id<>e.business_reference_id
+                 )
+               )
+               or (
+                 e.adjustment_kind='STOCK_VARIANCE'
+                 and (
+                   je.reference_type<>'fifo_stock_reconcile'
+                   or je.reference_id<>e.business_reference_id
+                 )
+               )
+             )
+         )::text as bad_event_links,
+         (
+           select count(*)
+           from (
+             select je.id
+             from private.fifo_reconciliation_events e
+             join public.journal_entries je on je.id=e.journal_entry_id
+             join public.journal_entry_lines jl on jl.journal_entry_id=je.id
+             where e.adjustment_kind in ('ORPHAN_SALE_COGS','STOCK_VARIANCE')
+             group by je.id
+             having round(sum(jl.debit),2)<>round(sum(jl.credit),2)
+           ) d
+         )::text as unbalanced_event_journals,
+         exists (
+           select 1
+           from pg_indexes
+           where schemaname='public'
+             and tablename='journal_entries'
+             and indexname='uq_journal_reference'
+             and indexdef ilike '%fifo_cogs_reconcile%'
+             and indexdef ilike '%fifo_stock_reconcile%'
+         ) as stock_reference_unique_excluded`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.orphan_mutator_rows ?? -1)).toBe(0);
+    expect(Number(state?.stock_mutator_rows ?? -1)).toBe(0);
+    expect(Number(state?.transitional_mutators ?? -1)).toBe(0);
+    expect(Number(state?.unclassified ?? -1)).toBe(0);
+    expect(state?.orphan_helper_anon).toBe(false);
+    expect(state?.orphan_helper_auth).toBe(false);
+    expect(state?.stock_helper_anon).toBe(false);
+    expect(state?.stock_helper_auth).toBe(false);
+    expect(Number(state?.bad_event_links ?? -1)).toBe(0);
+    expect(Number(state?.unbalanced_event_journals ?? -1)).toBe(0);
+    expect(state?.stock_reference_unique_excluded).toBe(true);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
