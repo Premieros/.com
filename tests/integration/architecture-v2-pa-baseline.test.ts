@@ -1451,6 +1451,46 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(Number(state?.unbalanced_reversals ?? -1)).toBe(0);
   });
 
+  it('keeps every direct journal mutator classified', async () => {
+    const { rows } = await client.query<{
+      mutation_functions: string;
+      unclassified: string;
+      posted_reclassification: string;
+      same_transaction_finalization: string;
+      transitional_reconciliation: string;
+      historical_repair: string;
+      controlled_reversal: string;
+      admin_destructive: string;
+      auth_registry_select: boolean;
+      auth_surface_select: boolean;
+    }>(
+      `select
+         count(*)::text as mutation_functions,
+         count(*) filter (where unclassified)::text as unclassified,
+         count(*) filter (where classification='POSTED_RECLASSIFICATION')::text as posted_reclassification,
+         count(*) filter (where classification='SAME_TRANSACTION_FINALIZATION')::text as same_transaction_finalization,
+         count(*) filter (where classification='TRANSITIONAL_RECONCILIATION')::text as transitional_reconciliation,
+         count(*) filter (where classification='HISTORICAL_REPAIR')::text as historical_repair,
+         count(*) filter (where classification='CONTROLLED_REVERSAL')::text as controlled_reversal,
+         count(*) filter (where classification='ADMIN_DESTRUCTIVE')::text as admin_destructive,
+         has_table_privilege('authenticated','private.journal_mutation_registry','SELECT') as auth_registry_select,
+         has_table_privilege('authenticated','private.journal_mutation_surface','SELECT') as auth_surface_select
+       from private.journal_mutation_surface`,
+    );
+
+    const state = rows[0];
+    expect(Number(state?.mutation_functions ?? 0)).toBeGreaterThan(0);
+    expect(Number(state?.unclassified ?? -1)).toBe(0);
+    expect(Number(state?.posted_reclassification ?? -1)).toBeGreaterThanOrEqual(1);
+    expect(Number(state?.same_transaction_finalization ?? -1)).toBeGreaterThanOrEqual(1);
+    expect(Number(state?.transitional_reconciliation ?? -1)).toBeGreaterThanOrEqual(1);
+    expect(Number(state?.historical_repair ?? -1)).toBeGreaterThanOrEqual(1);
+    expect(Number(state?.controlled_reversal ?? -1)).toBeGreaterThanOrEqual(1);
+    expect(Number(state?.admin_destructive ?? -1)).toBeGreaterThanOrEqual(1);
+    expect(state?.auth_registry_select).toBe(false);
+    expect(state?.auth_surface_select).toBe(false);
+  });
+
   it('keeps refunds and returns within their source quantities', async () => {
     const { rows } = await client.query<{ kind: string; id: string }>(
       `select 'sale_item'::text as kind, id::text
