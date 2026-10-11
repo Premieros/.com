@@ -20,6 +20,8 @@ describe('Architecture V2 Phase 4D component evidence', () => {
       authenticated_exec: boolean;
       service_exec: boolean;
       capture_calls_helper: boolean;
+      capture_fail_closed: boolean;
+      capture_preserves_partial_cost: boolean;
       capture_trigger_count: string;
     }>(`
       select
@@ -37,6 +39,12 @@ describe('Architecture V2 Phase 4D component evidence', () => {
         position('compute_sale_item_component_evidence' in
           pg_get_functiondef('private.capture_sale_item_cost_snapshot_trigger()'::regprocedure)) > 0
           as capture_calls_helper,
+        position('MISSING_COMPONENT_REFERENCE_COST' in
+          pg_get_functiondef('private.capture_sale_item_cost_snapshot_trigger()'::regprocedure)) > 0
+          as capture_fail_closed,
+        position('theoretical_partial_unit_cost' in
+          pg_get_functiondef('private.capture_sale_item_cost_snapshot_trigger()'::regprocedure)) > 0
+          as capture_preserves_partial_cost,
         (select count(*)::text
          from pg_trigger t
          join pg_class c on c.oid=t.tgrelid
@@ -48,7 +56,8 @@ describe('Architecture V2 Phase 4D component evidence', () => {
     expect(rows[0]).toMatchObject({
       helper_exists: true, anon_exec: false,
       authenticated_exec: false, service_exec: false,
-      capture_calls_helper: true, capture_trigger_count: '1',
+      capture_calls_helper: true, capture_fail_closed: true,
+      capture_preserves_partial_cost: true, capture_trigger_count: '1',
     });
   });
 
