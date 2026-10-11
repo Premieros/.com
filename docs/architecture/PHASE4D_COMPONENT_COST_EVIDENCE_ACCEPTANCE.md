@@ -91,4 +91,13 @@ unchanged. No legacy snapshots are reconstructed.
 - Private write denial and normal refunded quantity update verified again.
 - Transaction rolled back with 0 residual sale rows, 0 snapshot rows, and 0 failures.
 - New dedicated CI Phase 4D tests passed: 3/3 including independent synthetic BOM and real modifier effects inside a rollback transaction.
-- The pre-existing full DB regression suite remains 9 failures in its P-A and full-operating-cycle fixtures; PR remains draft until that separate gate is resolved.
+- The pre-existing full DB regression suite remains 8 failures in its P-A and full-operating-cycle fixtures; PR remains draft until that separate gate is resolved.
+
+## CI status after fixture privilege hardening
+GitHub Actions run 38124046679:
+- verify job: PASS.
+- dedicated Phase 4D integration: 3/3 PASS.
+- full DB integration: 36 PASS / 8 FAIL (previously 35 PASS / 9 FAIL).
+- the CI-only unexpected PUBLIC/anon SECURITY DEFINER execution finding is resolved.
+- remaining failures are tracked in https://github.com/Premieros/.com/issues/82
+- browser smoke skipped because DB job failed; PR remains a draft.
