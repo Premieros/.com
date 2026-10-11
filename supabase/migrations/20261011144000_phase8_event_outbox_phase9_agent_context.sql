@@ -119,8 +119,8 @@ end;
 $$;
 
 revoke all on function private.publish_erp_domain_event_v2(),
- function private.claim_erp_domain_outbox_v2(text,integer),
- function private.complete_erp_domain_outbox_v2(uuid,text,boolean,text)
+ private.claim_erp_domain_outbox_v2(text,integer),
+ private.complete_erp_domain_outbox_v2(uuid,text,boolean,text)
  from public,anon,authenticated,service_role;
 
 -- No model/provider secrets, personal data, arbitrary SQL or write actions.
