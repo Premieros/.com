@@ -32,3 +32,24 @@ This is a one-time bootstrap snapshot. New accounts/branches, renames and type c
 - Within a transactional CI fixture, a new organization/account remains deliberately unmapped and appears in health diagnostics.
 - After migration deploy, independently compare full live mapping counts and confirm no journal lines, account mapping references or periods changed.
 - Only close this phase after CI, migration, production-readiness evidence and main PR merge are verified.
+
+## Production acceptance — October 11, 2026
+
+- Applied production migration version: `20261011092600_phase5i_organization_account_shadow`.
+- Final migration filename in GitHub matches that exact production migration version.
+- Organization-owned private shadow accounts created: **126**.
+- Existing branch account links preserved: **183**, exactly matching all **183** original `public.chart_of_accounts` rows.
+- Unmapped accounts or account definition/code/organization drift at capture: **0**.
+- Organization totals: (29 org accounts / 29 branch links), (29 / 29), (68 / 125); all branch accounts matched in every organization.
+- The original 7,259 `journal_entry_lines`, 120 `account_mappings`, 4 accounting periods and 2,247 posted journals retained their original counts.
+- RLS is enabled on both private tables; direct anon/authenticated/service_role master SELECT denied; service_role link UPDATE denied; direct authenticated health-view SELECT denied.
+- No journal entry/line re-key, financial backfill, or public API writer changes.
+
+## Acceptance CI — GitHub Actions run 38128133721
+
+- `verify`: SUCCESS (project identity, API contract, lint, typechecks, unit, build).
+- `db`: SUCCESS — **50/50 integration and security tests**, including 3 new Phase 5I tests.
+- `browser-smoke`: SUCCESS — Playwright.
+- The synthetic new-branch test intentionally checks that newly created account codes do **not** auto-attach to the frozen org master and instead produce an unmapped health status.
+- This phase does not activate use of the new account IDs for journal posting; that remains a separately reviewed next step.
+
