@@ -20,6 +20,7 @@ describe('full ERP/POS operating cycle', () => {
 
   it('runs purchase -> manufacturing -> sale -> offline reconcile -> negative stock -> replenishment -> accounting in one isolated transaction', async () => {
     const branchId = randomUUID();
+    const organizationId = randomUUID();
     const warehouseId = randomUUID();
     const userId = randomUUID();
     const unitId = randomUUID();
@@ -43,11 +44,10 @@ describe('full ERP/POS operating cycle', () => {
          on conflict(role) do nothing`,
       );
 
-      await client.query(
-        `insert into public.branches(id,name,is_active)
-         values($1,$2,true)`,
-        [branchId, `CI Full Cycle ${token}`],
-      );
+      await client.query(`insert into public.organizations(id,name,slug) values($1,$2,$3)`,
+        [organizationId, `CI Test Org ${token}`, `ci-test-${token}`]);
+      await client.query(`insert into public.branches(id,name,is_active,organization_id) values($1,$2,true,$3)`,
+        [branchId, `CI Full Cycle ${token}`, organizationId]);
 
       await client.query(
         `insert into auth.users(id,email,created_at,updated_at)
