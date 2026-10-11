@@ -25,6 +25,7 @@ type Workbench = {
     plan_status: string;
     mapping_status: string;
     source: { name: string };
+    master: { name: string; code: string } | null;
   }>;
 };
 
@@ -106,6 +107,27 @@ describe('Architecture V2 Phase 5K secure org account review workbench', () => {
       expect(result.candidates?.some(o=>o.code===codeB)).toBe(false);
       expect((await read(b.org)).error).toBe('ORGANIZATION_ACCESS_REQUIRED');
       expect((await read(a.org)).success).toBe(true);
+    } finally {await db.query('ROLLBACK');}
+  });
+
+  it('shows the existing organization master even for a not-yet-linked branch account', async () => {
+    await db.query('BEGIN');
+    try {
+      const f=await setup();
+      await authenticate(null);
+      await db.query(
+        `insert into private.organization_accounts_v2
+        (organization_id,code,name,name_en,account_type,is_system,is_active,
+          initial_branch_account_count,initial_readiness_status)
+        values ($1,$2,'CI Org A Expense',null,'expense',false,true,1,'CONSISTENT')`,
+        [f.a.org,f.codeA],
+      );
+      await authenticate(f.a.user);
+      const wb=await read(f.a.org);
+      const item=wb.candidates?.find(row=>row.branch_account_id===f.acctA);
+      expect(item?.mapping_status).toBe('UNMAPPED_BRANCH_ACCOUNT');
+      expect(item?.plan_status).toBe('READY');
+      expect(item?.master).toMatchObject({code:f.codeA,name:'CI Org A Expense'});
     } finally {await db.query('ROLLBACK');}
   });
 
