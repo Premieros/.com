@@ -42,8 +42,8 @@ describe('Architecture V2 Phase 5H organization account readiness', () => {
     const branchA = randomUUID();
     const branchB = randomUUID();
     const token = randomUUID().slice(0, 8);
-    const commonCode = `CI-H-${token}`;
-    const mismatchCode = `CI-X-${token}`;
+    const commonCode = `CI-H-${token}`.toUpperCase();
+    const mismatchCode = `CI-X-${token}`.toUpperCase();
 
     await client.query('BEGIN');
     try {
