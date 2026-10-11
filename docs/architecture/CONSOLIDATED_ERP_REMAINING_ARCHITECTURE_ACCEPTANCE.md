@@ -42,3 +42,26 @@ Actual agent reasoning, tool registration, secret management, evaluation harness
 - Procurement functional end-to-end receiving / returns and refund tests across every warehouse and item variant.
 - Background outbox consumer deployment with idempotent downstream handlers and dead-letter operations.
 - Provider-backed AI agents with read-only tool invocation, prompt injection defenses, costs and authorization; approval-gated writes only when verified.
+
+## Actual production acceptance — 2026-10-11
+
+### Applied migrations and source history
+- `20261011113106_phase5l_org_journal_identity_bridge`
+- `20261011113110_phase6_procurement_receipt_integrity`
+- `20261011113114_phase8_event_outbox_phase9_agent_context`
+
+The three files have been renamed on the PR to match applied Supabase history exactly. No legacy posting writer, inventory FIFO, journal identifiers or historical amounts were changed.
+
+### CI evidence
+- GitHub Actions `Verify main` run `38135622191`: verify PASS, DB integration/security **68/68** PASS across 9 files, Playwright PASS.
+- Tests explicitly include draft-to-POSTED outbox emission once, valid receipt event generation, rejected cross-branch receipts, immutable journal evidence and all API/worker permission denials.
+
+### Production live verification
+- **7,259** source journal lines, **7,259** private immutable line identity snapshots; all **7,259** mapped, **0** unmapped.
+- **2,247** posted journals, **126** organization accounts, **183** branch mappings, **120** semantic mappings, **4** periods, **175** purchases unchanged.
+- **0** outbox events immediately after deployment: events intentionally begin with **new** transactions, with no artificial historical event replays.
+- Evidence and outbox tables both have RLS; authenticated and service roles cannot directly read or modify them. `anon` cannot call the agent readiness endpoint; authenticated calls undergo active user + permission + branch access. Client roles cannot execute the worker claiming procedure.
+- Rollback-only production smoke: temporary organization/two branches and account; POSTED journal plus two balanced lines recorded 2 `UNMAPPED_AT_POSTING` evidence rows; one journal event; wrong-branch receipt rejected; correct receipt event emitted; synthetic accountant read permitted sanitized readiness context reporting 2 unmapped lines and 2 pending events, autonomous execution false. All transaction fixtures rolled back with zero remaining organization/evidence/outbox/receipt records.
+
+### Operational scope limitation
+Journal identities are **materialized as immutable evidence** beside (not instead of) source lines. This gives an organization trial balance projection and an auditable bridge, but full canonical writer cutover requires a dedicated compatibility release. The outbox is created and workers can lease it, but no continuously running delivery worker or model provider is deployed. The read-only UI is a safe agent *foundation*, not production autonomous AI.
