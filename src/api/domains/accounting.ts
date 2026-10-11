@@ -86,7 +86,25 @@ export type OrgAccountSyncActionResult = {
   organization_account_id?: string;
 };
 
+export type ErpAgentReadinessContext = {
+  success: boolean;
+  error?: string;
+  organization_id?: string;
+  branch_id?: string;
+  read_only?: boolean;
+  agent_execution_enabled?: boolean;
+  journal_lines_with_identity_evidence?: number;
+  unmapped_journal_lines_at_posting?: number;
+  procurement_receipt_discrepancies?: number;
+  pending_or_failed_domain_events?: number;
+  domain_events_created_since_activation?: number;
+  next_review?: 'ACCOUNT_MAPPING_REVIEW' | 'PURCHASE_RECEIPT_REVIEW' | 'EVENT_PROCESSING_REVIEW' | 'NO_BLOCKING_ISSUES';
+};
+
 export const accounting = {
+  getErpAgentReadinessContext(p: { p_branch_id: string }): ApiResult<ErpAgentReadinessContext> {
+    return rpc('get_erp_agent_readiness_context_v2', p);
+  },
   getOrganizationAccountSyncWorkbench(p: { p_organization_id: string | null; p_limit: number }): ApiResult<OrgAccountSyncWorkbench> {
     return rpc('get_organization_account_sync_workbench_v2',p);
   },
