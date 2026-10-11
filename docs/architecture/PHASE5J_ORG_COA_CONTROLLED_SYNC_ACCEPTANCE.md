@@ -29,3 +29,17 @@ CI must validate:
 
 ## Deferred by design
 A separate later step can expose a reviewed UI, handle code/type/systems changes with specialized migration and business controls, and eventually promote organization accounts as operational posting identities; this phase does neither.
+
+## Final Production readiness and acceptance — 2026-10-11
+
+- Production migration registered as `20261011101007_phase5j_controlled_org_account_sync` on locked Supabase project `hvqlkapynjfjikqithvd`.
+- The migration filename tracked on the PR has been reconciled to the exact applied history version.
+- Pre/post deploy financial invariants: 126 organization account identities, 183 explicit branch-account links, 183 original accounts, 0 drift; 7,259 historical journal entry lines, 2,247 posted journals, 120 legacy semantic mappings and 4 fiscal periods unchanged.
+- Immediately after rollout: **0 synchronization requests**, 0 automatic remappings or account promotions.
+- Private request table has RLS enabled. No direct SELECT to `anon` or `authenticated`, no direct service-role UPDATE. `anon` cannot execute either public RPC; `authenticated` can invoke them only through the explicit in-function authorization gates. Private plan helper is not executable by `authenticated`.
+- GitHub Actions `Verify main` run `38130703038`: `verify` PASS; `db` **58/58 PASS across 7 files**; `browser-smoke` PASS.
+- Production rollback smoke: synthetic org/branch, account, two distinct active Super Admin users. Requester self-approval returned `SELF_APPROVAL_FORBIDDEN`; independent reviewer applied approval; shadow health became `MAPPED_OK`; exactly 2 audit events recorded. Deliberate exception rolled back all data and audit, with **0** residual synthetic orgs, branches, branch accounts or sync requests. This test used the actual Supabase `request.jwt.claim.sub` authentication source.
+- Existing `approval_requests` manager/POS workflow has not been modified. No new auto-synchronization and no UI activation in this phase.
+
+### Non-blocking next step
+Governed user interface for reviewing the private queue and controlled expansion to structural account changes after separate review. Do not promote the shadow CoA into journal posting as part of Phase 5J.
