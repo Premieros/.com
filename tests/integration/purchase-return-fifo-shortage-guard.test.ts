@@ -160,6 +160,46 @@ describe('Purchase returns must fail closed on FIFO shortage', () => {
       expect(partialState.purchase_status).toBe('completed');
       expect(partialState.reversal_ledger).toBe('0');
 
+      // A multi-line return is all-or-nothing if any component is short.
+      // The raw component has one unit available but the ready product has none.
+      const mixedPurchase = randomUUID();
+      await db.query(
+        "insert into public.purchases(id,invoice_number,branch_id,warehouse_id,status,total) values($1,$2,$3,$4,'completed',20)",
+        [mixedPurchase, `CI-MIXED-${token}`, branch, warehouse],
+      );
+      await db.query(
+        "insert into public.purchase_items(purchase_id,raw_material_id,unit_name,quantity,unit_cost,total) values($1,$2,'u',1,10,10)",
+        [mixedPurchase, raw],
+      );
+      await db.query(
+        "insert into public.purchase_items(purchase_id,product_id,quantity,unit_cost,total) values($1,$2,1,10,10)",
+        [mixedPurchase, product],
+      );
+      const { rows: [mixedResult] } = await db.query<{ result: { success: boolean; detail?: string } }>(
+        "select public.process_purchase_return($1,NULL,'CI atomic mixed-item return') result",
+        [mixedPurchase],
+      );
+      expect(mixedResult.result.success).toBe(false);
+      expect(mixedResult.result.detail).toContain('PURCHASE_RETURN_INSUFFICIENT_STOCK');
+      const { rows: [mixedState] } = await db.query<{
+        raw_inventory: string; raw_batch_qty: string; returned_lines: string;
+        purchase_status: string; reversed_movements: string;
+      }>(
+        `select
+          (select quantity::text from public.raw_material_inventory where raw_material_id=$1 and branch_id=$2) raw_inventory,
+          (select coalesce(sum(quantity),0)::text from public.raw_material_batches where raw_material_id=$1 and branch_id=$2) raw_batch_qty,
+          (select count(*)::text from public.purchase_items where purchase_id=$3 and returned_quantity<>0) returned_lines,
+          (select status from public.purchases where id=$3) purchase_status,
+          (select count(*)::text from public.inventory_ledger where reference_id=$3 and entry_type='purchase_return') reversed_movements`,
+        [raw, branch, mixedPurchase],
+      );
+      expect(Number(mixedState.raw_inventory)).toBe(1);
+      expect(Number(mixedState.raw_batch_qty)).toBe(1);
+      expect(mixedState.returned_lines).toBe('0');
+      expect(mixedState.purchase_status).toBe('completed');
+      expect(mixedState.reversed_movements).toBe('0');
+
+
     } finally {
       await db.query('ROLLBACK');
     }
