@@ -124,6 +124,42 @@ describe('Purchase returns must fail closed on FIFO shortage', () => {
       expect(Number(acceptedState.remaining)).toBe(1);
       expect(acceptedState.status).toBe('returned');
       expect(Number(acceptedState.returned_quantity)).toBe(1);
+      
+      // A partial FIFO removal must be rolled back atomically if its remainder
+      // is unavailable (not merely rejected when starting stock is zero).
+      const partialPurchase = randomUUID();
+      await db.query(
+        "insert into public.purchases(id,invoice_number,branch_id,warehouse_id,status,total) values($1,$2,$3,$4,'completed',20)",
+        [partialPurchase, `CI-PARTIAL-${token}`, branch, warehouse],
+      );
+      await db.query(
+        "insert into public.purchase_items(purchase_id,raw_material_id,unit_name,quantity,unit_cost,total) values($1,$2,'u',2,10,20)",
+        [partialPurchase, raw],
+      );
+      const { rows: [partialResult] } = await db.query<{ result: { success: boolean; detail?: string } }>(
+        "select public.process_purchase_return($1,NULL,'CI rollback-only partial FIFO test') result",
+        [partialPurchase],
+      );
+      expect(partialResult.result.success).toBe(false);
+      expect(partialResult.result.detail).toContain('PURCHASE_RETURN_INSUFFICIENT_STOCK');
+
+      const { rows: [partialState] } = await db.query<{
+        inventory: string; batches: string; returned_qty: string; purchase_status: string; reversal_ledger: string;
+      }>(
+        `select
+          (select quantity::text from public.raw_material_inventory where raw_material_id=$1 and branch_id=$2) inventory,
+          (select coalesce(sum(quantity),0)::text from public.raw_material_batches where raw_material_id=$1 and branch_id=$2) batches,
+          (select returned_quantity::text from public.purchase_items where purchase_id=$3) returned_qty,
+          (select status from public.purchases where id=$3) purchase_status,
+          (select count(*)::text from public.inventory_ledger where reference_id=$3 and entry_type='purchase_return') reversal_ledger`,
+        [raw, branch, partialPurchase],
+      );
+      expect(Number(partialState.inventory)).toBe(1);
+      expect(Number(partialState.batches)).toBe(1);
+      expect(Number(partialState.returned_qty)).toBe(0);
+      expect(partialState.purchase_status).toBe('completed');
+      expect(partialState.reversal_ledger).toBe('0');
+
     } finally {
       await db.query('ROLLBACK');
     }
