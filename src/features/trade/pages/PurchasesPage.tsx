@@ -9,6 +9,7 @@ import { useBranchFilter } from '@/lib/useBranchFilter';
 import { useBranchScope } from '@/lib/branchScope';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useToast } from '@/components/Toast';
+import { purchaseReturnFailureMessage } from '@/features/trade/utils/purchaseReturnErrors';
 import { DesignSurface, DesignPageHeader, DesignSearch, DesignPanel, DesignPagination } from '@/components/design';
 import { DataTable, type Column } from '@/components/DataTable';
 import { Button } from '@/components/Button';
@@ -343,13 +344,18 @@ export function PurchasesPage() {
         p_items: rpcItems,
       });
       if (updateError) {
+        const fifoMessage = purchaseReturnFailureMessage(
+          { error: updateError.message, detail: updateError.details },
+          lang === 'ar' ? 'ar' : 'en',
+        );
+        if (fifoMessage) { show(fifoMessage, 'error'); return; }
         const handled = interceptDbError(updateError, 'purchase_create', 'تعديل فاتورة مشتريات', 'Edit Purchase Invoice', { purchaseId: editingPurchase.id, form, lineItems });
         if (!handled) show(updateError.message, 'error');
         return;
       }
       const result = data as RpcResult | null;
       if (!result?.success) {
-        show(result?.detail || result?.error || t('error'), 'error');
+        show(purchaseReturnFailureMessage(result, lang === 'ar' ? 'ar' : 'en') || result?.detail || result?.error || t('error'), 'error');
         return;
       }
       await logAudit('update', 'purchases', result.purchase_id || editingPurchase.id, { previous_purchase_id: editingPurchase.id, total: totalValue });
@@ -487,9 +493,18 @@ export function PurchasesPage() {
       p_items: null,
       p_reason: reason.trim() || (lang === 'ar' ? 'إلغاء فاتورة شراء' : 'Purchase invoice reversal'),
     });
-    if (err) { show(err.message, 'error'); return; }
+    if (err) {
+      show(purchaseReturnFailureMessage(
+        { error: err.message, detail: err.details },
+        lang === 'ar' ? 'ar' : 'en',
+      ) || err.message, 'error');
+      return;
+    }
     const result = data as RpcResult | null;
-    if (!result?.success) { show(result?.detail || result?.error || t('error'), 'error'); return; }
+    if (!result?.success) {
+      show(purchaseReturnFailureMessage(result, lang === 'ar' ? 'ar' : 'en') || result?.detail || result?.error || t('error'), 'error');
+      return;
+    }
 
     show(lang === 'ar' ? 'تم عكس فاتورة الشراء بالكامل' : 'Purchase invoice fully reversed', 'success');
     if (viewModal?.id === p.id) setViewModal(null);
