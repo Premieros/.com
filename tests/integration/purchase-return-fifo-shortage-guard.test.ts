@@ -56,8 +56,8 @@ describe('Purchase returns must fail closed on FIFO shortage', () => {
         [product, `CIFP-${token}`, branch],
       );
       await db.query(
-        "insert into public.purchases(id,invoice_number,branch_id,warehouse_id,status,total) values($1,$3,$5,'completed',10),($2,$4,$5,'completed',10)",
-        [rawPurchase, productPurchase, `CIR-${token}`, `CIP-${token}`, branch],
+        "insert into public.purchases(id,invoice_number,branch_id,warehouse_id,status,total) values($1,$3,$5,$6,'completed',10),($2,$4,$5,$6,'completed',10)",
+        [rawPurchase, productPurchase, `CIR-${token}`, `CIP-${token}`, branch, warehouse],
       );
       await db.query(
         'insert into public.purchase_items(purchase_id,raw_material_id,unit_name,quantity,unit_cost,total) values($1,$2,\'u\',1,10,10)',
