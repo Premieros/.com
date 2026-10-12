@@ -89,6 +89,41 @@ describe('Purchase returns must fail closed on FIFO shortage', () => {
         [[rawPurchase, productPurchase]],
       );
       expect(state).toEqual({ completed: '2', returned_lines: '0', returned_ledger: '0' });
+      
+      // Sufficient stock must retain the legitimate completed-return workflow.
+      // Use a separate purchase/receipt batch after the rejected cases.
+      const stockedPurchase = randomUUID();
+      await db.query(
+        "insert into public.purchases(id,invoice_number,branch_id,warehouse_id,status,total) values($1,$2,$3,$4,'completed',10)",
+        [stockedPurchase, `CI-STOCKED-${token}`, branch, warehouse],
+      );
+      await db.query(
+        "insert into public.purchase_items(purchase_id,raw_material_id,unit_name,quantity,unit_cost,total) values($1,$2,'u',1,10,10)",
+        [stockedPurchase, raw],
+      );
+      await db.query(
+        "insert into public.raw_material_batches(raw_material_id,branch_id,warehouse_id,batch_number,quantity,unit_cost,source_type,source_id) values($1,$2,$3,$4,2,10,'purchase',$5)",
+        [raw, branch, warehouse, `CI-BATCH-${token}`, stockedPurchase],
+      );
+      await db.query(
+        'insert into public.raw_material_inventory(raw_material_id,branch_id,quantity,avg_cost) values($1,$2,2,10)',
+        [raw, branch],
+      );
+      const { rows: [accepted] } = await db.query<{ result: { success: boolean; error?: string } }>(
+        "select public.process_purchase_return($1,NULL,'CI rollback-only valid return') result",
+        [stockedPurchase],
+      );
+      expect(accepted.result.success, JSON.stringify(accepted.result)).toBe(true);
+      const { rows: [acceptedState] } = await db.query<{ remaining: string; status: string; returned_quantity: string }>(
+        `select
+          (select quantity::text from public.raw_material_inventory where raw_material_id=$1 and branch_id=$2) remaining,
+          (select status from public.purchases where id=$3) status,
+          (select returned_quantity::text from public.purchase_items where purchase_id=$3) returned_quantity`,
+        [raw, branch, stockedPurchase],
+      );
+      expect(Number(acceptedState.remaining)).toBe(1);
+      expect(acceptedState.status).toBe('returned');
+      expect(Number(acceptedState.returned_quantity)).toBe(1);
     } finally {
       await db.query('ROLLBACK');
     }
