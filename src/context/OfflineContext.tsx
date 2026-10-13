@@ -180,9 +180,10 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     const queued = (await getAllOfflineSales()).find((item) => item.id === id);
     const invoiceNumber = String(queued?.payload?.p_invoice_number || queued?.invoice_number || '').trim();
 
-    if (invoiceNumber) {
-      await InventoryRepository.markMovementsSynced([invoiceNumber, id]);
-    }
+    if (!queued) return;
+    await InventoryRepository.markSaleMovementsSynced(
+      id, invoiceNumber, String(queued.payload?.p_branch_id || '').trim(),
+    );
     await removeOfflineSale(id);
     await offlineSyncEngine.refreshPendingCount();
   }, []);

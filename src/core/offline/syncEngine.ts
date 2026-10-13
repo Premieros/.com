@@ -279,7 +279,9 @@ class OfflineSyncEngine {
         // cannot continue deducting the same sale after reconciliation.
         const invoiceNumber = String(item.payload.p_invoice_number || item.invoice_number || '').trim();
         if (invoiceNumber) {
-          await InventoryRepository.markMovementsSynced([invoiceNumber, item.id]);
+          await InventoryRepository.markSaleMovementsSynced(
+            item.id, invoiceNumber, String(item.payload.p_branch_id || '').trim(),
+          );
         }
         await removeOfflineSale(item.id);
         successCount++;

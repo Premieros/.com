@@ -1,7 +1,7 @@
-import { dbGetAll, dbPut, dbDelete } from './LocalDatabase';
+import { dbGetAll, dbGetAllStrict, dbPut, dbDelete } from './LocalDatabase';
 import type { LocalStockMovement, CachedStockEntry } from './types';
 import type { OfflineSaleQueueItem } from '@/core/offline/offlineStorage';
-import { getUnrecordedQueuedSaleDeductions } from './stockProjection';
+import { getUnrecordedQueuedSaleDeductions, saleMovementIdsForCleanup } from './stockProjection';
 
 export class InventoryRepository {
   /**
@@ -121,18 +121,25 @@ export class InventoryRepository {
     await dbPut('stock_balances', entry);
   }
 
-  /**
-   * Mark local movements as synced after their corresponding outbox sale/order is confirmed
+  /** Clear ONLY the confirmed sale's local deductions. Fail closed if the
+   * branch or IndexedDB read is missing; never drop an outbox after an
+   * assumed-empty movement store read.
    */
-  public static async markMovementsSynced(referenceIds: string[]): Promise<void> {
-    if (referenceIds.length === 0) return;
-    const refSet = new Set(referenceIds);
-    const allMovements = await dbGetAll<LocalStockMovement>('local_stock_movements');
-
-    for (const mov of allMovements) {
-      if (refSet.has(mov.referenceId) || refSet.has(mov.id)) {
-        await dbDelete('local_stock_movements', mov.id);
-      }
+  public static async markSaleMovementsSynced(
+    saleId: string,
+    invoiceNumber: string,
+    branchId: string,
+  ): Promise<void> {
+    if (!saleId || !branchId) throw new Error('OFFLINE_SALE_SCOPE_REQUIRED_FOR_CLEANUP');
+    const [allMovements, queuedSales] = await Promise.all([
+      dbGetAllStrict<LocalStockMovement>('local_stock_movements'),
+      dbGetAllStrict<OfflineSaleQueueItem>('sales_queue'),
+    ]);
+    const movementIds = saleMovementIdsForCleanup(
+      allMovements, queuedSales, saleId, invoiceNumber, branchId,
+    );
+    for (const id of movementIds) {
+      await dbDelete('local_stock_movements', id);
     }
   }
 
