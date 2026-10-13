@@ -51,3 +51,13 @@ See `docs/architecture/PURCHASE_RETURN_FIFO_SHORTAGE_GUARD_PROPOSAL_2026-10-12.m
 - Outstanding (not auto-corrected): 8 classified inventory review cases, 9 batch/operational quantity differences (including extra 0.3000), policy-allowed negative raw balances/FIFO debts, and external event delivery unproven. Next safely improve receipt error messages, inventory review evidence, offline sale replay, and organizational chart-of-accounts migration planning.
 
 See `docs/architecture/RECEIPT_ATOMICITY_FAIL_CLOSED_PROPOSAL_2026-10-13.md`. Never treat scope-limited deployment approval as permission to automatically rewrite historical inventory/accounting evidence.
+
+## Offline POS and Smouha FIFO evidence checkpoint — 2026-10-13
+
+- PR #97 improved bilingual purchase receipt failure feedback and uncertain-network retry messaging, merged as `fb610dbf`; Verify main and Pages passed.
+- PR #98 repaired offline owner capture, confirmed-outbox cleanup order, and branch/product-level fallback stock deductions for crash-partial offline sale rows, merged as `3406cf6d` after green unit, DB and browser CI. The main post-merge Verify and GitHub Pages also passed.
+- Legacy ownerless offline sales **remain** blocked by the same-cashier attribution guard: manual source-owner evidence is required, not automatic reassignment. Warehouse-specific local stock snapshots and IndexedDB crash/restart tests remain future hardening.
+- A new read-only review of the Smouha raw material `جرجير ربطه` reconfirmed operational quantity -1.6500, batch quantity -1.3500 and open FIFO debt 1.3500, exposing an unclassified +0.3000 batch-versus-operational delta.
+- Both original returned and replacement completed `Johna's-00103` purchases have distinct 0.3000 receipt ledger rows and applied 0.3000 FIFO settlements against the same Sept 15 sale debt, each valued at 18.00 at the batch unit cost. The original receipt has no scoped raw-ledger reversal; a posted purchase return journal is invoice-correlated but lacks direct `reference_id`. **Do not infer an 18.00 adjusting journal from this alone.**
+- Audit evidence and explicit financial sign-off gates: `docs/architecture/SMOUHA_RAW_FIFO_DUPLICATE_RECEIPT_EVIDENCE_2026-10-13.md` and `scripts/audit/smouha-raw-fifo-lineage-readonly.sql`. There have been **no** historical stock/debt/COGS/journal repairs.
+- Next: resolve FIFO and COGS source-event provenance with accounting review before any append-only correction; extend offline crash tests and warehouse scope; review organization-account cutover readiness; integrate provider-backed AI only after durable financial controls and explicit per-operation authority.
