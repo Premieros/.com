@@ -1,4 +1,4 @@
-import { dbGetAll, dbPut, dbDelete } from './LocalDatabase';
+import { dbGetAll, dbGetAllStrict, dbPut, dbDelete } from './LocalDatabase';
 import { InventoryRepository } from './InventoryRepository';
 import type { OfflineSaleQueueItem } from '@/core/offline/offlineStorage';
 import type { ProcessSalePayload } from '@/features/pos/services/payment';
@@ -40,7 +40,7 @@ export class SalesRepository {
             warehouseId: payload.p_warehouse_id,
             quantityDelta: -Math.abs(Number(item.quantity) || 1),
             reason: 'sale',
-            referenceId: payload.p_invoice_number,
+            referenceId: id,
             createdAt: now,
           });
         }
@@ -81,10 +81,12 @@ export class SalesRepository {
   }
 
   public static async markSaleSynced(id: string, invoiceNumber: string): Promise<void> {
-    // Confirmed sync: remove local deductions BEFORE deleting the outbox.
-    // If the tab dies between operations, the remaining sale can be replayed
-    // idempotently; otherwise a ghost deduction can persist with no outbox.
-    await InventoryRepository.markMovementsSynced([invoiceNumber, id]);
+    const queue = await dbGetAllStrict<OfflineSaleQueueItem>('sales_queue');
+    const queued = queue.find(s => s.id === id);
+    if (!queued) return;
+    const branchId = String(queued.payload.p_branch_id || '').trim();
+    // Dequeue only after scoped local cleanup has succeeded.
+    await InventoryRepository.markSaleMovementsSynced(id, invoiceNumber, branchId);
     await dbDelete('sales_queue', id);
   }
 }
