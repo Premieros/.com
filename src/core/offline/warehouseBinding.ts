@@ -48,3 +48,12 @@ export async function getPinnedSaleWarehouse(
   if (!Number.isFinite(t) || t > now + 5 * 60 * 1000 || now - t > MAX_BINDING_AGE_MS) return null;
   return binding.warehouseId;
 }
+
+/** Only the original warehouse saved in the financial payload may replay.
+ * A returned branch default or newly selected order warehouse cannot replace it.
+ */
+export function getReplayPinnedWarehouse(payload: { p_warehouse_id?: unknown }): string | null {
+  return typeof payload.p_warehouse_id === 'string'
+    ? payload.p_warehouse_id.trim() || null
+    : null;
+}
