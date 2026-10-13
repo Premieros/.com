@@ -1,10 +1,11 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useMemo, useState, useCallback, useEffect } from 'react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
 import { cartToItems, type ItemPayload } from '../utils/cart';
-import { nextInvoiceNumber, processSaleForOrder } from '../services/payment';
+import { nextInvoiceNumber, processSaleForOrder, fetchBranchWarehouseId } from '../services/payment';
+import { getPinnedSaleWarehouse } from '@/core/offline/warehouseBinding';
 import { fetchOrderSettlementPreview, type OrderSettlementPreview } from '../services/settlementPreview';
 import { APPROVED_FIXED_THERMAL_WIDTH_MM, buildReceiptFixedTemplate, buildReceiptHtml, buildReceiptThermalText, enqueueAutomaticReceiptPrint, openPrintWindow, type ReceiptData } from '../utils/printing';
 import { enqueueCloudOpenOrderPrint } from '../services/cloudPrint';
@@ -43,6 +44,13 @@ export function usePosOrder(input: UsePosOrderInput) {
   const [settlementPreview, setSettlementPreview] = useState<OrderSettlementPreview | null>(null);
   const [settlementReceipt, setSettlementReceipt] = useState<ReceiptData | null>(null);
   const [settlementReceiptSaleId, setSettlementReceiptSaleId] = useState<string | null>(null);
+
+  // While connected, verify and persist the current branch default or active
+  // order's pinned warehouse. Offline checkout never re-queries or guesses it.
+  useEffect(() => {
+    if (!input.branchId || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
+    void fetchBranchWarehouseId(input.branchId, base.activeOrderId).catch(() => undefined);
+  }, [input.branchId, base.activeOrderId]);
 
   const findCartSource = useCallback((item: ItemPayload) => {
     const wanted = [...(item.modifier_option_ids || [])].sort().join(',');
@@ -229,13 +237,23 @@ export function usePosOrder(input: UsePosOrderInput) {
 
       setOfflineCompleting(true);
       try {
+        const pinnedWarehouseId = await getPinnedSaleWarehouse(
+          input.branchId, base.activeOrderId,
+        ).catch(() => null);
+        if (!pinnedWarehouseId) {
+          show(isAr
+            ? 'لا يمكن حفظ البيع دون اتصال: مستودع هذا الفرع أو الطلب غير مثبت من اتصال سابق. اتصل بالشبكة للتحقق من المستودع أولاً.'
+            : 'Offline sale blocked: no previously verified warehouse for this branch/order. Connect once to verify the warehouse before retrying.',
+          'error');
+          return false;
+        }
         const invoiceNumber = await nextInvoiceNumber();
         const paidAmountToUse = base.paymentMethod === 'credit' ? 0 : base.paidAmount || base.total;
         const { result, error } = await processSaleForOrder({
           p_invoice_number: invoiceNumber,
           p_branch_id: input.branchId,
           p_shift_id: input.activeShift.id,
-          p_warehouse_id: null,
+          p_warehouse_id: pinnedWarehouseId,
           p_customer_id: base.customerId || null,
           p_salesperson_id: null,
           p_subtotal: base.subtotal,

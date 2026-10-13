@@ -1,6 +1,7 @@
 import { pos as posApi, supabase, type SplitTenderInput } from '@/api';
 import { enqueueOfflineSale, type OfflineSaleQueueItem } from '@/core/offline/offlineStorage';
 import { SettingsRepository, InventoryRepository } from '@/core/repositories';
+import { saveVerifiedSaleWarehouse } from '@/core/offline/warehouseBinding';
 import type { RpcResult, OrderType } from '@/lib/types';
 import type { ItemPayload } from '../utils/cart';
 
@@ -123,6 +124,7 @@ export function createSaleOperationKey(): string {
 
 async function queueOfflineSale(p: ProcessSalePayload): Promise<string> {
   if (!p.p_shift_id) throw new Error('SHIFT_REQUIRED_OFFLINE');
+  if (!p.p_warehouse_id?.trim()) throw new Error('WAREHOUSE_REQUIRED_OFFLINE_CAPTURE');
 
   // getSession() reads the persisted local Supabase session and therefore works
   // while offline. Never accept a financially relevant outbox row without a
@@ -155,6 +157,7 @@ async function queueOfflineSale(p: ProcessSalePayload): Promise<string> {
           id: `mov_${createOfflineToken()}`,
           productId: item.product_id,
           branchId: p.p_branch_id,
+          warehouseId: p.p_warehouse_id,
           quantityDelta: -Number(item.quantity || 0),
           reason: 'sale',
           referenceId: id,
@@ -246,6 +249,11 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   const globalSettings = await SettingsRepository.getGlobalSettings();
   const allowNegative = branchSettings?.allow_negative_stock ?? globalSettings?.allow_negative_stock ?? false;
 
+  const explicitlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  if (explicitlyOffline && !p.p_warehouse_id?.trim()) {
+    return { result: null, error: 'WAREHOUSE_REQUIRED_OFFLINE_CAPTURE' };
+  }
+
   if (!allowNegative && Array.isArray(p.p_items) && p.p_items.length > 0) {
     const productQuantities: Record<string, number> = {};
     for (const item of p.p_items) {
@@ -253,7 +261,25 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
       productQuantities[item.product_id] = (productQuantities[item.product_id] || 0) + (Number(item.quantity) || 0);
     }
     for (const [productId, requestedQty] of Object.entries(productQuantities)) {
-      const available = await InventoryRepository.getEffectiveAvailableStock(productId, p.p_branch_id);
+      let available: number;
+      if (explicitlyOffline) {
+        // Branch totals are NEVER evidence of stock in the pinned warehouse.
+        // If the exact warehouse snapshot is not known, refuse offline capture
+        // rather than borrowing inventory from another warehouse.
+        try {
+          const stock = await InventoryRepository.getWarehouseAvailableStock(
+            productId, p.p_branch_id, p.p_warehouse_id!,
+          );
+          if (stock.status !== 'known') {
+            return { result: null, error: `OFFLINE_WAREHOUSE_STOCK_UNVERIFIED: ${stock.reason}` };
+          }
+          available = stock.quantity;
+        } catch {
+          return { result: null, error: 'OFFLINE_WAREHOUSE_STOCK_UNVERIFIED' };
+        }
+      } else {
+        available = await InventoryRepository.getEffectiveAvailableStock(productId, p.p_branch_id);
+      }
       if (requestedQty > available) {
         return {
           result: null,
@@ -477,19 +503,38 @@ export async function nextInvoiceNumber(): Promise<string> {
 }
 
 export async function fetchBranchWarehouseId(branchId: string, orderId?: string | null): Promise<string | null> {
+  if (!branchId?.trim()) return null;
   try {
     if (orderId) {
-      const { data: order } = await supabase
+      const { data: order, error: orderError } = await supabase
         .from('orders')
         .select('inventory_warehouse_id')
         .eq('id', orderId)
         .eq('branch_id', branchId)
         .maybeSingle();
-      const orderWarehouseId = (order as { inventory_warehouse_id?: string | null } | null)?.inventory_warehouse_id;
-      if (orderWarehouseId) return orderWarehouseId;
+      if (orderError) return null;
+      const orderWarehouseId = String(
+        (order as { inventory_warehouse_id?: string | null } | null)?.inventory_warehouse_id || '',
+      ).trim();
+      // A linked order must use its own inventory warehouse. Do not fall back
+      // to a branch default when an order has not pinned/authorized one.
+      if (!orderWarehouseId) return null;
+      const { data: authorized, error: warehouseError } = await supabase
+        .from('warehouses')
+        .select('id')
+        .eq('id', orderWarehouseId)
+        .eq('branch_id', branchId)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (warehouseError || !authorized) return null;
+      await saveVerifiedSaleWarehouse(branchId, orderWarehouseId, orderId).catch(() => {
+        // A local cache failure must not alter the selected ONLINE warehouse.
+        // It will simply prevent a later unverified offline capture.
+      });
+      return orderWarehouseId;
     }
 
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('warehouses')
       .select('id,is_default,created_at')
       .eq('branch_id', branchId)
@@ -497,8 +542,15 @@ export async function fetchBranchWarehouseId(branchId: string, orderId?: string 
       .order('is_default', { ascending: false })
       .order('created_at', { ascending: true })
       .order('id', { ascending: true });
+    if (error) return null;
     const rows = (data as { id: string }[] | null) || [];
-    return rows.length > 0 ? rows[0].id : null;
+    const warehouseId = rows[0]?.id || null;
+    if (warehouseId) {
+      await saveVerifiedSaleWarehouse(branchId, warehouseId, null).catch(() => {
+        // Do not guess a default when the offline cache is unavailable.
+      });
+    }
+    return warehouseId;
   } catch {
     return null;
   }
