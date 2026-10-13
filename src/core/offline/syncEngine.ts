@@ -6,6 +6,7 @@
 
 import { pos as posApi, supabase } from '@/api';
 import { InventoryRepository } from '@/core/repositories';
+import { getReplayPinnedWarehouse } from './warehouseBinding';
 import {
   getAllOfflineSales,
   updateOfflineSaleStatus,
@@ -126,7 +127,7 @@ class OfflineSyncEngine {
     // sale was originally recorded (especially across branch defaults).
     // Never choose/reassign one after a financial operation was captured.
     // Legacy unpinned rows remain in the outbox for manual evidence review.
-    return String(item.payload.p_warehouse_id || '').trim() || null;
+    return getReplayPinnedWarehouse(item.payload);
   }
 
   private async reconcileCommittedSale(item: OfflineSaleQueueItem): Promise<SaleSyncResponse | null> {
