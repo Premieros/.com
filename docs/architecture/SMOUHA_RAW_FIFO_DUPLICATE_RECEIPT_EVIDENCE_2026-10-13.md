@@ -39,6 +39,24 @@ The earlier fail-open `process_purchase_return` could return a JSON error after 
 4. Draft **a preview-only, idempotent, explicitly scoped** correction plan with before/after state, dry-run rejection checks, and rollback/compensating journal policy. Obtain a finance reviewer sign-off on source documents and period controls.
 5. Apply any reviewed correction only as an append-only, authorized transaction, never a manual SQL overwrite of raw inventory, batches, debt totals or ledger lines. Verify all 16 blocking ERP invariants and exception counts afterward.
 
+## Full nine-delta review scope (read-only cross-check)
+
+The branch/material operational-vs-batch audit returned **nine** mismatched pairs at this checkpoint, but `private.canonical_inventory_review_cases` contains **eight** classified, manual-only cases. Those existing cases are not the same as the ninth, unclassified Smouha arugula case:
+
+| Class / branch and material | Operational | Batch | Batch minus operational | Existing review reason |
+| --- | ---: | ---: | ---: | --- |
+| Smouha — عيش توست براون | 51.0000 | 99.0000 | +48.0000 | `TRANSACTION_BASELINE_DRIFT` |
+| Cleopatra — دقيق 5 نجوم | 50.0000 | 79.4000 | +29.4000 | `HISTORICAL_OPENING_REBASE` |
+| Cleopatra — مسطرده جالون | 4.0000 | 10.7200 | +6.7200 | `HISTORICAL_OPENING_REBASE` |
+| Cleopatra — جمبرى جامبو ك | 3.0000 | 6.5500 | +3.5500 | `HISTORICAL_OPENING_REBASE` |
+| Cleopatra — سلامى | -0.0600 | 3.4150 | +3.4750 | `UNTRACKED_NEGATIVE_STOCK_PATH` |
+| Cleopatra — زيت شورتنج | 50.0000 | 53.0000 | +3.0000 | `HISTORICAL_OPENING_REBASE` |
+| Cleopatra — صلصه ك | 6.0000 | 8.2000 | +2.2000 | `HISTORICAL_OPENING_REBASE` |
+| Smouha — جرجير ربطه | -1.6500 | -1.3500 | +0.3000 | Unclassified; this investigation |
+| Cleopatra — ورشيستر صوص | 4.0000 | 4.2800 | +0.2800 | `HISTORICAL_OPENING_REBASE` |
+
+All eight existing records have `requires_human_review=true` and `repair_policy=NO_AUTOMATIC_REPAIR`. The 48.0000 transaction drift deserves its **own** item/period provenance review; the 3.4750 negative-balance case deserves an independent negative-stock-path investigation. Do not add deltas from different materials or units together as one warehouse stock quantity, and do not classify the ninth item automatically based on another item's history.
+
 ## Replayable evidence
 
 Run `scripts/audit/smouha-raw-fifo-lineage-readonly.sql` to reproduce the scoped SELECT-only material, purchase, ledger, settlement and journal provenance. Existing production cross-domain audit is `scripts/audit/erp-cross-domain-readonly.sql`.
