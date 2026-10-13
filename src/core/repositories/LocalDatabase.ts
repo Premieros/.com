@@ -160,6 +160,24 @@ export async function dbGetAll<T>(storeName: string): Promise<T[]> {
   }
 }
 
+/** Financial outbox cleanup must not treat an IndexedDB read failure as
+ * an empty store: doing so can leave orphan local deductions after dequeue.
+ */
+export async function dbGetAllStrict<T>(storeName: string): Promise<T[]> {
+  const db = await getLocalDb();
+  return new Promise<T[]>((resolve, reject) => {
+    try {
+      const tx = db.transaction(storeName, 'readonly');
+      const req = tx.objectStore(storeName).getAll();
+      req.onsuccess = () => resolve((req.result as T[]) || []);
+      req.onerror = () => reject(req.error || new Error('LOCAL_DB_READ_FAILED'));
+      tx.onabort = () => reject(tx.error || new Error('LOCAL_DB_READ_ABORTED'));
+    } catch (error) {
+      reject(error);
+    }
+  });
+}
+
 /**
  * Generic transactional helper to put/save an item
  */
