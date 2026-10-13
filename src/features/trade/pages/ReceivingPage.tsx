@@ -16,6 +16,7 @@ import { useCan } from '@/lib/permissions';
 import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
 import type { RpcResult, PurchaseBackorderRow, PurchaseReceiptRow, SupplierEvaluationRow, ReceiveLineInput } from '@/lib/types';
+import { purchaseReceiptFailureMessage } from '@/features/trade/utils/purchaseReceiptErrors';
 
 interface ReceivingLine {
   purchase_item_id: string;
@@ -147,23 +148,8 @@ export function ReceivingPage() {
 
   const updateQty = (i: number, qty: string) => setLines(lines.map((l, idx) => idx === i ? { ...l, qty } : l));
 
-  const receiveFailureMessage = (result: RpcResult & { detail?: string }) => {
-    if (lang === 'ar') {
-      if (result.error === 'WAREHOUSE_REQUIRED') return 'حدد مستودعًا لأمر الشراء قبل الاستلام، ثم أعد المحاولة.';
-      if (result.error === 'WAREHOUSE_BRANCH_MISMATCH') return 'مستودع أمر الشراء لا يتبع نفس الفرع. صحح المستودع في أمر الشراء قبل الاستلام.';
-      if (result.error === 'OVER_RECEIPT') return 'كمية الاستلام أكبر من الكمية المتبقية في أمر الشراء.';
-      if (result.error === 'NOT_RECEIVABLE') return 'أمر الشراء ليس في حالة تسمح باستلام جديد.';
-    } else {
-      if (result.error === 'WAREHOUSE_REQUIRED') return 'Select a warehouse on the purchase order before receiving, then try again.';
-      if (result.error === 'WAREHOUSE_BRANCH_MISMATCH') return 'The purchase-order warehouse belongs to another branch. Correct the warehouse before receiving.';
-      if (result.error === 'OVER_RECEIPT') return 'The receipt quantity is greater than the remaining purchase-order quantity.';
-      if (result.error === 'NOT_RECEIVABLE') return 'This purchase order is not in a state that allows another receipt.';
-    }
-    return result.detail || result.error || t('error');
-  };
-
   const saveReceipt = async () => {
-    if (!receiveModal) return;
+    if (!receiveModal || saving) return;
 
     const overRemaining = lines.find((l) => {
       const qty = parseFloat(l.qty);
@@ -185,18 +171,38 @@ export function ReceivingPage() {
     if (items.length === 0) { show(t('required') + ': ' + t('receiveItems'), 'error'); return; }
 
     setSaving(true);
-    const { data, error: err } = await api.procurement.receivePurchaseOrder({
-      p_purchase_id: receiveModal.purchase_id,
-      p_receipt_items: items,
-    });
-    setSaving(false);
-    if (err) { show(err.message, 'error'); return; }
-    const result = data as (RpcResult & { fully_received?: boolean; detail?: string }) | null;
-    if (!result?.success) { show(result ? receiveFailureMessage(result) : t('error'), 'error'); return; }
-    show(result.fully_received ? t('fullyReceived') : t('partiallyReceived'), 'success');
-    setReceiveModal(null);
-    loadBackorders();
-    loadReceipts();
+    try {
+      const { data, error: err } = await api.procurement.receivePurchaseOrder({
+        p_purchase_id: receiveModal.purchase_id,
+        p_receipt_items: items,
+      });
+      if (err) {
+        show(purchaseReceiptFailureMessage(
+          { error: err.message, detail: err.details },
+          lang === 'ar' ? 'ar' : 'en',
+        ) || err.message, 'error');
+        return;
+      }
+      const result = data as (RpcResult & { fully_received?: boolean; detail?: string }) | null;
+      if (!result?.success) {
+        show(purchaseReceiptFailureMessage(result, lang === 'ar' ? 'ar' : 'en')
+          || result?.detail || result?.error || t('error'), 'error');
+        return;
+      }
+      show(result.fully_received ? t('fullyReceived') : t('partiallyReceived'), 'success');
+      setReceiveModal(null);
+      loadBackorders();
+      loadReceipts();
+    } catch {
+      // A dropped connection may occur AFTER the server commits a GRN.
+      // Never claim the receipt failed or automatically repeat it.
+      show(lang === 'ar'
+        ? 'تعذر التأكد من نتيجة الاستلام بسبب الاتصال. راجع سندات الاستلام قبل إعادة الإرسال لتجنب التكرار.'
+        : 'Could not confirm the receipt outcome due to a connection error. Check saved receipts before submitting again to avoid duplicates.',
+      'error');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const boColumns: Column<PurchaseBackorderRow>[] = [
