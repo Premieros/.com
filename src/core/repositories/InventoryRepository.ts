@@ -2,6 +2,7 @@ import { dbGetAll, dbGetAllStrict, dbPut, dbDelete } from './LocalDatabase';
 import type { LocalStockMovement, CachedStockEntry } from './types';
 import type { OfflineSaleQueueItem } from '@/core/offline/offlineStorage';
 import { getUnrecordedQueuedSaleDeductions, saleMovementIdsForCleanup } from './stockProjection';
+import { projectWarehouseStock, type WarehouseStockAvailability } from './warehouseStockProjection';
 
 export class InventoryRepository {
   /**
@@ -88,6 +89,51 @@ export class InventoryRepository {
     }
 
     return stockMap;
+  }
+
+  /**
+   * Warehouse-scoped availability must never fall back to the branch total.
+   * "unknown" blocks availability assertions until a fresh, explicitly
+   * warehouse-specific stock snapshot exists.
+   */
+  public static async getWarehouseAvailableStock(
+    productId: string,
+    branchId: string,
+    warehouseId: string,
+  ): Promise<WarehouseStockAvailability> {
+    const [balances, movements, sales] = await Promise.all([
+      dbGetAllStrict<CachedStockEntry>('stock_balances'),
+      dbGetAllStrict<LocalStockMovement>('local_stock_movements'),
+      dbGetAllStrict<OfflineSaleQueueItem>('sales_queue'),
+    ]);
+    return projectWarehouseStock({
+      productId, branchId, warehouseId, balances, movements, sales,
+    });
+  }
+
+  /**
+   * Only a caller with an authoritative warehouse-specific quantity should
+   * invoke this; do not pass a branch-level aggregate to this method.
+   */
+  public static async updateWarehouseStockSnapshot(
+    branchId: string,
+    warehouseId: string,
+    productId: string,
+    quantity: number,
+  ): Promise<void> {
+    if (!branchId?.trim() || !warehouseId?.trim() || !productId?.trim()
+      || !Number.isFinite(quantity)) {
+      throw new Error('WAREHOUSE_SNAPSHOT_SCOPE_REQUIRED');
+    }
+    const entry: CachedStockEntry = {
+      id: JSON.stringify([branchId, warehouseId, productId]),
+      branchId,
+      warehouseId,
+      productId,
+      serverQuantity: quantity,
+      lastSyncedAt: new Date().toISOString(),
+    };
+    await dbPut('stock_balances', entry);
   }
 
   /**
