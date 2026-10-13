@@ -1,3 +1,5 @@
+import { getLocalDb } from '@/core/repositories/LocalDatabase';
+
 /**
  * Premier POS IndexedDB Offline Storage & Local Sync Engine
  * Stores products, categories, customers, dining tables, settings, active shifts,
@@ -25,90 +27,11 @@ export interface OfflineHoldOrderQueueItem {
   error?: string;
 }
 
-const DB_NAME = 'premier_pos_offline_db';
-// Version 3 adds the branch cache store that OfflineContext already reads/writes.
-// The upgrade is additive and preserves all existing queues/caches.
-const DB_VERSION = 3;
-
-let dbPromise: Promise<IDBDatabase> | null = null;
-
-export function openOfflineDb(): Promise<IDBDatabase> {
-  if (dbPromise) return dbPromise;
-
-  dbPromise = new Promise<IDBDatabase>((resolve, reject) => {
-    if (typeof indexedDB === 'undefined') {
-      reject(new Error('IndexedDB is not supported in this environment'));
-      return;
-    }
-
-    const req = indexedDB.open(DB_NAME, DB_VERSION);
-
-    req.onupgradeneeded = (e) => {
-      const db = (e.target as IDBOpenDBRequest).result;
-
-      // Cache stores (branch scoped data)
-      if (!db.objectStoreNames.contains('products')) {
-        db.createObjectStore('products', { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains('categories')) {
-        db.createObjectStore('categories', { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains('customers')) {
-        db.createObjectStore('customers', { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains('dining_tables')) {
-        db.createObjectStore('dining_tables', { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains('dining_areas')) {
-        db.createObjectStore('dining_areas', { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains('branches')) {
-        db.createObjectStore('branches', { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains('stock_map')) {
-        db.createObjectStore('stock_map', { keyPath: 'productId' });
-      }
-      if (!db.objectStoreNames.contains('system_settings')) {
-        db.createObjectStore('system_settings', { keyPath: 'key' });
-      }
-
-      // Outbox Sync queues
-      if (!db.objectStoreNames.contains('sales_queue')) {
-        const salesStore = db.createObjectStore('sales_queue', { keyPath: 'id' });
-        salesStore.createIndex('status', 'status', { unique: false });
-        salesStore.createIndex('created_at', 'created_at', { unique: false });
-      }
-
-      if (!db.objectStoreNames.contains('orders_queue')) {
-        const ordersStore = db.createObjectStore('orders_queue', { keyPath: 'id' });
-        ordersStore.createIndex('status', 'status', { unique: false });
-      }
-    };
-
-    req.onsuccess = () => {
-      const db = req.result;
-      db.onversionchange = () => {
-        db.close();
-        dbPromise = null;
-      };
-      resolve(db);
-    };
-
-    req.onerror = () => {
-      reject(req.error);
-    };
-
-    req.onblocked = () => {
-      reject(new Error('IndexedDB upgrade is blocked by another open tab'));
-    };
-  }).catch((error) => {
-    // A failed/blocked open must not poison all later attempts in this tab.
-    dbPromise = null;
-    throw error;
-  });
-
-  return dbPromise;
-}
+/** All offline data shares the same database name, version and upgrade path.
+ * Keep this public alias for existing callers, but NEVER open IndexedDB with
+ * an independent version: that can cause VersionError after v4/v5 upgrades.
+ */
+export const openOfflineDb = getLocalDb;
 
 // ── Cache operations ─────────────────────────────────────────────
 
