@@ -13,6 +13,8 @@ export interface OfflineSaleQueueItem {
   status: 'pending' | 'syncing' | 'synced' | 'failed';
   error?: string;
   retry_count: number;
+  /** Required on new sale captures; optional only for pre-fix legacy queue rows. */
+  created_by_user_id?: string;
 }
 
 export interface OfflineHoldOrderQueueItem {
