@@ -5,7 +5,9 @@
  */
 
 const DB_NAME = 'premier_pos_offline_db';
-const DB_VERSION = 4;
+// V5 unifies the offline outbox and local repositories behind this one upgrader.
+// It adds the missing legacy stock_map store without replacing any user data.
+const DB_VERSION = 5;
 
 let dbInstancePromise: Promise<IDBDatabase> | null = null;
 
@@ -52,6 +54,11 @@ export function getLocalDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains('warehouses')) {
         const whStore = db.createObjectStore('warehouses', { keyPath: 'id' });
         whStore.createIndex('branch_id', 'branch_id', { unique: false });
+      }
+      // Legacy OfflineContext still reads stock_map; v4's repository upgrader
+      // omitted it, so a v4-first connection left that fallback cache unusable.
+      if (!db.objectStoreNames.contains('stock_map')) {
+        db.createObjectStore('stock_map', { keyPath: 'productId' });
       }
       if (!db.objectStoreNames.contains('system_settings')) {
         db.createObjectStore('system_settings', { keyPath: 'key' });
