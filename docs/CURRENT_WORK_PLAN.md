@@ -40,3 +40,14 @@ Post-Phase 8C priority: investigate the historical raw FIFO/branch-balance varia
 - Remaining follow-up: purchase correction UI error display, broader multi-line/receipt tests, and historical FIFO debt/COGS evidence inspection before any data changes.
 
 See `docs/architecture/PURCHASE_RETURN_FIFO_SHORTAGE_GUARD_PROPOSAL_2026-10-12.md` for the full evidence and safety/rollback gates.
+
+## Verified procurement receipt deployment checkpoint — 2026-10-13
+
+- PR #94 verified the real purchase order → partial/final GRN → inventory + balanced accounting flow in rollback-only disposable PostgreSQL integration, then merged at `94e1724d`. Main Verify and Pages succeeded.
+- On explicit user approval, PR #95 was merged into `main` as `d9170dcf` after green verify, database and browser-smoke checks. Production `public.receive_purchase_order(uuid,jsonb)` now raises controlled exceptions when its three inventory/UOM helper failures occur **after** receipt writes, enforcing the surrounding PL/pgSQL subtransaction rollback.
+- Canonical Supabase `hvqlkapynjfjikqithvd` applied migration **`20261013060012`** named `receipt_atomicity_fail_closed`. Repository migration file is aligned to the recorded remote version, and exact pre-change function SQL remains in `scripts/rollback/20261013060000_restore_receipt_rpc.sql` for operator-only incident rollback.
+- Postdeploy check: 3 receipt failure guards installed; prior owner, `SECURITY DEFINER`, `search_path`, and `anon`/`authenticated`/`service_role` execute privileges unchanged. No production receipts were fabricated.
+- Read-only audit: all 16 BLOCK invariants have zero violations. Production purchases 175, purchase items 533, receipts/receipt items 0/0, inventory ledger 21,779, FIFO debts 8,718, journal entries/lines 2,247/7,259 all unchanged at deployment snapshot.
+- Outstanding (not auto-corrected): 8 classified inventory review cases, 9 batch/operational quantity differences (including extra 0.3000), policy-allowed negative raw balances/FIFO debts, and external event delivery unproven. Next safely improve receipt error messages, inventory review evidence, offline sale replay, and organizational chart-of-accounts migration planning.
+
+See `docs/architecture/RECEIPT_ATOMICITY_FAIL_CLOSED_PROPOSAL_2026-10-13.md`. Never treat scope-limited deployment approval as permission to automatically rewrite historical inventory/accounting evidence.
