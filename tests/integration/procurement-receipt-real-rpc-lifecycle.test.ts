@@ -213,8 +213,13 @@ describe('Procurement receipt: real RPC order-to-inventory and accounting lifecy
         "(select count(*)::text from private.erp_domain_outbox_v2 e join public.purchase_receipts r on r.id=e.aggregate_id where r.purchase_id=$1 and e.event_type='PURCHASE_RECEIPT_CREATED') outbox_events, " +
         "(select status from public.purchases where id=$1) status",
         [failPoId,product,raw,warehouse,branch]);
-      expect(failedState).toEqual({
-        receipts:'0',received:'0',product_qty:'4',raw_qty:'3',
+      expect({
+        ...failedState,
+        received:Number(failedState.received),
+        product_qty:Number(failedState.product_qty),
+        raw_qty:Number(failedState.raw_qty),
+      }).toEqual({
+        receipts:'0',received:0,product_qty:4,raw_qty:3,
         posted_journals:'0',outbox_events:'0',status:'approved',
       });
 
@@ -234,7 +239,11 @@ describe('Procurement receipt: real RPC order-to-inventory and accounting lifecy
         "(select coalesce(sum(quantity),0)::text from public.raw_material_inventory where raw_material_id=$3 and branch_id=$5) raw_qty, " +
         "(select count(*)::text from public.journal_entries where reference_type='purchase' and reference_id=$1) journals",
         [failPoId,product,raw,warehouse,branch]);
-      expect(recovery).toEqual({receipts:'1',product_qty:'5',raw_qty:'4',journals:'1'});
+      expect({
+        ...recovery,
+        product_qty:Number(recovery.product_qty),
+        raw_qty:Number(recovery.raw_qty),
+      }).toEqual({receipts:'1',product_qty:5,raw_qty:4,journals:'1'});
 
     } finally {
       await db.query('ROLLBACK');
