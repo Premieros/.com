@@ -249,6 +249,11 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   const globalSettings = await SettingsRepository.getGlobalSettings();
   const allowNegative = branchSettings?.allow_negative_stock ?? globalSettings?.allow_negative_stock ?? false;
 
+  const explicitlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  if (explicitlyOffline && !p.p_warehouse_id?.trim()) {
+    return { result: null, error: 'WAREHOUSE_REQUIRED_OFFLINE_CAPTURE' };
+  }
+
   if (!allowNegative && Array.isArray(p.p_items) && p.p_items.length > 0) {
     const productQuantities: Record<string, number> = {};
     for (const item of p.p_items) {
@@ -256,7 +261,25 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
       productQuantities[item.product_id] = (productQuantities[item.product_id] || 0) + (Number(item.quantity) || 0);
     }
     for (const [productId, requestedQty] of Object.entries(productQuantities)) {
-      const available = await InventoryRepository.getEffectiveAvailableStock(productId, p.p_branch_id);
+      let available: number;
+      if (explicitlyOffline) {
+        // Branch totals are NEVER evidence of stock in the pinned warehouse.
+        // If the exact warehouse snapshot is not known, refuse offline capture
+        // rather than borrowing inventory from another warehouse.
+        try {
+          const stock = await InventoryRepository.getWarehouseAvailableStock(
+            productId, p.p_branch_id, p.p_warehouse_id!,
+          );
+          if (stock.status !== 'known') {
+            return { result: null, error: `OFFLINE_WAREHOUSE_STOCK_UNVERIFIED: ${stock.reason}` };
+          }
+          available = stock.quantity;
+        } catch {
+          return { result: null, error: 'OFFLINE_WAREHOUSE_STOCK_UNVERIFIED' };
+        }
+      } else {
+        available = await InventoryRepository.getEffectiveAvailableStock(productId, p.p_branch_id);
+      }
       if (requestedQty > available) {
         return {
           result: null,
