@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { offlineSyncEngine, type SyncStatus } from '@/core/offline/syncEngine';
 import { InventoryRepository } from '@/core/repositories';
+import { supabase } from '@/api';
+import { requireOfflineSaleOwner } from '@/core/offline/requireOfflineSaleOwner';
 import {
   saveOfflineCache,
   getOfflineCache,
@@ -153,6 +155,11 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const queueSaleForOffline = useCallback(async (invoiceNumber: string, payload: Record<string, unknown>): Promise<string> => {
+    // Persist the origin user at CAPTURE time. Replay refuses missing/different
+    // owners, so an ownerless financial outbox row can never sync safely.
+    const { data, error } = await supabase.auth.getSession();
+    if (error) throw error;
+    const originatingUserId = requireOfflineSaleOwner(data.session);
     const id = 'offline_sale_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     await enqueueOfflineSale({
       id,
@@ -160,6 +167,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       invoice_number: invoiceNumber,
       created_at: new Date().toISOString(),
       payload,
+      created_by_user_id: originatingUserId,
     });
     return id;
   }, []);
