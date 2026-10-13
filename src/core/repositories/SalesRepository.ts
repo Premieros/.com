@@ -81,8 +81,10 @@ export class SalesRepository {
   }
 
   public static async markSaleSynced(id: string, invoiceNumber: string): Promise<void> {
-    await dbDelete('sales_queue', id);
-    // Mark local inventory movements as reconciled
+    // Confirmed sync: remove local deductions BEFORE deleting the outbox.
+    // If the tab dies between operations, the remaining sale can be replayed
+    // idempotently; otherwise a ghost deduction can persist with no outbox.
     await InventoryRepository.markMovementsSynced([invoiceNumber, id]);
+    await dbDelete('sales_queue', id);
   }
 }
