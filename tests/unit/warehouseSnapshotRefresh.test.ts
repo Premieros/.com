@@ -24,7 +24,6 @@ vi.mock('@/core/repositories/LocalDatabase', () => ({
 import {
   aggregateVerifiedWarehouseRows,
   refreshVerifiedWarehouseStock,
-  replaceWarehouseSnapshots,
 } from '@/core/repositories/warehouseSnapshotRefresh';
 
 const TIME = '2026-10-13T12:00:00.000Z';
