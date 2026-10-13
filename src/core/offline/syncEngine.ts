@@ -122,43 +122,11 @@ class OfflineSyncEngine {
   }
 
   private async resolveReplayWarehouse(item: OfflineSaleQueueItem): Promise<string | null> {
-    const existingWarehouseId = String(item.payload.p_warehouse_id || '').trim();
-    if (existingWarehouseId) return existingWarehouseId;
-
-    const branchId = String(item.payload.p_branch_id || '').trim();
-    if (!branchId) return null;
-
-    const orderId = String(item.payload.p_order_id || '').trim();
-    if (orderId) {
-      try {
-        const { data, error } = await supabase
-          .from('orders')
-          .select('inventory_warehouse_id')
-          .eq('id', orderId)
-          .eq('branch_id', branchId)
-          .maybeSingle();
-        if (error) return null;
-        return String((data as { inventory_warehouse_id?: string | null } | null)?.inventory_warehouse_id || '').trim() || null;
-      } catch {
-        return null;
-      }
-    }
-
-    try {
-      const { data, error } = await supabase
-        .from('warehouses')
-        .select('id,is_default,created_at')
-        .eq('branch_id', branchId)
-        .eq('is_active', true)
-        .order('is_default', { ascending: false })
-        .order('created_at', { ascending: true })
-        .order('id', { ascending: true });
-      if (error) return null;
-      const rows = (data as { id: string }[] | null) || [];
-      return rows[0]?.id || null;
-    } catch {
-      return null;
-    }
+    // A warehouse resolved at sync time may differ from the one on which the
+    // sale was originally recorded (especially across branch defaults).
+    // Never choose/reassign one after a financial operation was captured.
+    // Legacy unpinned rows remain in the outbox for manual evidence review.
+    return String(item.payload.p_warehouse_id || '').trim() || null;
   }
 
   private async reconcileCommittedSale(item: OfflineSaleQueueItem): Promise<SaleSyncResponse | null> {
@@ -241,10 +209,8 @@ class OfflineSyncEngine {
       try {
         await updateOfflineSaleStatus(item.id, 'syncing');
 
-        // Offline capture intentionally does not invent a warehouse. Once back
-        // online, resolve the linked order's pinned inventory warehouse, or the
-        // branch's deterministic active default for a direct sale, before any
-        // financial write. Missing warehouse stays fail-closed in the outbox.
+        // Replay ONLY the warehouse pinned at original offline capture.
+        // Old unpinned rows are held, never silently rerouted after reconnect.
         const warehouseId = await this.resolveReplayWarehouse(item);
         if (!warehouseId) throw new Error('WAREHOUSE_REQUIRED_OFFLINE_SYNC');
         const replayPayload = {
