@@ -165,6 +165,86 @@ describe('Procurement receipt: real RPC order-to-inventory and accounting lifecy
         "(select count(*)::text from public.journal_entries where reference_type='purchase' and reference_id=$1) posting_count",
         [poId]);
       expect(afterRetry).toEqual({count:'2',posting_count:'1'});
+
+      // Fault injection: a legacy purchase item that changed its purchase unit
+      // between PO approval and receipt. The product line would add stock
+      // successfully, and the second (raw) line fails UOM normalization.
+      // The entire receipt must rollback, including the FIRST line, GRN and
+      // emitted outbox event, rather than returning a JSON failure after writes.
+      const failOrder = await json(
+        "select public.create_purchase_order($1,$2,$3,'credit','CI atomic receipt failure',$4::jsonb,null) result",
+        [branch,supplier,warehouse,JSON.stringify([
+          {product_id:product,unit_name:'piece',quantity:1,unit_cost:10},
+          {raw_material_id:raw,unit_name:'u',quantity:1,unit_cost:5},
+        ])]);
+      expect(failOrder.success,JSON.stringify(failOrder)).toBe(true);
+      const failPoId = String(failOrder.purchase_id);
+      const { rows: failLines } = await db.query<{id:string;product_id:string|null;raw_material_id:string|null}>(
+        'select id,product_id,raw_material_id from public.purchase_items where purchase_id=$1',[failPoId]);
+      const failProductLine = failLines.find(x=>x.product_id===product)?.id;
+      const failRawLine = failLines.find(x=>x.raw_material_id===raw)?.id;
+      expect(failProductLine).toBeTruthy();
+      expect(failRawLine).toBeTruthy();
+      for(const status of ['submitted','approved']){
+        const next=await json('select public.update_purchase_order_status($1,$2) result',[failPoId,status]);
+        expect(next,JSON.stringify(next)).toMatchObject({success:true,status});
+      }
+      await db.query("update public.purchase_items set unit_name='kg' where id=$1",[failRawLine]);
+
+      const failedReceipt=await json(
+        'select public.receive_purchase_order($1,$2::jsonb) result',
+        [failPoId,JSON.stringify([
+          {purchase_item_id:failProductLine,quantity_received:1},
+          {purchase_item_id:failRawLine,quantity_received:1},
+        ])]);
+      expect(failedReceipt.success).toBe(false);
+      expect(failedReceipt.detail).toContain('PURCHASE_RECEIPT_STOCK_FAILED');
+      expect(failedReceipt.detail).toContain('INCOMPATIBLE_PURCHASE_UNIT');
+
+      const { rows:[failedState] } = await db.query<{
+        receipts:string; received:string; product_qty:string; raw_qty:string;
+        posted_journals:string; outbox_events:string; status:string;
+      }>(
+        "select (select count(*)::text from public.purchase_receipts where purchase_id=$1) receipts, " +
+        "(select coalesce(sum(received_quantity),0)::text from public.purchase_items where purchase_id=$1) received, " +
+        "(select coalesce(sum(quantity),0)::text from public.inventory where product_id=$2 and warehouse_id=$4) product_qty, " +
+        "(select coalesce(sum(quantity),0)::text from public.raw_material_inventory where raw_material_id=$3 and branch_id=$5) raw_qty, " +
+        "(select count(*)::text from public.journal_entries where reference_type='purchase' and reference_id=$1) posted_journals, " +
+        "(select count(*)::text from private.erp_domain_outbox_v2 e join public.purchase_receipts r on r.id=e.aggregate_id where r.purchase_id=$1 and e.event_type='PURCHASE_RECEIPT_CREATED') outbox_events, " +
+        "(select status from public.purchases where id=$1) status",
+        [failPoId,product,raw,warehouse,branch]);
+      expect({
+        ...failedState,
+        received:Number(failedState.received),
+        product_qty:Number(failedState.product_qty),
+        raw_qty:Number(failedState.raw_qty),
+      }).toEqual({
+        receipts:'0',received:0,product_qty:4,raw_qty:3,
+        posted_journals:'0',outbox_events:'0',status:'approved',
+      });
+
+      // Recovery after fixing the offending line uses the existing RPC; no
+      // ghost receipt or stock was left from the failed attempt.
+      await db.query("update public.purchase_items set unit_name='u' where id=$1",[failRawLine]);
+      const recovered=await json(
+        'select public.receive_purchase_order($1,$2::jsonb) result',
+        [failPoId,JSON.stringify([
+          {purchase_item_id:failProductLine,quantity_received:1},
+          {purchase_item_id:failRawLine,quantity_received:1},
+        ])]);
+      expect(recovered,JSON.stringify(recovered)).toMatchObject({success:true,fully_received:true,status:'completed'});
+      const {rows:[recovery]}=await db.query<{receipts:string; product_qty:string; raw_qty:string; journals:string}>(
+        "select (select count(*)::text from public.purchase_receipts where purchase_id=$1) receipts, " +
+        "(select coalesce(sum(quantity),0)::text from public.inventory where product_id=$2 and warehouse_id=$4) product_qty, " +
+        "(select coalesce(sum(quantity),0)::text from public.raw_material_inventory where raw_material_id=$3 and branch_id=$5) raw_qty, " +
+        "(select count(*)::text from public.journal_entries where reference_type='purchase' and reference_id=$1) journals",
+        [failPoId,product,raw,warehouse,branch]);
+      expect({
+        ...recovery,
+        product_qty:Number(recovery.product_qty),
+        raw_qty:Number(recovery.raw_qty),
+      }).toEqual({receipts:'1',product_qty:5,raw_qty:4,journals:'1'});
+
     } finally {
       await db.query('ROLLBACK');
     }
