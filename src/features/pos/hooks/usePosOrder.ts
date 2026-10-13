@@ -6,6 +6,7 @@ import { useToast } from '@/components/Toast';
 import { cartToItems, type ItemPayload } from '../utils/cart';
 import { nextInvoiceNumber, processSaleForOrder, fetchBranchWarehouseId } from '../services/payment';
 import { getPinnedSaleWarehouse } from '@/core/offline/warehouseBinding';
+import { refreshVerifiedWarehouseStock } from '@/core/repositories/warehouseSnapshotRefresh';
 import { fetchOrderSettlementPreview, type OrderSettlementPreview } from '../services/settlementPreview';
 import { APPROVED_FIXED_THERMAL_WIDTH_MM, buildReceiptFixedTemplate, buildReceiptHtml, buildReceiptThermalText, enqueueAutomaticReceiptPrint, openPrintWindow, type ReceiptData } from '../utils/printing';
 import { enqueueCloudOpenOrderPrint } from '../services/cloudPrint';
@@ -45,11 +46,28 @@ export function usePosOrder(input: UsePosOrderInput) {
   const [settlementReceipt, setSettlementReceipt] = useState<ReceiptData | null>(null);
   const [settlementReceiptSaleId, setSettlementReceiptSaleId] = useState<string | null>(null);
 
-  // While connected, verify and persist the current branch default or active
-  // order's pinned warehouse. Offline checkout never re-queries or guesses it.
+  // While connected, verify the branch/order warehouse and refresh only
+  // authoritative warehouse-scoped inventory rows. A zero-row result is NOT
+  // converted to a positive/zero stock snapshot for unrelated products.
   useEffect(() => {
-    if (!input.branchId || (typeof navigator !== 'undefined' && !navigator.onLine)) return;
-    void fetchBranchWarehouseId(input.branchId, base.activeOrderId).catch(() => undefined);
+    const branchId = input.branchId;
+    const orderId = base.activeOrderId;
+    if (!branchId) return;
+    const refresh = () => {
+      if (typeof navigator !== 'undefined' && !navigator.onLine) return;
+      void (async () => {
+        const warehouseId = await fetchBranchWarehouseId(branchId, orderId);
+        if (warehouseId) await refreshVerifiedWarehouseStock(branchId, warehouseId);
+      })().catch(() => {
+        // A network/RLS/cache error leaves offline availability unverified.
+        // It must not be presented as an authoritative zero-stock balance.
+      });
+    };
+    refresh();
+    if (typeof window !== 'undefined') window.addEventListener('online', refresh);
+    return () => {
+      if (typeof window !== 'undefined') window.removeEventListener('online', refresh);
+    };
   }, [input.branchId, base.activeOrderId]);
 
   const findCartSource = useCallback((item: ItemPayload) => {
