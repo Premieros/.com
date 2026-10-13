@@ -160,6 +160,11 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     const { data, error } = await supabase.auth.getSession();
     if (error) throw error;
     const originatingUserId = requireOfflineSaleOwner(data.session);
+    // All financial outbox entry points require a verified, pinned warehouse.
+    // Never assign a warehouse for this sale only when it later reconnects.
+    if (typeof payload.p_warehouse_id !== 'string' || !payload.p_warehouse_id.trim()) {
+      throw new Error('WAREHOUSE_REQUIRED_OFFLINE_CAPTURE');
+    }
     const id = 'offline_sale_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
     await enqueueOfflineSale({
       id,
