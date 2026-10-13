@@ -52,7 +52,7 @@ export async function replaceWarehouseSnapshots(
 ): Promise<void> {
   const db = await getLocalDb();
   return new Promise<void>((resolve, reject) => {
-    let transaction: IDBTransaction;
+    let transaction: IDBTransaction | null = null;
     try {
       transaction = db.transaction('stock_balances', 'readwrite');
       const store = transaction.objectStore('stock_balances');
@@ -69,7 +69,9 @@ export async function replaceWarehouseSnapshots(
       transaction.onerror = () => reject(transaction.error || new Error('WAREHOUSE_SNAPSHOT_WRITE_FAILED'));
       transaction.onabort = () => reject(transaction.error || new Error('WAREHOUSE_SNAPSHOT_WRITE_ABORTED'));
     } catch (error) {
-      if (typeof transaction !== 'undefined') transaction.abort();
+      if (transaction) {
+        try { transaction.abort(); } catch { /* already aborted */ }
+      }
       reject(error);
     }
   });
