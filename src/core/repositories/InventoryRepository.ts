@@ -1,6 +1,7 @@
 import { dbGetAll, dbPut, dbDelete } from './LocalDatabase';
 import type { LocalStockMovement, CachedStockEntry } from './types';
 import type { OfflineSaleQueueItem } from '@/core/offline/offlineStorage';
+import { getUnrecordedQueuedSaleDeductions } from './stockProjection';
 
 export class InventoryRepository {
   /**
@@ -43,27 +44,11 @@ export class InventoryRepository {
       .filter((m) => m.productId === productId && m.branchId === branchId && !m.synced)
       .reduce((sum, m) => sum + Number(m.quantityDelta || 0), 0);
 
-    // Also deduct any pending sales in sales_queue that might not have local movements
+    // Compare per branch and product: a partially persisted multi-item sale
+    // must still deduct items whose local movement was never written.
     const salesQueue = await dbGetAll<OfflineSaleQueueItem>('sales_queue');
-    const pendingSales = salesQueue.filter((s) => s.status !== 'synced');
-    const movementRefIds = new Set(allMovements.map((m) => m.referenceId));
-
-    let extraUnsyncedSalesDeductions = 0;
-    for (const sale of pendingSales) {
-      const invoiceNum = String(sale.payload?.p_invoice_number || sale.invoice_number || '');
-      // If this sale's invoice is already accounted for in local_stock_movements, avoid double-deducting
-      if (invoiceNum && movementRefIds.has(invoiceNum)) continue;
-
-      if (sale.payload?.p_branch_id === branchId && Array.isArray(sale.payload.p_items)) {
-        for (const item of sale.payload.p_items as Array<{ product_id: string; quantity: number }>) {
-          if (item.product_id === productId) {
-            extraUnsyncedSalesDeductions += Number(item.quantity) || 0;
-          }
-        }
-      }
-    }
-
-    return baseQuantity + localMovementDeltas - extraUnsyncedSalesDeductions;
+    const missing = getUnrecordedQueuedSaleDeductions(branchId, salesQueue, allMovements);
+    return baseQuantity + localMovementDeltas - (missing[productId] || 0);
   }
 
   /**
@@ -94,19 +79,12 @@ export class InventoryRepository {
       stockMap[m.productId] = (stockMap[m.productId] || 0) + Number(m.quantityDelta || 0);
     }
 
-    // 4. Subtract any pending sales in outbox not yet in local_stock_movements
-    const movementRefIds = new Set(allMovements.map((m) => m.referenceId));
+    // 4. Deduct only queued quantities not represented by unsynced movements,
+    // including any crash-partial multi-item sale movements.
     const salesQueue = await dbGetAll<OfflineSaleQueueItem>('sales_queue');
-    const pendingSales = salesQueue.filter((s) => s.status !== 'synced');
-    for (const sale of pendingSales) {
-      const invoiceNum = String(sale.payload?.p_invoice_number || sale.invoice_number || '');
-      if (invoiceNum && movementRefIds.has(invoiceNum)) continue;
-
-      if (sale.payload?.p_branch_id === branchId && Array.isArray(sale.payload.p_items)) {
-        for (const item of sale.payload.p_items as Array<{ product_id: string; quantity: number }>) {
-          stockMap[item.product_id] = (stockMap[item.product_id] || 0) - (Number(item.quantity) || 0);
-        }
-      }
+    const missing = getUnrecordedQueuedSaleDeductions(branchId, salesQueue, allMovements);
+    for (const [productId, quantity] of Object.entries(missing)) {
+      stockMap[productId] = (stockMap[productId] || 0) - quantity;
     }
 
     return stockMap;
