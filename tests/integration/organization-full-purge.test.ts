@@ -11,8 +11,8 @@ describe('full tenant purge by independent Super Admin',()=>{
   afterAll(async()=>{await db.end();});
 
   it('deletes a populated active organization while keeping other tenants and global Super Admin',async()=>{
-    const [orgA,orgB,branchA,branchB,ownerA,ownerB,adminId,staffA]=
-      Array.from({length:8},()=>randomUUID());
+    const [orgA,orgB,branchA,branchA2,branchB,ownerA,ownerB,adminId,staffA]=
+      Array.from({length:9},()=>randomUUID());
     const suffix=randomUUID().slice(0,10);
     const name='CI Tenant purge '+suffix;
     await db.query('BEGIN');
@@ -20,8 +20,8 @@ describe('full tenant purge by independent Super Admin',()=>{
       await db.query("SELECT set_config('app.register_branch','on',true)");
       await db.query("INSERT INTO public.organizations(id,name,slug,is_active) VALUES($1,$2,$3,true),($4,$5,$6,true)",
         [orgA,name,'ci-delete-a-'+suffix,orgB,'CI Tenant keep '+suffix,'ci-delete-b-'+suffix]);
-      await db.query("INSERT INTO public.branches(id,name,organization_id,is_active) VALUES($1,'Branch A',$2,true),($3,'Branch B',$4,true)",
-        [branchA,orgA,branchB,orgB]);
+      await db.query("INSERT INTO public.branches(id,name,organization_id,is_active) VALUES($1,'Branch A',$2,true),($3,'Branch A2',$2,true),($4,'Branch B',$5,true)",
+        [branchA,orgA,branchA2,branchB,orgB]);
       for(const [id,role,home,mail] of [
         [ownerA,'owner',branchA,'ci-owner-a-'+suffix+'@example.invalid'],
         [ownerB,'owner',branchB,'ci-owner-b-'+suffix+'@example.invalid'],
@@ -44,7 +44,31 @@ describe('full tenant purge by independent Super Admin',()=>{
         [messageId,conversationId,ownerA]);
       const baseline=await db.query<{total:string}>("SELECT COUNT(*)::text total FROM public.dining_tables WHERE branch_id=$1",[branchA]);
       expect(Number(baseline.rows[0].total)).toBeGreaterThan(0);
+      const secondaryTables=await db.query<{total:string}>("SELECT count(*)::text total FROM public.dining_tables WHERE branch_id=$1",[branchA2]);
+      expect(Number(secondaryTables.rows[0].total)).toBeGreaterThan(0);
       await db.query("SELECT set_config('app.user_id',$1,true)",[adminId]);
+
+      // Reproduce real tenant: open table order with a sent kitchen item.
+      const tableRes=await db.query<{id:string}>(
+        "SELECT id FROM public.dining_tables WHERE branch_id=$1 ORDER BY name LIMIT 1",[branchA]);
+      const orderId=randomUUID(),itemId=randomUUID(),productId=randomUUID();
+      await db.query("INSERT INTO public.products(id,branch_id,name,sale_price) VALUES($1,$2,'CI meal',15)",
+        [productId,branchA]);
+      await db.query("INSERT INTO public.orders(id,order_number,branch_id,table_id,status,cashier_id) VALUES($1,$2,$3,$4,'open',$5)",
+        [orderId,'CI-OPEN-'+suffix,branchA,tableRes.rows[0].id,ownerA]);
+      await db.query("INSERT INTO public.order_items(id,order_id,product_id,quantity,unit_price,total) VALUES($1,$2,$3,2,15,30)",
+        [itemId,orderId,productId]);
+      await db.query("INSERT INTO public.order_kitchen_sends(branch_id,order_id,order_item_id,sent_by,sent_quantity) VALUES($1,$2,$3,$4,2)",
+        [branchA,orderId,itemId,ownerA]);
+      // Preserve a real-world unsettled kitchen inventory event; the purge
+      // must remove it before the sent-item reduction guard runs.
+      const warehouseId=randomUUID();
+      await db.query("INSERT INTO public.warehouses(id,branch_id,name) VALUES($1,$2,'CI kitchen warehouse')",
+        [warehouseId,branchA]);
+      await db.query(`INSERT INTO public.order_kitchen_inventory_events(
+          branch_id,warehouse_id,order_id,order_item_id,sent_quantity,created_by
+        ) VALUES($1,$2,$3,$4,2,$5)`,
+        [branchA,warehouseId,orderId,itemId,ownerA]);
 
       const preview=await db.query<{result:{success:boolean;eligible:boolean;operational_documents:number;super_admins_preserved:number;blockers:unknown[]}}>(
         "SELECT public.super_admin_preview_organization_deletion($1) result",[orgA]);
