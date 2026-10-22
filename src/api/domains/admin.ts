@@ -40,11 +40,11 @@ export const admin = {
     branches?: number; users?: number; operational_documents?: number;
     blockers?: Array<string | { code: string; table?: string; count?: number }>;
   }> { return rpc('super_admin_preview_organization_deletion', p); },
-  deleteEmptyOrganization(p: {
+  deleteOrganization(p: {
     p_organization_id: string; p_confirm_name: string; p_confirm_phrase: string;
   }): ApiResult<{ success?: boolean; deleted?: boolean; error?: string; preview?: {
     success?: boolean; eligible?: boolean; blockers?: Array<string | { code: string; table?: string; count?: number }>;
-  } }> { return rpc('super_admin_delete_empty_organization', p); },
+  } }> { return rpc('super_admin_delete_organization', p); },
   getOrganizationModuleCatalog(p: { p_organization_id: string }): ApiResult<Array<{ feature_key: string; feature_name: string; category: string; enabled: boolean; source: string }>> { return rpc('get_organization_module_catalog', p); },
   setOrganizationModule(p: { p_organization_id: string; p_feature_key: string; p_enabled: boolean; p_reason?: string | null }): ApiResult<{ success?: boolean; error?: string; organization_id?: string; feature_key?: string; enabled?: boolean }> { return rpc('super_admin_set_organization_module', p); },
   getSystemHealthSnapshot(p: { p_branch_id: string | null }): ApiResult<Record<string, unknown>> { return rpc('get_system_health_snapshot', p); },
