@@ -42,7 +42,7 @@ export const admin = {
   }> { return rpc('super_admin_preview_organization_deletion', p); },
   queueOrganizationDeletion(p: {
     p_organization_id: string; p_confirm_name: string; p_confirm_phrase: string;
-  }): ApiResult<{ success?: boolean; job_id?: string; status?: string; error?: string; preview?: {
+  }): ApiResult<{ success?: boolean; job_id?: string; status?: 'none' | 'queued' | 'claimed' | 'succeeded' | 'failed'; error?: string; preview?: {
     success?: boolean; eligible?: boolean; blockers?: Array<string | { code: string; table?: string; count?: number }>;
   } }> { return rpc('super_admin_queue_organization_deletion', p); },
   organizationDeletionStatus(p: { p_organization_id: string }): ApiResult<{ success?: boolean; job_id?: string; status?: 'none' | 'queued' | 'claimed' | 'succeeded' | 'failed'; error?: string }> { return rpc('super_admin_organization_deletion_status', p); },
