@@ -88,6 +88,39 @@ describe('full tenant purge by independent Super Admin',()=>{
         .rejects.toThrow(/CREDIT_EMPLOYEE_ONLY/);
       await db.query('ROLLBACK TO SAVEPOINT credit_guard_still_active');
 
+      // Exercise raw FIFO settlement FK that blocked deletion of the real
+      // organization's inventory_ledger. Both tenants must have debt and
+      // receipt ledger rows; unrelated tenant's records must survive.
+      const seedRawFifo = async (branchId:string, warehouse:string, tag:string) => {
+        const materialId=randomUUID(),debtId=randomUUID();
+        const negativeId=(-BigInt('0x'+randomUUID().replace(/-/g,'').slice(0,12))).toString();
+        const negativeReceipt=(BigInt(negativeId)-1n).toString();
+        await db.query(
+          "INSERT INTO public.raw_materials(id,code,name,branch_id) VALUES($1,$2,$3,$4)",
+          [materialId,'CI-FIFO-'+tag+'-'+suffix,'CI FIFO material',branchId]);
+        await db.query(`INSERT INTO public.inventory_ledger(
+          id,branch_id,warehouse_id,raw_material_id,quantity,unit_cost,total_cost,entry_type
+        ) OVERRIDING SYSTEM VALUE VALUES
+          ($1,$3,$4,$5,-2,5,-10,'sale'),
+          ($2,$3,$4,$5,2,5,10,'purchase')`,
+          [negativeId,negativeReceipt,branchId,warehouse,materialId]);
+        await db.query(`INSERT INTO public.raw_fifo_debts(
+          id,branch_id,warehouse_id,raw_material_id,source_ledger_id,
+          debt_quantity,source_created_at
+        ) VALUES($1,$2,$3,$4,$5,2,now())`,
+          [debtId,branchId,warehouse,materialId,negativeId]);
+        const {rows}=await db.query<{id:string}>(`
+          INSERT INTO public.raw_fifo_settlements(
+            debt_id,receipt_ledger_id,quantity,unit_cost,total_cost
+          ) VALUES ($1,$2,2,5,10) RETURNING id`,[debtId,negativeReceipt]);
+        return { debtId,settlementId:rows[0].id,receipt:negativeReceipt };
+      };
+      const fifoA=await seedRawFifo(branchA,warehouseId,'A');
+      const warehouseB=randomUUID();
+      await db.query("INSERT INTO public.warehouses(id,branch_id,name) VALUES($1,$2,'CI other-tenant warehouse')",
+        [warehouseB,branchB]);
+      const fifoB=await seedRawFifo(branchB,warehouseB,'B');
+
       // Exercise actual immutable journal-line evidence (Phase 5L) and verified
       // ERP delivery receipts (Phase 8B), for both the target and kept tenant.
       const seedJournal = async (branch:string) => {
@@ -182,6 +215,18 @@ describe('full tenant purge by independent Super Admin',()=>{
           (SELECT count(*)::int FROM public.customers WHERE id=$4) "customerB"
       `,[saleA,employeeA,saleB,employeeB]);
       expect(creditCheck.rows[0]).toEqual({saleA:0,customerA:0,saleB:1,customerB:1});
+      const fifoCheck=await db.query<{debtA:number;settlementA:number;receiptA:number;
+        debtB:number;settlementB:number;receiptB:number}>(`SELECT
+        (SELECT count(*)::int FROM public.raw_fifo_debts WHERE id=$1) "debtA",
+        (SELECT count(*)::int FROM public.raw_fifo_settlements WHERE id=$2) "settlementA",
+        (SELECT count(*)::int FROM public.inventory_ledger WHERE id=$3) "receiptA",
+        (SELECT count(*)::int FROM public.raw_fifo_debts WHERE id=$4) "debtB",
+        (SELECT count(*)::int FROM public.raw_fifo_settlements WHERE id=$5) "settlementB",
+        (SELECT count(*)::int FROM public.inventory_ledger WHERE id=$6) "receiptB"`,
+        [fifoA.debtId,fifoA.settlementId,fifoA.receipt,
+         fifoB.debtId,fifoB.settlementId,fifoB.receipt]);
+      expect(fifoCheck.rows[0]).toEqual({debtA:0,settlementA:0,receiptA:0,
+        debtB:1,settlementB:1,receiptB:1});
       expect(await evidenceCount(journalA)).toBe(0);
       expect(await receiptCount(journalA)).toBe(0);
       expect(await evidenceCount(journalB)).toBe(2);
