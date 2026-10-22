@@ -21,6 +21,7 @@ import {
   History,
   WalletCards,
   MessageCircle,
+  Trash2,
 } from 'lucide-react';
 import { supabase, admin } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -39,6 +40,7 @@ import { ORGANIZATION_MODULE_KEYS, ORGANIZATION_MODULES, type OrganizationModule
 import { notifyOrganizationRuntimeChanged } from '@/core/modules/OrganizationModulesContext';
 import { notifyBranchesChanged } from '@/hooks/useBranches';
 import { OrganizationCreateWizard } from '@/features/admin/components/OrganizationCreateWizard';
+import { OrganizationDeleteDialog } from '@/features/admin/components/OrganizationDeleteDialog';
 import { SubscriptionManagementTab } from './SubscriptionManagementTab';
 import { SupportInboxTab } from './SupportInboxTab';
 import { FinancialVisibilityAdminControl } from '../components/FinancialVisibilityAdminControl';
@@ -122,6 +124,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
   const [loadingOrganizationModules, setLoadingOrganizationModules] = useState(false);
   const [savingModuleKey, setSavingModuleKey] = useState<OrganizationModuleKey | null>(null);
   const [organizationCreateOpen, setOrganizationCreateOpen] = useState(false);
+  const [organizationToDelete, setOrganizationToDelete] = useState<TenantStats | null>(null);
 
   // System Controls state (Allow New User Creation)
   const [allowNewUserCreation, setAllowNewUserCreation] = useState<boolean>(true);
@@ -688,6 +691,18 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
                           >
                             {t.is_active ? (ar ? 'تعطيل' : 'Disable') : (ar ? 'تفعيل' : 'Enable')}
                           </Button>
+                          {!t.is_active && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              data-testid={`organization-delete-${t.organization_id}`}
+                              onClick={() => setOrganizationToDelete(t)}
+                              className="border-ui-danger/40 text-ui-danger hover:bg-ui-danger-soft"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                              {ar ? 'حذف' : 'Delete'}
+                            </Button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -1388,6 +1403,16 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
           </div>
         </Modal>
       )}
+      <OrganizationDeleteDialog
+        target={organizationToDelete}
+        onClose={() => setOrganizationToDelete(null)}
+        onDeleted={() => {
+          setOrganizationToDelete(null);
+          notifyBranchesChanged();
+          notifyOrganizationRuntimeChanged();
+          void loadTenants();
+        }}
+      />
       <OrganizationCreateWizard
         open={organizationCreateOpen}
         onClose={() => setOrganizationCreateOpen(false)}
