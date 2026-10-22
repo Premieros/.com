@@ -1381,16 +1381,22 @@
       ]
     },
     {
-      "name": "super_admin_delete_organization",
+      "name": "super_admin_organization_deletion_status",
       "params": [
-        "confirm_name",
-        "confirm_phrase",
         "organization_id"
       ]
     },
     {
       "name": "super_admin_preview_organization_deletion",
       "params": [
+        "organization_id"
+      ]
+    },
+    {
+      "name": "super_admin_queue_organization_deletion",
+      "params": [
+        "confirm_name",
+        "confirm_phrase",
         "organization_id"
       ]
     },
