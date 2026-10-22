@@ -48,9 +48,12 @@ BEGIN
       WHERE m.user_id=ANY(v_users) AND m.organization_id<>p_organization_id)
   THEN v_blockers:=v_blockers||jsonb_build_array('CROSS_ORGANIZATION_MEMBERSHIP'); END IF;
 
-  IF EXISTS (SELECT 1 FROM public.user_branch_access a
-       WHERE a.user_id=ANY(v_users) AND a.branch_id<>ALL(v_branches))
-  THEN v_blockers:=v_blockers||jsonb_build_array('CROSS_ORGANIZATION_USER_ACCESS'); END IF;
+  -- A tenant user's explicit grant to a different branch is a permission
+  -- record owned by that soon-to-be-deleted user, not ownership of that
+  -- external branch. Deleting the tenant account cascades its grants without
+  -- modifying the external branch or its data. Do not block for this.
+  -- Cross-organization MEMBERSHIPS remain blocked because they establish
+  -- multi-tenant ownership rather than an isolated access grant.
 
   IF EXISTS (SELECT 1 FROM public.warehouse_transfers t
       WHERE (t.branch_id=ANY(v_branches)) IS DISTINCT FROM (t.to_branch_id=ANY(v_branches))
