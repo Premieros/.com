@@ -100,7 +100,7 @@ describe('full tenant purge by independent Super Admin',()=>{
           [materialId,'CI-FIFO-'+tag+'-'+suffix,'CI FIFO material',branchId]);
         await db.query(`INSERT INTO public.inventory_ledger(
           id,branch_id,warehouse_id,raw_material_id,quantity,unit_cost,total_cost,entry_type
-        ) VALUES
+        ) OVERRIDING SYSTEM VALUE VALUES
           ($1,$3,$4,$5,-2,5,-10,'sale'),
           ($2,$3,$4,$5,2,5,10,'purchase')`,
           [negativeId,negativeReceipt,branchId,warehouse,materialId]);
