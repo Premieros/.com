@@ -57,6 +57,7 @@ export const APP_ROUTES = {
   financialReports: '/financial-reports',
   accounting: '/accounting',
   accounts: '/accounts',
+  openingBalances: '/opening-balances',
   employeeReceivables: '/employee-receivables',
   payments: '/payments',
   journal: '/journal',
