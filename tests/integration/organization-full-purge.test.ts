@@ -60,6 +60,15 @@ describe('full tenant purge by independent Super Admin',()=>{
         [itemId,orderId,productId]);
       await db.query("INSERT INTO public.order_kitchen_sends(branch_id,order_id,order_item_id,sent_by,sent_quantity) VALUES($1,$2,$3,$4,2)",
         [branchA,orderId,itemId,ownerA]);
+      // Preserve a real-world unsettled kitchen inventory event; the purge
+      // must remove it before the sent-item reduction guard runs.
+      const warehouseId=randomUUID();
+      await db.query("INSERT INTO public.warehouses(id,branch_id,name) VALUES($1,$2,'CI kitchen warehouse')",
+        [warehouseId,branchA]);
+      await db.query(`INSERT INTO public.order_kitchen_inventory_events(
+          branch_id,warehouse_id,order_id,order_item_id,sent_quantity,created_by
+        ) VALUES($1,$2,$3,$4,2,$5)`,
+        [branchA,warehouseId,orderId,itemId,ownerA]);
 
       const preview=await db.query<{result:{success:boolean;eligible:boolean;operational_documents:number;super_admins_preserved:number;blockers:unknown[]}}>(
         "SELECT public.super_admin_preview_organization_deletion($1) result",[orgA]);
