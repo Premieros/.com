@@ -70,6 +70,55 @@ describe('full tenant purge by independent Super Admin',()=>{
         ) VALUES($1,$2,$3,$4,2,$5)`,
         [branchA,warehouseId,orderId,itemId,ownerA]);
 
+      // Exercise actual immutable journal-line evidence (Phase 5L) and verified
+      // ERP delivery receipts (Phase 8B), for both the target and kept tenant.
+      const seedJournal = async (branch:string) => {
+        const {rows} = await db.query<{id:string}>(
+          'SELECT id FROM public.chart_of_accounts WHERE branch_id=$1 ORDER BY code LIMIT 1',[branch]);
+        expect(rows.length).toBe(1);
+        const id=randomUUID();
+        await db.query('INSERT INTO public.journal_entries(id,entry_number,branch_id) VALUES($1,$2,$3)',
+          [id,'CI-EVIDENCE-'+randomUUID().slice(0,11),branch]);
+        await db.query(`INSERT INTO public.journal_entry_lines(journal_entry_id,account_id,debit,credit)
+          VALUES($1,$2,10,0),($1,$2,0,10)`,[id,rows[0].id]);
+        return id;
+      };
+      const journalA=await seedJournal(branchA);
+      const journalB=await seedJournal(branchB);
+      const evidenceCount=async (journal:string) => {
+        const {rows}=await db.query<{n:number}>(
+          'SELECT count(*)::int n FROM private.organization_journal_line_evidence_v2 WHERE journal_entry_id=$1',
+          [journal]);
+        return rows[0].n;
+      };
+      expect(await evidenceCount(journalA)).toBe(2);
+      expect(await evidenceCount(journalB)).toBe(2);
+
+      const worker=await db.query<{v:{delivered:number}}>(
+        "SELECT private.process_erp_domain_outbox_batch_v2('ci-purge-evidence',20) v");
+      expect(worker.rows[0].v.delivered).toBeGreaterThanOrEqual(2);
+      const receiptCount=async (journal:string) => {
+        const {rows}=await db.query<{n:number}>(
+          'SELECT count(*)::int n FROM private.erp_domain_event_receipts_v2 WHERE aggregate_id=$1',
+          [journal]);
+        return rows[0].n;
+      };
+      expect(await receiptCount(journalA)).toBe(1);
+      expect(await receiptCount(journalB)).toBe(1);
+
+      // Without the confirmed purge context, immutable accounting/audit
+      // evidence remains untouchable, including by platform administrators.
+      await db.query('SAVEPOINT protect_immutable_a');
+      await expect(db.query(
+        'DELETE FROM private.organization_journal_line_evidence_v2 WHERE journal_entry_id=$1',[journalA]
+      )).rejects.toThrow(/PHASE5L_IMMUTABLE_LEDGER_EVIDENCE/);
+      await db.query('ROLLBACK TO SAVEPOINT protect_immutable_a');
+      await db.query('SAVEPOINT protect_immutable_receipt');
+      await expect(db.query(
+        'DELETE FROM private.erp_domain_event_receipts_v2 WHERE aggregate_id=$1',[journalA]
+      )).rejects.toThrow(/PHASE8B_IMMUTABLE_DELIVERY_RECEIPT/);
+      await db.query('ROLLBACK TO SAVEPOINT protect_immutable_receipt');
+
       const preview=await db.query<{result:{success:boolean;eligible:boolean;operational_documents:number;super_admins_preserved:number;blockers:unknown[]}}>(
         "SELECT public.super_admin_preview_organization_deletion($1) result",[orgA]);
       expect(preview.rows[0].result,JSON.stringify(preview.rows[0].result)).toMatchObject({
@@ -108,6 +157,10 @@ describe('full tenant purge by independent Super Admin',()=>{
         orgA:0,branchA:0,ownerA:0,authA:0,ticket:0,message:0,
         orgB:1,branchB:1,ownerB:1,authB:1,admin:1,adminAuth:1,
       });
+      expect(await evidenceCount(journalA)).toBe(0);
+      expect(await receiptCount(journalA)).toBe(0);
+      expect(await evidenceCount(journalB)).toBe(2);
+      expect(await receiptCount(journalB)).toBe(1);
     } finally {await db.query('ROLLBACK');}
   });
 });
