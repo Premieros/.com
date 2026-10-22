@@ -963,6 +963,12 @@
       ]
     },
     {
+      "name": "preview_opening_balances",
+      "params": [
+        "branch_id"
+      ]
+    },
+    {
       "name": "process_purchase",
       "params": [
         "branch_id",
