@@ -46,6 +46,19 @@ describe('full tenant purge by independent Super Admin',()=>{
       expect(Number(baseline.rows[0].total)).toBeGreaterThan(0);
       await db.query("SELECT set_config('app.user_id',$1,true)",[adminId]);
 
+      // Reproduce real tenant: open table order with a sent kitchen item.
+      const tableRes=await db.query<{id:string}>(
+        "SELECT id FROM public.dining_tables WHERE branch_id=$1 ORDER BY name LIMIT 1",[branchA]);
+      const orderId=randomUUID(),itemId=randomUUID(),productId=randomUUID();
+      await db.query("INSERT INTO public.products(id,branch_id,name,sale_price) VALUES($1,$2,'CI meal',15)",
+        [productId,branchA]);
+      await db.query("INSERT INTO public.orders(id,order_number,branch_id,table_id,status,cashier_id) VALUES($1,$2,$3,$4,'open',$5)",
+        [orderId,'CI-OPEN-'+suffix,branchA,tableRes.rows[0].id,ownerA]);
+      await db.query("INSERT INTO public.order_items(id,order_id,product_id,quantity,unit_price,total) VALUES($1,$2,$3,2,15,30)",
+        [itemId,orderId,productId]);
+      await db.query("INSERT INTO public.order_kitchen_sends(branch_id,order_id,order_item_id,sent_by,sent_quantity) VALUES($1,$2,$3,$4,2)",
+        [branchA,orderId,itemId,ownerA]);
+
       const preview=await db.query<{result:{success:boolean;eligible:boolean;operational_documents:number;super_admins_preserved:number;blockers:unknown[]}}>(
         "SELECT public.super_admin_preview_organization_deletion($1) result",[orgA]);
       expect(preview.rows[0].result,JSON.stringify(preview.rows[0].result)).toMatchObject({
