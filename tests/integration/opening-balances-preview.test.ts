@@ -41,7 +41,12 @@ describe('opening balances read-only preview', () => {
 
       const response=await db.query<{r:{success:boolean;finished?:number;raw?:number;total?:number;has_opening?:boolean;can_post?:boolean;error?:string}}>(
         'SELECT public.preview_opening_balances($1) r',[branchA]);
-      expect(response.rows[0].r).toMatchObject({
+      const diagnostic=await db.query<{uid:string;branch_allowed:boolean;permission:boolean;role:string}>(`
+        SELECT auth.uid()::text uid,
+          public.user_may_access_branch($1) branch_allowed,
+          public.can_permission('accounts.view') permission,
+          (SELECT role FROM public.users WHERE id=$2) role`,[branchA,ownerA]);
+      expect(response.rows[0].r, JSON.stringify(diagnostic.rows[0])).toMatchObject({
         success:true,finished:84,raw:15,total:99,has_opening:false,can_post:true
       });
 
