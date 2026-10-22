@@ -31,7 +31,7 @@ BEGIN
   -- remain subject to an authenticated operator and permission checks.
   IF TG_TABLE_NAME='dining_tables' AND TG_OP IN ('INSERT','UPDATE') THEN
     IF v_uid IS NULL AND current_setting('app.register_branch',true)='on'
-       AND NEW.name ~ '^Table (0[1-9]|[1-4][0-9]|50)
+       AND NEW.name ~ '^Table (0[1-9]|[1-4][0-9]|50)$'
 
   IF v_is_service_role OR v_is_db_admin THEN
     IF TG_OP='DELETE' THEN RETURN OLD; END IF;
