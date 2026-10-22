@@ -9,12 +9,6 @@ import { WorkAuthorizationAppBoundary } from '@/features/admin/work-authorizatio
 import { PageLoadProgressProvider } from '@/components/PageProgressLoader';
 import { CustomerSupportLauncher } from '@/components/CustomerSupportLauncher';
 
-const FinancialVisibilityAdminControl = lazy(() =>
-  import('@/features/admin/components/FinancialVisibilityAdminControl').then((module) => ({
-    default: module.FinancialVisibilityAdminControl,
-  })),
-);
-
 const PrinterSettingsLauncher = lazy(() =>
   import('@/features/pos/components/settings/PrinterSettingsLauncher').then((module) => ({
     default: module.PrinterSettingsLauncher,
@@ -23,16 +17,10 @@ const PrinterSettingsLauncher = lazy(() =>
 
 function RouteScopedExtras() {
   const { pathname } = useLocation();
-  const onSuperAdmin = pathname === APP_ROUTES.superAdmin;
   const onSettings = pathname.startsWith(APP_ROUTES.settings);
 
   return (
     <>
-      {onSuperAdmin && (
-        <Suspense fallback={null}>
-          <FinancialVisibilityAdminControl />
-        </Suspense>
-      )}
       {onSettings && (
         <Suspense fallback={null}>
           <PrinterSettingsLauncher />
