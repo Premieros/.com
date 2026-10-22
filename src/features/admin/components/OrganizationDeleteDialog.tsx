@@ -105,8 +105,19 @@ export function OrganizationDeleteDialog({
       }
       show(ar ? 'تم حذف المؤسسة المحددة وكل بياناتها بنجاح.' : 'The selected organization and its data were deleted.', 'success');
       onDeleted();
-    } catch {
-      show(ar ? 'تعذر الحذف. لم يتم تأكيد أي حذف؛ راجع التبعيات وأعد الفحص.' : 'Deletion was blocked. Review dependencies and run the preview again.', 'error');
+    } catch (cause) {
+      const error = cause && typeof cause === 'object'
+        ? cause as { code?: string; message?: string }
+        : null;
+      const timedOut = error?.code === '57014' ||
+        /statement timeout|canceling statement due to statement timeout/i.test(error?.message ?? '');
+      show(timedOut
+        ? (ar
+            ? 'انتهت مهلة تنفيذ الحذف في قاعدة البيانات. لم يُؤكَّد حذف المؤسسة؛ تحقق من حالتها قبل إعادة المحاولة.'
+            : 'Database deletion timed out. The organization was not confirmed deleted; verify its status before retrying.')
+        : (ar
+            ? 'تعذر الحذف. لم يتم تأكيد أي حذف؛ راجع التبعيات وأعد الفحص.'
+            : 'Deletion was blocked. Review dependencies and run the preview again.'), 'error');
     } finally {
       setDeleting(false);
     }
