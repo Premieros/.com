@@ -172,6 +172,7 @@ export const accounting = {
     return rpc('upsert_expense_routing_rule', p);
   },
   getTrialBalance(p: { p_branch_id: string | null; p_to_date: string }): ApiResult<TrialBalanceRow[]> { return rpc('get_trial_balance', p); },
+  previewOpeningBalances(p: { p_branch_id: string }): ApiResult<{ success: boolean; error?: string; branch_id?: string; finished?: number; raw?: number; total?: number; has_opening?: boolean; can_post?: boolean; opening_entry?: { id: string; entry_number: string; entry_date: string } | null }> { return rpc('preview_opening_balances', p); },
   seedOpeningBalances(p: { p_branch_id: string | null }): ApiResult<RpcResult> { return rpc('seed_opening_balances', p); },
   getJournals(p: { p_branch_id: string | null; p_from_date: string | null; p_to_date: string | null; p_reference_type: string | null; p_search: string | null }): ApiResult<JournalDto[]> { return rpc('get_journals', p); },
   postManualJournal(p: { p_branch_id: string | null; p_description: string; p_lines: JournalLineInput[] }): ApiResult<RpcResult> { return rpc('post_manual_journal', p); },
