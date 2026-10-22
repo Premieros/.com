@@ -25,6 +25,12 @@ describe('opening balances read-only preview', () => {
         [ownerA,'ci-opening-'+suffix+'@example.invalid']);
       await db.query("INSERT INTO public.users(id,email,full_name,username,role,branch_id,is_active) VALUES($1,$2,'CI Opening owner',$3,'owner',$4,true)",
         [ownerA,'ci-opening-'+suffix+'@example.invalid','ci-opening-'+suffix,branchA]);
+      // CI's pristine role template has no accounting grants. Grant them
+      // inside this rollback-only test to simulate a legitimately permitted
+      // owner, without changing any production role or bypassing the RPC.
+      await db.query(`UPDATE public.roles
+        SET permissions=COALESCE(permissions,'[]'::jsonb) || '["accounts.view","accounts.manage"]'::jsonb
+        WHERE role='owner'`);
       await db.query("INSERT INTO public.products(id,branch_id,name,sale_price) VALUES($1,$2,'Opening product',20)",[productA,branchA]);
       await db.query("INSERT INTO public.raw_materials(id,code,name,branch_id) VALUES($1,$2,'Opening material',$3)",
         [materialA,'CI-OPEN-'+suffix,branchA]);
