@@ -114,6 +114,21 @@ BEGIN
 
   -- Cascade handles all other scoped children of orgs and branches.
   -- Remaining FK checks protect any missed/new dependency.
+  -- PostgreSQL RESTRICT/NO ACTION foreign keys can reject branch cascades
+  -- if accounts happen to be deleted before journal lines / expense records.
+  -- Delete dependent records first. All predicates target only locked branches.
+  DELETE FROM public.expense_routing_rules WHERE branch_id=ANY(v_branches);
+  DELETE FROM public.expenses WHERE branch_id=ANY(v_branches);
+  DELETE FROM public.journal_entry_lines
+    WHERE journal_entry_id IN (
+      SELECT id FROM public.journal_entries WHERE branch_id=ANY(v_branches)
+    );
+  -- Reversals may point to entries in the same organization with a RESTRICT FK.
+  -- Break only internal reversal links before deleting all tenant journals.
+  UPDATE public.journal_entries SET reversal_of=NULL
+    WHERE branch_id=ANY(v_branches) AND reversal_of IS NOT NULL;
+  DELETE FROM public.journal_entries WHERE branch_id=ANY(v_branches);
+
   DELETE FROM public.organizations WHERE id=p_organization_id;
 
   -- Deleting the org cascades only its local application user profiles.
