@@ -11,8 +11,8 @@ describe('full tenant purge by independent Super Admin',()=>{
   afterAll(async()=>{await db.end();});
 
   it('deletes a populated active organization while keeping other tenants and global Super Admin',async()=>{
-    const [orgA,orgB,branchA,branchB,ownerA,ownerB,adminId]=
-      Array.from({length:7},()=>randomUUID());
+    const [orgA,orgB,branchA,branchB,ownerA,ownerB,adminId,staffA]=
+      Array.from({length:8},()=>randomUUID());
     const suffix=randomUUID().slice(0,10);
     const name='CI Tenant purge '+suffix;
     await db.query('BEGIN');
@@ -25,12 +25,18 @@ describe('full tenant purge by independent Super Admin',()=>{
       for(const [id,role,home,mail] of [
         [ownerA,'owner',branchA,'ci-owner-a-'+suffix+'@example.invalid'],
         [ownerB,'owner',branchB,'ci-owner-b-'+suffix+'@example.invalid'],
-        [adminId,'super_admin',branchB,'ci-sys-'+suffix+'@example.invalid']
+        [adminId,'super_admin',branchB,'ci-sys-'+suffix+'@example.invalid'],
+        [staffA,'cashier',branchA,'ci-staff-'+suffix+'@example.invalid']
       ]) {
         await db.query("INSERT INTO auth.users(id,email) VALUES($1,$2)",[id,mail]);
         await db.query("INSERT INTO public.users(id,email,full_name,username,role,branch_id,is_active) VALUES($1,$2,'CI Test User',$3,$4,$5,true)",
           [id,mail,'ci-user-'+id.slice(0,12),role,home]);
       }
+      // A tenant-owned cashier has an old explicit access grant to the
+      // other organization's branch. Purging the tenant must remove ONLY
+      // this grant and cashier's identity, never that foreign branch.
+      await db.query("INSERT INTO public.user_branch_access(user_id,branch_id) VALUES($1,$2)",
+        [staffA,branchB]);
       const messageId=randomUUID(),conversationId=randomUUID();
       await db.query("INSERT INTO public.support_conversations(id,organization_id,branch_id,created_by,subject) VALUES($1,$2,$3,$4,'CI support ticket')",
         [conversationId,orgA,branchA,ownerA]);
@@ -54,7 +60,7 @@ describe('full tenant purge by independent Super Admin',()=>{
       const outcome=await db.query<{result:{success:boolean;deleted?:boolean;error?:string;auth_accounts_deleted?:number}}>(
         "SELECT public.super_admin_delete_organization($1,$2,'DELETE') result",[orgA,name]);
       expect(outcome.rows[0].result,JSON.stringify(outcome.rows[0].result)).toMatchObject({
-        success:true,deleted:true,auth_accounts_deleted:1
+        success:true,deleted:true,auth_accounts_deleted:2
       });
 
       const post=await db.query<{
