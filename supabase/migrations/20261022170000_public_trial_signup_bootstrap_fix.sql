@@ -250,6 +250,7 @@ DECLARE
   v_global_currency text;
   v_res jsonb;
   v_slug text;
+  v_context text;
 BEGIN
   v_email := lower(btrim(p_email));
 
@@ -341,7 +342,8 @@ BEGIN
     'trial_days', 14
   );
 EXCEPTION WHEN OTHERS THEN
-  RETURN jsonb_build_object('success', false, 'error', 'TENANT_REGISTRATION_FAILED', 'detail', SQLERRM);
+  GET STACKED DIAGNOSTICS v_context = PG_EXCEPTION_CONTEXT;
+  RETURN jsonb_build_object('success', false, 'error', 'TENANT_REGISTRATION_FAILED', 'detail', SQLERRM, 'context', v_context);
 END;
 $function$
 ;
