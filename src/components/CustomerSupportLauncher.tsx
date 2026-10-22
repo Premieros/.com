@@ -219,6 +219,7 @@ export function CustomerSupportLauncher() {
 
             {messages.map((message) => {
               const supportMessage = message.sender_kind === 'support';
+              const aiMessage = supportMessage && !message.sender_user_id;
               return (
                 <div key={message.id} className={`flex ${supportMessage ? 'justify-start' : 'justify-end'}`}>
                   <div className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-5 ${
@@ -227,7 +228,7 @@ export function CustomerSupportLauncher() {
                       : 'rounded-ee-md bg-ui-primary text-ui-primary-fg'
                   }`}>
                     {supportMessage && (
-                      <p className="mb-1 text-[10px] font-black opacity-70">{ar ? 'خدمة العملاء' : 'Support'}</p>
+                      <p className="mb-1 text-[10px] font-black opacity-70">{aiMessage ? (ar ? 'مساعد Premier الآلي' : 'Premier automated assistant') : (ar ? 'خدمة العملاء' : 'Support')}</p>
                     )}
                     <p className="whitespace-pre-wrap">{message.body}</p>
                     <time className="mt-1 block text-[9px] opacity-60" dateTime={message.created_at}>
