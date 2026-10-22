@@ -22,7 +22,7 @@ async function fetchBranchesForUser(userId: string, force = false): Promise<Bran
     branchCacheByUser.set(userId, next);
     try {
       if (typeof localStorage !== 'undefined' && next.length > 0) {
-        localStorage.setItem('premier:cached_branches', JSON.stringify(next));
+        localStorage.setItem(`premier:cached_branches:${userId}`, JSON.stringify(next));
       }
     } catch {
       // ignore
@@ -50,7 +50,7 @@ function getInitialBranches(userId: string | null): Branch[] {
   if (inMem && inMem.length > 0) return inMem;
   try {
     if (typeof localStorage !== 'undefined') {
-      const saved = localStorage.getItem('premier:cached_branches');
+      const saved = localStorage.getItem(`premier:cached_branches:${userId}`);
       if (saved) return JSON.parse(saved) as Branch[];
     }
   } catch {
@@ -103,6 +103,8 @@ export function useBranches() {
       return;
     }
 
+    // Reset immediately on identity change; never show the previous tenant's branches.
+    setBranches(getInitialBranches(userId));
     const sessionCached = branchCacheByUser.get(userId);
     if (sessionCached !== undefined) {
       setBranches(sessionCached);
