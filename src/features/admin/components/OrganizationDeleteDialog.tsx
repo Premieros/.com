@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { AlertTriangle, Loader2, Trash2 } from 'lucide-react';
 import { admin } from '@/api';
 import { Button } from '@/components/Button';
@@ -48,6 +48,13 @@ const displayBlocker = (blocker: string | { code: string; table?: string; count?
     `${label}${blocker.table ? ` (${blocker.table}: ${blocker.count ?? '?'})` : ''}`;
 };
 
+type DeletionJob = {
+  success?: boolean;
+  job_id?: string;
+  status?: 'none' | 'queued' | 'claimed' | 'succeeded' | 'failed';
+  error?: string;
+};
+
 export function OrganizationDeleteDialog({
   target,
   onClose,
@@ -66,9 +73,13 @@ export function OrganizationDeleteDialog({
   const [name, setName] = useState('');
   const [phrase, setPhrase] = useState('');
   const [acknowledged, setAcknowledged] = useState(false);
+  const [job, setJob] = useState<DeletionJob | null>(null);
+  const completedJobRef = useRef<string | null>(null);
 
   useEffect(() => {
     setPreview(null);
+    setJob(null);
+    completedJobRef.current = null;
     setName('');
     setPhrase('');
     setAcknowledged(false);
@@ -82,19 +93,51 @@ export function OrganizationDeleteDialog({
       })
       .catch(() => { if (!cancelled) setPreview({ success: false, error: 'PREVIEW_FAILED' }); })
       .finally(() => { if (!cancelled) setLoading(false); });
+    void admin.organizationDeletionStatus({ p_organization_id: target.organization_id })
+      .then(({ data, error }) => {
+        if (!cancelled && !error && data?.success) setJob(data);
+      })
+      .catch(() => {});
     return () => { cancelled = true; };
   }, [target?.organization_id]);
 
+  // Cron runs on the server. Closing/reopening the dialog does not stop it.
+  // Polling provides the current queued / running / complete state.
+  useEffect(() => {
+    if (!target?.organization_id || (job?.status !== 'queued' && job?.status !== 'claimed')) return;
+    let cancelled = false;
+    const refresh = async () => {
+      try {
+        const { data, error } = await admin.organizationDeletionStatus({
+          p_organization_id: target.organization_id,
+        });
+        if (cancelled || error || !data?.success) return;
+        setJob(data);
+        if (data.status === 'succeeded' && data.job_id && completedJobRef.current !== data.job_id) {
+          completedJobRef.current = data.job_id;
+          show(lang === 'ar' ? 'اكتمل حذف المؤسسة وبياناتها بنجاح.' : 'The organization and its records have been deleted.', 'success');
+          onDeleted();
+        }
+      } catch {
+        // Keep the last known job state and poll again; never infer deletion.
+      }
+    };
+    void refresh();
+    const timer = window.setInterval(() => { void refresh(); }, 5000);
+    return () => { cancelled = true; window.clearInterval(timer); };
+  }, [target?.organization_id, job?.status, lang, onDeleted, show]);
+
   if (!target) return null;
 
-  const permitted = preview?.success && preview.eligible &&
+  const jobPending = job?.status === 'queued' || job?.status === 'claimed';
+  const permitted = preview?.success && preview.eligible && !jobPending &&
     name === target.organization_name && phrase === 'DELETE' && acknowledged && !loading && !deleting;
 
   const deleteOrganization = async () => {
     if (!permitted) return;
     setDeleting(true);
     try {
-      const { data, error } = await admin.deleteOrganization({
+      const { data, error } = await admin.queueOrganizationDeletion({
         p_organization_id: target.organization_id,
         p_confirm_name: name,
         p_confirm_phrase: phrase,
@@ -103,8 +146,8 @@ export function OrganizationDeleteDialog({
         if (data?.preview) setPreview(data.preview);
         throw error || new Error(data?.error || 'DELETE_BLOCKED');
       }
-      show(ar ? 'تم حذف المؤسسة المحددة وكل بياناتها بنجاح.' : 'The selected organization and its data were deleted.', 'success');
-      onDeleted();
+      setJob(data);
+      show(ar ? 'تم استلام طلب الحذف. ستُنفَّذ العملية على الخادم ويمكنك متابعة حالتها هنا.' : 'Deletion was queued. The server will process it and this dialog will show the result.', 'success');
     } catch (cause) {
       const error = cause && typeof cause === 'object'
         ? cause as { code?: string; message?: string }
@@ -155,6 +198,30 @@ export function OrganizationDeleteDialog({
           )}
         </div>
 
+        {job && job.status !== 'none' && (
+          <div className="rounded-xl border border-ui-border bg-ui-page-alt p-3 text-xs" role="status" data-testid="organization-delete-job-status">
+            <p className="font-bold text-ui-text">
+              {job.status === 'queued'
+                ? (ar ? 'طلب الحذف في قائمة الانتظار' : 'Deletion queued')
+                : job.status === 'claimed'
+                  ? (ar ? 'جارٍ تنفيذ الحذف في قاعدة البيانات' : 'Server is deleting the organization')
+                  : job.status === 'succeeded'
+                    ? (ar ? 'اكتمل الحذف بنجاح' : 'Deletion completed')
+                    : (ar ? 'فشلت عملية الحذف' : 'Deletion failed')}
+            </p>
+            {(job.status === 'queued' || job.status === 'claimed') && (
+              <p className="mt-1 text-ui-muted">
+                {ar ? 'يمكنك إغلاق النافذة والعودة لاحقًا. لا تُعد إرسال طلب الحذف.' : 'You can close this dialog and return later. Do not submit a duplicate deletion.'}
+              </p>
+            )}
+            {job.status === 'failed' && (
+              <p className="mt-1 text-ui-danger">
+                {ar ? 'سبب الفشل' : 'Error'}: {job.error || (ar ? 'لم يكتمل الحذف' : 'Deletion did not complete')}
+              </p>
+            )}
+          </div>
+        )}
+
         {preview && (!preview.success || !preview.eligible) && (
           <div className="rounded-xl border border-ui-danger/30 p-3 text-xs text-ui-danger" role="alert">
             <p className="font-bold">{ar ? 'الحذف موقوف لحماية بيانات مشتركة مع مؤسسة أخرى:' : 'Deletion is blocked to protect shared records:'}</p>
@@ -201,7 +268,7 @@ export function OrganizationDeleteDialog({
             onClick={() => void deleteOrganization()}
           >
             {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
-            {ar ? 'حذف المؤسسة نهائيًا' : 'Permanently delete'}
+            {jobPending ? (ar ? 'الحذف قيد التنفيذ' : 'Deletion in progress') : (ar ? 'طلب الحذف النهائي' : 'Request permanent deletion')}
           </Button>
         </div>
       </div>
