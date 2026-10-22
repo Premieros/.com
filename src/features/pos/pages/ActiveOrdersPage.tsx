@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Plus, Pencil, Trash2, Users, UtensilsCrossed, Clock,
@@ -49,6 +49,7 @@ export function ActiveOrdersPage() {
   const [products, setProducts] = useState<{ id: string; name: string; name_en: string | null }[]>([]);
   const [cashiers, setCashiers] = useState<CashierOption[]>([]);
   const [areasLoading, setAreasLoading] = useState(false);
+  const [areasError, setAreasError] = useState('');
   const [orderTypeFilter, setOrderTypeFilter] = useState<OrderType | ''>('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'held'>('all');
   const [busy, setBusy] = useState(false);
@@ -56,6 +57,8 @@ export function ActiveOrdersPage() {
   const [tableTarget, setTableTarget] = useState<DiningTable | null>(null);
   const [editTarget, setEditTarget] = useState<DiningTable | null>(null);
   const [areaModal, setAreaModal] = useState(false);
+  const [areaSaving, setAreaSaving] = useState(false);
+  const [areaTarget, setAreaTarget] = useState<DiningArea | null>(null);
   const [tableModal, setTableModal] = useState(false);
   const [mainAreaCountModal, setMainAreaCountModal] = useState(false);
   const [mainAreaCount, setMainAreaCount] = useState(50);
@@ -67,6 +70,8 @@ export function ActiveOrdersPage() {
   });
 
   const effectiveBranch = branchFilter || user?.branch_id || '';
+  const activeAreaBranchRef = useRef(effectiveBranch);
+  activeAreaBranchRef.current = effectiveBranch;
   const canManage = can('floor_plan.manage');
   const canCreateOrder = can('pos.order.create');
   const canPayOrder = can('pos.payment.take');
@@ -77,13 +82,22 @@ export function ActiveOrdersPage() {
   const { orders, tables, counts, ordersByTable, itemsByOrder, loading, error } = useActiveOrders(effectiveBranch);
 
   const loadAreas = async () => {
-    if (!effectiveBranch) { setAreas([]); return; }
+    const branchId = effectiveBranch;
+    if (!branchId) { setAreas([]); setAreasError(''); return; }
     setAreasLoading(true);
     try {
-      const { data } = await supabase.from('dining_areas').select('*').eq('branch_id', effectiveBranch).order('sort_order');
-      setAreas((data as DiningArea[]) || []);
+      const { data, error: fetchError } = await supabase.from('dining_areas')
+        .select('*').eq('branch_id', branchId).order('sort_order');
+      if (activeAreaBranchRef.current !== branchId) return;
+      if (fetchError) {
+        setAreas([]);
+        setAreasError(userFacingErrorMessage(fetchError, isAr ? 'ar' : 'en'));
+      } else {
+        setAreas((data as DiningArea[]) || []);
+        setAreasError('');
+      }
     } finally {
-      setAreasLoading(false);
+      if (activeAreaBranchRef.current === branchId) setAreasLoading(false);
     }
   };
 
@@ -202,14 +216,61 @@ export function ActiveOrdersPage() {
     setBusy(false);
   };
 
-  const createArea = async () => {
-    if (!areaName.trim()) { show(t('required'), 'error'); return; }
-    const { error } = await supabase.from('dining_areas').insert({ name: areaName.trim(), branch_id: effectiveBranch });
-    if (error) { show(userFacingErrorMessage(error, isAr ? 'ar' : 'en'), 'error'); return; }
-    show(t('saveSuccess'), 'success');
+  const openCreateArea = () => {
+    setAreaTarget(null);
     setAreaName('');
-    setAreaModal(false);
-    await loadAreas();
+    setAreaModal(true);
+  };
+
+  const openRenameArea = (area: DiningArea) => {
+    if (!effectiveBranch || area.branch_id !== effectiveBranch || area.is_default) return;
+    setAreaTarget(area);
+    setAreaName(area.name);
+    setAreaModal(true);
+  };
+
+  const saveArea = async () => {
+    const name = areaName.trim();
+    if (!effectiveBranch) {
+      show(isAr ? 'اختر الفرع أولًا.' : 'Select a branch first.', 'error');
+      return;
+    }
+    if (!name || name.length > 100) {
+      show(isAr ? 'اسم المنطقة مطلوب ويجب ألا يزيد عن 100 حرف.' : 'Area name is required (maximum 100 characters).', 'error');
+      return;
+    }
+    if (areas.some((area) => area.id !== areaTarget?.id && area.name.trim().toLocaleLowerCase() === name.toLocaleLowerCase())) {
+      show(isAr ? 'توجد منطقة بنفس الاسم في هذا الفرع.' : 'An area with this name already exists in this branch.', 'error');
+      return;
+    }
+    if (areaSaving) return;
+    setAreaSaving(true);
+    try {
+      const { data, error: saveError } = areaTarget
+        ? await api.floorPlan.renameArea({ p_area_id: areaTarget.id, p_name: name })
+        : await api.floorPlan.createArea({ p_branch_id: effectiveBranch, p_name: name });
+      if (saveError) {
+        show(userFacingErrorMessage(saveError, isAr ? 'ar' : 'en'), 'error');
+        return;
+      }
+      const result = data as RpcResult | null;
+      if (!result?.success) {
+        const message = result?.error === 'AREA_NAME_EXISTS'
+          ? (isAr ? 'توجد منطقة بنفس الاسم في هذا الفرع.' : 'An area with this name already exists in this branch.')
+          : result?.error === 'DEFAULT_AREA_FIXED'
+            ? (isAr ? 'المنطقة الأساسية محمية ولا يمكن تعديل اسمها.' : 'The Main Area name is protected.')
+            : userFacingErrorMessage(result ?? t('error'), isAr ? 'ar' : 'en');
+        show(message, 'error');
+        return;
+      }
+      show(isAr ? (areaTarget ? 'تم تحديث اسم المنطقة.' : 'تم إنشاء المنطقة. أضف الطاولات إليها.') : (areaTarget ? 'Area renamed.' : 'Area created. You can now add tables.'), 'success');
+      setAreaModal(false);
+      setAreaTarget(null);
+      setAreaName('');
+      await loadAreas();
+    } finally {
+      setAreaSaving(false);
+    }
   };
 
   const openAddTable = (areaId = '') => {
@@ -271,10 +332,23 @@ export function ActiveOrdersPage() {
       show(isAr ? 'المنطقة الأساسية ثابتة ولا يمكن حذفها.' : 'Main Area is fixed and cannot be deleted.', 'error');
       return;
     }
-    if (!window.confirm(isAr ? `حذف المنطقة "${area.name}"؟` : `Delete area "${area.name}"?`)) return;
-    const { error } = await supabase.from('dining_areas').delete().eq('id', area.id);
-    if (error) { show(userFacingErrorMessage(error, isAr ? 'ar' : 'en'), 'error'); return; }
-    show(isAr ? 'تم الحذف' : 'Deleted', 'success');
+    if (!effectiveBranch || area.branch_id !== effectiveBranch) return;
+    const tableCount = tables.filter((table) => table.area_id === area.id).length;
+    if (tableCount > 0) {
+      show(isAr ? `المنطقة تحتوي على ${tableCount} طاولة. انقل الطاولات أولًا قبل حذف المنطقة.` : `This area contains ${tableCount} table(s). Move them before deleting the area.`, 'error');
+      return;
+    }
+    if (!window.confirm(isAr ? `حذف المنطقة الفارغة "${area.name}"؟` : `Delete empty area "${area.name}"?`)) return;
+    const { data, error: deleteError } = await api.floorPlan.deleteArea({ p_area_id: area.id });
+    if (deleteError) { show(userFacingErrorMessage(deleteError, isAr ? 'ar' : 'en'), 'error'); return; }
+    const result = data as RpcResult | null;
+    if (!result?.success) {
+      show(result?.error === 'AREA_HAS_TABLES'
+        ? (isAr ? 'تعذر الحذف: المنطقة تحتوي على طاولات. انقلها أولًا.' : 'Cannot delete an area with tables. Move them first.')
+        : userFacingErrorMessage(result ?? t('error'), isAr ? 'ar' : 'en'), 'error');
+      return;
+    }
+    show(isAr ? 'تم حذف المنطقة الفارغة.' : 'Empty area deleted.', 'success');
     await loadAreas();
   };
 
@@ -342,7 +416,7 @@ export function ActiveOrdersPage() {
           <>
             {canManage && (
               <>
-                <Button variant="outline" onClick={() => setAreaModal(true)}>
+                <Button variant="outline" onClick={openCreateArea} disabled={!effectiveBranch}>
                   <Plus className="w-4 h-4" /> {t('addArea')}
                 </Button>
                 <Button onClick={() => openAddTable()}>
@@ -381,6 +455,11 @@ export function ActiveOrdersPage() {
                 {userFacingErrorMessage(error, isAr ? 'ar' : 'en')}
               </DesignPanel>
             )}
+            {areasError && (
+              <DesignPanel className="text-sm text-ui-danger border-ui-danger/30 bg-ui-danger/10" bodyClassName="p-3">
+                {areasError}
+              </DesignPanel>
+            )}
             <TableFloorPlan
               areas={areas}
               tables={tables}
@@ -388,7 +467,9 @@ export function ActiveOrdersPage() {
               canManage={canManage}
               currency="EGP"
               onSelectTable={setTableTarget}
+              onAddArea={openCreateArea}
               onAddTable={openAddTable}
+              onRenameArea={openRenameArea}
               onDeleteArea={deleteArea}
               onEditDefaultAreaCount={openMainAreaCountEditor}
             />
@@ -579,14 +660,33 @@ export function ActiveOrdersPage() {
         </div>
       </Modal>
 
-      <Modal open={areaModal} onClose={() => setAreaModal(false)} title={t('addArea')} size="sm">
-        <div className="space-y-4">
+      <Modal
+        open={areaModal}
+        onClose={() => { if (!areaSaving) { setAreaModal(false); setAreaTarget(null); setAreaName(''); } }}
+        title={areaTarget ? (isAr ? 'تعديل اسم المنطقة' : 'Rename area') : t('addArea')}
+        size="sm"
+      >
+        <form className="space-y-4" onSubmit={(event) => { event.preventDefault(); void saveArea(); }}>
           <div>
-            <label className="block text-sm font-medium text-ui-muted mb-1.5">{t('areaName')}</label>
-            <input value={areaName} onChange={(e) => setAreaName(e.target.value)} placeholder={isAr ? 'مثال: التراس' : 'e.g. Terrace'} className="w-full px-3 py-2.5 rounded-xl border border-ui-border bg-ui-surface-raised text-sm text-ui-text focus:ring-2 focus:ring-ui-ring" />
+            <label htmlFor="floor-area-name" className="block text-sm font-medium text-ui-muted mb-1.5">{t('areaName')}</label>
+            <input
+              id="floor-area-name"
+              data-testid="floor-area-name"
+              value={areaName}
+              onChange={(event) => setAreaName(event.target.value)}
+              placeholder={isAr ? 'مثال: التراس' : 'e.g. Terrace'}
+              maxLength={100}
+              autoComplete="off"
+              required
+              disabled={areaSaving}
+              className="w-full px-3 py-2.5 rounded-xl border border-ui-border bg-ui-surface-raised text-sm text-ui-text focus:ring-2 focus:ring-ui-ring"
+            />
+            <p className="mt-1.5 text-xs text-ui-muted">{isAr ? 'تظهر المنطقة فورًا ويمكنك إضافة الطاولات إليها لاحقًا.' : 'Areas appear immediately; tables can be added later.'}</p>
           </div>
-          <Button className="w-full" onClick={createArea}>{t('saveSuccess')}</Button>
-        </div>
+          <Button data-testid="floor-area-save" type="submit" className="w-full" disabled={areaSaving || !areaName.trim() || !effectiveBranch}>
+            {areaSaving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (areaTarget ? (isAr ? 'حفظ التعديل' : 'Save changes') : (isAr ? 'إنشاء المنطقة' : 'Create area'))}
+          </Button>
+        </form>
       </Modal>
 
       <Modal open={tableModal} onClose={() => { setTableModal(false); setEditTarget(null); }} title={editTarget ? `${isAr ? 'تعديل' : 'Edit'} ${editTarget.name}` : t('addTable')} size="md">

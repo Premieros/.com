@@ -36,7 +36,9 @@ interface TableFloorPlanProps {
   canManage: boolean;
   currency: string;
   onSelectTable: (table: DiningTable) => void;
+  onAddArea: () => void;
   onAddTable: (areaId?: string) => void;
+  onRenameArea: (area: DiningArea) => void;
   onDeleteArea: (area: DiningArea) => void;
   onEditDefaultAreaCount: (area: DiningArea, currentCount: number) => void;
 }
@@ -48,7 +50,9 @@ export function TableFloorPlan({
   canManage,
   currency,
   onSelectTable,
+  onAddArea,
   onAddTable,
+  onRenameArea,
   onDeleteArea,
   onEditDefaultAreaCount,
 }: TableFloorPlanProps) {
@@ -100,7 +104,7 @@ export function TableFloorPlan({
         <Grid3x3 className="w-16 h-16 mx-auto mb-4 opacity-30" />
         <p className="text-lg font-medium">{isAr ? 'لا توجد مناطق أو طاولات بعد' : 'No areas or tables yet'}</p>
         {canManage && (
-          <Button className="mt-4" onClick={() => onAddTable()}>
+          <Button className="mt-4" onClick={onAddArea}>
             <Plus className="w-4 h-4" /> {t('addArea')}
           </Button>
         )}
@@ -112,9 +116,8 @@ export function TableFloorPlan({
     <div className="space-y-5">
       {areas.map((area) => {
         const areaTables = tables.filter((tb) => tb.area_id === area.id);
-        if (areaTables.length === 0) return null;
         return (
-          <Card key={area.id} className="p-4">
+          <Card key={area.id} className="p-4" data-testid={`dining-area-${area.id}`}>
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-sm font-bold text-ui-text flex items-center gap-2">
                 <MapPin className="w-4 h-4 text-ui-accent" />
@@ -128,7 +131,10 @@ export function TableFloorPlan({
                       <button onClick={() => onAddTable(area.id)} className="p-1.5 rounded-lg text-ui-subtle hover:text-ui-accent hover:bg-ui-page-alt" title={t('addTable')}>
                         <Plus className="w-4 h-4" />
                       </button>
-                      <button onClick={() => onDeleteArea(area)} className="p-1.5 rounded-lg text-ui-subtle hover:text-ui-danger hover:bg-ui-danger/10" title={isAr ? 'حذف المنطقة' : 'Delete area'}>
+                      <button type="button" onClick={() => onRenameArea(area)} className="p-1.5 rounded-lg text-ui-subtle hover:text-ui-accent hover:bg-ui-page-alt" aria-label={isAr ? `تعديل منطقة ${area.name}` : `Rename area ${area.name}`} title={isAr ? 'تعديل اسم المنطقة' : 'Rename area'}>
+                        <Pencil className="w-4 h-4" />
+                      </button>
+                      <button type="button" onClick={() => onDeleteArea(area)} className="p-1.5 rounded-lg text-ui-subtle hover:text-ui-danger hover:bg-ui-danger/10" aria-label={isAr ? `حذف منطقة ${area.name}` : `Delete area ${area.name}`} title={isAr ? 'حذف المنطقة' : 'Delete area'}>
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </>
@@ -153,7 +159,16 @@ export function TableFloorPlan({
                 </div>
               )}
             </div>
-            {renderCanvas(areaTables)}
+            {areaTables.length ? renderCanvas(areaTables) : (
+              <div className="rounded-xl border border-dashed border-ui-border bg-ui-page-alt p-6 text-center" data-testid="dining-area-empty">
+                <p className="mb-3 text-xs font-bold text-ui-muted">{isAr ? 'المنطقة أنشئت بنجاح، لكن لا توجد طاولات فيها بعد.' : 'Area created. No tables have been added yet.'}</p>
+                {canManage && !area.is_default && (
+                  <Button variant="outline" size="sm" onClick={() => onAddTable(area.id)}>
+                    <Plus className="h-4 w-4" /> {t('addTable')}
+                  </Button>
+                )}
+              </div>
+            )}
           </Card>
         );
       })}
