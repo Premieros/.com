@@ -93,7 +93,7 @@ describe('full tenant purge by independent Super Admin',()=>{
       // receipt ledger rows; unrelated tenant's records must survive.
       const seedRawFifo = async (branchId:string, warehouse:string, tag:string) => {
         const materialId=randomUUID(),debtId=randomUUID();
-        const negativeId=(-BigInt('0x'+randomUUID().replaceAll('-','').slice(0,12))).toString();
+        const negativeId=(-BigInt('0x'+randomUUID().replace(/-/g,'').slice(0,12))).toString();
         const negativeReceipt=(BigInt(negativeId)-1n).toString();
         await db.query(
           "INSERT INTO public.raw_materials(id,code,name,branch_id) VALUES($1,$2,$3,$4)",
