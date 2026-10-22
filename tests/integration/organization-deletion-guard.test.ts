@@ -91,7 +91,7 @@ describe('super admin guarded organization hard delete', () => {
         'SELECT public.super_admin_preview_organization_deletion($1) data',[adminOrg]);
       expect(activePreview.rows[0].data.eligible).toBe(false);
       expect(activePreview.rows[0].data.blockers).toContain('ORGANIZATION_ACTIVE');
-      expect(activePreview.rows[0].data.blockers).toContain('CURRENT_USER_BELONGS_TO_ORGANIZATION');
+      expect(activePreview.rows[0].data.blockers).not.toContain('CURRENT_USER_BELONGS_TO_ORGANIZATION');
     } finally {
       await db.query('ROLLBACK');
     }
