@@ -20,6 +20,7 @@ type DeletionPreview = {
   branches?: number;
   users?: number;
   operational_documents?: number;
+  super_admins_preserved?: number;
   blockers?: Array<string | { code: string; table?: string; count?: number }>;
 };
 
@@ -33,7 +34,13 @@ const displayBlocker = (blocker: string | { code: string; table?: string; count?
     SHARED_ORGANIZATION_MEMBER: ['يوجد مستخدمون مرتبطون بمؤسسة أخرى.', 'Some users belong to another organization.'],
     USER_WITH_CROSS_ORGANIZATION_BRANCH_ACCESS: ['توجد صلاحيات مستخدمين على فروع أخرى.', 'Some users have access to other organizations.'],
     CROSS_ORGANIZATION_STOCK_TRANSFER: ['توجد تحويلات مرتبطة بمؤسسة أخرى.', 'Cross-organization transfer detected.'],
-    OPERATIONAL_HISTORY_PRESENT: ['تحتوي على معاملات تشغيلية أو مالية ويُمنع حذفها تلقائيًا.', 'Has financial or operational history and cannot be automatically deleted.'],
+    OPERATIONAL_HISTORY_PRESENT: ['توجد معاملات تشغيلية قديمة، ولكنها لا تمنع الحذف الشامل.', 'Operational history exists, but it does not prohibit full tenant deletion.'],
+    CROSS_ORGANIZATION_DEPENDENCIES: ['توجد بيانات متصلة بمؤسسة أخرى؛ الحذف موقوف لحمايتها.', 'Some records are linked to another organization. Deletion is stopped to protect them.'],
+    CROSS_ORGANIZATION_MEMBERSHIP: ['توجد عضوية مستخدم في مؤسسة أخرى.', 'A user is also a member of another organization.'],
+    CROSS_ORGANIZATION_USER_ACCESS: ['توجد صلاحيات وصول على فرع مؤسسة أخرى.', 'A user has access to a branch outside this organization.'],
+    CROSS_ORGANIZATION_WAREHOUSE_TRANSFER: ['توجد تحويلات مخزنية مرتبطة بفروع خارج المؤسسة.', 'A warehouse transfer references a branch outside the organization.'],
+    CROSS_ORGANIZATION_TREASURY_TRANSFER: ['توجد تحويلات مالية مرتبطة بفروع خارج المؤسسة.', 'A financial transfer references another organization.'],
+    CROSS_OR_UNSCOPED_USER_REFERENCE: ['توجد سجلات مستخدم مرتبطة بجهة أخرى أو غير محددة النطاق.', 'A user has references outside this organization or with ambiguous scope.'],
     RESTRICTED_DEPENDENCY: ['توجد سجلات ذات علاقات محمية تمنع الحذف.', 'Protected dependent records prevent deletion.'],
   };
   const label = labels[code]?.[ar ? 0 : 1] ?? code;
@@ -80,14 +87,14 @@ export function OrganizationDeleteDialog({
 
   if (!target) return null;
 
-  const permitted = !target.is_active && preview?.success && preview.eligible &&
+  const permitted = preview?.success && preview.eligible &&
     name === target.organization_name && phrase === 'DELETE' && acknowledged && !loading && !deleting;
 
   const deleteOrganization = async () => {
     if (!permitted) return;
     setDeleting(true);
     try {
-      const { data, error } = await admin.deleteEmptyOrganization({
+      const { data, error } = await admin.deleteOrganization({
         p_organization_id: target.organization_id,
         p_confirm_name: name,
         p_confirm_phrase: phrase,
@@ -96,7 +103,7 @@ export function OrganizationDeleteDialog({
         if (data?.preview) setPreview(data.preview);
         throw error || new Error(data?.error || 'DELETE_BLOCKED');
       }
-      show(ar ? 'تم حذف المؤسسة التجريبية وبياناتها المؤهلة بنجاح' : 'The eligible test organization was permanently deleted', 'success');
+      show(ar ? 'تم حذف المؤسسة المحددة وكل بياناتها بنجاح.' : 'The selected organization and its data were deleted.', 'success');
       onDeleted();
     } catch {
       show(ar ? 'تعذر الحذف. لم يتم تأكيد أي حذف؛ راجع التبعيات وأعد الفحص.' : 'Deletion was blocked. Review dependencies and run the preview again.', 'error');
@@ -109,7 +116,7 @@ export function OrganizationDeleteDialog({
     <Modal
       open={Boolean(target)}
       onClose={() => { if (!deleting) onClose(); }}
-      title={ar ? 'حذف مؤسسة تجريبية وبياناتها نهائيًا' : 'Permanently delete test organization'}
+      title={ar ? 'حذف المؤسسة وجميع بياناتها' : 'Permanently delete organization and all data'}
       size="md"
     >
       <div className="space-y-4" data-testid="organization-delete-dialog">
@@ -118,8 +125,8 @@ export function OrganizationDeleteDialog({
           <div className="text-xs leading-6">
             <p className="font-black text-ui-danger">{ar ? 'حذف نهائي لا يمكن التراجع عنه' : 'Permanent and irreversible deletion'}</p>
             <p>{ar
-              ? 'يُسمح فقط للمؤسسات غير النشطة التي لا تحتوي على معاملات مالية أو تشغيلية. سيُحذف سجل المؤسسة وفروعها وإعداداتها وحسابات مستخدميها المخصصة.'
-              : 'Only inactive organizations without operational or financial transactions are eligible. Their organization, branches, setup data and dedicated user accounts will be removed.'}</p>
+              ? 'سيحذف هذا الإجراء جميع بيانات المؤسسة المختارة، حتى لو كانت نشطة: الفروع، المستخدمين، المبيعات، المخزون، القيود والمحادثات. حسابات Super Admin المستقلة وبيانات المؤسسات الأخرى محمية. لا يمكن التراجع عن الحذف.'
+              : 'This deletes ALL data in the selected organization, even if active: branches, users, sales, inventory, accounts and chats. Global Super Admins and other tenants are protected. This cannot be undone.'}</p>
           </div>
         </div>
 
@@ -132,13 +139,14 @@ export function OrganizationDeleteDialog({
               <span>{ar ? 'الفروع' : 'Branches'}: {preview.branches ?? '-'}</span>
               <span>{ar ? 'المستخدمون' : 'Users'}: {preview.users ?? '-'}</span>
               <span>{ar ? 'المعاملات' : 'Transactions'}: {preview.operational_documents ?? '-'}</span>
+              <span>{ar ? 'مديرو النظام المحميون' : 'Protected platform admins'}: {preview.super_admins_preserved ?? '-'}</span>
             </div>
           )}
         </div>
 
         {preview && (!preview.success || !preview.eligible) && (
           <div className="rounded-xl border border-ui-danger/30 p-3 text-xs text-ui-danger" role="alert">
-            <p className="font-bold">{ar ? 'الحذف محظور حاليًا للأسباب التالية:' : 'Deletion is blocked for the following reasons:'}</p>
+            <p className="font-bold">{ar ? 'الحذف موقوف لحماية بيانات مشتركة مع مؤسسة أخرى:' : 'Deletion is blocked to protect shared records:'}</p>
             {preview.blockers?.map((b, i) => <p key={i} className="mt-1">• {displayBlocker(b, ar)}</p>)}
             {!preview.success && <p className="mt-1">{preview.error || 'PREVIEW_FAILED'}</p>}
           </div>
@@ -168,7 +176,7 @@ export function OrganizationDeleteDialog({
               <input type="checkbox" checked={acknowledged}
                 onChange={(event) => setAcknowledged(event.target.checked)}
                 disabled={deleting} className="mt-0.5" />
-              <span>{ar ? 'أقر أن حذف هذه المؤسسة وبياناتها نهائي وغير قابل للاستعادة من داخل التطبيق.' : 'I understand this is permanent and cannot be undone in the app.'}</span>
+              <span>{ar ? 'أؤكد أنني اخترت المؤسسة الصحيحة، وأن حذف جميع فروعها ومستخدميها ومبيعاتها ومحاسبتها نهائي ولا يمكن التراجع عنه.' : 'I confirm the selected organization and accept permanent deletion of all its branches, users, sales and accounting data.'}</span>
             </label>
           </>
         )}

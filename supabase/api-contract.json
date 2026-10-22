@@ -1381,7 +1381,7 @@
       ]
     },
     {
-      "name": "super_admin_delete_empty_organization",
+      "name": "super_admin_delete_organization",
       "params": [
         "confirm_name",
         "confirm_phrase",

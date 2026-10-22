@@ -691,7 +691,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
                           >
                             {t.is_active ? (ar ? 'تعطيل' : 'Disable') : (ar ? 'تفعيل' : 'Enable')}
                           </Button>
-                          {!t.is_active && (
+                          {(
                             <Button
                               size="sm"
                               variant="outline"
