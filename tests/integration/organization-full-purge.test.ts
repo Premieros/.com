@@ -11,8 +11,8 @@ describe('full tenant purge by independent Super Admin',()=>{
   afterAll(async()=>{await db.end();});
 
   it('deletes a populated active organization while keeping other tenants and global Super Admin',async()=>{
-    const [orgA,orgB,branchA,branchB,ownerA,ownerB,adminId,staffA]=
-      Array.from({length:8},()=>randomUUID());
+    const [orgA,orgB,branchA,branchA2,branchB,ownerA,ownerB,adminId,staffA]=
+      Array.from({length:9},()=>randomUUID());
     const suffix=randomUUID().slice(0,10);
     const name='CI Tenant purge '+suffix;
     await db.query('BEGIN');
@@ -20,8 +20,8 @@ describe('full tenant purge by independent Super Admin',()=>{
       await db.query("SELECT set_config('app.register_branch','on',true)");
       await db.query("INSERT INTO public.organizations(id,name,slug,is_active) VALUES($1,$2,$3,true),($4,$5,$6,true)",
         [orgA,name,'ci-delete-a-'+suffix,orgB,'CI Tenant keep '+suffix,'ci-delete-b-'+suffix]);
-      await db.query("INSERT INTO public.branches(id,name,organization_id,is_active) VALUES($1,'Branch A',$2,true),($3,'Branch B',$4,true)",
-        [branchA,orgA,branchB,orgB]);
+      await db.query("INSERT INTO public.branches(id,name,organization_id,is_active) VALUES($1,'Branch A',$2,true),($3,'Branch A2',$2,true),($4,'Branch B',$5,true)",
+        [branchA,orgA,branchA2,branchB,orgB]);
       for(const [id,role,home,mail] of [
         [ownerA,'owner',branchA,'ci-owner-a-'+suffix+'@example.invalid'],
         [ownerB,'owner',branchB,'ci-owner-b-'+suffix+'@example.invalid'],
@@ -44,6 +44,8 @@ describe('full tenant purge by independent Super Admin',()=>{
         [messageId,conversationId,ownerA]);
       const baseline=await db.query<{total:string}>("SELECT COUNT(*)::text total FROM public.dining_tables WHERE branch_id=$1",[branchA]);
       expect(Number(baseline.rows[0].total)).toBeGreaterThan(0);
+      const secondaryTables=await db.query<{total:string}>("SELECT count(*)::text total FROM public.dining_tables WHERE branch_id=$1",[branchA2]);
+      expect(Number(secondaryTables.rows[0].total)).toBeGreaterThan(0);
       await db.query("SELECT set_config('app.user_id',$1,true)",[adminId]);
 
       // Reproduce real tenant: open table order with a sent kitchen item.
