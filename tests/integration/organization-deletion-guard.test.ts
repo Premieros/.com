@@ -89,9 +89,15 @@ describe('super admin guarded organization hard delete', () => {
 
       const activePreview = await db.query<{ data: { eligible:boolean;blockers:string[] } }>(
         'SELECT public.super_admin_preview_organization_deletion($1) data',[adminOrg]);
-      expect(activePreview.rows[0].data.eligible).toBe(false);
-      expect(activePreview.rows[0].data.blockers).toContain('ORGANIZATION_ACTIVE');
+      // Full deletion preview no longer treats active status as a blocker.
+      expect(activePreview.rows[0].data.eligible).toBe(true);
+      expect(activePreview.rows[0].data.blockers).not.toContain('ORGANIZATION_ACTIVE');
       expect(activePreview.rows[0].data.blockers).not.toContain('CURRENT_USER_BELONGS_TO_ORGANIZATION');
+      // The older conservative empty-org deletion route remains guarded.
+      const conservative = await db.query<{ data:{success:boolean;error:string} }>(
+        "SELECT public.super_admin_delete_empty_organization($1,$2,'DELETE') data",
+        [adminOrg,'CI protected '+slug]);
+      expect(conservative.rows[0].data).toMatchObject({success:false,error:'DELETION_NOT_SAFE'});
     } finally {
       await db.query('ROLLBACK');
     }
