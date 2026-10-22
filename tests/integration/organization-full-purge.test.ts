@@ -113,13 +113,35 @@ describe('full tenant purge by independent Super Admin',()=>{
           INSERT INTO public.raw_fifo_settlements(
             debt_id,receipt_ledger_id,quantity,unit_cost,total_cost
           ) VALUES ($1,$2,2,5,10) RETURNING id`,[debtId,negativeReceipt]);
-        return { debtId,settlementId:rows[0].id,receipt:negativeReceipt };
+        return { debtId,settlementId:rows[0].id,receipt:negativeReceipt, materialId };
       };
       const fifoA=await seedRawFifo(branchA,warehouseId,'A');
       const warehouseB=randomUUID();
       await db.query("INSERT INTO public.warehouses(id,branch_id,name) VALUES($1,$2,'CI other-tenant warehouse')",
         [warehouseB,branchB]);
       const fifoB=await seedRawFifo(branchB,warehouseB,'B');
+
+      // A previously applied stock count is still linked to raw materials
+      // and warehouse. RESTRICT FKs on the lines and count header previously
+      // aborted deletion of the real tenant after the FIFO cleanup succeeded.
+      // Seed one on each tenant to verify the other tenant stays unchanged.
+      const countA=randomUUID(),countB=randomUUID(),countItemA=randomUUID(),countItemB=randomUUID();
+      await db.query("SELECT set_config('app.user_id','',true)");
+      await db.query(`INSERT INTO public.stock_counts(id,branch_id,warehouse_id,status,count_type)
+        VALUES($1,$2,$3,'draft','full'),($4,$5,$6,'draft','full')`,
+        [countA,branchA,warehouseId,countB,branchB,warehouseB]);
+      await db.query(`INSERT INTO public.stock_count_items(
+        id,stock_count_id,raw_material_id,system_quantity,counted_quantity,unit_cost
+      ) VALUES($1,$2,$3,5,4,2),($4,$5,$6,5,4,2)`,
+        [countItemA,countA,fifoA.materialId,countItemB,countB,fifoB.materialId]);
+      await db.query("SELECT set_config('app.user_id',$1,true)",[adminId]);
+      const checkStockCount=async (id:string) => {
+        const {rows}=await db.query<{n:number}>(`
+          SELECT count(*)::int n FROM public.stock_counts WHERE id=$1`,[id]);
+        return rows[0].n;
+      };
+      expect(await checkStockCount(countA)).toBe(1);
+      expect(await checkStockCount(countB)).toBe(1);
 
       // Exercise actual immutable journal-line evidence (Phase 5L) and verified
       // ERP delivery receipts (Phase 8B), for both the target and kept tenant.
@@ -227,6 +249,13 @@ describe('full tenant purge by independent Super Admin',()=>{
          fifoB.debtId,fifoB.settlementId,fifoB.receipt]);
       expect(fifoCheck.rows[0]).toEqual({debtA:0,settlementA:0,receiptA:0,
         debtB:1,settlementB:1,receiptB:1});
+      expect(await checkStockCount(countA)).toBe(0);
+      expect(await checkStockCount(countB)).toBe(1);
+      const stockLines=await db.query<{local:number;other:number}>(`
+        SELECT (SELECT count(*)::int FROM public.stock_count_items WHERE id=$1) local,
+          (SELECT count(*)::int FROM public.stock_count_items WHERE id=$2) other
+      `,[countItemA,countItemB]);
+      expect(stockLines.rows[0]).toEqual({local:0,other:1});
       expect(await evidenceCount(journalA)).toBe(0);
       expect(await receiptCount(journalA)).toBe(0);
       expect(await evidenceCount(journalB)).toBe(2);
