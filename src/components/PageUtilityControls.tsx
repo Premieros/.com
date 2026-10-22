@@ -1,5 +1,4 @@
-import { ArrowDown, ArrowUp, MoreHorizontal, Search } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowDown, ArrowUp, Search } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
 function isVisible(element: HTMLElement) {
@@ -10,7 +9,6 @@ function isVisible(element: HTMLElement) {
 
 export function PageUtilityControls() {
   const { lang } = useLanguage();
-  const [open, setOpen] = useState(false);
   const ar = lang === 'ar';
 
   const focusSearch = () => {
@@ -24,67 +22,54 @@ export function PageUtilityControls() {
         target.focus();
         target.select();
       }, 220);
-      setOpen(false);
       return;
     }
-    setOpen(false);
     window.dispatchEvent(new Event('premier:open-command-palette'));
   };
+
+  const buttonClass =
+    'inline-flex min-h-9 flex-1 items-center justify-center gap-1.5 rounded-lg border border-ui-border bg-ui-page px-3 text-xs font-bold text-ui-text transition hover:border-ui-primary/40 hover:bg-ui-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-ring active:scale-[0.98] sm:flex-none';
 
   return (
     <div
       data-testid="page-utility-controls"
-      className="fixed bottom-4 end-4 z-40 flex items-end gap-2 print:hidden sm:flex-col"
+      className="flex w-full min-w-0 items-center justify-between gap-3"
+      role="group"
       aria-label={ar ? 'أدوات الصفحة' : 'Page utilities'}
     >
-      <button
-        data-testid="page-utility-toggle"
-        type="button"
-        onClick={() => setOpen((value) => !value)}
-        className="flex h-11 w-11 items-center justify-center rounded-full border border-ui-border bg-ui-surface text-ui-primary shadow-ui-md transition hover:bg-ui-primary-soft active:scale-95 sm:hidden"
-        aria-expanded={open}
-        aria-label={ar ? 'إظهار أدوات الصفحة' : 'Show page utilities'}
-        title={ar ? 'أدوات الصفحة' : 'Page utilities'}
-      >
-        <MoreHorizontal className="h-5 w-5" />
-      </button>
-
-      <div
-        data-testid="page-utility-menu"
-        className={`${open ? 'flex' : 'hidden'} items-center gap-2 sm:flex sm:flex-col`}
-      >
+      <span className="hidden shrink-0 text-xs font-semibold text-ui-subtle sm:inline">
+        {ar ? 'أدوات الصفحة' : 'Page tools'}
+      </span>
+      <div data-testid="page-utility-menu" className="flex min-w-0 flex-1 items-center gap-2 sm:flex-none">
         <button
           type="button"
           onClick={focusSearch}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-ui-border bg-ui-surface text-ui-primary shadow-ui-md transition hover:bg-ui-primary-soft active:scale-95"
+          className={buttonClass}
           aria-label={ar ? 'بحث في الصفحة' : 'Search this page'}
           title={ar ? 'بحث في الصفحة' : 'Search this page'}
         >
-          <Search className="h-5 w-5" />
+          <Search className="h-4 w-4 shrink-0" />
+          <span>{ar ? 'بحث' : 'Search'}</span>
         </button>
         <button
           type="button"
-          onClick={() => {
-            setOpen(false);
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-ui-border bg-ui-surface text-ui-muted shadow-ui-md transition hover:bg-ui-page-alt hover:text-ui-text active:scale-95"
+          onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+          className={buttonClass}
           aria-label={ar ? 'أعلى الصفحة' : 'Scroll to top'}
           title={ar ? 'أعلى الصفحة' : 'Scroll to top'}
         >
-          <ArrowUp className="h-5 w-5" />
+          <ArrowUp className="h-4 w-4 shrink-0" />
+          <span>{ar ? 'أعلى' : 'Top'}</span>
         </button>
         <button
           type="button"
-          onClick={() => {
-            setOpen(false);
-            window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
-          }}
-          className="flex h-11 w-11 items-center justify-center rounded-full border border-ui-border bg-ui-surface text-ui-muted shadow-ui-md transition hover:bg-ui-page-alt hover:text-ui-text active:scale-95"
+          onClick={() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })}
+          className={buttonClass}
           aria-label={ar ? 'أسفل الصفحة' : 'Scroll to bottom'}
           title={ar ? 'أسفل الصفحة' : 'Scroll to bottom'}
         >
-          <ArrowDown className="h-5 w-5" />
+          <ArrowDown className="h-4 w-4 shrink-0" />
+          <span>{ar ? 'أسفل' : 'Bottom'}</span>
         </button>
       </div>
     </div>
