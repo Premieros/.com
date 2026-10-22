@@ -30,7 +30,7 @@ BEGIN
   -- Only permit canonical default dining-table provisioning during a newly
   -- registered anonymous tenant's branch bootstrap. All regular POS actions
   -- remain subject to an authenticated operator and permission checks.
-  IF TG_TABLE_NAME='dining_tables' AND TG_OP='INSERT'
+  IF TG_TABLE_NAME='dining_tables' AND TG_OP IN ('INSERT','UPDATE')
      AND v_uid IS NULL AND current_setting('app.register_branch',true)='on'
      AND NEW.name ~ '^Table (0[1-9]|[1-4][0-9]|50)$'
      AND EXISTS (SELECT 1 FROM public.dining_areas a
