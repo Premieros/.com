@@ -156,3 +156,20 @@ EXCEPTION WHEN OTHERS THEN
   RETURN jsonb_build_object('success',false,'error','DELETE_BLOCKED_ATOMICALLY');
 END;
 $function$;
+
+-- Architecture V2 P-A: this is an explicit, highly restricted ADMIN_DESTRUCTIVE
+-- journal mutator, NOT an ordinary reversal, reclassification or adjustment.
+INSERT INTO private.journal_mutation_registry(
+  function_signature,classification,rationale,remediation,active
+) VALUES(
+  'super_admin_delete_organization(uuid,text,text)',
+  'ADMIN_DESTRUCTIVE',
+  'Fully confirmed Super Admin tenant purge; journal rows and immutable evidence may be removed only after identity checks, row locks and tenant-isolation preflight.',
+  'Never use for financial corrections. Keep restricted to global Super Admin with atomic rollback and confirmed tenant scope.',
+  true
+)
+ON CONFLICT(function_signature) DO UPDATE SET
+  classification=excluded.classification,
+  rationale=excluded.rationale,
+  remediation=excluded.remediation,
+  active=true;
