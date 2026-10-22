@@ -70,6 +70,24 @@ describe('full tenant purge by independent Super Admin',()=>{
         ) VALUES($1,$2,$3,$4,2,$5)`,
         [branchA,warehouseId,orderId,itemId,ownerA]);
 
+      // Real incident: deleting employee customer while their credit sale
+      // exists invokes sales_customer_id_fkey SET NULL, then
+      // CREDIT_EMPLOYEE_ONLY rejects the UPDATE. Sale must be deleted first.
+      const employeeA=randomUUID(), employeeB=randomUUID();
+      const saleA=randomUUID(), saleB=randomUUID();
+      await db.query("INSERT INTO public.customers(id,branch_id,name,customer_type) VALUES($1,$2,'CI credit employee A','employee'),($3,$4,'CI credit employee B','employee')",
+        [employeeA,branchA,employeeB,branchB]);
+      await db.query(`INSERT INTO public.sales(id,branch_id,invoice_number,customer_id,payment_method,total)
+        VALUES($1,$2,$3,$4,'credit',15),($5,$6,$7,$8,'credit',15)`,
+        [saleA,branchA,'CI-CREDIT-A-'+suffix,employeeA,
+         saleB,branchB,'CI-CREDIT-B-'+suffix,employeeB]);
+      // The normal trigger must still reject employee credit sales without a
+      // customer. Revert the failed statement without aborting this test.
+      await db.query('SAVEPOINT credit_guard_still_active');
+      await expect(db.query('UPDATE public.sales SET customer_id=NULL WHERE id=$1',[saleA]))
+        .rejects.toThrow(/CREDIT_EMPLOYEE_ONLY/);
+      await db.query('ROLLBACK TO SAVEPOINT credit_guard_still_active');
+
       // Exercise actual immutable journal-line evidence (Phase 5L) and verified
       // ERP delivery receipts (Phase 8B), for both the target and kept tenant.
       const seedJournal = async (branch:string) => {
@@ -157,6 +175,13 @@ describe('full tenant purge by independent Super Admin',()=>{
         orgA:0,branchA:0,ownerA:0,authA:0,ticket:0,message:0,
         orgB:1,branchB:1,ownerB:1,authB:1,admin:1,adminAuth:1,
       });
+      const creditCheck=await db.query<{saleA:number;customerA:number;saleB:number;customerB:number}>(`
+        SELECT (SELECT count(*)::int FROM public.sales WHERE id=$1) "saleA",
+          (SELECT count(*)::int FROM public.customers WHERE id=$2) "customerA",
+          (SELECT count(*)::int FROM public.sales WHERE id=$3) "saleB",
+          (SELECT count(*)::int FROM public.customers WHERE id=$4) "customerB"
+      `,[saleA,employeeA,saleB,employeeB]);
+      expect(creditCheck.rows[0]).toEqual({saleA:0,customerA:0,saleB:1,customerB:1});
       expect(await evidenceCount(journalA)).toBe(0);
       expect(await receiptCount(journalA)).toBe(0);
       expect(await evidenceCount(journalB)).toBe(2);
