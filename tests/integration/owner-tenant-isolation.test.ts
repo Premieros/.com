@@ -21,10 +21,10 @@ describe('owner tenant branch isolation', () => {
       await db.query("INSERT INTO auth.users(id,email) VALUES ($1,$2)",[ownerId,'ci-owner-'+suffix+'@example.invalid']);
       await db.query("INSERT INTO public.users(id,role,branch_id,email,full_name,username,is_active) VALUES($1,'owner',$2,$3,'Owner CI',$4,true)",[ownerId,branchA,'ci-owner-'+suffix+'@example.invalid','ci-owner-'+suffix]);
       await db.query("SELECT set_config('app.user_id',$1,true)",[ownerId]);
-      const flags = await db.query<{ mine: boolean; second: boolean; foreign: boolean }>(
-        'SELECT public.user_may_access_branch($1) mine,public.user_may_access_branch($2) second,public.user_may_access_branch($3) foreign',
+      const flags = await db.query<{ mine: boolean; ownSecond: boolean; foreign: boolean }>(
+        'SELECT public.user_may_access_branch($1) mine,public.user_may_access_branch($2) "ownSecond",public.user_may_access_branch($3) foreign',
         [branchA,secondA,branchB]);
-      expect(flags.rows[0]).toEqual({ mine:true,second:true,foreign:false });
+      expect(flags.rows[0]).toEqual({ mine:true,ownSecond:true,foreign:false });
       await expect(db.query('INSERT INTO public.user_branch_access(user_id,branch_id) VALUES($1,$2)',[ownerId,branchB]))
         .rejects.toThrow(/OWNER_CROSS_ORGANIZATION_BRANCH_ACCESS_FORBIDDEN/);
     } finally {
