@@ -76,7 +76,7 @@ export function FinancialVisibilityAdminControl() {
         type="button"
         data-testid="financial-visibility-admin-trigger"
         onClick={() => setOpen(true)}
-        className="fixed bottom-5 end-5 z-[85] flex items-center gap-2 rounded-2xl border border-brand-500/30 bg-ui-surface px-4 py-3 text-sm font-black text-ui-text shadow-ui-lg transition hover:-translate-y-0.5 hover:bg-ui-page-alt"
+        className="inline-flex min-h-9 items-center gap-2 rounded-xl border border-brand-500/30 bg-ui-surface px-3 py-2 text-xs font-black text-ui-text transition hover:bg-ui-page-alt focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-ring"
         title={ar ? 'سياسة عرض البيانات المالية' : 'Financial visibility policy'}
       >
         <SlidersHorizontal className="h-4 w-4 text-brand-500" />
