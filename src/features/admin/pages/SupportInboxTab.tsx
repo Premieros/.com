@@ -21,6 +21,37 @@ export function SupportInboxTab() {
   const [loadingMessages, setLoadingMessages] = useState(false);
   const [sending, setSending] = useState(false);
   const [changingStatus, setChangingStatus] = useState(false);
+  const [aiEnabled, setAiEnabled] = useState<boolean | null>(null);
+  const [aiChanging, setAiChanging] = useState(false);
+  const [approvedArticles, setApprovedArticles] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    void support.aiStatus().then(({ data, error }) => {
+      if (cancelled) return;
+      if (!error && data?.success && typeof data.enabled === 'boolean') {
+        setAiEnabled(data.enabled);
+        setApprovedArticles(data.approved_articles || 0);
+      }
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const toggleAi = async () => {
+    if (aiEnabled === null || aiChanging) return;
+    setAiChanging(true);
+    try {
+      const { data, error } = await support.setAiEnabled(!aiEnabled);
+      if (error || !data?.success) throw error || new Error(data?.error || 'AI_CONTROL_FAILED');
+      setAiEnabled(Boolean(data.enabled));
+      show(ar ? (data.enabled ? 'تم تفعيل الردود التلقائية الموثقة' : 'تم إيقاف الردود التلقائية')
+              : (data.enabled ? 'Verified automatic replies enabled' : 'Automatic replies disabled'), 'success');
+    } catch {
+      show(ar ? 'تعذر تغيير وضع الرد الآلي' : 'Could not change auto-reply mode', 'error');
+    } finally {
+      setAiChanging(false);
+    }
+  };
 
   const active = useMemo(
     () => rows.find((row) => row.id === activeId) || null,
@@ -145,10 +176,28 @@ export function SupportInboxTab() {
             <div>
               <h3 className="font-black text-ui-text">{ar ? 'دعم العملاء' : 'Customer Support'}</h3>
               <p className="text-xs text-ui-subtle">{ar ? 'محادثات المؤسسات والعملاء' : 'Tenant and customer conversations'}</p>
+              <p className="mt-1 text-[11px] text-ui-subtle">
+                {ar ? 'الرد الآلي للأسئلة الموثقة فقط — الأسئلة المالية والحساسة تُحال للبشر' : 'Verified FAQ only — financial and sensitive issues go to human support'}
+              </p>
             </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                data-testid="support-ai-toggle"
+                onClick={() => void toggleAi()}
+                disabled={aiEnabled === null || aiChanging}
+                aria-pressed={Boolean(aiEnabled)}
+                className={`min-h-9 rounded-lg border px-2.5 text-xs font-bold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ui-ring disabled:opacity-50 ${aiEnabled ? 'border-ui-primary bg-ui-primary-soft text-ui-primary' : 'border-ui-border bg-ui-page-alt text-ui-muted'}`}
+                title={ar ? `${approvedArticles} مقالات معتمدة` : `${approvedArticles} approved articles`}
+              >
+                {aiEnabled === null ? (ar ? 'جاري فحص الرد الآلي' : 'Checking auto-replies') : aiEnabled
+                  ? (ar ? 'الرد الآلي: يعمل' : 'Auto-replies: on')
+                  : (ar ? 'الرد الآلي: متوقف' : 'Auto-replies: off')}
+              </button>
             <Button size="sm" variant="outline" onClick={() => void loadRows()} disabled={loadingRows}>
               <RefreshCw className={`h-4 w-4 ${loadingRows ? 'animate-spin' : ''}`} />
             </Button>
+            </div>
           </div>
 
           <div className="relative mb-3">
@@ -263,6 +312,7 @@ export function SupportInboxTab() {
 
               {messages.map((message) => {
                 const supportMessage = message.sender_kind === 'support';
+                const aiMessage = supportMessage && !message.sender_user_id;
                 return (
                   <div key={message.id} className={`flex ${supportMessage ? 'justify-end' : 'justify-start'}`}>
                     <div className={`max-w-[80%] rounded-2xl px-3 py-2 text-sm leading-6 ${
@@ -271,7 +321,7 @@ export function SupportInboxTab() {
                         : 'rounded-es-md bg-ui-page-alt text-ui-text'
                     }`}>
                       <p className="mb-1 text-[10px] font-black opacity-70">
-                        {supportMessage ? (ar ? 'خدمة العملاء' : 'Support') : (message.sender_name || (ar ? 'العميل' : 'Customer'))}
+                        {supportMessage ? (aiMessage ? (ar ? 'مساعد Premier الآلي' : 'Premier automated assistant') : (ar ? 'خدمة العملاء' : 'Support')) : (message.sender_name || (ar ? 'العميل' : 'Customer'))}
                       </p>
                       <p className="whitespace-pre-wrap">{message.body}</p>
                       <time className="mt-1 block text-[10px] opacity-60" dateTime={message.created_at}>
