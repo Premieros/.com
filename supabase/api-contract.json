@@ -370,6 +370,26 @@
       ]
     },
     {
+      "name": "floor_plan_create_area",
+      "params": [
+        "branch_id",
+        "name"
+      ]
+    },
+    {
+      "name": "floor_plan_delete_area",
+      "params": [
+        "area_id"
+      ]
+    },
+    {
+      "name": "floor_plan_rename_area",
+      "params": [
+        "area_id",
+        "name"
+      ]
+    },
+    {
       "name": "floor_plan_set_main_area_table_count",
       "params": [
         "branch_id",
