@@ -414,7 +414,7 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           </div>
         )}
-        <main data-testid="app-main" className="min-h-[calc(100vh-64px)] bg-ui-page p-4 sm:p-6 lg:p-7">
+        <main data-testid="app-main" className="min-h-[calc(100vh-64px)] bg-ui-page p-4 pb-36 sm:p-6 sm:pb-24 lg:p-7 lg:pb-24">
           <div
             data-testid="design-content-surface"
             className={`min-h-[calc(100vh-64px)] w-full min-w-0 space-y-5 ${fullWidthContent ? 'max-w-none' : 'mx-auto max-w-[1600px]'}`}
@@ -424,11 +424,18 @@ export function Layout({ children }: { children: ReactNode }) {
         </main>
       </div>
 
-      <nav
-        data-testid="mobile-bottom-nav"
-        className="fixed bottom-0 start-0 end-0 z-[55] grid grid-flow-col auto-cols-fr border-t border-ui-border bg-ui-surface/95 px-1 pt-1 shadow-[0_-8px_28px_rgba(0,0,0,0.08)] backdrop-blur-xl md:hidden"
-        aria-label={ar ? 'التنقل السريع' : 'Quick navigation'}
+      <footer
+        data-testid="app-bottom-footer"
+        className={`fixed bottom-0 start-0 end-0 z-[55] border-t border-ui-border bg-ui-surface/95 shadow-[0_-8px_28px_rgba(0,0,0,0.08)] backdrop-blur-xl transition-all duration-200 print:hidden ${desktopSidebarHidden ? 'lg:start-0' : 'lg:start-[260px]'} ${mobileOpen ? 'hidden lg:block' : ''}`}
       >
+        <div data-testid="app-bottom-toolbar" className="flex h-12 items-center border-b border-ui-border px-3 sm:h-14 sm:px-5 md:border-b-0">
+          <PageUtilityControls />
+        </div>
+        <nav
+          data-testid="mobile-bottom-nav"
+          className="grid grid-flow-col auto-cols-fr gap-1 px-1 pt-1 pb-[max(0.25rem,env(safe-area-inset-bottom))] md:hidden"
+          aria-label={ar ? 'التنقل السريع' : 'Quick navigation'}
+        >
         {mobilePrimaryItems.map((item) => (
           <NavLink
             key={item.id}
@@ -468,9 +475,9 @@ export function Layout({ children }: { children: ReactNode }) {
           <span className="flex h-6 items-center justify-center"><Menu className="h-5 w-5" /></span>
           <span>{ar ? 'المزيد' : 'More'}</span>
         </button>
-      </nav>
+        </nav>
+      </footer>
 
-      <PageUtilityControls />
       <CommandPalette />
     </div>
   );
