@@ -331,15 +331,16 @@ export function LoginPage() {
                   : 'Sign in with staff PIN'}
             </button>
 
-            <div className="mt-5 flex items-center justify-between gap-4 border-t border-slate-100 pt-3 text-xs font-bold text-slate-500">
+            <div className="mt-5 border-t border-slate-100 pt-3">
               <Link
                 data-testid="login-register-link"
                 to={APP_ROUTES.register}
-                className="text-blue-700 transition hover:text-blue-800 hover:underline"
+                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-blue-200 bg-blue-50 px-4 text-sm font-black text-blue-800 transition hover:border-blue-400 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
               >
-                {isAr ? 'ابدأ 14 يومًا مجانًا' : 'Start 14 days free'}
+                {isAr ? 'أنشئ مؤسستك الآن — 14 يومًا مجانًا' : 'Create your business — 14 days free'}
+                {isAr ? <ArrowLeft className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
               </Link>
-              <span>Premier © 2026</span>
+              <p className="mt-2 text-center text-[11px] text-slate-400">Premier © 2026</p>
             </div>
 
           </div>
