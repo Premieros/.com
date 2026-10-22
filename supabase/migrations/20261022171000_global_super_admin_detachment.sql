@@ -29,7 +29,8 @@ END;
 $fn$;
 
 DROP TRIGGER IF EXISTS trg_00_keep_super_admin_global ON public.users;
-CREATE TRIGGER trg_00_keep_super_admin_global
+DROP TRIGGER IF EXISTS trg_zz_keep_super_admin_global ON public.users;
+CREATE TRIGGER trg_zz_keep_super_admin_global
 BEFORE INSERT OR UPDATE ON public.users
 FOR EACH ROW EXECUTE FUNCTION private.keep_super_admin_global();
 
