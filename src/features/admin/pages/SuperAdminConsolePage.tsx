@@ -41,6 +41,7 @@ import { notifyBranchesChanged } from '@/hooks/useBranches';
 import { OrganizationCreateWizard } from '@/features/admin/components/OrganizationCreateWizard';
 import { SubscriptionManagementTab } from './SubscriptionManagementTab';
 import { SupportInboxTab } from './SupportInboxTab';
+import { FinancialVisibilityAdminControl } from '../components/FinancialVisibilityAdminControl';
 
 interface TenantStats {
   organization_id: string;
@@ -578,7 +579,8 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <FinancialVisibilityAdminControl />
           <Button
             variant="outline"
             size="sm"
