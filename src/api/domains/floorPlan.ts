@@ -7,6 +7,15 @@ const isServiceOrderType = (orderType?: OrderType): orderType is 'delivery' | 'd
   orderType === 'delivery' || orderType === 'drive_thru';
 
 export const floorPlan = {
+  createArea(p: { p_branch_id: string; p_name: string }): ApiResult<RpcResult & { area_id?: string }> {
+    return rpc('floor_plan_create_area', p);
+  },
+  renameArea(p: { p_area_id: string; p_name: string }): ApiResult<RpcResult & { area_id?: string }> {
+    return rpc('floor_plan_rename_area', p);
+  },
+  deleteArea(p: { p_area_id: string }): ApiResult<RpcResult & { deleted?: boolean; tables?: number }> {
+    return rpc('floor_plan_delete_area', p);
+  },
   async createOrder(p: {
     p_branch_id: string;
     p_order_type?: OrderType;
