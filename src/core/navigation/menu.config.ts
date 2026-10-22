@@ -6,7 +6,7 @@ export type MenuGroup = 'main' | 'catalog' | 'centers' | 'admin';
 export type MenuIcon =
   | 'dashboard' | 'pos' | 'products' | 'pricing' | 'productModifiers' | 'categories' | 'components' | 'rawMaterials' | 'recipes' | 'inventory' | 'warehouses' | 'transfers'
   | 'inventoryLedger' | 'stockCounts' | 'inventoryBatches' | 'stockValuation' | 'lowStockAlerts' | 'inventoryUnits' | 'wasteCenter' | 'kitchenDisplay' | 'kitchenStations' | 'costingCenter' | 'branches' | 'purchases' | 'customers' | 'suppliers' | 'expenses'
-  | 'accounts' | 'payments' | 'journal' | 'treasury' | 'reconciliation' | 'financialReports' | 'sales' | 'shifts' | 'reports' | 'users' | 'auditLog' | 'settings' | 'superAdmin' | 'importExport';
+  | 'accounts' | 'payments' | 'openingBalances' | 'journal' | 'treasury' | 'reconciliation' | 'financialReports' | 'sales' | 'shifts' | 'reports' | 'users' | 'auditLog' | 'settings' | 'superAdmin' | 'importExport';
 
 export interface MenuItemConfig {
   id: string;
@@ -40,6 +40,9 @@ export const MENU_ITEMS: MenuItemConfig[] = [
   { id: 'people-center', route: APP_ROUTES.peopleCenter, icon: 'customers', labelKey: 'customers', label: { ar: 'مركز الأطراف', en: 'People Center' }, permissionsAny: ['customers.view', 'suppliers.view'], group: 'centers' },
   { id: 'finance-center', route: APP_ROUTES.financeCenter, icon: 'accounts', labelKey: 'reports', label: { ar: 'المركز المالي', en: 'Finance Center' }, permissionsAny: ['accounts.view', 'expenses.view', 'sales.view', 'shifts.view', 'reports.view', 'reports.financial', 'reports.costing'], group: 'centers' },
   { id: 'administration-center', route: APP_ROUTES.administrationCenter, icon: 'settings', labelKey: 'settings', label: { ar: 'مركز الإدارة', en: 'Administration Center' }, permissionsAny: ['branches.manage', 'users.view', 'roles.permissions.manage', 'approvals.review', 'audit.view', 'settings.manage'], group: 'centers' },
+
+  { id: 'stock-counts', route: APP_ROUTES.stockCounts, icon: 'stockCounts', labelKey: 'inventory', label: { ar: 'الجرد والتسويات', en: 'Stock Counts & Adjustments' }, permission: 'inventory.view', group: 'centers' },
+  { id: 'opening-balances', route: APP_ROUTES.openingBalances, icon: 'openingBalances', labelKey: 'accounts', label: { ar: 'الأرصدة الافتتاحية', en: 'Opening Balances' }, permission: 'accounts.view', group: 'centers' },
 
   { id: 'products', route: APP_ROUTES.products, icon: 'products', labelKey: 'products', permission: 'products.view', group: 'catalog' },
   { id: 'raw-materials', route: APP_ROUTES.rawMaterials, icon: 'rawMaterials', labelKey: 'rawMaterials', permission: 'raw_materials.view', group: 'catalog' },

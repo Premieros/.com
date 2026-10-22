@@ -54,6 +54,7 @@ const SalesPage = lazy(() => import('../features/trade/pages/SalesPage').then(m 
 const ShiftsPage = lazy(() => import('../features/trade/pages/ShiftsPage').then(m => ({ default: m.ShiftsPage })));
 const ReportsCenterPage = lazy(() => import('../features/reporting/pages/ReportsCenterPage').then(m => ({ default: m.ReportsCenterPage })));
 const AccountsPage = lazy(() => import('../features/accounting/pages/AccountsPage').then(m => ({ default: m.AccountsPage })));
+const OpeningBalancesPage = lazy(() => import('../features/accounting/pages/OpeningBalancesPage').then(m => ({ default: m.OpeningBalancesPage })));
 const EmployeeReceivablesPage = lazy(() => import('../features/accounting/pages/EmployeeReceivablesPage').then(m => ({ default: m.EmployeeReceivablesPage })));
 const PaymentsPage = lazy(() => import('../features/accounting/pages/PaymentsPage').then(m => ({ default: m.PaymentsPage })));
 const JournalPage = lazy(() => import('../features/accounting/pages/JournalPage').then(m => ({ default: m.JournalPage })));
@@ -206,6 +207,7 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.financialReports} element={<ProtectedRoute permission="reports.financial"><ReportsCenterPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.accounting} element={<ProtectedRoute permission="reports.financial"><Navigate to={APP_ROUTES.financialReports} replace /></ProtectedRoute>} />
         <Route path={APP_ROUTES.accounts} element={<ProtectedRoute permission="accounts.view"><AccountsPage /></ProtectedRoute>} />
+        <Route path={APP_ROUTES.openingBalances} element={<ProtectedRoute permission="accounts.view"><OpeningBalancesPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.employeeReceivables} element={<ProtectedRoute permission="accounts.view"><EmployeeReceivablesPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.payments} element={<ProtectedRoute permission="accounts.view"><PaymentsPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.journal} element={<ProtectedRoute permission="accounts.view"><JournalPage /></ProtectedRoute>} />

@@ -57,6 +57,7 @@ const ICONS: Record<MenuIcon, ReactNode> = {
   suppliers: <Building2 className="h-5 w-5" />,
   expenses: <Receipt className="h-5 w-5" />,
   accounts: <Landmark className="h-5 w-5" />,
+  openingBalances: <HandCoins className="h-5 w-5" />,
   payments: <HandCoins className="h-5 w-5" />,
   journal: <NotebookPen className="h-5 w-5" />,
   treasury: <Wallet className="h-5 w-5" />,

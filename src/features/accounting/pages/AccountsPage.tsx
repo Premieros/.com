@@ -1,4 +1,6 @@
 import { useState, useCallback, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { APP_ROUTES } from '@/core/navigation/routes';
 import { Plus, Edit2, Trash2, Coins, Landmark, ShieldCheck } from 'lucide-react';
 import { OrganizationAccountSyncWorkbench } from './OrganizationAccountSyncWorkbench';
 import { supabase } from '@/api';
@@ -31,6 +33,7 @@ const ACCOUNT_TYPES: { value: AccountType; labelKey: 'typeAsset' | 'typeLiabilit
 
 export function AccountsPage() {
   const { t, lang } = useLanguage();
+  const navigate = useNavigate();
   const { show } = useToast();
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
@@ -41,7 +44,6 @@ export function AccountsPage() {
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<ChartOfAccount | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
-  const [seeding, setSeeding] = useState(false);
   const [showOrgSync, setShowOrgSync] = useState(false);
   const [form, setForm] = useState({ code: '', name: '', name_en: '', account_type: 'asset' as AccountType, is_active: true });
 
@@ -119,22 +121,6 @@ export function AccountsPage() {
     reloadAccounts();
   };
 
-  const seedOpening = async () => {
-    if (!effectiveBranchFilter) { show(t('filterByBranch'), 'error'); return; }
-    setSeeding(true);
-    const { data, error } = await api.accounting.seedOpeningBalances({ p_branch_id: effectiveBranchFilter });
-    setSeeding(false);
-    if (error) { show(error.message, 'error'); return; }
-    const r = data as { success: boolean; error?: string; detail?: string; total?: number; skipped?: boolean } | null;
-    if (!r?.success) {
-      if (r?.error === 'OPENING_ALREADY_EXISTS') show(t('openingBalanceExists'), 'warning');
-      else show(r?.detail || r?.error || t('error'), 'error');
-      return;
-    }
-    show(r.skipped ? t('openingBalanceExists') : `${t('openingBalanceDone')} (${formatCurrency(r.total || 0, currency, lang)})`, 'success');
-    reloadAccounts();
-  };
-
   const typeLabel = (accountType: AccountType) => {
     const found = ACCOUNT_TYPES.find((x) => x.value === accountType);
     return found ? (isAr ? { typeAsset: 'أصل', typeLiability: 'التزام', typeEquity: 'حقوق ملكية', typeIncome: 'إيراد', typeExpense: 'مصروف' }[found.labelKey] : { typeAsset: 'Asset', typeLiability: 'Liability', typeEquity: 'Equity', typeIncome: 'Income', typeExpense: 'Expense' }[found.labelKey]) : accountType;
@@ -171,11 +157,9 @@ export function AccountsPage() {
       <DesignPageHeader title={t('chartOfAccounts')} subtitle={t('accounts')}
         actions={
           <>
-            {canManage && (
-              <Button size="sm" variant="outline" onClick={seedOpening} disabled={seeding || !effectiveBranchFilter}>
-                <Coins className="w-4 h-4" /> {seeding ? t('loading') : t('seedOpeningBalances')}
-              </Button>
-            )}
+            <Button size="sm" variant="outline" onClick={() => navigate(APP_ROUTES.openingBalances)}>
+              <Coins className="w-4 h-4" /> {isAr ? 'الأرصدة الافتتاحية' : 'Opening Balances'}
+            </Button>
             {canManage && <Button size="sm" variant="outline" onClick={() => setShowOrgSync(open => !open)}
               aria-expanded={showOrgSync} aria-controls="organization-account-review-panel"
               data-testid="organization-account-sync-toggle">

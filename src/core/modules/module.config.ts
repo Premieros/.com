@@ -68,6 +68,7 @@ const ROUTE_MODULES: Partial<Record<AppRoute, OrganizationModuleKey>> = {
   [APP_ROUTES.shifts]: 'shift_management',
 
   [APP_ROUTES.accounts]: 'accounting',
+  [APP_ROUTES.openingBalances]: 'accounting',
   [APP_ROUTES.employeeReceivables]: 'accounting',
   [APP_ROUTES.payments]: 'accounting',
   [APP_ROUTES.journal]: 'accounting',
