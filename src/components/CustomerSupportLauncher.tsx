@@ -140,7 +140,7 @@ export function CustomerSupportLauncher() {
         type="button"
         data-testid="support-floating-button"
         onClick={() => setOpen((value) => !value)}
-        className="fixed bottom-5 end-5 z-[65] flex h-14 w-14 items-center justify-center rounded-full bg-ui-primary text-ui-primary-fg shadow-xl transition hover:bg-ui-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ui-ring"
+        className="fixed bottom-32 end-5 z-[65] flex h-14 md:bottom-20 w-14 items-center justify-center rounded-full bg-ui-primary text-ui-primary-fg shadow-xl transition hover:bg-ui-primary-hover focus:outline-none focus-visible:ring-2 focus-visible:ring-ui-ring"
         aria-label={ar ? 'محادثة خدمة العملاء' : 'Customer support chat'}
       >
         {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
@@ -149,7 +149,7 @@ export function CustomerSupportLauncher() {
       {open && (
         <section
           data-testid="support-chat-panel"
-          className="fixed bottom-24 end-4 z-[64] flex h-[min(72dvh,620px)] w-[min(94vw,390px)] flex-col overflow-hidden rounded-2xl border border-ui-border bg-ui-surface shadow-2xl"
+          className="fixed bottom-52 end-4 z-[64] flex h-[min(58dvh,520px)] w-[min(94vw,390px)] md:bottom-40 md:h-[min(65dvh,620px)] flex-col overflow-hidden rounded-2xl border border-ui-border bg-ui-surface shadow-2xl"
           aria-label={ar ? 'محادثة خدمة العملاء' : 'Customer support chat'}
         >
           <header className="flex items-center justify-between gap-3 border-b border-ui-border bg-ui-page-alt px-4 py-3">
