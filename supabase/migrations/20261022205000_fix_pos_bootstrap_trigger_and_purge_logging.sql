@@ -5,7 +5,7 @@ CREATE OR REPLACE FUNCTION public.guard_pos_operator_ownership()
  LANGUAGE plpgsql
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
-AS $function$
+AS $fn$
 DECLARE
   v_uid uuid:=auth.uid();
   v_is_service_role boolean:=COALESCE(current_setting('role',true),'')='service_role'
@@ -225,7 +225,7 @@ BEGIN
   IF TG_OP='DELETE' THEN RETURN OLD; END IF;
   RETURN NEW;
 END;
-$function$;
+$fn$;
 
 -- Error details are logged server-side only; API remains generic.
 CREATE OR REPLACE FUNCTION public.super_admin_delete_organization(
