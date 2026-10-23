@@ -1,14 +1,14 @@
 -- Regression checks for the staged non-FIFO sale stock writer.
 -- Run on an isolated PremierOS .com clone ONLY, with privileges to access private schema.
 -- All writes are rolled back. Replace :sale_id, :material_id and :operation_id with real fixture IDs.
--- Keep execution within a single database connection and transaction.
+-- Run with psql -v sale_id=... -v material_id=... -v operation_id=...\n-- Keep execution within a single database connection and transaction.
 BEGIN;
-SELECT set_config('premieros.v2_movement_test', 'enabled', true);
+SELECT set_config('premieros.v2_movement_test', 'enabled', true);\nSELECT set_config('premieros.test_sale_id', :'sale_id', true);\nSELECT set_config('premieros.test_material_id', :'material_id', true);\nSELECT set_config('premieros.test_operation_id', :'operation_id', true);
 DO $$
 DECLARE
-  v_sale_id uuid := :'sale_id';
-  v_material_id uuid := :'material_id';
-  v_operation_id uuid := :'operation_id';
+  v_sale_id uuid := current_setting('premieros.test_sale_id')::uuid;
+  v_material_id uuid := current_setting('premieros.test_material_id')::uuid;
+  v_operation_id uuid := current_setting('premieros.test_operation_id')::uuid;
   v_first jsonb;
   v_replay jsonb;
   v_conflict jsonb;
