@@ -1,5 +1,4 @@
--- Sale modifiers use published raw material price AS OF the recorded sale time, zero if no published price.
--- Target Supabase project hvqlkapynjfjikqithvd (.com), on an audited deployment only.
+-- Sale modifier published price as of sale timestamp; zero allowed for existing recipe.
 CREATE OR REPLACE FUNCTION private.compute_sale_item_cost_snapshot(p_product_id uuid, p_branch_id uuid, p_modifier_option_ids uuid[], p_sale_quantity numeric, p_captured_at timestamp with time zone)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -89,8 +88,8 @@ begin
   order by s.effective_from desc
   limit 1;
 
-  if coalesce(v_base_status,'MISSING_INPUT')='AVAILABLE'
-     and coalesce(v_base_cost,0)>0
+  if ( (coalesce(v_base_status,'MISSING_INPUT')='AVAILABLE' and v_base_cost is not null)
+       or (v_recipe_id is not null and v_base_cost=0) )
      and v_missing_modifier_cost_count=0 then
     v_theoretical_unit:=greatest(v_base_cost+v_modifier_delta,0);
     v_theoretical_total:=v_theoretical_unit*p_sale_quantity;
