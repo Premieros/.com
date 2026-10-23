@@ -20,9 +20,10 @@ export interface SupportConversation {
 export interface SupportMessage {
   id: string;
   conversation_id: string;
-  sender_user_id: string;
+  sender_user_id: string | null;
   sender_kind: 'customer' | 'support';
   sender_name?: string | null;
+  is_ai?: boolean;
   body: string;
   created_at: string;
 }
@@ -34,9 +35,18 @@ type RpcEnvelope<T> = {
   conversation_id?: string;
   message_id?: string;
   status?: string;
+  enabled?: boolean;
+  mode?: string;
+  approved_articles?: number;
 };
 
 export const support = {
+  aiStatus(): ApiResult<RpcEnvelope<SupportConversation>> {
+    return rpc('support_ai_status', {});
+  },
+  setAiEnabled(enabled: boolean): ApiResult<RpcEnvelope<SupportConversation>> {
+    return rpc('support_ai_set_enabled', { p_enabled: enabled });
+  },
   openConversation(p: { p_branch_id: string | null; p_subject: string; p_message: string }): ApiResult<RpcEnvelope<SupportConversation>> {
     return rpc('support_open_conversation', p);
   },
