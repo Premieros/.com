@@ -2,7 +2,7 @@ import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useBranches } from '@/hooks/useBranches';
 import { useActiveBranchId } from './activeBranch';
 
-const STORAGE_KEY = 'premier_branch_scope_v1';
+const STORAGE_KEY = 'premier_branch_scope_v2';
 
 export type BranchScopeMode = 'all' | 'selected';
 
@@ -40,7 +40,7 @@ function write(next: StoredBranchScope): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(current));
   } catch {
-    // Keep the in-memory value if storage is unavailable.
+    // Keep in-memory scope if persistent storage is unavailable.
   }
   listeners.forEach((listener) => listener());
 }
@@ -59,36 +59,42 @@ export function useBranchScope() {
   const { branches, loading } = useBranches();
   const [activeBranchId, setActiveBranchId] = useActiveBranchId();
 
-  const activeBranch = useMemo(
-    () => branches.find((branch) => branch.id === activeBranchId) ?? null,
-    [activeBranchId, branches],
+  const accessibleBranches = useMemo(
+    () => branches.filter((branch) => branch.is_active !== false),
+    [branches],
   );
 
-  const organizationBranches = useMemo(() => {
-    if (!activeBranch?.organization_id) return branches;
-    return branches.filter((branch) => branch.organization_id === activeBranch.organization_id);
-  }, [activeBranch?.organization_id, branches]);
-
-  const organizationBranchIds = useMemo(
-    () => organizationBranches.map((branch) => branch.id),
-    [organizationBranches],
+  const accessibleBranchIds = useMemo(
+    () => accessibleBranches.map((branch) => branch.id),
+    [accessibleBranches],
   );
 
   const selectedBranchIds = useMemo(() => {
-    if (stored.mode === 'all') return organizationBranchIds;
+    if (stored.mode === 'all') return accessibleBranchIds;
 
-    const allowed = new Set(organizationBranchIds);
+    const allowed = new Set(accessibleBranchIds);
     const selected = stored.selectedIds.filter((id) => allowed.has(id));
     if (selected.length > 0) return selected;
 
     if (activeBranchId && allowed.has(activeBranchId)) return [activeBranchId];
-    return organizationBranchIds[0] ? [organizationBranchIds[0]] : [];
-  }, [activeBranchId, organizationBranchIds, stored.mode, stored.selectedIds]);
+    return accessibleBranchIds[0] ? [accessibleBranchIds[0]] : [];
+  }, [accessibleBranchIds, activeBranchId, stored.mode, stored.selectedIds]);
 
   const selectedBranchSet = useMemo(() => new Set(selectedBranchIds), [selectedBranchIds]);
-  const allBranchesSelected = organizationBranchIds.length > 0
-    && selectedBranchIds.length === organizationBranchIds.length
-    && organizationBranchIds.every((id) => selectedBranchSet.has(id));
+
+  const selectedOrganizationIds = useMemo(
+    () => [...new Set(
+      accessibleBranches
+        .filter((branch) => selectedBranchSet.has(branch.id))
+        .map((branch) => branch.organization_id)
+        .filter((id): id is string => !!id),
+    )],
+    [accessibleBranches, selectedBranchSet],
+  );
+
+  const allBranchesSelected = accessibleBranchIds.length > 0
+    && selectedBranchIds.length === accessibleBranchIds.length
+    && accessibleBranchIds.every((id) => selectedBranchSet.has(id));
 
   const actionBranchId = activeBranchId && selectedBranchSet.has(activeBranchId)
     ? activeBranchId
@@ -101,17 +107,17 @@ export function useBranchScope() {
 
   const setAllBranches = (enabled: boolean) => {
     if (enabled) {
-      write({ mode: 'all', selectedIds: organizationBranchIds });
+      write({ mode: 'all', selectedIds: accessibleBranchIds });
       return;
     }
-    const fallback = actionBranchId ?? organizationBranchIds[0] ?? null;
+    const fallback = actionBranchId ?? accessibleBranchIds[0] ?? null;
     write({ mode: 'selected', selectedIds: fallback ? [fallback] : [] });
   };
 
   const setSelectedBranchIds = (ids: string[]) => {
-    const allowed = new Set(organizationBranchIds);
+    const allowed = new Set(accessibleBranchIds);
     const next = [...new Set(ids.filter((id) => allowed.has(id)))];
-    const fallback = actionBranchId ?? organizationBranchIds[0] ?? null;
+    const fallback = actionBranchId ?? accessibleBranchIds[0] ?? null;
     write({
       mode: 'selected',
       selectedIds: next.length > 0 ? next : (fallback ? [fallback] : []),
@@ -119,8 +125,8 @@ export function useBranchScope() {
   };
 
   const toggleBranch = (branchId: string) => {
-    if (!organizationBranchIds.includes(branchId)) return;
-    const base = stored.mode === 'all' ? organizationBranchIds : selectedBranchIds;
+    if (!accessibleBranchIds.includes(branchId)) return;
+    const base = stored.mode === 'all' ? accessibleBranchIds : selectedBranchIds;
     const next = base.includes(branchId)
       ? base.filter((id) => id !== branchId)
       : [...base, branchId];
@@ -133,16 +139,41 @@ export function useBranchScope() {
     }
   };
 
+  const setOrganizationSelected = (organizationId: string, selected: boolean) => {
+    const orgBranchIds = accessibleBranches
+      .filter((branch) => branch.organization_id === organizationId)
+      .map((branch) => branch.id);
+
+    if (orgBranchIds.length === 0) return;
+
+    const base = new Set(stored.mode === 'all' ? accessibleBranchIds : selectedBranchIds);
+    for (const id of orgBranchIds) {
+      if (selected) base.add(id);
+      else base.delete(id);
+    }
+
+    if (base.size === 0) return;
+
+    const next = [...base];
+    write({ mode: 'selected', selectedIds: next });
+
+    if (activeBranchId && !base.has(activeBranchId)) {
+      setActiveBranchId(next[0] ?? null);
+    }
+  };
+
   const setActionBranchId = (branchId: string) => {
     if (!selectedBranchSet.has(branchId)) return;
     setActiveBranchId(branchId);
   };
 
   return {
-    branches,
-    organizationBranches,
+    branches: accessibleBranches,
+    accessibleBranches,
+    organizationBranches: accessibleBranches,
     selectedBranchIds,
     selectedBranchSet,
+    selectedOrganizationIds,
     actionBranchId,
     allBranchesSelected,
     isAggregate: selectedBranchIds.length > 1,
@@ -150,6 +181,7 @@ export function useBranchScope() {
     setAllBranches,
     setSelectedBranchIds,
     toggleBranch,
+    setOrganizationSelected,
     setActionBranchId,
     includesBranch: (branchId: string | null | undefined) => !!branchId && selectedBranchSet.has(branchId),
     scopeKey: selectedBranchIds.slice().sort().join(','),
