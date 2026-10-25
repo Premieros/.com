@@ -3,6 +3,7 @@ import type { OrganizationModuleKey } from '@/core/modules/module.config';
 export type BusinessProfileKey =
   | 'restaurant'
   | 'food_manufacturing'
+  | 'garment_manufacturing'
   | 'pharmacy'
   | 'car_showroom'
   | 'tourism'
@@ -64,6 +65,17 @@ export const BUSINESS_PROFILE_PRESETS: Record<BusinessProfileKey, BusinessProfil
     descriptionEn: 'Raw materials, component groups, costing, purchasing, inventory and sales.',
     enabledModules: [...CORE, 'pos', 'catalog', 'inventory', 'purchases', 'costing', 'advanced_reports', 'approvals'],
     terminology: { item: 'صنف', customer: 'عميل', supplier: 'مورد خامات', branch: 'موقع' },
+    capabilities: ['recipes', 'raw_materials', 'component_groups', 'batches', 'costing', 'wholesale_sales'],
+    defaults: { taxEnabled: true, taxRate: 14, currency: 'EGP' },
+  },
+  garment_manufacturing: {
+    key: 'garment_manufacturing',
+    ar: 'مصنع ملابس',
+    en: 'Garment Manufacturing',
+    descriptionAr: 'موديلات ومقاسات وألوان وأقمشة وخامات ومخزون ومشتريات وتكاليف.',
+    descriptionEn: 'Garment styles, sizes, colors, fabrics, stock, purchasing and costing.',
+    enabledModules: [...CORE, 'pos', 'catalog', 'inventory', 'purchases', 'costing', 'advanced_reports', 'approvals'],
+    terminology: { item: 'موديل / قطعة ملابس', customer: 'عميل', supplier: 'مورد أقمشة وخامات', branch: 'مصنع / موقع' },
     capabilities: ['recipes', 'raw_materials', 'component_groups', 'batches', 'costing', 'wholesale_sales'],
     defaults: { taxEnabled: true, taxRate: 14, currency: 'EGP' },
   },
@@ -134,5 +146,14 @@ export const BUSINESS_PROFILE_PRESETS: Record<BusinessProfileKey, BusinessProfil
     defaults: { taxEnabled: true, taxRate: 14, currency: 'EGP' },
   },
 };
+
+/**
+ * The hosted database currently validates business_type against a fixed list.
+ * Garments is persisted as "custom" plus business_profile.preset_key until a
+ * separately approved DB migration adds a first-class business_type value.
+ */
+export function databaseBusinessTypeForProfile(key: BusinessProfileKey): BusinessProfileKey {
+  return key === 'garment_manufacturing' ? 'custom' : key;
+}
 
 export const BUSINESS_PROFILE_KEYS = Object.keys(BUSINESS_PROFILE_PRESETS) as BusinessProfileKey[];

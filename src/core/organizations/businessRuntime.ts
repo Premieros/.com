@@ -173,6 +173,43 @@ const BLUEPRINTS: Record<BusinessProfileKey, RuntimeBlueprint> = {
       ],
     },
   },
+  garment_manufacturing: {
+    workflow: 'manufacturing',
+    terminology: {
+      item: T('موديل / قطعة ملابس', 'Garment / Style'),
+      customer: T('عميل', 'Customer'),
+      supplier: T('مورد أقمشة وخامات', 'Fabric & Trim Supplier'),
+      branch: T('مصنع / موقع', 'Factory / Site'),
+      sale: T('مبيعات جملة', 'Wholesale Sales'),
+      purchase: T('توريد أقمشة وخامات', 'Fabric & Material Procurement'),
+    },
+    navigation: {
+      order: ['dashboard', 'products', 'raw-materials', 'inventory-center', 'procurement-center', 'business-records', 'finance-center', 'people-center', 'pos', 'administration-center', 'super-admin'],
+      hidden: ['kitchen-display', 'operations-center'],
+      menuLabels: {
+        products: T('الموديلات والمنتجات', 'Styles & Products'),
+        'raw-materials': T('الأقمشة والخامات', 'Fabrics & Trims'),
+        'inventory-center': T('مخازن المصنع', 'Factory Inventory'),
+        'procurement-center': T('شراء الخامات', 'Material Procurement'),
+        'business-records': T('خطط الإنتاج والعينات', 'Production Plans & Samples'),
+        'finance-center': T('الحسابات والتكاليف', 'Finance & Costing'),
+        pos: T('مبيعات الملابس', 'Garment Sales'),
+      },
+      groupLabels: {
+        centers: T('مراكز تشغيل مصنع الملابس', 'Garment Factory Workspaces'),
+        catalog: T('الموديلات والأقمشة', 'Styles & Fabrics'),
+      },
+    },
+    dashboard: {
+      sections: ['sales', 'inventory', 'purchases', 'expenses', 'finance', 'production', 'business_records'],
+      quickActions: [
+        { id: 'styles', route: APP_ROUTES.products, ar: 'الموديلات', en: 'Garment Styles', module: 'catalog' },
+        { id: 'fabrics', route: APP_ROUTES.rawMaterials, ar: 'الأقمشة والخامات', en: 'Fabrics & Trims', capability: 'raw_materials' },
+        { id: 'planning', route: APP_ROUTES.businessRecords, ar: 'خطة إنتاج', en: 'Production Plan' },
+        { id: 'procurement', route: APP_ROUTES.purchases, ar: 'شراء خامات', en: 'Buy Materials', module: 'purchases' },
+      ],
+    },
+  },
   pharmacy: {
     workflow: 'pharmacy_retail',
     terminology: {

@@ -42,6 +42,21 @@ export const BUSINESS_RUNTIME_PROFILES: Record<BusinessProfileKey, BusinessRunti
       { key: 'production_plan', ar: 'خطة إنتاج', en: 'Production plan', amountEnabled: true, dateRangeEnabled: true },
     ],
   },
+  garment_manufacturing: {
+    fields: [
+      { entity: 'product', key: 'style_code', ar: 'كود الموديل', en: 'Style code', type: 'text', required: true },
+      { entity: 'product', key: 'garment_category', ar: 'نوع الملابس', en: 'Garment category', type: 'text' },
+      { entity: 'product', key: 'season', ar: 'الموسم', en: 'Season', type: 'text' },
+      { entity: 'product', key: 'fabric_type', ar: 'نوع القماش', en: 'Fabric type', type: 'text' },
+      { entity: 'product', key: 'garment_size', ar: 'المقاس', en: 'Size', type: 'text' },
+      { entity: 'product', key: 'garment_color', ar: 'اللون', en: 'Color', type: 'text' },
+    ],
+    records: [
+      { key: 'garment_sample', ar: 'عينة موديل', en: 'Garment sample', customerRequired: false, dateRangeEnabled: true },
+      { key: 'garment_production_plan', ar: 'خطة إنتاج ملابس', en: 'Garment production plan', dateRangeEnabled: true },
+      { key: 'garment_quality_record', ar: 'سجل فحص جودة', en: 'Quality review record', dateRangeEnabled: true },
+    ],
+  },
   pharmacy: {
     fields: [
       { entity: 'product', key: 'active_ingredient', ar: 'المادة الفعالة', en: 'Active ingredient', type: 'text' },

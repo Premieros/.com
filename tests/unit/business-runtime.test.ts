@@ -5,6 +5,7 @@ import {
   resolveBusinessRuntime,
 } from '@/core/organizations/businessRuntime';
 import { APP_ROUTES } from '@/core/navigation/routes';
+import { BUSINESS_PROFILE_PRESETS, databaseBusinessTypeForProfile } from '@/core/organizations/businessProfiles';
 
 describe('business runtime architecture', () => {
   it('turns tourism into a booking/service workspace instead of a POS/inventory workspace', () => {
@@ -82,4 +83,27 @@ describe('business runtime architecture', () => {
     expect(runtime.recordTypes).toHaveLength(0);
     expect(businessPathAllowed(runtime, APP_ROUTES.businessRecords)).toBe(false);
   });
+  it('supports the garments profile without changing the protected DB business_type allow-list', () => {
+    const runtime = resolveBusinessRuntime('custom', { preset_key: 'garment_manufacturing' });
+    const preset = BUSINESS_PROFILE_PRESETS.garment_manufacturing;
+
+    expect(databaseBusinessTypeForProfile('garment_manufacturing')).toBe('custom');
+    expect(databaseBusinessTypeForProfile('restaurant')).toBe('restaurant');
+    expect(runtime.key).toBe('garment_manufacturing');
+    expect(runtime.workflow).toBe('manufacturing');
+    expect(runtime.navigation.hidden.has('kitchen-display')).toBe(true);
+    expect(runtime.navigation.hidden.has('operations-center')).toBe(true);
+    expect(businessPathAllowed(runtime, APP_ROUTES.kitchenDisplay)).toBe(false);
+    expect(businessPathAllowed(runtime, APP_ROUTES.floorPlan)).toBe(false);
+    expect(businessPathAllowed(runtime, APP_ROUTES.rawMaterials)).toBe(true);
+    expect(businessPathAllowed(runtime, APP_ROUTES.businessRecords)).toBe(true);
+    expect(runtime.runtimeFields.map((field) => field.key)).toContain('style_code');
+    expect(runtime.runtimeFields.map((field) => field.key)).toContain('garment_size');
+    expect(runtime.runtimeFields.map((field) => field.key)).toContain('garment_color');
+    expect(runtime.recordTypes.map((record) => record.key)).toContain('garment_production_plan');
+    expect(preset.enabledModules).toContain('inventory');
+    expect(preset.enabledModules).toContain('costing');
+    expect(businessMenuLabel(runtime, 'raw-materials', 'ar', '')).toBe('الأقمشة والخامات');
+  });
+
 });

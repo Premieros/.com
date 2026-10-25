@@ -9,6 +9,7 @@ import { ORGANIZATION_MODULES, ORGANIZATION_MODULE_KEYS, type OrganizationModule
 import {
   BUSINESS_PROFILE_KEYS,
   BUSINESS_PROFILE_PRESETS,
+  databaseBusinessTypeForProfile,
   type BusinessProfileKey,
 } from '@/core/organizations/businessProfiles';
 import { BUSINESS_RUNTIME_PROFILES } from '@/core/organizations/businessProfileRuntime';
@@ -95,7 +96,7 @@ export function OrganizationCreateWizard({ open, onClose, onCreated, ar }: Props
     try {
       const { data, error } = await admin.createOrganizationFromProfile({
         p_name: form.name.trim(),
-        p_business_type: businessType,
+        p_business_type: databaseBusinessTypeForProfile(businessType),
         p_branch_name: form.branchName.trim() || form.name.trim(),
         p_enabled_modules: enabledModules,
         p_business_profile: {
