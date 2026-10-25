@@ -299,6 +299,7 @@ const BLUEPRINTS: Record<BusinessProfileKey, RuntimeBlueprint> = {
       },
       groupLabels: {
         centers: T('تشغيل المتجر', 'Store Operations'),
+        catalog: T('المنتجات', 'Products'),
       },
     },
     dashboard: {
