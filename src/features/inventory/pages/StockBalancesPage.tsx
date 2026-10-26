@@ -7,8 +7,8 @@ import { useBranches } from '@/hooks/useBranches';
 import { DesignSurface, DesignPageHeader } from '@/components/design';
 
 type Balance = { key: string; kind: 'product' | 'raw' | 'manufactured'; name: string; branch: string; warehouse: string; quantity: number };
-type Catalog = { id: string; branch_id: string; name: string; unit_type?: string };
-type Stock = { branch_id: string; warehouse_id: string; quantity: number; product_id?: string; raw_material_id?: string; unit_id?: string };
+
+
 const PAGE_SIZE = 1000;
 async function allRows(table: string, columns: string, branchIds: string[]): Promise<Record<string, unknown>[]> {
   const rows: Record<string, unknown>[] = [];
@@ -43,35 +43,21 @@ export function StockBalancesPage() {
     setBusy(true); setError('');
     (async () => {
       try {
-        const [productCatalog, rawCatalog, unitsCatalog, productStocks, rawStocks, unitEntries, warehouseRows] = await Promise.all([
-          allRows('products', 'id,branch_id,name', ids),
-          allRows('raw_materials', 'id,branch_id,name', ids),
-          allRows('inventory_units', 'id,branch_id,name,unit_type', ids),
-          allRows('inventory', 'product_id,branch_id,warehouse_id,quantity', ids),
-          allRows('raw_material_warehouse_inventory', 'raw_material_id,branch_id,warehouse_id,quantity', ids),
-          allRows('inventory_unit_entries', 'unit_id,branch_id,warehouse_id,quantity', ids),
-          allRows('warehouses', 'id,branch_id,name', ids)
+        const [balanceRows, warehouseRows] = await Promise.all([
+          allRows('v_stock_balances_unified', 'item_type,item_id,item_name,branch_id,warehouse_id,quantity', ids),
+          allRows('warehouses', 'id,branch_id,name', ids),
         ]);
         if (cancelled) return;
-        const map = new Map<string, Balance>();
-        const products = productCatalog as Catalog[], raws = rawCatalog as Catalog[], units = unitsCatalog as Catalog[];
         const whs = warehouseRows as { id: string; branch_id: string; name: string }[];
-        const names = {
-          product: new Map(products.map(p => [p.branch_id + ':' + p.id, p.name])),
-          raw: new Map(raws.map(p => [p.branch_id + ':' + p.id, p.name])),
-          manufactured: new Map(units.map(p => [p.branch_id + ':' + p.id, p.name]))
-        };
-        const add = (type: Balance['kind'], itemId: string, b: string, w: string, qty: number) => {
-          const key = [type, b, w, itemId].join(':');
-          const current = map.get(key);
-          if (current) current.quantity += qty;
-          else map.set(key, { key, kind: type, name: names[type].get(b + ':' + itemId) || itemId, branch: b, warehouse: w, quantity: qty });
-        };
-        for (const s of productStocks as Stock[]) if (s.product_id) add('product', s.product_id, s.branch_id, s.warehouse_id, Number(s.quantity));
-        for (const s of rawStocks as Stock[]) if (s.raw_material_id) add('raw', s.raw_material_id, s.branch_id, s.warehouse_id, Number(s.quantity));
-        for (const s of unitEntries as Stock[]) if (s.unit_id) add('manufactured', s.unit_id, s.branch_id, s.warehouse_id, Number(s.quantity));
         setWarehouses(whs);
-        setRows([...map.values()]);
+        setRows(balanceRows.map(row => ({
+          key: [row.item_type,row.branch_id,row.warehouse_id,row.item_id].join(':'),
+          kind: row.item_type as Balance['kind'],
+          name: String(row.item_name),
+          branch: String(row.branch_id),
+          warehouse: String(row.warehouse_id),
+          quantity: Number(row.quantity),
+        })));
       } catch (e) { if (!cancelled) setError(e instanceof Error ? e.message : String(e)); }
       finally { if (!cancelled) setBusy(false); }
     })();
