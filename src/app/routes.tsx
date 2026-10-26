@@ -27,6 +27,7 @@ const ProductSetupWizardPage = lazy(() => import('../features/catalog/pages/Prod
 const ProductModifiersPage = lazy(() => import('../features/catalog/pages/ProductModifiersPage').then(m => ({ default: m.ProductModifiersPage })));
 const ProductModifierOptionsPage = lazy(() => import('../features/catalog/pages/ProductModifierOptionsPage').then(m => ({ default: m.ProductModifierOptionsPage })));
 const CategoriesPage = lazy(() => import('../features/catalog/pages/CategoriesPage').then(m => ({ default: m.CategoriesPage })));
+const StockBalancesPage = lazy(() => import('../features/inventory/pages/StockBalancesPage').then(m => ({ default: m.StockBalancesPage })));
 const InventoryPage = lazy(() => import('../features/inventory/pages/InventoryPage').then(m => ({ default: m.InventoryPage })));
 const WarehousesPage = lazy(() => import('../features/inventory/pages/WarehousesPage').then(m => ({ default: m.WarehousesPage })));
 const RawMaterialsPage = lazy(() => import('../features/manufacturing/pages/RawMaterialsPage').then(m => ({ default: m.RawMaterialsPage })));
@@ -179,6 +180,7 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.wasteCenter} element={<ProtectedRoute permission="waste.view"><WasteCenterPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.kitchenDisplay} element={<ProtectedRoute permission="pos.kds_view"><KitchenDisplayPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.kitchenStations} element={<ProtectedRoute permission="settings.manage"><KitchenStationsPage /></ProtectedRoute>} />
+        <Route path={APP_ROUTES.stockBalances} element={<ProtectedRoute permission="inventory.view"><StockBalancesPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.inventory} element={<ProtectedRoute permission="inventory.view"><InventoryPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.warehouses} element={<ProtectedRoute permission="warehouses.view"><WarehousesPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.rawMaterials} element={<ProtectedRoute permission="raw_materials.view"><RawMaterialsPage /></ProtectedRoute>} />
