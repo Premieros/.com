@@ -26,6 +26,7 @@ export const APP_ROUTES = {
   categories: '/categories',
   components: '/components',
   inventory: '/inventory',
+  stockBalances: '/stock-balances',
   warehouses: '/warehouses',
   rawMaterials: '/raw-materials',
   recipes: '/recipes',
