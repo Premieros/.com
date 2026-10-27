@@ -982,6 +982,8 @@ export function PosWorkspacePage() {
               userId={user?.id || null}
               enableStationNavigation={posSurface.workflow === 'restaurant_service' && posSurface.showKitchen}
               products={products}
+              stockMap={liveStockMap}
+              showAvailableStock={effSettings?.allow_negative_stock === false}
               categories={categories}
               search={search}
               selectedCategory={selectedCategory}
