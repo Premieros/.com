@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useSyncExternalStore } from 'react';
 import { useBranches } from '@/hooks/useBranches';
+import { useAuth } from '@/context/AuthContext';
 import { useActiveBranchId } from './activeBranch';
 
 const STORAGE_KEY = 'premier_branch_scope_v1';
@@ -57,6 +58,8 @@ function getSnapshot(): StoredBranchScope {
 export function useBranchScope() {
   const stored = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const { branches, loading } = useBranches();
+  const { user } = useAuth();
+  const isSuperAdmin = user?.role === 'super_admin';
   const [activeBranchId, setActiveBranchId] = useActiveBranchId();
 
   const activeBranch = useMemo(
@@ -65,9 +68,9 @@ export function useBranchScope() {
   );
 
   const organizationBranches = useMemo(() => {
-    if (!activeBranch?.organization_id) return branches;
+    if (isSuperAdmin || !activeBranch?.organization_id) return branches;
     return branches.filter((branch) => branch.organization_id === activeBranch.organization_id);
-  }, [activeBranch?.organization_id, branches]);
+  }, [activeBranch?.organization_id, branches, isSuperAdmin]);
 
   const organizationBranchIds = useMemo(
     () => organizationBranches.map((branch) => branch.id),
