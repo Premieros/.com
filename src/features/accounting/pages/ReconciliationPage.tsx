@@ -86,6 +86,7 @@ export function ReconciliationPage() {
   };
 
   const createRecon = async () => {
+    if (!can('accounting.reconciliation.manage')) return;
     if (!createForm.treasury_account_id || !createForm.statement_balance) { show(t('required'), 'error'); return; }
     setSaving(true);
     const { data, error } = await api.accounting.createBankReconciliation( {
@@ -106,6 +107,7 @@ export function ReconciliationPage() {
   };
 
   const addLine = async () => {
+    if (!can('accounting.reconciliation.manage')) return;
     if (!detail?.header || !lineForm.amount) { show(t('required'), 'error'); return; }
     setSaving(true);
     const { data, error } = await api.accounting.addStatementLine( {
@@ -125,6 +127,7 @@ export function ReconciliationPage() {
   };
 
   const matchLine = async (lineId: string) => {
+    if (!can('accounting.reconciliation.manage')) return;
     const candidateId = matchSelections[lineId];
     if (!candidateId) { show(t('required'), 'error'); return; }
     setSaving(true);
@@ -181,7 +184,7 @@ export function ReconciliationPage() {
       <DesignPageHeader
         title={t('bankReconciliation')}
         subtitle={t('reconciliation')}
-        actions={can('accounts.manage') && (
+        actions={can('accounting.reconciliation.manage') && (
           <Button size="sm" onClick={() => { setCreateForm({ treasury_account_id: '', statement_date: todayISO(), statement_balance: '' }); setCreateOpen(true); }}><Plus className="w-4 h-4" /> {t('reconciliation')}</Button>
         )}
       />
@@ -246,7 +249,7 @@ export function ReconciliationPage() {
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-bold text-ui-text">{t('statementLines')}</h3>
               {detail.header.status === 'open' && (
-                <Button size="sm" variant="outline" onClick={() => { setLineForm({ statement_date: todayISO(), description: '', amount: '', reference: '' }); setAddLineOpen(true); }}><Plus className="w-4 h-4" /> {t('addStatementLine')}</Button>
+                <Button size="sm" variant="outline" onClick={() => { if (!can('accounting.reconciliation.manage')) return; setLineForm({ statement_date: todayISO(), description: '', amount: '', reference: '' }); setAddLineOpen(true); }}><Plus className="w-4 h-4" /> {t('addStatementLine')}</Button>
               )}
             </div>
 
