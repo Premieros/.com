@@ -641,6 +641,19 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
         if (overviewResults.some(({ result }) => result.error)) {
           setData([]); setChartData([]); setSummary({ total: 0, count: 0 }); return;
         }
+        // Current offer prices come from one catalog contract, not a costing snapshot.
+        const currentPrices = new Map<string, number>();
+        for (const branchId of reportBranchIds) {
+          for (let offset = 0; ; offset += 1000) {
+            const { data, error } = await supabase.from('v_current_sale_prices')
+              .select('item_id,sale_price').eq('item_type', 'product')
+              .eq('branch_id', branchId).range(offset, offset + 999);
+            if (error) throw error;
+            const batch = data || [];
+            for (const price of batch) currentPrices.set(branchId + ':' + price.item_id, Number(price.sale_price || 0));
+            if (batch.length < 1000) break;
+          }
+        }
         const catName = filters.category ? options.categories.find((category) => category.id === filters.category)?.name ?? filters.category : '';
         const overviewRows = overviewResults.flatMap(({ branchId, result }) =>
           (result.data || []).map((row) => ({ ...row, __branch_id: branchId })),
@@ -649,12 +662,12 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
           .filter((row) => row.recipe_item_count > 0)
           .filter((row) => !filters.product || row.product_id === filters.product)
           .filter((row) => !catName || row.category_name === catName)
-          .map((row) => withBranch(row.__branch_id, {
+          .map((row) => { const salePrice = currentPrices.get(row.__branch_id + ':' + row.product_id) ?? 0; return withBranch(row.__branch_id, {
             [lang === 'ar' ? 'المنتج' : 'Product']: row.product_name,
             [lang === 'ar' ? 'تكلفة المكونات' : 'Component Cost']: Number(row.actual_cost),
-            [lang === 'ar' ? 'سعر البيع' : 'Sale Price']: Number(row.sale_price),
+            [lang === 'ar' ? 'سعر البيع' : 'Sale Price']: salePrice,
             [lang === 'ar' ? 'الهامش' : 'Margin']: Number(row.sale_price) - Number(row.actual_cost),
-          }));
+          }); });
         setData(rows);
         setChartData(rows.slice(0, 10).map((row) => ({ name: String(row[lang === 'ar' ? 'المنتج' : 'Product']), value: Number(row[lang === 'ar' ? 'الهامش' : 'Margin']) })));
         setSummary({ total: rows.reduce((sum, row) => sum + Number(row[lang === 'ar' ? 'تكلفة المكونات' : 'Component Cost'] || 0), 0), count: rows.length });
