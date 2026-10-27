@@ -1,4 +1,5 @@
-import { NavLink } from 'react-router-dom';
+import { NavLink, useSearchParams } from 'react-router-dom';
+import { CenterPageContent } from './CenterPageContent';
 import { useLanguage } from '../../context/LanguageContext';
 import type { LucideIcon } from 'lucide-react';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
@@ -21,10 +22,11 @@ export type CenterTileItem = {
 type CenterTileProps = {
   item: CenterTileItem;
   testIdPrefix: string;
+  inline?: boolean;
 };
 
 /** Compact navigation tab: every center opens its pages by clicking the top row. */
-export function CenterTile({ item, testIdPrefix }: CenterTileProps) {
+export function CenterTile({ item, testIdPrefix, inline = false }: CenterTileProps) {
   const { lang } = useLanguage();
   const ar = lang === 'ar';
   const Icon = item.icon;
@@ -34,7 +36,7 @@ export function CenterTile({ item, testIdPrefix }: CenterTileProps) {
   return (
     <NavLink
       data-testid={`${testIdPrefix}-${item.id}`}
-      to={item.route}
+      to={inline ? `?page=${encodeURIComponent(item.route)}` : item.route}
       title={description || label}
       className={({ isActive }) =>
         `inline-flex min-h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-ring ${isActive
@@ -59,11 +61,16 @@ type CenterGridProps = {
 export function CenterGrid({ items, testIdPrefix }: CenterGridProps) {
   const { canAccessModule } = useOrganizationModules();
   const { lang } = useLanguage();
+  const [params] = useSearchParams();
   const visibleItems = items.filter(
     item => item.permission !== false && canAccessModule(moduleForPath(item.route)),
   );
 
+  const selectedRoute = params.get('page');
+  const firstEmbeddable = visibleItems.find(item => !['/pos', '/inventory-center', '/procurement-center', '/finance', '/people', '/administration', '/operations'].includes(item.route));
+  const selected = visibleItems.find(item => item.route === selectedRoute) ?? firstEmbeddable;
   return (
+    <div className="space-y-5">
     <nav
       aria-label={lang === 'ar' ? 'صفحات المركز' : 'Center pages'}
       data-testid={`${testIdPrefix}-navigation`}
@@ -71,7 +78,7 @@ export function CenterGrid({ items, testIdPrefix }: CenterGridProps) {
     >
       <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-1">
         {visibleItems.map(item => (
-          <CenterTile key={item.id} item={item} testIdPrefix={testIdPrefix} />
+          <CenterTile key={item.id} item={item} inline={!['/pos', '/inventory-center', '/procurement-center', '/finance', '/people', '/administration', '/operations'].includes(item.route)} testIdPrefix={testIdPrefix} />
         ))}
       </div>
       {visibleItems.length === 0 && (
@@ -80,5 +87,7 @@ export function CenterGrid({ items, testIdPrefix }: CenterGridProps) {
         </p>
       )}
     </nav>
+    {selected && <section aria-label={lang === 'ar' ? 'محتوى الشاشة المحددة' : 'Selected page content'} className="min-w-0"><CenterPageContent route={selected.route} /></section>}
+    </div>
   );
 }
