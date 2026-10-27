@@ -935,6 +935,10 @@ export function usePosOrder(input: UsePosOrderInput) {
   }, [cart, completing, branchId, branchName, activeShift, orderType, tableId, getStock, isNegativeEligible, paymentMethod, total, paidAmount, customerId, subtotal, discountValue, discountType, taxAmount, change, activeOrderId, activeOrderNumber, guestCount, customers, activeTable, effSettings, lang, isAr, show, showReceiptPrintError, t, user]);
 
   const printReceipt = useCallback(async () => {
+    if (orderLoading || mutationLockRef.current) {
+      show(isAr ? 'يجب اكتمال تحميل الطلب قبل طباعة الحساب.' : 'Wait for the order to finish loading before printing.', 'error');
+      return;
+    }
     if (!effSettings) return;
     try {
       if (cart.length > 0) {
@@ -998,7 +1002,7 @@ export function usePosOrder(input: UsePosOrderInput) {
     } catch (error) {
       showReceiptPrintError(error);
     }
-  }, [cart, lastReceipt, effSettings, activeOrderNumber, branchName, subtotal, discountValue, taxAmount, total, customers, customerId, activeTable, orderType, guestCount, user, t, lang, isAr, showReceiptPrintError, persistCart, show]);
+  }, [cart, lastReceipt, effSettings, activeOrderNumber, branchName, subtotal, discountValue, taxAmount, total, customers, customerId, activeTable, orderType, guestCount, user, t, lang, isAr, showReceiptPrintError, persistCart, show, orderLoading]);
 
   const closeReceipt = useCallback(() => setReceiptSaleId(null), []);
 
