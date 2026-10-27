@@ -155,6 +155,7 @@ export function JournalPage() {
   const addManualLine = () => setManualLines((ls) => [...ls, { account_id: '', debit: '', credit: '', note: '' }]);
 
   const submitManual = async () => {
+    if (!can('accounting.journal.post')) return;
     if (!manualDesc.trim()) { show(t('required'), 'error'); return; }
     const lines = manualLines
       .map((l) => ({
@@ -192,8 +193,8 @@ export function JournalPage() {
       <DesignPageHeader
         title={t('journalEntries')}
         subtitle={t('journal')}
-        actions={can('accounts.manage') && (
-          <Button size="sm" onClick={() => setManualOpen(true)}><Plus className="w-4 h-4" /> {t('postManualJournal')}</Button>
+        actions={can('accounting.journal.post') && (
+          <Button size="sm" onClick={() => { if (can('accounting.journal.post')) setManualOpen(true); }}><Plus className="w-4 h-4" /> {t('postManualJournal')}</Button>
         )}
       />
 
