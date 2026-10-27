@@ -173,20 +173,44 @@ export function PosWorkspacePage() {
         return;
       }
       const live: Record<string, number> = {};
+      const manufactured: Record<string, number> = {};
       let online = true;
       for (let offset = 0; ; offset += 1000) {
         const { data, error } = await supabase.from('v_current_stock_position')
-          .select('item_id,quantity')
+          .select('item_type,item_id,quantity')
           .eq('branch_id', effectiveBranch)
-          .eq('item_type', 'product')
+          .in('item_type', ['product', 'manufactured'])
           .eq('warehouse_id', warehouseId)
           .range(offset, offset + 999);
         if (error) { online = false; break; }
         const batch = data || [];
         for (const entry of batch) {
-          live[entry.item_id] = (live[entry.item_id] || 0) + Number(entry.quantity || 0);
+          const target = entry.item_type === 'manufactured' ? manufactured : live;
+          target[entry.item_id] = (target[entry.item_id] || 0) + Number(entry.quantity || 0);
         }
         if (batch.length < 1000) break;
+      }
+      if (online && products.length > 0) {
+        // A product that consumes manufactured groups can be sold up to the
+        // tightest linked group balance, without consuming its raw ingredients twice.
+        const links: Array<{ product_id: string; unit_id: string; quantity: number }> = [];
+        const productIds = products.map(p => p.id);
+        for (let start = 0; start < productIds.length; start += 200) {
+          const { data, error } = await supabase.from('product_unit_links')
+            .select('product_id,unit_id,quantity').in('product_id', productIds.slice(start, start + 200));
+          if (error) { online = false; break; }
+          links.push(...(data || []));
+        }
+        if (online) {
+          const limits: Record<string, number> = {};
+          for (const link of links) {
+            const required = Number(link.quantity);
+            if (!(required > 0) || manufactured[link.unit_id] === undefined) continue;
+            const possible = Math.max(0, Math.floor(manufactured[link.unit_id] / required));
+            limits[link.product_id] = limits[link.product_id] === undefined ? possible : Math.min(limits[link.product_id], possible);
+          }
+          Object.assign(live, limits);
+        }
       }
       if (online) {
         setLiveStockMap(live);
@@ -196,7 +220,7 @@ export function PosWorkspacePage() {
     } catch {
       // fallback
     }
-  }, [effectiveBranch, orderIdParam]);
+  }, [effectiveBranch, orderIdParam, products]);
 
   useEffect(() => {
     void refreshLiveStockMap();
