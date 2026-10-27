@@ -1,0 +1,32 @@
+'use strict';
+const test=require('node:test');
+const assert=require('node:assert/strict');
+const {DatabaseSync}=require('node:sqlite');
+const {createOfflineSalesEngine}=require('./offline-sales.cjs');
+test('offline sale deducts stock, balances journals, queues one sync event',()=>{
+ const db=new DatabaseSync(':memory:');
+ try{
+  const engine=createOfflineSalesEngine(db,'branch_001');
+  engine.setOpeningStock('coffee',10,120);
+  const input={key:'checkout-00001',lines:[{sku:'coffee',quantity:2,priceMinor:300}]};
+  const first=engine.commitSale(input);
+  assert.equal(first.totalMinor,600);
+  assert.equal(engine.commitSale(input).duplicate,true);
+  assert.equal(db.prepare("SELECT quantity FROM offline_stock WHERE sku='coffee'").get().quantity,8);
+  const journal=db.prepare('SELECT SUM(debit_minor) AS dr,SUM(credit_minor) AS cr FROM offline_journal').get();
+  assert.equal(journal.dr,840);assert.equal(journal.cr,840);
+  assert.equal(db.prepare('SELECT count(*) AS n FROM offline_outbox').get().n,1);
+  assert.throws(()=>engine.commitSale({...input,lines:[{sku:'coffee',quantity:1,priceMinor:300}]}),/IDEMPOTENCY_CONFLICT/);
+  assert.throws(()=>engine.commitSale({key:'checkout-00002',lines:[{sku:'coffee',quantity:100,priceMinor:300}]}),/INSUFFICIENT_STOCK/);
+  assert.equal(db.prepare('SELECT count(*) AS n FROM offline_sales').get().n,1);
+  assert.equal(db.prepare('SELECT quantity FROM offline_stock').get().quantity,8);
+ }finally{db.close();}
+});
+test('separate branch inventory cannot be consumed',()=>{
+ const db=new DatabaseSync(':memory:');
+ try{
+  createOfflineSalesEngine(db,'branch_A').setOpeningStock('sku1',3,5);
+  const other=createOfflineSalesEngine(db,'branch_B');
+  assert.throws(()=>other.commitSale({key:'sale-12345678',lines:[{sku:'sku1',quantity:1,priceMinor:10}]}),/INSUFFICIENT_STOCK/);
+ }finally{db.close();}
+});
