@@ -27,3 +27,11 @@ Current app offline IndexedDB data and cloud Supabase RPCs do **not** satisfy th
 The first startup stores the organization and branch identity in the local SQLite database. Later startup refuses a different identity for that same data directory. New print-job submissions must include matching `organizationId` and `branchId` and fail with `BRANCH_SCOPE_MISMATCH` otherwise. This is a defense-in-depth guard **not secure server-side enrollment**: the configuration must ultimately be issued by the cloud after the administrator authenticates, signed, stored securely, and tied to a registered device. Changing branch requires an explicitly audited re-enrollment/migration workflow; never point another branch at an existing data directory.
 
 Remote app updates, offline full ERP, printer execution, and synchronization are still not implemented by this foundation.
+
+## Windows desktop prototype and installer build
+
+The `branch-hub/desktop.cjs` Electron shell is now packaged by `.github/workflows/build-branch-hub-windows.yml` into a **prototype NSIS .exe** in GitHub Actions artifacts (only if the build succeeds). This is **not** the release-ready single installer promised for branches. It does not yet support real branch enrollment, provisioning of trusted TLS for tablets, POS transaction processing, physical printer execution, cloud synchronization, remote update rollout, or automatic recovery. The prototype deliberately shows an unconfigured state rather than silently selecting an organization or branch.
+
+Developers may configure `branch-config.json` under Electron userData containing `organizationId`, `branchId`, and a 32+ character `token` for isolated lab testing only; this file is NOT a secure enrollment mechanism. Never ship it with production credentials.
+
+The new local receipt API stores **draft records, not approved/final sales**. Nothing here debits inventory, receives payments, posts ledger journals or performs cloud sync. No real sales should be made through the prototype.
