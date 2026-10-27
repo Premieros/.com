@@ -28,10 +28,7 @@ export function InventoryCenterPage() {
     <div className="space-y-6">
       <PageHeader title={ar ? `مخزون ${runtime.title.ar}` : `${runtime.title.en} Inventory`} subtitle={ar ? `وظائف المخزون المناسبة لنشاط ${runtime.title.ar} فقط.` : `Inventory capabilities relevant to the active ${runtime.title.en} profile only.`} />
       <CenterGrid items={actions} testIdPrefix="inventory-center" columns={4} />
-      <div className="ui-accent-card ui-accent-inventory rounded-2xl border border-ui-border bg-ui-surface p-5 shadow-ui-sm">
-        <h2 className="text-base font-extrabold leading-6 text-ui-text">{ar ? 'دورة المخزون' : 'Inventory flow'}</h2>
-        <p className="mt-2 text-sm font-medium leading-6 text-ui-muted">{ar ? 'يمكن متابعة المخزون من الرصيد الحالي إلى الحركة والجرد والتحويلات والتقييم، مع بقاء كل عملية مرتبطة بمسار ثابت وصلاحية مستقلة.' : 'Follow inventory from current balances through ledger, counts, transfers, and valuation. Each action uses a stable route and independent permission.'}</p>
-      </div>
+
     </div>
   );
 }
