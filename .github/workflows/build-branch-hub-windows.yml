@@ -1,0 +1,30 @@
+name: Build PremierOS Branch Hub for Windows
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'branch-hub/**'
+      - '.github/workflows/build-branch-hub-windows.yml'
+jobs:
+  windows-build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Unit tests
+        run: node --test branch-hub/server.test.cjs
+      - name: Install packager
+        working-directory: branch-hub
+        run: npm install --no-audit --no-fund
+      - name: Package Windows installer
+        working-directory: branch-hub
+        run: npm run build:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: PremierOS-Branch-Hub-Windows-Prototype
+          path: branch-hub/release/*.exe
+          if-no-files-found: error
