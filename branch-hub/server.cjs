@@ -103,6 +103,15 @@ function createHub(config = {}) {
     const pathname = new URL(req.url || '/', 'https://branch.local').pathname;
     if (pathname === '/health' && req.method === 'GET') return send(res, 200, { ok: true, service: 'premier-branch-hub', version: 1 });
     if (!checkToken(req.headers.authorization)) return send(res, 401, { error: 'UNAUTHORIZED' });
+    if (pathname === '/api/v1/offline/sync/pending' && req.method === 'GET') {
+      // Local offline-sale outbox is read-only until a verified, idempotent cloud ACK protocol exists.
+      const events=db.prepare("SELECT event_id,sale_id,payload FROM offline_outbox WHERE branch_id=? AND status='pending' ORDER BY rowid LIMIT 100").all(branchId);
+      return send(res,200,{events:events.map(e=>({eventId:e.event_id,saleId:e.sale_id,payload:JSON.parse(e.payload)})),cloudAcknowledgementImplemented:false});
+    }
+    if (pathname === '/api/v1/offline/sync/status' && req.method === 'GET') {
+      const pending=db.prepare("SELECT count(*) AS n FROM offline_outbox WHERE branch_id=? AND status='pending'").get(branchId).n;
+      return send(res,200,{pending,onlineSyncImplemented:false});
+    }
     if (pathname === '/api/v1/offline/stock' && req.method === 'GET') {
       const stock=db.prepare('SELECT sku,quantity,unit_cost_minor FROM offline_stock WHERE branch_id=? ORDER BY sku LIMIT 500').all(branchId);
       return send(res,200,{stock});
