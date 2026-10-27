@@ -43,3 +43,13 @@ The Branch Hub exposes a **server-side only** `createLocalBackup()` method using
 This is **not yet scheduled or off-machine backup**, nor encrypted backup, retention policy, or an administrator-approved restore workflow. The SQLite file may contain customer/transaction data: protect the Windows profile and backup folder and do not copy snapshots to shared/untrusted folders. Never overwrite a live DB while the server is running. Any restoration must verify that the target installation belongs to the same organization and branch.
 
 A Windows installer may be produced only after GitHub Actions succeeds; generating the artifact does not by itself make the prototype safe for real sales.
+
+## Verified offline restore (fresh directory only)
+
+Stop Branch Hub first. From a trusted administrator terminal, run:
+
+```sh
+node branch-hub/restore.cjs /secure/backup.sqlite /empty/branch-data-dir org_001 branch_001
+```
+
+The destination directory must be empty. Recovery verifies a full SQLite integrity check, expected organization/branch binding, and the presence of core receipt, sync outbox, and print-job tables. It refuses corrupt backups, mismatched branches, and existing data. Once restored, start the hub with `BRANCH_HUB_DATA_DIR` pointing at the restored directory and matching identity. Never run restoration against a live branch data directory. Keep backup encryption/off-machine rotation and operator approval as separate release blockers.
