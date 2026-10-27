@@ -156,13 +156,30 @@ export function RawMaterialsPage() {
   };
 
   const remove = async () => {
-    if (!deleteId) return;
-    const { error } = await supabase.from('raw_materials').delete().eq('id', deleteId);
-    if (error) show(error.message, 'error');
-    else { show(t('deleteSuccess'), 'success'); await logAudit('delete', 'raw_materials', deleteId); }
+    if (!deleteId || !can('raw_materials.manage')) return;
+    const id = deleteId;
+    const { error } = await supabase.from('raw_materials').delete().eq('id', id);
+    if (error?.code === '23503') {
+      // Referenced records cannot be erased: archive from operational selection
+      // while retaining historical orders, stock movements and audit trails.
+      const { error: archiveError } = await supabase.from('raw_materials')
+        .update({ is_active: false }).eq('id', id);
+      if (archiveError) {
+        show(archiveError.message, 'error');
+      } else {
+        show(isAr ? 'الصنف مرتبط بعمليات سابقة؛ تم تعطيله مع الاحتفاظ بسجلاته.' : 'Used in historical records; deactivated instead of deleting.', 'success');
+        await logAudit('update', 'raw_materials', id, { is_active: false, reason: 'referenced_record_archived' });
+      }
+    } else if (error) {
+      show(error.message, 'error');
+    } else {
+      show(t('deleteSuccess'), 'success');
+      await logAudit('delete', 'raw_materials', id);
+    }
     setDeleteId(null);
+    
     reloadMaterials();
-  };
+  }
 
   const openAdjust = (inv: RawMaterialInventory) => {
     setAdjustTarget(inv);
