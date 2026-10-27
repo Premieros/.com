@@ -337,17 +337,17 @@ export function Layout({ children }: { children: ReactNode }) {
             )}
           </section>
 
-          {(Object.keys(MENU_GROUPS) as MenuGroup[]).map((group) => {
+          {(['main', 'catalog', 'centers', 'admin'] as MenuGroup[]).map((group) => {
             const items = grouped[group] ?? [];
             if (!items.length) return null;
             return (
-              <section key={group} data-testid={`nav-group-${group}`} className="mb-3">
+              <section key={group} data-testid={`nav-group-${group}`} className="mb-2">
                 <button data-testid={`nav-group-toggle-${group}`} type="button" onClick={() => setCollapsed((v) => ({ ...v, [group]: !v[group] }))} className="flex min-h-9 w-full items-center justify-between rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-ui-subtle transition hover:bg-ui-page-alt hover:text-ui-text">
                   <span>{businessGroupLabel(runtime, group, ar ? 'ar' : 'en', MENU_GROUPS[group][ar ? 'ar' : 'en'])}</span>
                   <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-150 ${collapsed[group] ? 'rotate-90' : ''}`} />
                 </button>
                 {!collapsed[group] && (
-                  <div className="mt-1 space-y-0.5">
+                  <div className="mt-0.5 space-y-0.5">
                     {items.map((item) => (
                       <NavLink
                         data-testid={`nav-item-${item.id}`}
@@ -357,7 +357,7 @@ export function Layout({ children }: { children: ReactNode }) {
                         onFocus={() => prefetchAppRoute(item.route)}
                         onTouchStart={() => prefetchAppRoute(item.route)}
                         onClick={() => setMobileOpen(false)}
-                        className={({ isActive }) => `group flex min-h-[40px] items-center gap-3 rounded-xl px-3 text-sm font-medium transition-all duration-150 ${isActive ? 'bg-ui-primary text-ui-primary-fg shadow-[0_4px_12px_rgba(91,43,216,0.18)]' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary'}`}
+                        className={({ isActive }) => `group flex min-h-[38px] items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-all duration-150 ${isActive ? 'bg-ui-primary text-ui-primary-fg shadow-[0_4px_12px_rgba(91,43,216,0.18)]' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary'}`}
                       >
                         {ICONS[item.icon]}
                         <span className="flex-1 truncate">{businessMenuLabel(
