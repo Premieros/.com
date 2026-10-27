@@ -1,0 +1,18 @@
+{
+  "appId": "com.premieros.branchhub",
+  "productName": "PremierOS Branch Hub",
+  "directories": { "output": "release" },
+  "files": ["desktop.cjs", "server.cjs", "package.json"],
+  "asar": true,
+  "win": {
+    "target": [{"target":"nsis","arch":["x64"]}],
+    "requestedExecutionLevel": "asInvoker",
+    "artifactName": "PremierOS-Branch-Hub-Setup-${version}-${arch}.${ext}"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true
+  }
+}
