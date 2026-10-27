@@ -666,7 +666,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
             [lang === 'ar' ? 'المنتج' : 'Product']: row.product_name,
             [lang === 'ar' ? 'تكلفة المكونات' : 'Component Cost']: Number(row.actual_cost),
             [lang === 'ar' ? 'سعر البيع' : 'Sale Price']: salePrice,
-            [lang === 'ar' ? 'الهامش' : 'Margin']: Number(row.sale_price) - Number(row.actual_cost),
+            [lang === 'ar' ? 'الهامش' : 'Margin']: salePrice - Number(row.actual_cost),
           }); });
         setData(rows);
         setChartData(rows.slice(0, 10).map((row) => ({ name: String(row[lang === 'ar' ? 'المنتج' : 'Product']), value: Number(row[lang === 'ar' ? 'الهامش' : 'Margin']) })));
