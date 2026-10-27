@@ -45,7 +45,7 @@ export function ProductionOrdersPage() {
     try {
       if (op==='create' && (!effectiveBranch || !warehouse || !product || !(Number(quantity)>0))) throw new Error(ar?'حدد المنتج والمخزن وكمية صحيحة':'Select product, warehouse and valid quantity');
       if (op==='cancel' && !window.confirm(ar?'هل تريد إلغاء أمر الإنتاج؟':'Cancel this production order?')) return;
-      const { error: rpcError } = op==='create'
+      const { data: rpcData, error: rpcError } = op==='create'
         ? await supabase.rpc('create_production_order',{p_product_id:product,p_branch_id:effectiveBranch,p_warehouse_id:warehouse,p_quantity:Number(quantity),p_notes:notes||null})
         : op==='start'
         ? await supabase.rpc('start_production_order',{p_order_id:id})
@@ -53,6 +53,8 @@ export function ProductionOrdersPage() {
         ? await supabase.rpc('complete_production_order',{p_order_id:id})
         : await supabase.rpc('cancel_production_order',{p_order_id:id});
       if (rpcError) throw rpcError;
+      const response = rpcData as { success?: boolean; error?: string; detail?: string } | null;
+      if (response?.success === false) throw new Error(response.detail || response.error || 'Production operation failed');
       await load();
     } catch(e) {setError(e instanceof Error?e.message:String(e));}
     finally {setBusy(false);}
@@ -63,7 +65,7 @@ export function ProductionOrdersPage() {
     <DesignPageHeader title={ar?'أوامر الإنتاج':'Production orders'} subtitle={ar?'إنشاء ومتابعة وإتمام أوامر الإنتاج — الرصيد يزيد عند الإتمام فقط':'Create, track and complete production orders — inventory increases on completion only'}/>
     <div className="space-y-4 rounded-2xl border border-ui-border bg-ui-surface p-4">
       {!fixedBranch && <select aria-label={ar?'الفرع':'Branch'} className="rounded-lg border border-ui-border p-2 bg-ui-surface" value={branch} onChange={e=>{setBranch(e.target.value);setWarehouse('');setProduct('');}}><option value="">{ar?'اختر الفرع':'Select branch'}</option>{branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}</select>}
-      {can('raw_materials.manage') && <div className="flex flex-wrap items-center gap-2">
+      {can('production.manage') && <div className="flex flex-wrap items-center gap-2">
         <select aria-label={ar?'المنتج':'Product'} className="rounded-lg border border-ui-border p-2 bg-ui-surface" value={product} onChange={e=>setProduct(e.target.value)}><option value="">{ar?'اختر المنتج':'Select product'}</option>{products.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select>
         <select aria-label={ar?'المخزن':'Warehouse'} className="rounded-lg border border-ui-border p-2 bg-ui-surface" value={warehouse} onChange={e=>setWarehouse(e.target.value)}><option value="">{ar?'اختر المخزن':'Select warehouse'}</option>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>
         <input aria-label={ar?'الكمية':'Quantity'} className="w-28 rounded-lg border border-ui-border p-2 bg-ui-surface" type="number" min="0.0001" step="any" value={quantity} onChange={e=>setQuantity(e.target.value)}/>
@@ -71,7 +73,7 @@ export function ProductionOrdersPage() {
         <button className="rounded-lg bg-blue-600 px-4 py-2 text-white disabled:opacity-50" disabled={busy||!effectiveBranch} onClick={()=>void perform('create')}>{ar?'إنشاء أمر إنتاج':'Create production order'}</button>
       </div>}
       {error && <p role="alert" className="text-red-600">{error}</p>}
-      <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-ui-border">{[ar?'الأمر':'Order',ar?'المنتج':'Product',ar?'المخزن':'Warehouse',ar?'الكمية':'Quantity',ar?'الحالة':'Status',ar?'الإجراءات':'Actions'].map(h=><th key={h} className="p-2 text-start">{h}</th>)}</tr></thead><tbody>{orders.map(o=><tr key={o.id} className="border-b border-ui-border"><td className="p-2">{o.order_number||o.id.slice(0,8)}</td><td className="p-2">{names.get(o.product_id)||o.product_id}</td><td className="p-2">{warehouseNames.get(o.warehouse_id)||o.warehouse_id}</td><td className="p-2">{o.quantity}</td><td className="p-2">{o.status}</td><td className="p-2 space-x-2">{can('raw_materials.manage') && <>{o.status==='planned' && <button disabled={busy} className="underline" onClick={()=>void perform('start',o.id)}>{ar?'بدء':'Start'}</button>}{['planned','in_progress','started'].includes(o.status) && <button disabled={busy} className="underline" onClick={()=>void perform('complete',o.id)}>{ar?'إتمام':'Complete'}</button>}{['planned','in_progress','started'].includes(o.status) && <button disabled={busy} className="underline text-red-600" onClick={()=>void perform('cancel',o.id)}>{ar?'إلغاء':'Cancel'}</button>}</>}</td></tr>)}</tbody></table>{!orders.length && <p className="p-5 text-center text-ui-muted">{ar?'لا توجد أوامر إنتاج في الفرع المحدد':'No production orders for the selected branch'}</p>}</div>
+      <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-ui-border">{[ar?'الأمر':'Order',ar?'المنتج':'Product',ar?'المخزن':'Warehouse',ar?'الكمية':'Quantity',ar?'الحالة':'Status',ar?'الإجراءات':'Actions'].map(h=><th key={h} className="p-2 text-start">{h}</th>)}</tr></thead><tbody>{orders.map(o=><tr key={o.id} className="border-b border-ui-border"><td className="p-2">{o.order_number||o.id.slice(0,8)}</td><td className="p-2">{names.get(o.product_id)||o.product_id}</td><td className="p-2">{warehouseNames.get(o.warehouse_id)||o.warehouse_id}</td><td className="p-2">{o.quantity}</td><td className="p-2">{o.status}</td><td className="p-2 space-x-2">{can('production.manage') && <>{o.status==='planned' && <button disabled={busy} className="underline" onClick={()=>void perform('start',o.id)}>{ar?'بدء':'Start'}</button>}{['planned','in_progress','started'].includes(o.status) && <button disabled={busy} className="underline" onClick={()=>void perform('complete',o.id)}>{ar?'إتمام':'Complete'}</button>}{['planned','in_progress','started'].includes(o.status) && <button disabled={busy} className="underline text-red-600" onClick={()=>void perform('cancel',o.id)}>{ar?'إلغاء':'Cancel'}</button>}</>}</td></tr>)}</tbody></table>{!orders.length && <p className="p-5 text-center text-ui-muted">{ar?'لا توجد أوامر إنتاج في الفرع المحدد':'No production orders for the selected branch'}</p>}</div>
     </div>
   </DesignSurface>;
 }
