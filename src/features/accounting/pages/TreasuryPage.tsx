@@ -182,11 +182,15 @@ export function TreasuryPage() {
   };
 
   const openModal = (m: Exclude<ModalType, null>) => {
+    if (m === 'transfer' && !can('accounting.treasury.transfer')) return;
+    if ((m === 'deposit' || m === 'withdrawal') && !can('accounts.manage')) return;
     setForm({ from_account_id: '', to_account_id: '', account_id: '', amount: '', notes: '' });
     setModal(m);
   };
 
   const submit = async () => {
+    if (modal === 'transfer' && !can('accounting.treasury.transfer')) return;
+    if ((modal === 'deposit' || modal === 'withdrawal') && !can('accounts.manage')) return;
     const amount = Number(form.amount);
     if (!amount || amount <= 0) { show(t('required'), 'error'); return; }
     if (!effectiveBranchFilter) { show(t('filterByBranch'), 'error'); return; }
