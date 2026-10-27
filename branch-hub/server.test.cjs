@@ -123,3 +123,33 @@ test('print job key cannot be reused for a different document', async () => {
   assert.equal((await request(port,'GET','/api/v1/jobs',null,token)).data.jobs.length,1);
  } finally {await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('consistent backup restores branch binding, receipt, and pending outbox', async () => {
+ const { DatabaseSync } = require('node:sqlite');
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'premier-backup-'));
+ const config={host:'127.0.0.1',port:0,branchId:'branch_001',organizationId:'org_001',token,dataDir:dir};
+ let hub=createHub(config);
+ try {
+  const {port}=await hub.listen();
+  const receipt={organizationId:'org_001',branchId:'branch_001',deviceId:'device_001',
+   idempotencyKey:'receipt-backup-001',totalMinor:499,currency:'EGP',receipt:{lines:[{sku:'abc',qty:1}]}};
+  assert.equal((await request(port,'POST','/api/v1/receipts',receipt,token)).status,201);
+  const snapshot=hub.createLocalBackup();
+  assert.ok(snapshot.bytes>0);
+  const filepath=path.join(dir,'backups',snapshot.filename);
+  const restored=new DatabaseSync(filepath,{readOnly:true});
+  try {
+   assert.equal(restored.prepare('PRAGMA quick_check').get().quick_check,'ok');
+   assert.equal(restored.prepare('SELECT branch_id FROM hub_identity').get().branch_id,'branch_001');
+   assert.equal(restored.prepare('SELECT count(*) AS n FROM local_receipts').get().n,1);
+   assert.equal(restored.prepare("SELECT count(*) AS n FROM sync_outbox WHERE status='pending'").get().n,1);
+  } finally {restored.close();}
+  await hub.close();hub=null;
+  fs.copyFileSync(filepath,path.join(dir,'branch-hub.sqlite'));
+  hub=createHub(config);
+  const rebound=await hub.listen();
+  assert.equal((await request(rebound.port,'GET','/api/v1/sync/status',null,token)).data.pending,1);
+  await hub.close();hub=null;
+  assert.throws(()=>createHub({...config,branchId:'branch_002'}),/BRANCH_BINDING_MISMATCH/);
+ } finally {if(hub)await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
+});
