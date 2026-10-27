@@ -14,7 +14,7 @@ import { APPROVED_FIXED_THERMAL_WIDTH_MM, buildReceiptFixedTemplate, buildReceip
 import { fetchOrderForWorkspace } from '../services/posOrders';
 import { sendOrderToKitchen } from '../services/kitchen';
 import { enqueueCloudOpenOrderPrint } from '../services/cloudPrint';
-import { processSaleForOrder, nextInvoiceNumber, fetchBranchWarehouseId } from '../services/payment';
+import { processSaleForOrder, nextInvoiceNumber, fetchBranchWarehouseId, createSaleOperationKey, type ProcessSalePayload } from '../services/payment';
 import type { KitchenSendItem, KitchenStationDispatchSummary } from '../types';
 
 export interface ActiveShiftInfo {
@@ -80,6 +80,7 @@ export function usePosOrder(input: UsePosOrderInput) {
   const [completing, setCompleting] = useState(false);
   // Synchronous lock: React state alone does not block same-tick double submits.
   const mutationLockRef = useRef(false);
+  const pendingCheckoutRef = useRef<{ fingerprint: string; payload: ProcessSalePayload } | null>(null);
   const [orderLoading, setOrderLoading] = useState(false);
   const [kitchenSending, setKitchenSending] = useState(false);
   const [kitchenSentItems, setKitchenSentItems] = useState<KitchenSendItem[]>([]);
@@ -802,8 +803,22 @@ export function usePosOrder(input: UsePosOrderInput) {
         }
       }
 
-      const warehouseId = await fetchBranchWarehouseId(branchId, activeOrderId);
-      const invoiceNumber = (await nextInvoiceNumber()) || `INV-${Date.now()}`;
+      // Retain the exact financial attempt after an ambiguous transport failure.
+      // A retry must reuse its invoice, operation key, warehouse and item snapshot.
+      const fingerprint = JSON.stringify({
+        branchId, shiftId: activeShift.id, activeOrderId, cart: cartToItems(cart),
+        customerId, orderType, tableId, guestCount, paymentMethod,
+        subtotal, discountValue, discountType, taxAmount, total, paidAmount,
+      });
+      if (pendingCheckoutRef.current && pendingCheckoutRef.current.fingerprint !== fingerprint) {
+        show(isAr
+          ? 'هناك عملية دفع سابقة غير مؤكدة. تحقق من الفاتورة قبل تغيير محتوى الطلب.'
+          : 'A previous payment attempt is unresolved. Verify its invoice before changing the order.', 'error');
+        return false;
+      }
+      const previousAttempt = pendingCheckoutRef.current;
+      const warehouseId = previousAttempt?.payload.p_warehouse_id ?? await fetchBranchWarehouseId(branchId, activeOrderId);
+      const invoiceNumber = previousAttempt?.payload.p_invoice_number ?? await nextInvoiceNumber();
       const itemsPayload = cartToItems(cart);
       const paidAmountToUse = paymentMethod === 'credit' ? 0 : paidAmount || total;
       const binding = resolveOrderBindingForSave({
@@ -813,7 +828,8 @@ export function usePosOrder(input: UsePosOrderInput) {
         activeTableId: activeTable?.id ?? null,
       });
 
-      const { result, error: saleError } = await processSaleForOrder({
+      const payload: ProcessSalePayload = previousAttempt?.payload ?? {
+        p_client_operation_key: createSaleOperationKey(),
         p_invoice_number: invoiceNumber,
         p_branch_id: branchId,
         p_shift_id: activeShift?.id || null,
@@ -834,9 +850,13 @@ export function usePosOrder(input: UsePosOrderInput) {
         p_table_id: binding.tableId,
         p_order_id: activeOrderId,
         p_guest_count: guestCount,
-      });
+      };
+      pendingCheckoutRef.current = { fingerprint, payload };
+      const { result, error: saleError } = await processSaleForOrder(payload);
+      if (result && !result.success) pendingCheckoutRef.current = null;
       if (saleError) { show(saleError, 'error'); return false; }
       if (!result?.success) { show(result?.detail || result?.error || t('error'), 'error'); return false; }
+      pendingCheckoutRef.current = null;
       const saleId = result.sale_id || '';
 
       await logAudit('create', 'sales', saleId, { invoice: invoiceNumber, total });
