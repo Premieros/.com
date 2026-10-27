@@ -63,3 +63,7 @@ The destination directory must be empty. Recovery verifies a full SQLite integri
 ### Local stock deduction audit
 
 Each committed offline sale now inserts one immutable (application-level) `offline_stock_movements` record per SKU in the same SQLite transaction as its stock deduction, journal, and outbox event. `GET /api/v1/offline/stock/movements` returns the latest 200 movements under branch authentication. An idempotent retry creates no second movement. Opening stock, returns, transfers, external replenishment and full stock reconciliation still need their own audited workflows; this read endpoint does not make the prototype production-ready.
+
+### Offline sales sync staging (no cloud acknowledgement yet)
+
+Authenticated `GET /api/v1/offline/sync/pending` returns at most 100 unsynchronized sales events from the durable `offline_outbox`; `GET /api/v1/offline/sync/status` returns the pending count. Both remain read-only across restarts. They deliberately cannot acknowledge, delete, or dispatch events: an authenticated, idempotent Supabase ingestion endpoint and verified cloud acknowledgement protocol must be implemented and tested first. These local endpoints do not imply functional cloud synchronization.
