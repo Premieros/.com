@@ -53,3 +53,9 @@ node branch-hub/restore.cjs /secure/backup.sqlite /empty/branch-data-dir org_001
 ```
 
 The destination directory must be empty. Recovery verifies a full SQLite integrity check, expected organization/branch binding, and the presence of core receipt, sync outbox, and print-job tables. It refuses corrupt backups, mismatched branches, and existing data. Once restored, start the hub with `BRANCH_HUB_DATA_DIR` pointing at the restored directory and matching identity. Never run restoration against a live branch data directory. Keep backup encryption/off-machine rotation and operator approval as separate release blockers.
+
+## Offline sales kernel (isolated development module)
+
+`offline-sales.cjs` now supplies a branch-scoped SQLite transaction engine for integer-unit stock, checkout idempotency, atomic stock consumption, a balanced four-line cost/revenue journal, and a pending offline outbox event. It rejects insufficient stock, mismatched idempotency payloads, numeric overflow and cross-branch stock access. Run `npm test` inside `branch-hub` to execute its regression tests.
+
+**Not wired into the HTTP API or UI yet.** Opening stock is an initial import-only operation and cannot modify existing balances. This kernel is not a full approved POS: returns, taxes, split tenders, permissions, actual FIFO/batch cost, real Supabase reconciliation, and complete posting into Premier accounting remain separate tasks. Do not process production sales using this module.
