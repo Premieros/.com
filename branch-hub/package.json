@@ -1,0 +1,8 @@
+{
+  "name": "premier-branch-hub",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Local-first branch gateway prototype for PremierOS",
+  "engines": { "node": ">=22.13.0" },
+  "scripts": { "start": "node server.cjs", "test": "node --test server.test.cjs" }
+}
