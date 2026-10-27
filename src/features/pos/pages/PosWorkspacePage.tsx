@@ -19,6 +19,7 @@ import { useToast } from '@/components/Toast';
 import { useOperationalGuard, PrerequisiteAlertBanner, PREREQUISITE_STEPS } from '@/core/guard';
 import type { Product, Customer, Settings, Branch, Category, RpcResult, Order, CartItem, DiningArea, DiningTable } from '@/lib/types';
 import { usePosOrder } from '../hooks/usePosOrder';
+import { fetchBranchWarehouseId } from '../services/payment';
 import { useActiveOrders } from '../hooks/useActiveOrders';
 import { usePosPermissions } from '../hooks/usePosPermissions';
 import { usePosKeyboard } from '../hooks/usePosKeyboard';
@@ -159,6 +160,11 @@ export function PosWorkspacePage() {
     try {
       // Prefer the authoritative signed stock read contract online.
       // The IndexedDB stock map is only an offline fallback, never an additional source to sum.
+      const warehouseId = await fetchBranchWarehouseId(effectiveBranch, orderIdParam || null);
+      if (!warehouseId) {
+        setLiveStockMap(await InventoryRepository.getBranchStockMap(effectiveBranch));
+        return;
+      }
       const live: Record<string, number> = {};
       let online = true;
       for (let offset = 0; ; offset += 1000) {
@@ -166,6 +172,7 @@ export function PosWorkspacePage() {
           .select('item_id,quantity')
           .eq('branch_id', effectiveBranch)
           .eq('item_type', 'product')
+          .eq('warehouse_id', warehouseId)
           .range(offset, offset + 999);
         if (error) { online = false; break; }
         const batch = data || [];
@@ -182,7 +189,7 @@ export function PosWorkspacePage() {
     } catch {
       // fallback
     }
-  }, [effectiveBranch]);
+  }, [effectiveBranch, orderIdParam]);
 
   useEffect(() => {
     void refreshLiveStockMap();
