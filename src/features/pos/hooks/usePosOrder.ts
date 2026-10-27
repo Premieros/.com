@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback, useEffect } from 'react';
+import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -42,6 +42,7 @@ export function usePosOrder(input: UsePosOrderInput) {
   const { show } = useToast();
   const perms = usePosPermissions();
   const [offlineCompleting, setOfflineCompleting] = useState(false);
+  const settlementLockRef = useRef(false);
   const [settlementPreview, setSettlementPreview] = useState<OrderSettlementPreview | null>(null);
   const [settlementReceipt, setSettlementReceipt] = useState<ReceiptData | null>(null);
   const [settlementReceiptSaleId, setSettlementReceiptSaleId] = useState<string | null>(null);
@@ -241,6 +242,7 @@ export function usePosOrder(input: UsePosOrderInput) {
 
   const completeSale = useCallback(async (): Promise<boolean> => {
     const explicitlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+    if (settlementLockRef.current || base.mutationLockRef.current) return false;
 
     if (explicitlyOffline) {
       if (base.cart.length === 0 || base.completing || offlineCompleting) return false;
@@ -253,6 +255,7 @@ export function usePosOrder(input: UsePosOrderInput) {
         return false;
       }
 
+      settlementLockRef.current = true;
       setOfflineCompleting(true);
       try {
         const pinnedWarehouseId = await getPinnedSaleWarehouse(
@@ -304,6 +307,7 @@ export function usePosOrder(input: UsePosOrderInput) {
         );
         return true;
       } finally {
+        settlementLockRef.current = false;
         setOfflineCompleting(false);
       }
     }
@@ -314,6 +318,7 @@ export function usePosOrder(input: UsePosOrderInput) {
       return false;
     }
 
+    settlementLockRef.current = true;
     setOfflineCompleting(true);
     try {
       const preview = settlementPreview || await loadSettlementPreview(false);
@@ -393,6 +398,7 @@ export function usePosOrder(input: UsePosOrderInput) {
       }
       return true;
     } finally {
+      settlementLockRef.current = false;
       setOfflineCompleting(false);
     }
   }, [base, buildSettlementReceipt, input.activeShift?.id, input.branchId, input.effSettings, isAr, lang, loadSettlementPreview, offlineCompleting, settlementPreview, show, t]);
