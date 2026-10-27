@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Building2, Check, ChevronDown, Layers3 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { useBranchScope } from '@/lib/branchScope';
+import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/api';
 
 type Props = {
   compact?: boolean;
@@ -12,6 +14,25 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
   const { lang } = useLanguage();
   const ar = lang === 'ar';
   const scope = useBranchScope();
+  const { user } = useAuth();
+  const superAdmin = user?.role === 'super_admin';
+  const [organizationNames, setOrganizationNames] = useState<Record<string, string>>({});
+  useEffect(() => {
+    if (!superAdmin) return;
+    let mounted = true;
+    void supabase.from('organizations').select('id,name').then(({ data }) => {
+      if (mounted && data) setOrganizationNames(Object.fromEntries(data.map((o) => [o.id, o.name])));
+    });
+    return () => { mounted = false; };
+  }, [superAdmin]);
+  const groups = useMemo(() => {
+    const grouped = new Map<string, typeof scope.organizationBranches>();
+    for (const branch of scope.organizationBranches) {
+      const key = branch.organization_id || 'unassigned';
+      grouped.set(key, [...(grouped.get(key) || []), branch]);
+    }
+    return [...grouped.entries()];
+  }, [scope.organizationBranches]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -147,9 +168,9 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
       {open && (
         <div
           data-testid="branch-scope-menu"
-          className="absolute end-0 top-full z-50 mt-2 w-[320px] overflow-hidden rounded-2xl border border-ui-border bg-ui-surface shadow-ui-lg"
+          className="absolute end-0 top-full z-50 mt-1.5 w-[min(300px,calc(100vw-24px))] overflow-hidden rounded-xl border border-ui-border bg-ui-surface shadow-ui-lg"
         >
-          <div className="border-b border-ui-border p-3">
+          <div className="border-b border-ui-border p-2">
             <button
               type="button"
               data-testid="all-branches-option"
@@ -174,8 +195,11 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
             </button>
           </div>
 
-          <div className="max-h-64 overflow-y-auto p-2">
-            {scope.organizationBranches.map((branch) => {
+          <div className="max-h-56 overflow-y-auto p-1.5">
+            {groups.map(([organizationId, branches]) => (
+              <div key={organizationId}>
+                {superAdmin && <p className="px-2.5 pt-2 pb-1 text-[10px] font-black text-ui-muted">{organizationNames[organizationId] || (ar ? 'المؤسسة' : 'Organization') + ' · ' + organizationId.slice(0, 6)}</p>}
+                {branches.map((branch) => {
               const selected = scope.selectedBranchSet.has(branch.id);
               return (
                 <button
@@ -183,7 +207,7 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
                   type="button"
                   data-testid={`branch-scope-option-${branch.id}`}
                   onClick={() => scope.toggleBranch(branch.id)}
-                  className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-start text-sm text-ui-text transition hover:bg-ui-page-alt"
+                  className="flex w-full items-center gap-3 rounded-lg px-2.5 py-1.5 text-start text-xs text-ui-text transition hover:bg-ui-page-alt"
                 >
                   <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
                     selected ? 'border-ui-primary bg-ui-primary text-ui-primary-fg' : 'border-ui-border'
@@ -193,10 +217,12 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
                   <span className="truncate font-bold">{lang === 'ar' ? branch.name : branch.name_en || branch.name}</span>
                 </button>
               );
-            })}
+                })}
+              </div>
+            ))}
           </div>
 
-          <div className="border-t border-ui-border bg-ui-page-alt/60 p-3">
+          <div className="border-t border-ui-border bg-ui-page-alt/60 p-2">
             <label className="grid gap-1.5">
               <span className="text-[11px] font-black text-ui-muted">
                 {ar ? 'فرع الإجراء' : 'Action branch'}
