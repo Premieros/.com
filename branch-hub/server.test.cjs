@@ -202,3 +202,23 @@ test('offline sale outbox remains pending after restart and requires authorizati
   assert.equal((await request(port,'GET','/api/v1/offline/sync/pending',null,token)).data.events[0].eventId,first.data.events[0].eventId);
  } finally {if(hub)await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('offline integrity audit detects missing sync event and unbalanced journal', async () => {
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'premier-account-audit-'));
+ const hub=createHub({host:'127.0.0.1',port:0,branchId:'branch_001',organizationId:'org_001',token,dataDir:dir});
+ try {
+  hub.db.prepare('INSERT INTO offline_stock(branch_id,sku,quantity,unit_cost_minor) VALUES(?,?,?,?)').run('branch_001','sku1',3,10);
+  const {port}=await hub.listen();
+  const body={organizationId:'org_001',branchId:'branch_001',key:'integrity-sale-0001',lines:[{sku:'sku1',quantity:1,priceMinor:25}]};
+  assert.equal((await request(port,'POST','/api/v1/offline/sales',body,token)).status,201);
+  assert.equal((await request(port,'GET','/api/v1/offline/integrity')).status,401);
+  assert.equal((await request(port,'GET','/api/v1/offline/integrity',null,token)).data.ok,true);
+  hub.db.prepare('DELETE FROM offline_outbox WHERE branch_id=?').run('branch_001');
+  const audit=await request(port,'GET','/api/v1/offline/integrity',null,token);
+  assert.equal(audit.data.ok,false);
+  assert.equal(audit.data.missingOutbox,1);
+  hub.db.prepare("UPDATE offline_journal SET credit_minor=credit_minor+1 WHERE account='sales_revenue'").run();
+  const second=await request(port,'GET','/api/v1/offline/integrity',null,token);
+  assert.equal(second.data.unbalanced,1);
+ } finally {await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
+});
