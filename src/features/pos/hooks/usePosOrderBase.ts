@@ -78,6 +78,8 @@ export function usePosOrder(input: UsePosOrderInput) {
   const [activeTable, setActiveTable] = useState<DiningTable | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [completing, setCompleting] = useState(false);
+  // Synchronous lock: React state alone does not block same-tick double submits.
+  const mutationLockRef = useRef(false);
   const [orderLoading, setOrderLoading] = useState(false);
   const [kitchenSending, setKitchenSending] = useState(false);
   const [kitchenSentItems, setKitchenSentItems] = useState<KitchenSendItem[]>([]);
@@ -640,12 +642,13 @@ export function usePosOrder(input: UsePosOrderInput) {
   }, [branchId, activeOrderId, activeOrderNumber, orderType, tableId, customerId, guestCount, orderNotes, cart, subtotal, discountValue, discountType, taxAmount, total, user?.id, show, t]);
 
   const holdOrder = useCallback(async (): Promise<boolean> => {
-    if (cart.length === 0 || completing || orderLoading) return false;
+    if (mutationLockRef.current || cart.length === 0 || completing || orderLoading) return false;
     if (!branchId) { show(t('selectBranchFirst'), 'error'); return false; }
     if (orderType === 'dine_in' && !tableId) {
       show(isAr ? 'اختر طاولة لطلب داخل الصالة' : 'Select a table for dine-in orders', 'error');
       return false;
     }
+    mutationLockRef.current = true;
     setCompleting(true);
     try {
       if (activeOrderId) {
@@ -667,17 +670,19 @@ export function usePosOrder(input: UsePosOrderInput) {
       show(t('orderHeld'), 'success');
       return true;
     } finally {
+      mutationLockRef.current = false;
       setCompleting(false);
     }
   }, [cart.length, completing, orderLoading, branchId, orderType, tableId, activeOrderId, persistCart, show, t, isAr]);
 
   const sendToKitchen = useCallback(async (): Promise<boolean> => {
-    if (cart.length === 0 || completing || orderLoading || kitchenSending) return false;
+    if (mutationLockRef.current || cart.length === 0 || completing || orderLoading || kitchenSending) return false;
     if (!branchId) { show(t('selectBranchFirst'), 'error'); return false; }
     if (orderType === 'dine_in' && !tableId) {
       show(isAr ? 'اختر طاولة لطلب داخل الصالة' : 'Select a table for dine-in orders', 'error');
       return false;
     }
+    mutationLockRef.current = true;
     setKitchenSending(true);
     try {
       const { ok, orderId: targetOrderId, orderNumber: targetOrderNumber } = await persistCart('open');
@@ -740,6 +745,7 @@ export function usePosOrder(input: UsePosOrderInput) {
       }
       return true;
     } finally {
+      mutationLockRef.current = false;
       setKitchenSending(false);
     }
   }, [cart.length, completing, orderLoading, kitchenSending, branchId, orderType, tableId, activeOrderNumber, persistCart, effSettings, activeTable, guestCount, orderNotes, t, isAr, onInventoryChanged, show]);
@@ -760,7 +766,7 @@ export function usePosOrder(input: UsePosOrderInput) {
   }, [cart, effSettings, activeOrderNumber, activeTable, orderType, guestCount, orderNotes, t, isAr]);
 
   const completeSale = useCallback(async (): Promise<boolean> => {
-    if (cart.length === 0 || completing) return false;
+    if (mutationLockRef.current || cart.length === 0 || completing) return false;
     if (!branchId) { show(t('selectBranchFirst'), 'error'); return false; }
     if (!activeShift) { show(t('shiftRequired'), 'error'); return false; }
     if (paymentMethod === 'credit') {
@@ -783,6 +789,7 @@ export function usePosOrder(input: UsePosOrderInput) {
       show(isAr ? 'اختر طاولة لطلب داخل الصالة' : 'Select a table for dine-in orders', 'error');
       return false;
     }
+    mutationLockRef.current = true;
     setCompleting(true);
     try {
       // A linked order has already crossed the authoritative kitchen boundary.
@@ -889,6 +896,7 @@ export function usePosOrder(input: UsePosOrderInput) {
       }
       return true;
     } finally {
+      mutationLockRef.current = false;
       setCompleting(false);
     }
   }, [cart, completing, branchId, branchName, activeShift, orderType, tableId, getStock, isNegativeEligible, paymentMethod, total, paidAmount, customerId, subtotal, discountValue, discountType, taxAmount, change, activeOrderId, activeOrderNumber, guestCount, customers, activeTable, effSettings, lang, isAr, show, showReceiptPrintError, t, user]);
@@ -992,6 +1000,7 @@ export function usePosOrder(input: UsePosOrderInput) {
     activeOrderId, activeOrderNumber, activeTable,
     checkoutOpen, setCheckoutOpen,
     completing, orderLoading, kitchenSending, kitchenSentItems, kitchenDispatch,
+    mutationLockRef,
     lastReceipt, receiptSaleId, closeReceipt,
     subtotal, discountValue, taxAmount, total, change,
     effCurrency,
