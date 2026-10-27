@@ -67,6 +67,27 @@ function createHub(config = {}) {
     status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','acknowledged')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );`);
+  // SQLite VACUUM INTO creates a consistent snapshot even while WAL is enabled.
+  // Backups stay on the server, never returned by the HTTP API.
+  function createLocalBackup() {
+    const backupDir = path.join(dir, 'backups');
+    fs.mkdirSync(backupDir, { recursive: true, mode: 0o700 });
+    const filename = 'branch-' + new Date().toISOString().replace(/[:.]/g, '-') +
+      '-' + crypto.randomUUID() + '.sqlite';
+    const destination = path.join(backupDir, filename);
+    db.exec('VACUUM INTO ' + "'" + destination.replaceAll("'", "''") + "'");
+    try {
+      const check = new DatabaseSync(destination, { readOnly: true });
+      try {
+        const outcome = check.prepare('PRAGMA quick_check').all();
+        const identityCheck = check.prepare('SELECT organization_id,branch_id FROM hub_identity WHERE singleton=1').get();
+        if (outcome.length !== 1 || outcome[0].quick_check !== 'ok' ||
+          identityCheck?.organization_id !== organizationId || identityCheck?.branch_id !== branchId)
+          throw Error('BACKUP_VERIFICATION_FAILED');
+      } finally { check.close(); }
+    } catch (error) { fs.rmSync(destination, { force:true }); throw error; }
+    return { filename, bytes:fs.statSync(destination).size };
+  }
   const send = (res, status, body) => {
     res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
     res.end(JSON.stringify(body));
@@ -168,7 +189,7 @@ function createHub(config = {}) {
   const server = keyFile && certFile
     ? https.createServer({ key: fs.readFileSync(keyFile), cert: fs.readFileSync(certFile) }, handler)
     : http.createServer(handler);
-  return { server, db, listen: () => new Promise(resolve => server.listen(port, host, () => resolve(server.address()))),
+  return { server, db, createLocalBackup, listen: () => new Promise(resolve => server.listen(port, host, () => resolve(server.address()))),
     close: () => new Promise(resolve => server.close(() => { db.close(); resolve(); })) };
 }
 if (require.main === module) {
