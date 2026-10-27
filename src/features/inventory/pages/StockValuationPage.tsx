@@ -1,6 +1,5 @@
 ﻿import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/api';
-import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
 import { useBranchFilter } from '@/lib/useBranchFilter';
@@ -10,7 +9,7 @@ import { Button } from '@/components/Button';
 import { Select } from '@/components/Input';
 import { formatNumber } from '@/lib/format';
 import { exportToExcel } from '@/lib/excel';
-import type { StockValuationRow, StockValuationSummaryRow, Warehouse } from '@/lib/types';
+import type { StockValuationRow, Warehouse } from '@/lib/types';
 
 export function StockValuationPage() {
   const { t, lang } = useLanguage();
@@ -19,7 +18,6 @@ export function StockValuationPage() {
   const branchFilter = useBranchFilter();
 
   const [rows, setRows] = useState<StockValuationRow[]>([]);
-  const [summary, setSummary] = useState<StockValuationSummaryRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
@@ -42,13 +40,9 @@ export function StockValuationPage() {
     let effBranch = branchId;
     if (!effBranch && b.length === 1) { effBranch = b[0].id; setBranchId(effBranch); }
 
-    const [v, s] = await Promise.all([
-      api.inventory.getStockValuation({ p_branch_id: effBranch || null, p_warehouse_id: warehouseId || null }),
-      api.inventory.getStockValuationSummary({ p_branch_id: effBranch || null, p_warehouse_id: warehouseId || null }),
-    ]);
-    if (v.error || s.error) { setError(v.error?.message || s.error?.message || t('error')); setLoading(false); return; }
-    setRows(v.data || []);
-    setSummary(s.data || []);
+    const { data, error: valuationError } = await supabase.rpc('get_stock_valuation', { p_branch_id: effBranch || null, p_warehouse_id: warehouseId || null });
+    if (valuationError) { setError(valuationError.message); setLoading(false); return; }
+    setRows((data || []) as StockValuationRow[]);
     setLoading(false);
   }, [branchId, warehouseId, show, t]);
 
@@ -66,6 +60,14 @@ export function StockValuationPage() {
   });
 
   const visibleBranches = branchFilter ? branches.filter((b) => b.id === branchFilter) : branches;
+
+  const summary = Object.values(rows.reduce<Record<string, { branch_id: string; branch_name: string; total_quantity: number; total_value: number }>>((acc, r) => {
+    const id = r.branch_id;
+    const item = acc[id] ?? (acc[id] = { branch_id: id, branch_name: branches.find(b => b.id === id)?.name || '', total_quantity: 0, total_value: 0 });
+    item.total_quantity += Number(r.quantity);
+    item.total_value += Number(r.total_value);
+    return acc;
+  }, {}));
 
   const grandTotal = rows.reduce((s, r) => s + Number(r.total_value), 0);
   const grandQty = rows.reduce((s, r) => s + Number(r.quantity), 0);
