@@ -46,6 +46,27 @@ function createHub(config = {}) {
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
     UNIQUE(branch_id, idempotency_key)
   );`);
+  // Persist operator-approved receipts independently of the cloud and survive process restarts.
+  db.exec(`CREATE TABLE IF NOT EXISTS local_receipts (
+    id TEXT PRIMARY KEY,
+    branch_id TEXT NOT NULL,
+    device_id TEXT NOT NULL,
+    idempotency_key TEXT NOT NULL,
+    total_minor INTEGER NOT NULL CHECK(total_minor >= 0),
+    currency TEXT NOT NULL CHECK(length(currency)=3),
+    body TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    UNIQUE(branch_id, idempotency_key)
+  );`);
+  db.exec(`CREATE TABLE IF NOT EXISTS sync_outbox (
+    event_id TEXT PRIMARY KEY,
+    branch_id TEXT NOT NULL,
+    entity_type TEXT NOT NULL,
+    entity_id TEXT NOT NULL,
+    payload TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','acknowledged')),
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );`);
   const send = (res, status, body) => {
     res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
     res.end(JSON.stringify(body));
@@ -59,6 +80,46 @@ function createHub(config = {}) {
     const pathname = new URL(req.url || '/', 'https://branch.local').pathname;
     if (pathname === '/health' && req.method === 'GET') return send(res, 200, { ok: true, service: 'premier-branch-hub', branchId, version: 1 });
     if (!checkToken(req.headers.authorization)) return send(res, 401, { error: 'UNAUTHORIZED' });
+    if (pathname === '/api/v1/receipts' && req.method === 'GET') {
+      const receipts = db.prepare('SELECT id,device_id,total_minor,currency,created_at FROM local_receipts WHERE branch_id=? ORDER BY created_at DESC LIMIT 100').all(branchId);
+      return send(res, 200, { receipts });
+    }
+    if (pathname === '/api/v1/receipts' && req.method === 'POST') {
+      let body = '';
+      try {
+        for await (const chunk of req) {
+          body += chunk;
+          if (Buffer.byteLength(body) > 65536) return send(res, 413, { error: 'PAYLOAD_TOO_LARGE' });
+        }
+        const item = JSON.parse(body);
+        if (item.organizationId !== organizationId || item.branchId !== branchId) return send(res, 403, { error: 'BRANCH_SCOPE_MISMATCH' });
+        if (!/^[a-zA-Z0-9_-]{3,80}$/.test(item.deviceId || '') ||
+          typeof item.idempotencyKey !== 'string' || item.idempotencyKey.length < 8 || item.idempotencyKey.length > 160 ||
+          !Number.isSafeInteger(item.totalMinor) || item.totalMinor < 0 ||
+          typeof item.currency !== 'string' || !/^[A-Z]{3}$/.test(item.currency) ||
+          !item.receipt || typeof item.receipt !== 'object' || Array.isArray(item.receipt)) {
+          return send(res, 400, { error: 'INVALID_RECEIPT' });
+        }
+        const existing = db.prepare('SELECT id,body FROM local_receipts WHERE branch_id=? AND idempotency_key=?').get(branchId,item.idempotencyKey);
+        const canonical = JSON.stringify({deviceId:item.deviceId,totalMinor:item.totalMinor,currency:item.currency,receipt:item.receipt});
+        if (existing && existing.body !== canonical) return send(res, 409, { error: 'IDEMPOTENCY_CONFLICT' });
+        if (existing) return send(res, 200, { receiptId: existing.id, duplicated: true });
+        const id = crypto.randomUUID();
+        db.exec('BEGIN IMMEDIATE');
+        try {
+          db.prepare('INSERT INTO local_receipts(id,branch_id,device_id,idempotency_key,total_minor,currency,body) VALUES(?,?,?,?,?,?,?)')
+            .run(id,branchId,item.deviceId,item.idempotencyKey,item.totalMinor,item.currency,canonical);
+          db.prepare('INSERT INTO sync_outbox(event_id,branch_id,entity_type,entity_id,payload) VALUES(?,?,?,?,?)')
+            .run(id,branchId,'receipt',id,canonical);
+          db.exec('COMMIT');
+        } catch (error) { db.exec('ROLLBACK'); throw error; }
+        return send(res, 201, { receiptId:id, queuedForSync:true });
+      } catch { return send(res, 400, { error: 'INVALID_REQUEST' }); }
+    }
+    if (pathname === '/api/v1/sync/status' && req.method === 'GET') {
+      const row=db.prepare("SELECT count(*) pending FROM sync_outbox WHERE branch_id=? AND status='pending'").get(branchId);
+      return send(res,200,{ pending:row.pending, onlineSyncImplemented:false });
+    }
     if (pathname === '/api/v1/jobs' && req.method === 'GET') {
       const jobs = db.prepare('SELECT id,kind,status,created_at FROM jobs WHERE branch_id=? ORDER BY created_at DESC LIMIT 100').all(branchId);
       return send(res, 200, { jobs });
