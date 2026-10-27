@@ -23,10 +23,11 @@ type CenterTileProps = {
   item: CenterTileItem;
   testIdPrefix: string;
   inline?: boolean;
+  selected?: boolean;
 };
 
 /** Compact navigation tab: every center opens its pages by clicking the top row. */
-export function CenterTile({ item, testIdPrefix, inline = false }: CenterTileProps) {
+export function CenterTile({ item, testIdPrefix, inline = false, selected = false }: CenterTileProps) {
   const { lang } = useLanguage();
   const ar = lang === 'ar';
   const Icon = item.icon;
@@ -38,8 +39,8 @@ export function CenterTile({ item, testIdPrefix, inline = false }: CenterTilePro
       data-testid={`${testIdPrefix}-${item.id}`}
       to={inline ? `?page=${encodeURIComponent(item.route)}` : item.route}
       title={description || label}
-      className={({ isActive }) =>
-        `inline-flex min-h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-ring ${isActive
+      className={() =>
+        `inline-flex min-h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-ring ${selected
           ? 'border-ui-primary bg-ui-primary-soft text-ui-primary'
           : 'border-ui-border bg-ui-surface text-ui-text hover:border-ui-primary hover:bg-ui-page-alt'}`
       }
@@ -78,7 +79,7 @@ export function CenterGrid({ items, testIdPrefix }: CenterGridProps) {
     >
       <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-1">
         {visibleItems.map(item => (
-          <CenterTile key={item.id} item={item} inline={!['/pos', '/inventory-center', '/procurement-center', '/finance', '/people', '/administration', '/operations'].includes(item.route)} testIdPrefix={testIdPrefix} />
+          <CenterTile key={item.id} item={item} selected={selected?.route === item.route} inline={!['/pos', '/inventory-center', '/procurement-center', '/finance', '/people', '/administration', '/operations'].includes(item.route)} testIdPrefix={testIdPrefix} />
         ))}
       </div>
       {visibleItems.length === 0 && (
