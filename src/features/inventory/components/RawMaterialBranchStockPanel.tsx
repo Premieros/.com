@@ -209,7 +209,7 @@ export function RawMaterialBranchStockPanel() {
           </div>
         ) : (
           <>
-          <p className="text-xs text-ui-muted">{isAr ? 'هذه الشاشة تعرض الكمية التشغيلية فقط. قيمة المخزون وتكلفة الخامات تعرض من تقييم FIFO المعتمد في التقارير المالية حتى لا يظهر رقمان مختلفان لنفس الرصيد.' : 'This screen shows operational quantity only. Inventory value and raw-material cost come from the authoritative FIFO valuation in financial reports so users do not see two values for the same stock.'}</p>
+          <p className="text-xs text-ui-muted">{isAr ? 'التكلفة المعروضة متوسط تكلفة المخزن المسجل؛ تقييم المخزون المحاسبي النهائي قد يختلف حسب سياسة التقييم.' : 'Displayed cost is the stored warehouse average; final accounting valuation may differ under the valuation policy.'}</p>
           <div className="overflow-x-auto rounded-xl border border-ui-border">
             <table className="w-full text-sm">
               <thead className="bg-ui-page-alt text-ui-muted">
@@ -220,6 +220,8 @@ export function RawMaterialBranchStockPanel() {
                   <th className="px-3 py-2 text-start">{isAr ? 'الوحدة' : 'Unit'}</th>
                   <th className="px-3 py-2 text-end">{isAr ? 'المتاح' : 'Available'}</th>
                   <th className="px-3 py-2 text-end">{isAr ? 'الحد الأدنى' : 'Minimum'}</th>
+                  <th className="px-3 py-2 text-end">{isAr ? 'متوسط التكلفة' : 'Average unit cost'}</th>
+                  <th className="px-3 py-2 text-end">{isAr ? 'القيمة التقديرية' : 'Estimated value'}</th>
                   <th className="px-3 py-2 text-start">{isAr ? 'الحالة' : 'Status'}</th>
                 </tr>
               </thead>
@@ -239,6 +241,8 @@ export function RawMaterialBranchStockPanel() {
                       <td className="px-3 py-2 text-ui-muted">{unit}</td>
                       <td className="px-3 py-2 text-end font-bold text-ui-text">{formatRawMaterialQuantity(quantity, measurementUnit, { lang })}</td>
                       <td className="px-3 py-2 text-end text-ui-muted">{formatRawMaterialQuantity(minimum, measurementUnit, { lang })}</td>
+                      <td className="px-3 py-2 text-end tabular-nums">{Number(row.avg_cost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 })}</td>
+                      <td className="px-3 py-2 text-end tabular-nums font-semibold">{(quantity * Number(row.avg_cost)).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                       <td className="px-3 py-2">
                         <span className={`inline-flex items-center gap-1 rounded-full px-2 py-1 text-xs font-semibold ${quantity <= 0 ? 'bg-ui-danger-soft text-ui-danger' : low ? 'bg-ui-warning-soft text-ui-warning' : 'bg-ui-success-soft text-ui-success'}`}>
                           {low && <AlertTriangle className="h-3.5 w-3.5" />}
