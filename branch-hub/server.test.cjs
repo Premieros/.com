@@ -76,3 +76,18 @@ test('receipt draft is stored atomically, deduplicated and queued across restart
   assert.equal((await request(port,'GET','/api/v1/sync/status',null,token)).data.pending,1);
  } finally {if(hub)await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('parallel submissions share one receipt and one outbox event', async () => {
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'premier-parallel-'));
+ const hub=createHub({host:'127.0.0.1',port:0,branchId:'branch_001',organizationId:'org_001',token,dataDir:dir});
+ try {
+  const {port}=await hub.listen();
+  const body={organizationId:'org_001',branchId:'branch_001',deviceId:'device_001',
+    idempotencyKey:'sale-parallel-001',totalMinor:2500,currency:'EGP',receipt:{items:[{qty:1}]}};
+  const responses=await Promise.all(Array.from({length:20},()=>request(port,'POST','/api/v1/receipts',body,token)));
+  assert.equal(responses.filter(x=>x.status===201).length,1);
+  assert.equal(responses.filter(x=>x.status===200).length,19);
+  assert.equal(new Set(responses.map(x=>x.data.receiptId)).size,1);
+  assert.equal(hub.db.prepare('SELECT count(*) AS n FROM sync_outbox').get().n,1);
+ } finally {await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
+});
