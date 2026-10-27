@@ -157,8 +157,28 @@ export function PosWorkspacePage() {
   const refreshLiveStockMap = useCallback(async () => {
     if (!effectiveBranch) return;
     try {
-      const map = await InventoryRepository.getBranchStockMap(effectiveBranch);
-      setLiveStockMap(map);
+      // Prefer the authoritative signed stock read contract online.
+      // The IndexedDB stock map is only an offline fallback, never an additional source to sum.
+      const live: Record<string, number> = {};
+      let online = true;
+      for (let offset = 0; ; offset += 1000) {
+        const { data, error } = await supabase.from('v_current_stock_position')
+          .select('item_id,quantity')
+          .eq('branch_id', effectiveBranch)
+          .eq('item_type', 'product')
+          .range(offset, offset + 999);
+        if (error) { online = false; break; }
+        const batch = data || [];
+        for (const entry of batch) {
+          live[entry.item_id] = (live[entry.item_id] || 0) + Number(entry.quantity || 0);
+        }
+        if (batch.length < 1000) break;
+      }
+      if (online) {
+        setLiveStockMap(live);
+      } else {
+        setLiveStockMap(await InventoryRepository.getBranchStockMap(effectiveBranch));
+      }
     } catch {
       // fallback
     }
