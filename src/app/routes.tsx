@@ -186,7 +186,7 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.warehouses} element={<ProtectedRoute permission="warehouses.view"><WarehousesPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.rawMaterials} element={<ProtectedRoute permission="raw_materials.view"><RawMaterialsPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.recipes} element={<Navigate to={APP_ROUTES.products} replace />} />
-        <Route path={APP_ROUTES.production} element={<ProtectedRoute permission="raw_materials.view"><ProductionOrdersPage /></ProtectedRoute>} />
+        <Route path={APP_ROUTES.production} element={<ProtectedRoute permission="production.view"><ProductionOrdersPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.productionUnits} element={<Navigate to={APP_ROUTES.inventoryUnits} replace />} />
         <Route path={APP_ROUTES.transfers} element={<ProtectedRoute permission="inventory.view"><TransfersPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.inventoryLedger} element={<ProtectedRoute permission="inventory.ledger.view"><InventoryLedgerPage /></ProtectedRoute>} />
