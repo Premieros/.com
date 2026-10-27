@@ -46,6 +46,8 @@ export const MENU_ITEMS: MenuItemConfig[] = [
 
   { id: 'products', route: APP_ROUTES.products, icon: 'products', labelKey: 'products', permission: 'products.view', group: 'catalog' },
   { id: 'raw-materials', route: APP_ROUTES.rawMaterials, icon: 'rawMaterials', labelKey: 'rawMaterials', permission: 'raw_materials.view', group: 'catalog' },
+  { id: 'manufactured-units', route: APP_ROUTES.inventoryUnits, icon: 'inventoryUnits', labelKey: 'rawMaterials', label: { ar: 'المصنّعات', en: 'Manufactured units' }, permission: 'raw_materials.view', group: 'catalog' },
+  { id: 'production-orders', route: APP_ROUTES.production, icon: 'inventoryUnits', labelKey: 'rawMaterials', label: { ar: 'أوامر الإنتاج', en: 'Production orders' }, permission: 'raw_materials.view', group: 'catalog' },
 
   { id: 'super-admin', route: APP_ROUTES.superAdmin, icon: 'superAdmin', labelKey: 'superAdmin', permission: 'settings.manage', group: 'admin', superAdminOnly: true },
 ];
