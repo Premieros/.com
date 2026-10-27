@@ -1,0 +1,28 @@
+name: Branch Hub complete regression suite
+on:
+  pull_request:
+    paths:
+      - 'branch-hub/**'
+      - '.github/workflows/branch-hub-full-tests.yml'
+  push:
+    branches:
+      - 'feature/branch-hub-safe-sqlite-restore'
+    paths:
+      - 'branch-hub/**'
+      - '.github/workflows/branch-hub-full-tests.yml'
+  workflow_dispatch:
+jobs:
+  offline-tests:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Verify SQLite backup and restoration, offline sales, and local server
+        working-directory: branch-hub
+        run: npm test
