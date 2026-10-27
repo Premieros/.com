@@ -6,6 +6,7 @@ const http = require('node:http');
 const https = require('node:https');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const { createOfflineSalesEngine } = require('./offline-sales.cjs');
 
 function createHub(config = {}) {
   const host = config.host || process.env.BRANCH_HUB_HOST || '127.0.0.1';
@@ -67,6 +68,7 @@ function createHub(config = {}) {
     status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','acknowledged')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );`);
+  const offlineSales = createOfflineSalesEngine(db, branchId);
   // SQLite VACUUM INTO creates a consistent snapshot even while WAL is enabled.
   // Backups stay on the server, never returned by the HTTP API.
   function createLocalBackup() {
@@ -101,6 +103,32 @@ function createHub(config = {}) {
     const pathname = new URL(req.url || '/', 'https://branch.local').pathname;
     if (pathname === '/health' && req.method === 'GET') return send(res, 200, { ok: true, service: 'premier-branch-hub', version: 1 });
     if (!checkToken(req.headers.authorization)) return send(res, 401, { error: 'UNAUTHORIZED' });
+    if (pathname === '/api/v1/offline/stock' && req.method === 'GET') {
+      const stock=db.prepare('SELECT sku,quantity,unit_cost_minor FROM offline_stock WHERE branch_id=? ORDER BY sku LIMIT 500').all(branchId);
+      return send(res,200,{stock});
+    }
+    if (pathname === '/api/v1/offline/sales' && req.method === 'GET') {
+      const sales=db.prepare('SELECT id,total_minor,created_at FROM offline_sales WHERE branch_id=? ORDER BY created_at DESC LIMIT 100').all(branchId);
+      return send(res,200,{sales});
+    }
+    if (pathname === '/api/v1/offline/sales' && req.method === 'POST') {
+      let body='';
+      try {
+        for await (const chunk of req) {
+          body+=chunk;
+          if (Buffer.byteLength(body)>65536) return send(res,413,{error:'PAYLOAD_TOO_LARGE'});
+        }
+        const input=JSON.parse(body);
+        if(input.organizationId!==organizationId || input.branchId!==branchId)
+          return send(res,403,{error:'BRANCH_SCOPE_MISMATCH'});
+        const result=offlineSales.commitSale(input);
+        return send(res,result.duplicate?200:201,result);
+      } catch(error) {
+        if(error.message==='IDEMPOTENCY_CONFLICT') return send(res,409,{error:error.message});
+        if(error.message.startsWith('INSUFFICIENT_STOCK')) return send(res,409,{error:error.message});
+        return send(res,400,{error:'INVALID_SALE'});
+      }
+    }
     if (pathname === '/api/v1/receipts' && req.method === 'GET') {
       const receipts = db.prepare('SELECT id,device_id,total_minor,currency,created_at FROM local_receipts WHERE branch_id=? ORDER BY created_at DESC LIMIT 100').all(branchId);
       return send(res, 200, { receipts });
