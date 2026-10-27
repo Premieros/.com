@@ -153,3 +153,24 @@ test('consistent backup restores branch binding, receipt, and pending outbox', a
   assert.throws(()=>createHub({...config,branchId:'branch_002'}),/BRANCH_BINDING_MISMATCH/);
  } finally {if(hub)await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('offline sales API commits stock, journal and outbox atomically with branch isolation', async () => {
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'premier-sale-api-'));
+ const hub=createHub({host:'127.0.0.1',port:0,branchId:'branch_001',organizationId:'org_001',token,dataDir:dir});
+ try {
+  hub.db.prepare('INSERT INTO offline_stock(branch_id,sku,quantity,unit_cost_minor) VALUES(?,?,?,?)').run('branch_001','item_001',5,100);
+  const {port}=await hub.listen();
+  const input={organizationId:'org_001',branchId:'branch_001',key:'sale-api-0001',
+   lines:[{sku:'item_001',quantity:2,priceMinor:250}]};
+  const first=await request(port,'POST','/api/v1/offline/sales',input,token);
+  assert.equal(first.status,201);
+  assert.equal(first.data.totalMinor,500);
+  assert.equal((await request(port,'POST','/api/v1/offline/sales',input,token)).status,200);
+  assert.equal((await request(port,'POST','/api/v1/offline/sales',{...input,branchId:'branch_002'},token)).status,403);
+  assert.equal((await request(port,'POST','/api/v1/offline/sales',{...input,key:'sale-api-0002',lines:[{sku:'item_001',quantity:9,priceMinor:250}]},token)).status,409);
+  assert.equal((await request(port,'GET','/api/v1/offline/stock',null,token)).data.stock[0].quantity,3);
+  assert.equal(hub.db.prepare('SELECT count(*) AS n FROM offline_outbox').get().n,1);
+  const journal=hub.db.prepare('SELECT SUM(debit_minor) dr,SUM(credit_minor) cr FROM offline_journal').get();
+  assert.equal(journal.dr,journal.cr);
+ } finally {await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
+});
