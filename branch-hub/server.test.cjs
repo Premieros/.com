@@ -170,6 +170,11 @@ test('offline sales API commits stock, journal and outbox atomically with branch
   assert.equal((await request(port,'POST','/api/v1/offline/sales',{...input,key:'sale-api-0002',lines:[{sku:'item_001',quantity:9,priceMinor:250}]},token)).status,409);
   assert.equal((await request(port,'GET','/api/v1/offline/stock',null,token)).data.stock[0].quantity,3);
   assert.equal(hub.db.prepare('SELECT count(*) AS n FROM offline_outbox').get().n,1);
+  const movements=await request(port,'GET','/api/v1/offline/stock/movements',null,token);
+  assert.equal(movements.status,200);
+  assert.equal(movements.data.movements.length,1);
+  assert.equal(movements.data.movements[0].delta,-2);
+  assert.equal(movements.data.movements[0].balance_after,3);
   const journal=hub.db.prepare('SELECT SUM(debit_minor) dr,SUM(credit_minor) cr FROM offline_journal').get();
   assert.equal(journal.dr,journal.cr);
  } finally {await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
