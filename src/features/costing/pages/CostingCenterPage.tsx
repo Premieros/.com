@@ -15,6 +15,7 @@ import { Modal } from '@/components/Modal';
 import { CostBreakdownButton } from '@/features/costing/components/CostBreakdownButton';
 import { formatCurrency, formatNumber, formatDate, formatDateTime, formatExactQuantity, formatRawMaterialQuantity, type MeasurementUnitDisplay } from '@/lib/format';
 import { exportToExcel } from '@/lib/excel';
+import { exportRecipeCostCards } from '../utils/exportRecipeCostCards';
 import { foodCostPct, marginPct, safeDiv, variancePct } from '@/lib/costing';
 import type {
   CostingOverviewRow, OrderMarginRow, SupplierPriceImpactRow, ProductCostingDetail,
@@ -55,6 +56,7 @@ export function CostingCenterPage() {
   const [rawMaterialUnits, setRawMaterialUnits] = useState<Record<string, MeasurementUnitDisplay>>({});
   const [detail, setDetail] = useState<ProductCostingDetail | null>(null);
   const [detailLoading, setDetailLoading] = useState(false);
+  const [recipeExportLoading, setRecipeExportLoading] = useState(false);
 
   const loadBranches = useCallback(async () => {
     const br = await supabase.from('branches').select('id, name').eq('is_active', true).order('name');
@@ -420,6 +422,32 @@ export function CostingCenterPage() {
 
   const tabBtn = (key: Tab, label: string) => <button onClick={() => setTab(key)} className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${tab === key ? 'bg-ui-primary text-ui-primary-fg shadow-lg shadow-ui-primary/25 scale-[1.02]' : 'liquid-glass text-ui-text hover:border-ui-primary/40 hover:bg-ui-surface/90'}`}>{label}</button>;
 
+  const handleExportRecipeCards = async () => {
+    if (recipeExportLoading || filteredOverview.length === 0) return;
+    setRecipeExportLoading(true);
+    try {
+      const details: ProductCostingDetail[] = [];
+      // Keep concurrent reads bounded; never assume missing costing data is zero.
+      for (let offset = 0; offset < filteredOverview.length; offset += 6) {
+        const chunk = filteredOverview.slice(offset, offset + 6);
+        const results = await Promise.all(chunk.map((item) =>
+          api.costing.getProductDetail({ p_product_id: item.product_id, p_branch_id: effBranch })
+        ));
+        for (const result of results) {
+          if (result.error || !result.data || result.data.success === false) {
+            throw new Error(result.error?.message || result.data?.error || 'PRODUCT_COST_UNAVAILABLE');
+          }
+          details.push(result.data);
+        }
+      }
+      await exportRecipeCostCards(details, 'premier-product-recipe-costs');
+    } catch (error) {
+      show(error instanceof Error ? error.message : String(error), 'error');
+    } finally {
+      setRecipeExportLoading(false);
+    }
+  };
+
   const handleExportOverview = () => exportToExcel(filteredOverview.map((r) => ({ Product: r.product_name, Barcode: r.barcode || '', SKU: r.sku || '', Category: r.category_name || '', Type: r.product_type, SalePrice: r.sale_price, UnitCost: r.unit_cost, TheoreticalCost: r.theoretical_cost, ActualCost: r.actual_cost })), 'costing-overview');
   const handleExportRawCosts = () => exportToExcel(filteredRawCosts.map((r) => ({ RawMaterial: r.raw_material_name, Code: r.raw_material_code || '', StockQuantity: r.stock_quantity, KnownUnitCost: r.latest_cost, ActualPositiveStockValue: r.actual_stock_value, NegativeQuantity: r.negative_quantity, EstimatedNegativeCost: r.estimated_negative_value, UnpricedNegativeQuantity: r.unpriced_negative_quantity, EstimatedValueIncludingNegative: r.estimated_net_stock_value, PreviousCost: r.previous_cost ?? '', ChangePct: r.change_pct ?? '', Source: rawPriceSourceLabel(r.price_source), PriceDate: r.priced_at || '', Reference: r.reference_number || '', Detail: r.source_detail || '' })), 'raw-material-cost-valuation');
   const handleExportOrders = () => exportToExcel(orders.map((r) => ({ Invoice: r.invoice_number, Date: r.sale_date, Total: r.total, Discount: r.discount_amount, COGS: r.cogs, GrossMargin: r.gross_margin })), 'order-margin');
@@ -439,7 +467,7 @@ export function CostingCenterPage() {
 
   return (
     <DesignSurface testId="costing-center-page">
-      <DesignPageHeader title={t('costingCenter')} subtitle={isAr ? 'تكلفة المنتجات وربحية المبيعات وآخر أسعار الخامات' : 'Product costing, sales margin and latest raw-material prices'} actions={<Button variant="outline" size="sm" onClick={() => { if (tab === 'overview') handleExportOverview(); else if (tab === 'raw_prices') handleExportRawCosts(); else if (tab === 'orders') handleExportOrders(); else if (tab === 'variance') handleExportVariance(); else handleExportSupplier(); }}><Download className="w-4 h-4" /> {t('exportExcel')}</Button>} />
+      <DesignPageHeader title={t('costingCenter')} subtitle={isAr ? 'تكلفة المنتجات وربحية المبيعات وآخر أسعار الخامات' : 'Product costing, sales margin and latest raw-material prices'} actions={<div className="flex flex-wrap gap-2">{tab === 'overview' && <Button variant="outline" size="sm" disabled={recipeExportLoading || filteredOverview.length === 0} onClick={() => void handleExportRecipeCards()}><Download className="w-4 h-4" /> {recipeExportLoading ? (isAr ? 'جار تجهيز الوصفات...' : 'Preparing recipes...') : (isAr ? 'تكلفة الوصفات - Excel' : 'Recipe cost cards - Excel')}</Button>}<Button variant="outline" size="sm" onClick={() => { if (tab === 'overview') handleExportOverview(); else if (tab === 'raw_prices') handleExportRawCosts(); else if (tab === 'orders') handleExportOrders(); else if (tab === 'variance') handleExportVariance(); else handleExportSupplier(); }}><Download className="w-4 h-4" /> {t('exportExcel')}</Button></div>} />
 
       <div className="flex gap-1.5 liquid-glass rounded-2xl p-1.5 w-fit mb-4" role="tablist">
         {tabBtn('overview', t('costingOverview'))}
