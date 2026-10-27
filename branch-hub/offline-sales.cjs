@@ -10,6 +10,13 @@ function createOfflineSalesEngine(db, branchId) {
       unit_cost_minor INTEGER NOT NULL CHECK(unit_cost_minor>=0),
       PRIMARY KEY(branch_id,sku)
     );
+    CREATE TABLE IF NOT EXISTS offline_stock_movements (
+      id TEXT PRIMARY KEY, branch_id TEXT NOT NULL, sku TEXT NOT NULL,
+      sale_id TEXT NOT NULL, delta INTEGER NOT NULL CHECK(delta < 0),
+      balance_after INTEGER NOT NULL CHECK(balance_after >= 0),
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+      UNIQUE(branch_id,sale_id,sku)
+    );
     CREATE TABLE IF NOT EXISTS offline_sales (
       id TEXT PRIMARY KEY, branch_id TEXT NOT NULL, key TEXT NOT NULL,
       canonical TEXT NOT NULL, total_minor INTEGER NOT NULL,
@@ -82,6 +89,9 @@ function createOfflineSalesEngine(db, branchId) {
         const changed=db.prepare('UPDATE offline_stock SET quantity=quantity-? WHERE branch_id=? AND sku=? AND quantity>=?')
           .run(line.quantity,branchId,line.sku,line.quantity);
         if(changed.changes!==1) throw Error('INSUFFICIENT_STOCK');
+        const current=db.prepare('SELECT quantity FROM offline_stock WHERE branch_id=? AND sku=?').get(branchId,line.sku);
+        db.prepare('INSERT INTO offline_stock_movements(id,branch_id,sku,sale_id,delta,balance_after) VALUES(?,?,?,?,?,?)')
+          .run(crypto.randomUUID(),branchId,line.sku,id,-line.quantity,current.quantity);
         db.prepare('INSERT INTO offline_sale_lines(sale_id,sku,quantity,price_minor,cost_minor) VALUES(?,?,?,?,?)')
           .run(id,line.sku,line.quantity,line.priceMinor,line.costMinor);
       }
