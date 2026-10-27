@@ -114,6 +114,7 @@ export function PaymentsPage() {
   const filteredAp = apRows.filter((r) => !search || r.name.toLowerCase().includes(search.toLowerCase()) || (r.phone || '').includes(search));
 
   async function openCollect(row: ScopedArAgingRow) {
+    if (!can('sales.payment.receive')) return;
     if (row.branch_id !== effectiveBranchFilter) {
       show(lang === 'ar' ? 'حدد فرع هذا الصف كفرع الإجراء أولاً.' : 'Select this row\'s branch as the action branch first.', 'warning');
       return;
@@ -134,6 +135,7 @@ export function PaymentsPage() {
   }
 
   async function openPay(row: ScopedApAgingRow) {
+    if (!can('procurement.payment.create')) return;
     if (row.branch_id !== effectiveBranchFilter) {
       show(lang === 'ar' ? 'حدد فرع هذا الصف كفرع الإجراء أولاً.' : 'Select this row\'s branch as the action branch first.', 'warning');
       return;
@@ -163,6 +165,7 @@ export function PaymentsPage() {
   }
 
   const collect = async () => {
+    if (!can('sales.payment.receive')) return;
     if (!collecting) return;
     const amount = Number(form.amount);
     if (!amount || amount <= 0) { show(t('required'), 'error'); return; }
@@ -187,6 +190,7 @@ export function PaymentsPage() {
   };
 
   const paySupplier = async () => {
+    if (!can('procurement.payment.create')) return;
     if (!paying) return;
     const amount = Number(apForm.amount);
     if (!amount || amount <= 0 || !apForm.treasury_account_id || !effectiveBranchFilter) {
@@ -232,7 +236,7 @@ export function PaymentsPage() {
     { key: 'bucket_31_60', header: t('days60'), render: (r) => formatCurrency(r.bucket_31_60, currency, lang) },
     { key: 'bucket_61_90', header: t('days90'), render: (r) => formatCurrency(r.bucket_61_90, currency, lang) },
     { key: 'bucket_90_plus', header: t('days90Plus'), render: (r) => <span className={r.bucket_90_plus > 0 ? 'text-ui-danger font-semibold' : ''}>{formatCurrency(r.bucket_90_plus, currency, lang)}</span> },
-    { key: 'actions', header: t('actions'), render: (r) => <Button size="sm" onClick={() => openCollect(r)}><HandCoins className="w-4 h-4" /> {t('collect')}</Button> },
+    { key: 'actions', header: t('actions'), render: (r) => can('sales.payment.receive') ? <Button size="sm" onClick={() => openCollect(r)}><HandCoins className="w-4 h-4" /> {t('collect')}</Button> },
   ];
 
   const apColumns: Column<ScopedApAgingRow>[] = [
