@@ -2,6 +2,7 @@ import { type HTMLAttributes, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
+import { useEmbeddedCenterPage } from '@/components/design/EmbeddedCenterPage';
 
 export interface BreadcrumbItem {
   label: string;
@@ -16,6 +17,8 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({ title, subtitle, actions, breadcrumbs }: PageHeaderProps) {
+  const embedded = useEmbeddedCenterPage();
+  if (embedded) return actions ? <div data-testid="page-actions" className="flex min-w-0 flex-wrap items-center gap-2 py-2">{actions}</div> : null;
   return (
     <div data-testid="page-header" className="mb-4 flex min-w-0 flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4 lg:mb-8">
       <div className="min-w-0">
