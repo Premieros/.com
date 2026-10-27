@@ -20,7 +20,7 @@ export function PageHeader({ title, subtitle, actions, breadcrumbs }: PageHeader
   const embedded = useEmbeddedCenterPage();
   if (embedded) return actions ? <div data-testid="page-actions" className="flex min-w-0 flex-wrap items-center gap-2 py-2">{actions}</div> : null;
   return (
-    <div data-testid="page-header" className="mb-4 flex min-w-0 flex-col gap-3 sm:mb-6 sm:flex-row sm:items-center sm:justify-between sm:gap-4 lg:mb-8">
+    <div data-testid="page-header" className="mb-3 flex min-w-0 flex-col gap-2 sm:mb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3 lg:mb-5">
       <div className="min-w-0">
         {breadcrumbs && breadcrumbs.length > 0 && (
           <nav data-testid="page-breadcrumbs" aria-label="Breadcrumbs" className="mb-1.5 flex flex-wrap items-center gap-1 text-xs">
@@ -39,8 +39,8 @@ export function PageHeader({ title, subtitle, actions, breadcrumbs }: PageHeader
             })}
           </nav>
         )}
-        <h1 data-testid="page-title" className="text-xl font-extrabold tracking-tight text-ui-text sm:text-2xl">{title}</h1>
-        {subtitle && <p data-testid="page-description" className="mt-1 text-sm font-medium leading-6 text-ui-muted sm:mt-1.5">{subtitle}</p>}
+        <h1 data-testid="page-title" className="text-lg font-extrabold tracking-tight text-ui-text sm:text-xl">{title}</h1>
+        {subtitle && <p data-testid="page-description" className="mt-0.5 text-xs font-medium leading-5 text-ui-muted sm:text-sm">{subtitle}</p>}
       </div>
       {actions && (
         <div
