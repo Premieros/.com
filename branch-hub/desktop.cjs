@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, dialog, shell } = require('electron');
+const { app, BrowserWindow, dialog } = require('electron');
 const { fork } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -29,7 +29,7 @@ function createWindow(status) {
 app.whenReady().then(()=>{
  try {
   const c=loadConfig();
-  if (!c) {createWindow('لم يتم ربط الجهاز بفرع بعد. يتطلب التشغيل ملف إعداد موقّع من مسؤول المؤسسة في إصدار التسجيل القادم.');return;}
+  if (!c) {createWindow('لم يتم ربط الجهاز بفرع بعد. يتطلب التشغيل إعداد ربط فرع آمن؛ لم يتم تنفيذ التسجيل المركزي أو التوقيع بعد.');return;}
   const env={...process.env,ELECTRON_RUN_AS_NODE:'1',BRANCH_HUB_HOST:'127.0.0.1',
    BRANCH_HUB_BRANCH_ID:c.branchId,BRANCH_HUB_ORGANIZATION_ID:c.organizationId,
    BRANCH_HUB_TOKEN:c.token,BRANCH_HUB_DATA_DIR:path.join(app.getPath('userData'),'branch-data')};
