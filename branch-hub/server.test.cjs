@@ -252,3 +252,17 @@ test('paired devices keep least privilege across restart, audit actors, and revo
   assert.equal((await request(port,'GET','/api/v1/offline/stock',null,deviceToken)).status,401);
  } finally {await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('device session discloses permissions without credentials, UI assets have no embedded token',async()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hub-ui-'));
+ const hub=createHub({port:0,dataDir:dir,branchId:'branch_001',organizationId:'org_001',token});
+ try {
+  const {port}=await hub.listen();
+  const session=await request(port,'GET','/api/v1/session',null,token);
+  assert.equal(session.data.admin,true);assert.equal(session.data.token,undefined);
+  for(const pathname of ['/','/hub.js','/hub.css']){
+   const response=await fetch(`http://127.0.0.1:${port}${pathname}`);
+   assert.equal(response.status,200);assert.equal((await response.text()).includes(token),false);
+  }
+ }finally{await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
+});

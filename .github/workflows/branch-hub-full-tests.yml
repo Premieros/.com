@@ -26,3 +26,20 @@ jobs:
       - name: Verify SQLite backup and restoration, offline sales, and local server
         working-directory: branch-hub
         run: npm test
+  browser-offline:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Local UI checkout, lost acknowledgement, reload and mobile layout
+        run: node branch-hub/ui.browser.cjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Branch-Hub-UI-acceptance
+          path: branch-hub/test-output/*.png
+          if-no-files-found: ignore

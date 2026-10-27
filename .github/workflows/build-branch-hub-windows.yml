@@ -30,12 +30,22 @@ jobs:
           $env:ELECTRON_RUN_AS_NODE = "1"
           $runtime = Resolve-Path "branch-hub/release/win-unpacked/PremierOS Branch Hub.exe"
           $smoke = Join-Path (Split-Path $runtime) "resources/app.asar/packaged-smoke.cjs"
-          & $runtime $smoke
-          if ($LASTEXITCODE -ne 0) { throw "Packaged runtime smoke failed" }
+          $process = Start-Process -FilePath $runtime.Path -ArgumentList "`"$smoke`"" -Wait -PassThru -NoNewWindow
+          if ($process.ExitCode -ne 0) { throw "Packaged runtime smoke failed: $($process.ExitCode)" }
           Remove-Item Env:ELECTRON_RUN_AS_NODE
           $installers = @(Get-ChildItem branch-hub/release/*Setup*.exe)
           if ($installers.Count -ne 1) { throw "Expected one Windows installer" }
           $exe = $installers[0]
+          $installDir = Join-Path $env:RUNNER_TEMP "hub-install-validation"
+          $setup = Start-Process -FilePath $exe.FullName -ArgumentList "/S", "/D=$installDir" -Wait -PassThru
+          if ($setup.ExitCode -ne 0) { throw "Silent installation failed" }
+          $installedExe = Join-Path $installDir "PremierOS Branch Hub.exe"
+          if (!(Test-Path $installedExe)) { throw "Installed executable missing" }
+          $env:ELECTRON_RUN_AS_NODE = "1"
+          $installedSmoke = Join-Path $installDir "resources/app.asar/packaged-smoke.cjs"
+          $installed = Start-Process -FilePath $installedExe -ArgumentList "`"$installedSmoke`"" -Wait -PassThru -NoNewWindow
+          if ($installed.ExitCode -ne 0) { throw "Installed application smoke failed" }
+          Remove-Item Env:ELECTRON_RUN_AS_NODE
           $stream = [System.IO.File]::OpenRead($exe.FullName)
           try {
             if ($stream.ReadByte() -ne 77 -or $stream.ReadByte() -ne 90) { throw "Invalid PE installer" }

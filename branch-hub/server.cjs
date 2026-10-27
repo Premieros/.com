@@ -71,7 +71,7 @@ function createHub(config = {}) {
     status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','acknowledged')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );`);
-  const printerConfig = config.printers || {};
+  const printerConfig = config.printers || JSON.parse(process.env.BRANCH_HUB_PRINTERS || '{}');
   const printWorker = createPrintWorker(db, branchId, printerConfig);
   if (Object.keys(printerConfig).length) printWorker.start();
   const devices = createDeviceRegistry(db, branchId);
@@ -107,6 +107,13 @@ function createHub(config = {}) {
   };
   const handler = async (req, res) => {
     const pathname = new URL(req.url || '/', 'https://branch.local').pathname;
+    const assets={'/':['index.html','text/html; charset=utf-8'],'/hub.js':['hub.js','text/javascript; charset=utf-8'],'/hub.css':['hub.css','text/css; charset=utf-8']};
+    if(req.method === 'GET' && Object.hasOwn(assets,pathname)) {
+      const [file,type]=assets[pathname];
+      res.writeHead(200,{'content-type':type,'cache-control':'no-store','x-content-type-options':'nosniff',
+        'content-security-policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'",'referrer-policy':'no-referrer'});
+      return res.end(fs.readFileSync(path.join(__dirname,'ui',file)));
+    }
     if (pathname === '/health' && req.method === 'GET') return send(res, 200, { ok: true, service: 'premier-branch-hub', version: 1 });
     const bearer = String(req.headers.authorization || '').replace(/^Bearer /i, '');
     const principal = checkToken(req.headers.authorization)
@@ -119,6 +126,8 @@ function createHub(config = {}) {
       pathname.startsWith('/api/v1/offline/sales/') && pathname.endsWith('/print') ? 'print' : 'admin';
     if ((adminPath && !principal.admin) || (permission === 'admin' && !principal.admin) ||
         (permission !== 'admin' && !principal.allows(permission))) return send(res,403,{error:'FORBIDDEN'});
+    if(pathname === '/api/v1/session' && req.method === 'GET')return send(res,200,{organizationId,branchId,admin:Boolean(principal.admin),permissions:['read','sell','print','stock'].filter(p=>principal.allows(p))});
+    if(pathname === '/api/v1/printers' && req.method === 'GET')return send(res,200,{printers:Object.keys(printerConfig)});
     if (pathname.startsWith('/api/v1/offline/sales/') && pathname.endsWith('/print') && req.method === 'POST') {
       const saleId=pathname.slice('/api/v1/offline/sales/'.length,-'/print'.length);
       const sale=db.prepare('SELECT id,total_minor FROM offline_sales WHERE branch_id=? AND id=?').get(branchId,saleId);
@@ -315,6 +324,9 @@ function createHub(config = {}) {
 }
 if (require.main === module) {
   const hub = createHub();
-  hub.listen().then(addr => console.log('Premier Branch Hub listening on', addr.address, addr.port));
+  hub.listen().then(addr => {
+    console.log('Premier Branch Hub listening on', addr.address, addr.port);
+    if(process.send)process.send({type:'ready',port:addr.port});
+  });
 }
 module.exports = { createHub };
