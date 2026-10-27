@@ -91,3 +91,35 @@ test('parallel submissions share one receipt and one outbox event', async () => 
   assert.equal(hub.db.prepare('SELECT count(*) AS n FROM sync_outbox').get().n,1);
  } finally {await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('integrity audit and read-only pending sync survive restart without premature acknowledgement', async () => {
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'premier-integrity-'));
+ const config={host:'127.0.0.1',port:0,branchId:'branch_001',organizationId:'org_001',token,dataDir:dir};
+ let hub=createHub(config);
+ try {
+  let {port}=await hub.listen();
+  const record={organizationId:'org_001',branchId:'branch_001',deviceId:'device_001',
+    idempotencyKey:'receipt-integrity-001',totalMinor:150,currency:'EGP',receipt:{items:[]}};
+  assert.equal((await request(port,'POST','/api/v1/receipts',record,token)).status,201);
+  assert.equal((await request(port,'GET','/api/v1/integrity',null,token)).data.ok,true);
+  const pending=await request(port,'GET','/api/v1/sync/pending',null,token);
+  assert.equal(pending.data.events.length,1);
+  assert.equal(pending.data.cloudAcknowledgementImplemented,false);
+  assert.equal((await request(port,'GET','/api/v1/sync/status',null,token)).data.pending,1);
+  await hub.close();hub=null;
+  hub=createHub(config);({port}=await hub.listen());
+  assert.equal((await request(port,'GET','/api/v1/integrity',null,token)).data.outbox,1);
+  assert.equal((await request(port,'GET','/api/v1/sync/status',null,token)).data.pending,1);
+ } finally {if(hub)await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
+});
+test('print job key cannot be reused for a different document', async () => {
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'premier-print-conflict-'));
+ const hub=createHub({host:'127.0.0.1',port:0,branchId:'branch_001',organizationId:'org_001',token,dataDir:dir});
+ try {
+  const {port}=await hub.listen();
+  const job={organizationId:'org_001',branchId:'branch_001',kind:'print',idempotencyKey:'print-job-0001',payload:{text:'first'}};
+  assert.equal((await request(port,'POST','/api/v1/jobs',job,token)).status,202);
+  assert.equal((await request(port,'POST','/api/v1/jobs',{...job,payload:{text:'changed'}},token)).status,409);
+  assert.equal((await request(port,'GET','/api/v1/jobs',null,token)).data.jobs.length,1);
+ } finally {await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
+});
