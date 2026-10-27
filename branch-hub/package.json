@@ -3,6 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "description": "Local-first branch gateway prototype for PremierOS",
-  "engines": { "node": ">=22.13.0" },
-  "scripts": { "start": "node server.cjs", "test": "node --test server.test.cjs" }
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "scripts": {
+    "start": "node server.cjs",
+    "test": "node --test server.test.cjs",
+    "build:win": "electron-builder --win nsis"
+  },
+  "main": "desktop.cjs",
+  "devDependencies": {
+    "electron": "38.1.0",
+    "electron-builder": "26.0.12"
+  }
 }
