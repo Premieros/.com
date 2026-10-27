@@ -223,6 +223,16 @@ export function ProductBrowser({ branchId = null, userId = null, enableStationNa
                   <button type="button" disabled={gated} onClick={() => selectProduct(product)} className={`relative h-32 w-full overflow-hidden bg-white text-start sm:h-28 ${gated ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
                     <ProductImage src={imageUrl} name={productLabel} category={categoryLabel} className="h-full w-full" imgClassName="h-full w-full bg-white object-contain p-1.5" positionX={imageView.x} positionY={imageView.y} zoom={imageView.zoom} />
                   </button>
+                  {showAvailableStock && (
+                    <span
+                      data-testid={`pos-product-available-${product.id}`}
+                      title={isAr ? 'الكمية المتاحة للبيع من مخزن الطلب' : 'Available to sell from order warehouse'}
+                      aria-label={`${isAr ? 'المتاح للبيع' : 'Available to sell'}: ${stockMap[product.id] === undefined ? (isAr ? 'غير معروف' : 'Unknown') : Math.max(0, Number(stockMap[product.id]))}`}
+                      className={`absolute end-2 top-2 z-20 flex h-10 min-w-10 items-center justify-center rounded-full border-2 border-ui-surface px-1.5 text-xs font-black text-white shadow-lg ${stockMap[product.id] === undefined ? 'bg-slate-500' : Number(stockMap[product.id]) <= 0 ? 'bg-red-600' : Number(stockMap[product.id]) <= 5 ? 'bg-amber-500' : 'bg-emerald-600'}`}
+                    >
+                      {stockMap[product.id] === undefined ? '?' : Math.max(0, Number(stockMap[product.id])).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US', { maximumFractionDigits: 2 })}
+                    </span>
+                  )}
                   {can('products.edit') && (
                     <>
                       <label onClick={(event) => event.stopPropagation()} className="absolute start-2 top-2 z-10 flex h-8 w-8 cursor-pointer items-center justify-center rounded-full border border-white/70 bg-ui-surface/95 text-ui-muted shadow-ui-sm backdrop-blur transition hover:text-ui-primary" title={isAr ? 'رفع صورة للمنتج' : 'Upload product photo'}>
@@ -243,9 +253,6 @@ export function ProductBrowser({ branchId = null, userId = null, enableStationNa
                   <div className="flex flex-1 flex-col p-3">
                     <p className="line-clamp-2 min-h-10 text-[14px] font-black leading-5 text-ui-text" title={productLabel}>{productLabel}</p>
                     {categoryLabel && <p className="mt-0.5 truncate text-[11px] font-medium text-ui-subtle">{categoryLabel}</p>}
-                    {showAvailableStock && <p data-testid={`pos-product-available-${product.id}`} className={`mt-1 text-xs font-bold ${stockMap[product.id] !== undefined && stockMap[product.id] <= 0 ? 'text-red-500' : 'text-ui-muted'}`}>
-                      {isAr ? 'المتاح للبيع: ' : 'Available to sell: '}{stockMap[product.id] === undefined ? (isAr ? 'غير محدد' : 'Unknown') : Math.max(0, Number(stockMap[product.id])).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US', { maximumFractionDigits: 3 })}
-                    </p>}
                     <div className="mt-auto flex items-center justify-between gap-2 pt-3">
                       <span className="min-w-0 truncate text-[15px] font-black text-ui-accent">{formatCurrency(product.sale_price, currency, lang)}</span>
                       {!gated && <div className="flex shrink-0 items-center gap-1.5">
