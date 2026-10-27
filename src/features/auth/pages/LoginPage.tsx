@@ -67,18 +67,17 @@ export function LoginPage() {
     };
   }, []);
 
-  const slides = useMemo(
-    () => [
-      '/auth/hq/tables.webp',
-      '/auth/hq/pos.webp',
-      '/auth/exact/login-art-1.webp',
-      '/auth/hq/kitchen.webp',
-      '/auth/hq/dashboard.webp',
-      '/auth/exact/login-art-4.webp',
-      '/auth/hq/exit.webp',
-    ],
-    [],
-  );
+  // Each visual has an explicit product capability and an accessible description.
+  const slides = useMemo(() => [
+    { image: '/auth/hq/pos.webp', titleAr: 'نقطة بيع سريعة ومرنة', titleEn: 'Fast, flexible point of sale', textAr: 'طلبات ومبيعات ومدفوعات من واجهة واحدة', textEn: 'Orders, sales and payments in one workspace' },
+    { image: '/auth/hq/tables.webp', titleAr: 'إدارة الطاولات والطلبات', titleEn: 'Tables & order management', textAr: 'تابع الصالة، الطاولات، وحالة كل طلب', textEn: 'Keep track of tables, dining areas and orders' },
+    { image: '/auth/hq/kitchen.webp', titleAr: 'المطبخ والإنتاج', titleEn: 'Kitchen & production', textAr: 'نظّم تحضير الطلبات والوصفات والمكونات', textEn: 'Coordinate kitchen orders, recipes and ingredients' },
+    { image: '/auth/hq/dashboard.webp', titleAr: 'لوحات تحكم وتقارير', titleEn: 'Dashboards & reports', textAr: 'راقب الأداء والمبيعات والتكاليف في مكان واحد', textEn: 'See performance, sales and costing in one place' },
+    { image: '/auth/creative/dashboard.webp', titleAr: 'المخزون والمشتريات', titleEn: 'Inventory & purchasing', textAr: 'تابع حركة المخزون والخامات والتوريد', textEn: 'Track stock, raw materials and purchases' },
+    { image: '/auth/exact/login-art-4.webp', titleAr: 'المحاسبة والفروع', titleEn: 'Accounting & branches', textAr: 'إدارة مالية وصلاحيات وفروع متعددة', textEn: 'Financial workflows, permissions and multiple branches' },
+  ], []);
+
+  const activeSlide = slides[slideIndex];
 
   useEffect(() => {
     const timer = window.setInterval(() => {
@@ -91,7 +90,7 @@ export function LoginPage() {
   useEffect(() => {
     const nextSlide = slides[(slideIndex + 1) % slides.length];
     const preload = new Image();
-    preload.src = nextSlide;
+    preload.src = nextSlide.image;
   }, [slideIndex, slides]);
 
 
@@ -178,9 +177,9 @@ export function LoginPage() {
       <div className="h-[100dvh] overflow-hidden bg-white text-slate-950 lg:grid lg:grid-cols-[64%_36%]" dir="ltr">
         <section className="relative hidden h-full min-h-0 overflow-hidden bg-slate-950 lg:block">
           <img
-            key={slides[slideIndex]}
-            src={slides[slideIndex]}
-            alt=""
+            key={activeSlide.image}
+            src={activeSlide.image}
+            alt={isAr ? activeSlide.titleAr : activeSlide.titleEn}
             loading="eager"
             decoding="async"
             fetchPriority="high"
@@ -188,6 +187,22 @@ export function LoginPage() {
             className="absolute inset-0 h-full w-full object-cover object-center will-change-transform"
             style={{ animation: 'login-scene-zoom-out 4200ms ease-out both' }}
           />
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-slate-950/95 via-slate-950/65 to-transparent px-10 pb-10 pt-28 text-white xl:px-14" dir={isAr ? 'rtl' : 'ltr'}>
+            <div className="max-w-2xl">
+              <p className="mb-2 text-xs font-black tracking-[0.18em] text-sky-300">PREMIER OS</p>
+              <h2 className="text-3xl font-black leading-tight xl:text-4xl">{isAr ? activeSlide.titleAr : activeSlide.titleEn}</h2>
+              <p className="mt-3 text-base font-medium leading-relaxed text-slate-100">{isAr ? activeSlide.textAr : activeSlide.textEn}</p>
+            </div>
+            <div className="pointer-events-auto mt-6 flex items-center gap-2" role="tablist" aria-label={isAr ? 'إمكانيات النظام' : 'System capabilities'}>
+              {slides.map((slide, index) => (
+                <button key={slide.image} type="button" role="tab" aria-selected={slideIndex === index}
+                  aria-label={isAr ? slide.titleAr : slide.titleEn}
+                  onClick={() => setSlideIndex(index)}
+                  className={`h-2.5 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${slideIndex === index ? 'w-9 bg-sky-400' : 'w-2.5 bg-white/60 hover:bg-white'}`}
+                />
+              ))}
+            </div>
+          </div>
         </section>
 
         <section
