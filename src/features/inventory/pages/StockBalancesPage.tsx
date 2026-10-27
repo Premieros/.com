@@ -6,7 +6,7 @@ import { useBranchFilter } from '@/lib/useBranchFilter';
 import { useBranches } from '@/hooks/useBranches';
 import { DesignSurface, DesignPageHeader } from '@/components/design';
 
-type Balance = { key: string; kind: 'product' | 'raw' | 'manufactured'; name: string; branch: string; warehouse: string; quantity: number; unitCost: number; costSource: string };
+type Balance = { key: string; kind: 'product' | 'raw' | 'manufactured'; name: string; branch: string; warehouse: string; quantity: number; unitCost: number; salePrice: number; costSource: string };
 
 
 const PAGE_SIZE = 1000;
@@ -43,15 +43,13 @@ export function StockBalancesPage() {
     setBusy(true); setError('');
     (async () => {
       try {
-        const [balanceRows, warehouseRows, costRows] = await Promise.all([
-          allRows('v_stock_balances_unified', 'item_type,item_id,item_name,branch_id,warehouse_id,quantity', ids),
+        const [balanceRows, warehouseRows] = await Promise.all([
+          allRows('v_current_stock_position', 'item_type,item_id,item_name,branch_id,warehouse_id,quantity,unit_cost,sale_price,cost_source', ids),
           allRows('warehouses', 'id,branch_id,name', ids),
-          allRows('v_stock_current_costs', 'item_type,item_id,branch_id,unit_cost,cost_source', ids),
         ]);
         if (cancelled) return;
         const whs = warehouseRows as { id: string; branch_id: string; name: string }[];
         setWarehouses(whs);
-        const costs = new Map(costRows.map(row => [[row.item_type,row.branch_id,row.item_id].join(':'), row]));
         setRows(balanceRows.map(row => ({
           key: [row.item_type,row.branch_id,row.warehouse_id,row.item_id].join(':'),
           kind: row.item_type as Balance['kind'],
@@ -59,8 +57,9 @@ export function StockBalancesPage() {
           branch: String(row.branch_id),
           warehouse: String(row.warehouse_id),
           quantity: Number(row.quantity),
-          unitCost: Number(costs.get([row.item_type,row.branch_id,row.item_id].join(':'))?.unit_cost ?? 0),
-          costSource: String(costs.get([row.item_type,row.branch_id,row.item_id].join(':'))?.cost_source ?? ''),
+          unitCost: Number(row.unit_cost ?? 0),
+          salePrice: Number(row.sale_price ?? 0),
+          costSource: String(row.cost_source ?? ''),
         })));
       } catch (e) { if (!cancelled) setError(e instanceof Error ? e.message : String(e)); }
       finally { if (!cancelled) setBusy(false); }
@@ -89,7 +88,7 @@ export function StockBalancesPage() {
       </div>
       <div className="text-sm text-ui-muted">{ar ? 'عدد الأرصدة المعروضة:' : 'Shown balances:'} {result.length} · {ar ? 'السالبة:' : 'Negative:'} {result.filter(r=>r.quantity<0).length} · {ar ? 'الموجبة:' : 'Positive:'} {result.filter(r=>r.quantity>0).length}</div>
       {error && <p role="alert" className="text-red-600">{error}</p>}
-      {busy ? <p>{ar ? 'جاري تحميل الأرصدة...' : 'Loading balances...'}</p> : <div className="overflow-x-auto"><table className="w-full text-sm text-start"><thead><tr className="border-b border-ui-border"><th className="p-3 text-start">{ar ? 'الصنف' : 'Item'}</th><th className="p-3 text-start">{ar ? 'النوع' : 'Type'}</th><th className="p-3 text-start">{ar ? 'الفرع' : 'Branch'}</th><th className="p-3 text-start">{ar ? 'المخزن' : 'Warehouse'}</th><th className="p-3 text-end">{ar ? 'الرصيد' : 'Balance'}</th><th className="p-3 text-end">{ar ? 'التكلفة الحالية للوحدة' : 'Current unit cost'}</th></tr></thead><tbody>{result.map(r=><tr key={r.key} className="border-b border-ui-border"><td className="p-3">{r.name}</td><td className="p-3">{label(r.kind)}</td><td className="p-3">{branchName.get(r.branch) || r.branch}</td><td className="p-3">{warehouseName.get(r.warehouse) || r.warehouse}</td><td dir="ltr" className={`p-3 text-end font-semibold tabular-nums ${r.quantity < 0 ? 'text-red-600' : r.quantity > 0 ? 'text-green-600' : 'text-ui-muted'}`}>{r.quantity.toLocaleString(undefined,{ maximumFractionDigits:4 })}</td><td className="p-3 text-end tabular-nums" title={r.costSource}>{r.unitCost.toLocaleString(undefined,{maximumFractionDigits:4})}</td></tr>)}</tbody></table>{!result.length && <p className="p-6 text-center text-ui-muted">{ar ? 'لا توجد أرصدة مطابقة' : 'No matching balances'}</p>}</div>}
+      {busy ? <p>{ar ? 'جاري تحميل الأرصدة...' : 'Loading balances...'}</p> : <div className="overflow-x-auto"><table className="w-full text-sm text-start"><thead><tr className="border-b border-ui-border"><th className="p-3 text-start">{ar ? 'الصنف' : 'Item'}</th><th className="p-3 text-start">{ar ? 'النوع' : 'Type'}</th><th className="p-3 text-start">{ar ? 'الفرع' : 'Branch'}</th><th className="p-3 text-start">{ar ? 'المخزن' : 'Warehouse'}</th><th className="p-3 text-end">{ar ? 'الرصيد' : 'Balance'}</th><th className="p-3 text-end">{ar ? 'التكلفة الحالية للوحدة' : 'Current unit cost'}</th><th className="p-3 text-end">{ar ? 'سعر البيع الحالي' : 'Current sale price'}</th></tr></thead><tbody>{result.map(r=><tr key={r.key} className="border-b border-ui-border"><td className="p-3">{r.name}</td><td className="p-3">{label(r.kind)}</td><td className="p-3">{branchName.get(r.branch) || r.branch}</td><td className="p-3">{warehouseName.get(r.warehouse) || r.warehouse}</td><td dir="ltr" className={`p-3 text-end font-semibold tabular-nums ${r.quantity < 0 ? 'text-red-600' : r.quantity > 0 ? 'text-green-600' : 'text-ui-muted'}`}>{r.quantity.toLocaleString(undefined,{ maximumFractionDigits:4 })}</td><td className="p-3 text-end tabular-nums" title={r.costSource}>{r.unitCost.toLocaleString(undefined,{maximumFractionDigits:4})}</td><td className="p-3 text-end tabular-nums">{r.kind === 'raw' ? '—' : r.salePrice.toLocaleString(undefined,{maximumFractionDigits:4})}</td></tr>)}</tbody></table>{!result.length && <p className="p-6 text-center text-ui-muted">{ar ? 'لا توجد أرصدة مطابقة' : 'No matching balances'}</p>}</div>}
       <p className="text-xs text-ui-muted">{ar ? 'يتم عرض الأرصدة المسجلة حسب المخزن. العناصر التي لم تُسجل لها أي حركة مخزنية بعد لا تظهر.' : 'Shows recorded warehouse balances. Items without any warehouse movement are not shown.'}</p>
     </div>
   </DesignSurface>;
