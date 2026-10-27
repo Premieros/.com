@@ -114,6 +114,10 @@ export function usePosOrder(input: UsePosOrderInput) {
 
   useEffect(() => {
     setActiveOrderId(orderId);
+    setActiveTable(null);
+    setCart(EMPTY_CART);
+    setCustomerId('');
+    setDiscountAmount(0);
     if (!orderId) {
       setActiveOrderNumber(null);
       setTableId(null);
@@ -126,9 +130,9 @@ export function usePosOrder(input: UsePosOrderInput) {
     let cancelled = false;
     setOrderLoading(true);
     fetchOrderForWorkspace(orderId)
-      .then(({ order, items, products: orderProducts }) => {
+      .then(({ order, items, products: orderProducts, table }) => {
         if (cancelled) return;
-        if (!order) { setOrderLoading(false); return; }
+        if (!order) throw new Error('ORDER_NOT_FOUND');
         if (order.status !== 'open' && order.status !== 'held') {
           show(isAr ? 'لا يمكن استئناف طلب منتهي' : 'Cannot resume a completed order', 'error');
           setActiveOrderId(null);
@@ -138,6 +142,10 @@ export function usePosOrder(input: UsePosOrderInput) {
         }
         setOrderType(order.order_type as OrderType);
         setTableId(order.table_id);
+        setActiveTable(table);
+        setCustomerId(order.customer_id || '');
+        setDiscountType('amount');
+        setDiscountAmount(Number(order.discount_amount || 0));
         setActiveOrderId(order.id);
         setActiveOrderNumber(order.order_number);
         setGuestCount(order.guest_count);
@@ -155,7 +163,12 @@ export function usePosOrder(input: UsePosOrderInput) {
         show(t('orderResumed'), 'success');
         setOrderLoading(false);
       })
-      .catch(() => { if (!cancelled) setOrderLoading(false); });
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setCart(EMPTY_CART);
+        setOrderLoading(false);
+        show(error instanceof Error ? error.message : 'ORDER_LOAD_FAILED', 'error');
+      });
     return () => { cancelled = true; };
   }, [orderId, t, show, isAr]);
 
