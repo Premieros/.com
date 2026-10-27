@@ -399,12 +399,29 @@ export function ProductsPage() {
 
   const remove = async () => {
     if (!deleteId || !can('products.delete')) return;
-    const { error } = await supabase.from('products').delete().eq('id', deleteId);
-    if (error) show(error.message, 'error'); else { show(t('deleteSuccess'), 'success'); await logAudit('delete', 'products', deleteId); }
+    const id = deleteId;
+    const { error } = await supabase.from('products').delete().eq('id', id);
+    if (error?.code === '23503') {
+      // Referenced records cannot be erased: archive from operational selection
+      // while retaining historical orders, stock movements and audit trails.
+      const { error: archiveError } = await supabase.from('products')
+        .update({ is_active: false }).eq('id', id);
+      if (archiveError) {
+        show(archiveError.message, 'error');
+      } else {
+        show(lang === 'ar' ? 'الصنف مرتبط بعمليات سابقة؛ تم تعطيله مع الاحتفاظ بسجلاته.' : 'Used in historical records; deactivated instead of deleting.', 'success');
+        await logAudit('update', 'products', id, { is_active: false, reason: 'referenced_record_archived' });
+      }
+    } else if (error) {
+      show(error.message, 'error');
+    } else {
+      show(t('deleteSuccess'), 'success');
+      await logAudit('delete', 'products', id);
+    }
     setDeleteId(null);
     await invalidatePosCatalogCache();
     reloadProducts();
-  };
+  }
 
   const handleExport = async () => {
     const all = await fetchAllProducts();
