@@ -17,7 +17,7 @@ test('offline sale deducts stock, balances journals, queues one sync event',()=>
   assert.equal(journal.dr,840);assert.equal(journal.cr,840);
   assert.equal(db.prepare('SELECT count(*) AS n FROM offline_outbox').get().n,1);
   const movements=db.prepare('SELECT delta,balance_after FROM offline_stock_movements').all();
-  assert.deepEqual(movements,[{delta:-2,balance_after:8}]);
+  assert.deepEqual(movements.map(({delta,balance_after})=>({delta,balance_after})),[{delta:-2,balance_after:8}]);
   assert.throws(()=>engine.commitSale({...input,lines:[{sku:'coffee',quantity:1,priceMinor:300}]}),/IDEMPOTENCY_CONFLICT/);
   assert.throws(()=>engine.commitSale({key:'checkout-00002',lines:[{sku:'coffee',quantity:100,priceMinor:300}]}),/INSUFFICIENT_STOCK/);
   assert.equal(db.prepare('SELECT count(*) AS n FROM offline_sales').get().n,1);
