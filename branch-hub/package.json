@@ -8,7 +8,7 @@
   },
   "scripts": {
     "start": "node server.cjs",
-    "test": "node --test server.test.cjs restore.test.cjs",
+    "test": "node --test server.test.cjs restore.test.cjs offline-sales.test.cjs",
     "build:win": "electron-builder --win nsis"
   },
   "main": "desktop.cjs",
