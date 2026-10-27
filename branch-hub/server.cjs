@@ -78,7 +78,7 @@ function createHub(config = {}) {
   };
   const handler = async (req, res) => {
     const pathname = new URL(req.url || '/', 'https://branch.local').pathname;
-    if (pathname === '/health' && req.method === 'GET') return send(res, 200, { ok: true, service: 'premier-branch-hub', branchId, version: 1 });
+    if (pathname === '/health' && req.method === 'GET') return send(res, 200, { ok: true, service: 'premier-branch-hub', version: 1 });
     if (!checkToken(req.headers.authorization)) return send(res, 401, { error: 'UNAUTHORIZED' });
     if (pathname === '/api/v1/receipts' && req.method === 'GET') {
       const receipts = db.prepare('SELECT id,device_id,total_minor,currency,created_at FROM local_receipts WHERE branch_id=? ORDER BY created_at DESC LIMIT 100').all(branchId);
@@ -100,20 +100,26 @@ function createHub(config = {}) {
           !item.receipt || typeof item.receipt !== 'object' || Array.isArray(item.receipt)) {
           return send(res, 400, { error: 'INVALID_RECEIPT' });
         }
-        const existing = db.prepare('SELECT id,body FROM local_receipts WHERE branch_id=? AND idempotency_key=?').get(branchId,item.idempotencyKey);
         const canonical = JSON.stringify({deviceId:item.deviceId,totalMinor:item.totalMinor,currency:item.currency,receipt:item.receipt});
-        if (existing && existing.body !== canonical) return send(res, 409, { error: 'IDEMPOTENCY_CONFLICT' });
-        if (existing) return send(res, 200, { receiptId: existing.id, duplicated: true });
         const id = crypto.randomUUID();
+        let stored;
+        let inserted = false;
+        // The uniqueness check and outbox write must share a transaction.
+        // Two LAN devices can retry the same receipt concurrently.
         db.exec('BEGIN IMMEDIATE');
         try {
-          db.prepare('INSERT INTO local_receipts(id,branch_id,device_id,idempotency_key,total_minor,currency,body) VALUES(?,?,?,?,?,?,?)')
+          const result = db.prepare('INSERT OR IGNORE INTO local_receipts(id,branch_id,device_id,idempotency_key,total_minor,currency,body) VALUES(?,?,?,?,?,?,?)')
             .run(id,branchId,item.deviceId,item.idempotencyKey,item.totalMinor,item.currency,canonical);
-          db.prepare('INSERT INTO sync_outbox(event_id,branch_id,entity_type,entity_id,payload) VALUES(?,?,?,?,?)')
-            .run(id,branchId,'receipt',id,canonical);
+          inserted = result.changes === 1;
+          stored = db.prepare('SELECT id,body FROM local_receipts WHERE branch_id=? AND idempotency_key=?').get(branchId,item.idempotencyKey);
+          if (inserted) {
+            db.prepare('INSERT INTO sync_outbox(event_id,branch_id,entity_type,entity_id,payload) VALUES(?,?,?,?,?)')
+              .run(stored.id,branchId,'receipt',stored.id,canonical);
+          }
           db.exec('COMMIT');
         } catch (error) { db.exec('ROLLBACK'); throw error; }
-        return send(res, 201, { receiptId:id, queuedForSync:true });
+        if (stored.body !== canonical) return send(res, 409, { error: 'IDEMPOTENCY_CONFLICT' });
+        return send(res, inserted ? 201 : 200, { receiptId:stored.id, duplicated:!inserted, queuedForSync:true });
       } catch { return send(res, 400, { error: 'INVALID_REQUEST' }); }
     }
     if (pathname === '/api/v1/sync/status' && req.method === 'GET') {
