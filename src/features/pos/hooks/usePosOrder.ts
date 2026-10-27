@@ -4,7 +4,7 @@ import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
 import { cartToItems, type ItemPayload } from '../utils/cart';
-import { nextInvoiceNumber, processSaleForOrder, fetchBranchWarehouseId } from '../services/payment';
+import { nextInvoiceNumber, processSaleForOrder, fetchBranchWarehouseId, createSaleOperationKey, type ProcessSalePayload } from '../services/payment';
 import { getPinnedSaleWarehouse } from '@/core/offline/warehouseBinding';
 import { refreshVerifiedWarehouseStock } from '@/core/repositories/warehouseSnapshotRefresh';
 import { fetchOrderSettlementPreview, type OrderSettlementPreview } from '../services/settlementPreview';
@@ -43,6 +43,7 @@ export function usePosOrder(input: UsePosOrderInput) {
   const perms = usePosPermissions();
   const [offlineCompleting, setOfflineCompleting] = useState(false);
   const settlementLockRef = useRef(false);
+  const pendingLinkedCheckoutRef = useRef<{ orderId: string; branchId: string; payload: ProcessSalePayload; preview: OrderSettlementPreview } | null>(null);
   const [settlementPreview, setSettlementPreview] = useState<OrderSettlementPreview | null>(null);
   const [settlementReceipt, setSettlementReceipt] = useState<ReceiptData | null>(null);
   const [settlementReceiptSaleId, setSettlementReceiptSaleId] = useState<string | null>(null);
@@ -321,12 +322,18 @@ export function usePosOrder(input: UsePosOrderInput) {
     settlementLockRef.current = true;
     setOfflineCompleting(true);
     try {
-      const preview = settlementPreview || await loadSettlementPreview(false);
+      const previousAttempt = pendingLinkedCheckoutRef.current;
+      if (previousAttempt && (previousAttempt.orderId !== base.activeOrderId || previousAttempt.branchId !== input.branchId)) {
+        show(isAr ? 'عملية تحصيل أخرى لم يتأكد مصيرها بعد. تحقق من الفاتورة أولًا.' : 'An earlier settlement is unresolved. Verify its invoice first.', 'error');
+        return false;
+      }
+      const preview = previousAttempt?.preview || settlementPreview || await loadSettlementPreview(false);
       if (!preview) return false;
 
-      const invoiceNumber = await nextInvoiceNumber();
+      const invoiceNumber = previousAttempt?.payload.p_invoice_number || await nextInvoiceNumber();
       const paidAmountToUse = base.paymentMethod === 'credit' ? 0 : (base.paidAmount || preview.total);
-      const { result, error } = await processSaleForOrder({
+      const payload: ProcessSalePayload = previousAttempt?.payload ?? {
+        p_client_operation_key: createSaleOperationKey(),
         p_invoice_number: invoiceNumber,
         p_branch_id: input.branchId,
         p_shift_id: input.activeShift.id,
@@ -347,13 +354,17 @@ export function usePosOrder(input: UsePosOrderInput) {
         p_table_id: resolveOrderBindingForSave({ activeOrderId: base.activeOrderId, orderType: base.orderType, tableId: base.tableId, activeTableId: base.activeTable?.id ?? null }).tableId,
         p_order_id: base.activeOrderId,
         p_guest_count: base.guestCount,
-      });
+      };
+      pendingLinkedCheckoutRef.current = { orderId: base.activeOrderId, branchId: input.branchId, payload, preview };
+      const { result, error } = await processSaleForOrder(payload);
+      if (result && !result.success) pendingLinkedCheckoutRef.current = null;
 
       if (error || !result?.success) {
         show(error || result?.detail || result?.error || (isAr ? 'تعذر تحصيل الأصناف المرسلة' : 'Could not settle sent items'), 'error');
         return false;
       }
 
+      pendingLinkedCheckoutRef.current = null;
       const extended = result as typeof result & {
         order_completed?: boolean;
         sale_id?: string;
