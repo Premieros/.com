@@ -179,3 +179,26 @@ test('offline sales API commits stock, journal and outbox atomically with branch
   assert.equal(journal.dr,journal.cr);
  } finally {await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('offline sale outbox remains pending after restart and requires authorization', async () => {
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'premier-offline-outbox-'));
+ const config={host:'127.0.0.1',port:0,branchId:'branch_001',organizationId:'org_001',token,dataDir:dir};
+ let hub=createHub(config);
+ try {
+  hub.db.prepare('INSERT INTO offline_stock(branch_id,sku,quantity,unit_cost_minor) VALUES(?,?,?,?)').run('branch_001','sku1',2,10);
+  let {port}=await hub.listen();
+  const body={organizationId:'org_001',branchId:'branch_001',key:'offline-outbox-sale-001',lines:[{sku:'sku1',quantity:1,priceMinor:25}]};
+  assert.equal((await request(port,'POST','/api/v1/offline/sales',body,token)).status,201);
+  assert.equal((await request(port,'GET','/api/v1/offline/sync/pending')).status,401);
+  const first=await request(port,'GET','/api/v1/offline/sync/pending',null,token);
+  assert.equal(first.status,200);
+  assert.equal(first.data.events.length,1);
+  assert.equal(first.data.events[0].payload.branchId,'branch_001');
+  assert.equal(first.data.cloudAcknowledgementImplemented,false);
+  assert.equal((await request(port,'GET','/api/v1/offline/sync/status',null,token)).data.pending,1);
+  await hub.close();hub=null;
+  hub=createHub(config);({port}=await hub.listen());
+  assert.equal((await request(port,'GET','/api/v1/offline/sync/status',null,token)).data.pending,1);
+  assert.equal((await request(port,'GET','/api/v1/offline/sync/pending',null,token)).data.events[0].eventId,first.data.events[0].eventId);
+ } finally {if(hub)await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
+});
