@@ -436,9 +436,10 @@ export function CurrentOrderPanel({
 
       {!empty && (
         <div className="shrink-0 border-t border-ui-border p-3">
-          <div className="grid grid-cols-3 gap-2">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div className="rounded-xl border border-ui-border bg-ui-page-alt p-2"><p className="text-[10px] font-bold text-ui-muted">{t('subtotal')}</p><p className="mt-0.5 truncate text-xs font-black text-ui-text">{formatCurrency(subtotal, currency, lang)}</p></div>
             <div className="rounded-xl bg-ui-page-alt p-2"><p className="text-[9px] font-bold text-ui-subtle">{t('discount')}</p><p data-testid="pos-discount-value" className="mt-0.5 truncate text-xs font-black text-ui-text">{formatCurrency(discountValue, currency, lang)}</p></div>
+            <div className="rounded-xl border border-ui-border bg-ui-page-alt p-2"><p className="text-[10px] font-bold text-ui-muted">{lang === 'ar' ? 'الضريبة' : 'Tax'} ({Number(taxRate).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US', {maximumFractionDigits:2})}%)</p><p data-testid="pos-tax-value" className="mt-0.5 truncate text-xs font-black text-ui-text">{formatCurrency(taxAmount, currency, lang)}</p></div>
             <div className="rounded-xl border border-ui-primary/30 bg-ui-primary-soft p-2"><p className="text-[10px] font-bold text-ui-muted">{t('total')}</p><p data-testid="pos-total-value" className="mt-0.5 truncate text-sm font-black text-ui-accent">{formatCurrency(total, currency, lang)}</p></div>
           </div>
         </div>
