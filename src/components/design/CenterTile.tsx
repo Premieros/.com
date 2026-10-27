@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useLanguage } from '../../context/LanguageContext';
 import type { LucideIcon } from 'lucide-react';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
@@ -23,39 +23,29 @@ type CenterTileProps = {
   testIdPrefix: string;
 };
 
+/** Compact navigation tab: every center opens its pages by clicking the top row. */
 export function CenterTile({ item, testIdPrefix }: CenterTileProps) {
-  const navigate = useNavigate();
   const { lang } = useLanguage();
   const ar = lang === 'ar';
   const Icon = item.icon;
-  const accentClass = `ui-accent-${item.accent || 'primary'}`;
+  const label = (ar ? item.ar ?? item.en : item.en ?? item.ar) || item.id;
+  const description = ar ? item.descriptionAr : item.descriptionEn;
 
   return (
-    <button
+    <NavLink
       data-testid={`${testIdPrefix}-${item.id}`}
-      type="button"
-      onClick={() => navigate(item.route)}
-      className={`ui-accent-card ${accentClass} group relative rounded-2xl border border-ui-border bg-ui-surface p-5 text-start shadow-ui-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-ui-primary hover:shadow-ui-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-ring`}
+      to={item.route}
+      title={description || label}
+      className={({ isActive }) =>
+        `inline-flex min-h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-ring ${isActive
+          ? 'border-ui-primary bg-ui-primary-soft text-ui-primary'
+          : 'border-ui-border bg-ui-surface text-ui-text hover:border-ui-primary hover:bg-ui-page-alt'}`
+      }
     >
-      <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-xl bg-ui-primary-soft text-ui-primary transition-all duration-150 group-hover:bg-ui-primary group-hover:text-ui-primary-fg">
-        <Icon className="h-5 w-5" />
-      </div>
-      <h3 className="text-base font-extrabold leading-6 text-ui-text">{ar ? (item.ar ?? item.en) : (item.en ?? item.ar)}</h3>
-      {(item.descriptionAr || item.descriptionEn) && (
-        <p className="mt-2 text-sm font-medium leading-6 text-ui-muted">
-          {ar ? item.descriptionAr : item.descriptionEn}
-        </p>
-      )}
-      <span className="mt-4 inline-flex items-center gap-1 text-xs font-bold text-ui-primary transition group-hover:gap-2">
-        {ar ? 'فتح الوحدة' : 'Open module'}
-        <span aria-hidden="true" className="transition-all group-hover:ms-1">{ar ? '←' : '→'}</span>
-      </span>
-      {item.badge && (
-        <span className="absolute end-3 top-3 rounded-full bg-ui-success px-2 py-0.5 text-[10px] font-bold text-ui-primary-fg">
-          {item.badge}
-        </span>
-      )}
-    </button>
+      <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
+      <span>{label}</span>
+      {item.badge && <span className="rounded-full bg-ui-page-alt px-2 py-0.5 text-xs">{item.badge}</span>}
+    </NavLink>
   );
 }
 
@@ -65,17 +55,30 @@ type CenterGridProps = {
   columns?: 2 | 3 | 4;
 };
 
-export function CenterGrid({ items, testIdPrefix, columns = 4 }: CenterGridProps) {
+/** Retain the existing component API so every center gets the same tab row. */
+export function CenterGrid({ items, testIdPrefix }: CenterGridProps) {
   const { canAccessModule } = useOrganizationModules();
-  const gridCols = columns === 2 ? 'sm:grid-cols-2' : columns === 3 ? 'sm:grid-cols-2 xl:grid-cols-3' : 'sm:grid-cols-2 xl:grid-cols-4';
+  const { lang } = useLanguage();
   const visibleItems = items.filter(
-    (item) => item.permission !== false && canAccessModule(moduleForPath(item.route)),
+    item => item.permission !== false && canAccessModule(moduleForPath(item.route)),
   );
+
   return (
-    <div className={`grid gap-4 ${gridCols}`}>
-      {visibleItems.map((item) => (
-        <CenterTile key={item.id} item={item} testIdPrefix={testIdPrefix} />
-      ))}
-    </div>
+    <nav
+      aria-label={lang === 'ar' ? 'صفحات المركز' : 'Center pages'}
+      data-testid={`${testIdPrefix}-navigation`}
+      className="w-full rounded-2xl border border-ui-border bg-ui-surface p-2 shadow-ui-sm"
+    >
+      <div className="flex w-full flex-row flex-wrap items-center gap-2">
+        {visibleItems.map(item => (
+          <CenterTile key={item.id} item={item} testIdPrefix={testIdPrefix} />
+        ))}
+      </div>
+      {visibleItems.length === 0 && (
+        <p className="px-3 py-2 text-sm text-ui-muted">
+          {lang === 'ar' ? 'لا توجد صفحات متاحة لصلاحياتك الحالية' : 'No pages available with your current permissions'}
+        </p>
+      )}
+    </nav>
   );
 }
