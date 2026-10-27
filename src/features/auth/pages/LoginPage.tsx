@@ -5,6 +5,10 @@ import {
   ArrowRight,
   Loader2,
   LockKeyhole,
+  ChevronLeft,
+  ChevronRight,
+  ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -27,6 +31,7 @@ export function LoginPage() {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [slideIndex, setSlideIndex] = useState(0);
+  const [slideshowPaused, setSlideshowPaused] = useState(false);
 
   const isAr = lang === 'ar';
 
@@ -80,12 +85,13 @@ export function LoginPage() {
   const activeSlide = slides[slideIndex];
 
   useEffect(() => {
+    if (slideshowPaused || (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
     const timer = window.setInterval(() => {
       setSlideIndex((value) => (value + 1) % slides.length);
-    }, 4200);
+    }, 6500);
 
     return () => window.clearInterval(timer);
-  }, [slides.length]);
+  }, [slides.length, slideshowPaused]);
 
   useEffect(() => {
     const nextSlide = slides[(slideIndex + 1) % slides.length];
@@ -174,8 +180,8 @@ export function LoginPage() {
           }
         }
       `}</style>
-      <div className="h-[100dvh] overflow-hidden bg-white text-slate-950 lg:grid lg:grid-cols-[64%_36%]" dir="ltr">
-        <section className="relative hidden h-full min-h-0 overflow-hidden bg-slate-950 lg:block">
+      <div className="h-[100dvh] overflow-hidden bg-white text-slate-950 lg:grid lg:grid-cols-[60%_40%] xl:grid-cols-[62%_38%]" dir="ltr">
+        <section className="group relative hidden h-full min-h-0 overflow-hidden bg-[#07172e] lg:block" onMouseEnter={() => setSlideshowPaused(true)} onMouseLeave={() => setSlideshowPaused(false)} onFocusCapture={() => setSlideshowPaused(true)} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSlideshowPaused(false); }}>
           <img
             key={activeSlide.image}
             src={activeSlide.image}
@@ -185,15 +191,20 @@ export function LoginPage() {
             fetchPriority="high"
             draggable={false}
             className="absolute inset-0 h-full w-full object-cover object-center will-change-transform"
-            style={{ animation: 'login-scene-zoom-out 4200ms ease-out both' }}
+            style={{ animation: 'login-scene-zoom-out 6500ms ease-out both' }}
           />
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 bg-gradient-to-t from-slate-950/95 via-slate-950/65 to-transparent px-10 pb-10 pt-28 text-white xl:px-14" dir={isAr ? 'rtl' : 'ltr'}>
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#06152b]/65 via-transparent to-[#06152b]/95" />
+          <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-9 pt-9 text-white xl:px-14" dir={isAr ? "rtl" : "ltr"}>
+            <div className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black tracking-wider backdrop-blur-xl"><Sparkles className="h-4 w-4 text-sky-300" /> PREMIER OS</div>
+            <span className="rounded-full border border-white/20 bg-slate-950/25 px-3 py-2 text-xs font-semibold backdrop-blur-xl">{isAr ? "منصة متكاملة لإدارة أعمالك" : "Your connected business workspace"}</span>
+          </div>
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-9 pb-9 pt-28 text-white xl:px-14" dir={isAr ? 'rtl' : 'ltr'}>
             <div className="max-w-2xl">
-              <p className="mb-2 text-xs font-black tracking-[0.18em] text-sky-300">PREMIER OS</p>
-              <h2 className="text-3xl font-black leading-tight xl:text-4xl">{isAr ? activeSlide.titleAr : activeSlide.titleEn}</h2>
-              <p className="mt-3 text-base font-medium leading-relaxed text-slate-100">{isAr ? activeSlide.textAr : activeSlide.textEn}</p>
+              <p className="mb-3 text-xs font-black tracking-widest text-sky-300">{String(slideIndex + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")} · {isAr ? "اكتشف الإمكانيات" : "EXPLORE THE PLATFORM"}</p>
+              <h2 className="max-w-xl text-3xl font-black leading-tight drop-shadow-lg xl:text-5xl">{isAr ? activeSlide.titleAr : activeSlide.titleEn}</h2>
+              <p className="mt-3 max-w-xl text-base font-medium leading-relaxed text-slate-100 xl:text-lg">{isAr ? activeSlide.textAr : activeSlide.textEn}</p>
             </div>
-            <div className="pointer-events-auto mt-6 flex items-center gap-2" role="tablist" aria-label={isAr ? 'إمكانيات النظام' : 'System capabilities'}>
+            <div className="pointer-events-auto mt-7 flex items-center justify-between gap-3"><div className="flex items-center gap-2" role="tablist" aria-label={isAr ? 'إمكانيات النظام' : 'System capabilities'}>
               {slides.map((slide, index) => (
                 <button key={slide.image} type="button" role="tab" aria-selected={slideIndex === index}
                   aria-label={isAr ? slide.titleAr : slide.titleEn}
@@ -201,12 +212,15 @@ export function LoginPage() {
                   className={`h-2.5 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${slideIndex === index ? 'w-9 bg-sky-400' : 'w-2.5 bg-white/60 hover:bg-white'}`}
                 />
               ))}
-            </div>
+              </div><div className="flex gap-2" dir="ltr">
+                <button type="button" aria-label={isAr ? "الشريحة السابقة" : "Previous slide"} onClick={() => setSlideIndex((i) => (i - 1 + slides.length) % slides.length)} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/10 backdrop-blur-md transition hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"><ChevronLeft className="h-5 w-5" /></button>
+                <button type="button" aria-label={isAr ? "الشريحة التالية" : "Next slide"} onClick={() => setSlideIndex((i) => (i + 1) % slides.length)} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/10 backdrop-blur-md transition hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"><ChevronRight className="h-5 w-5" /></button>
+              </div></div>
           </div>
         </section>
 
         <section
-          className="relative flex h-full min-h-0 items-center justify-center overflow-hidden bg-white px-6 py-4 sm:px-10 lg:border-s lg:border-slate-100 lg:px-9 xl:px-12"
+          className="relative flex h-full min-h-0 items-center justify-center overflow-y-auto bg-gradient-to-b from-white via-white to-slate-50 px-6 py-4 sm:px-10 lg:border-s lg:border-slate-100 lg:px-9 xl:px-12"
           dir={isAr ? 'rtl' : 'ltr'}
         >
           <div className="login-panel-shell relative z-10 w-full max-w-[430px]">
@@ -224,6 +238,7 @@ export function LoginPage() {
             </div>
 
             <div className="mb-5">
+              <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-[11px] font-black text-blue-700"><ShieldCheck className="h-3.5 w-3.5" />{isAr ? "بوابة دخول Premier الآمنة" : "Premier secure sign-in"}</div>
               <h1 className="text-4xl font-black tracking-tight text-slate-950">
                 {isAr ? 'مرحبًا بعودتك' : 'Welcome back'}
               </h1>
