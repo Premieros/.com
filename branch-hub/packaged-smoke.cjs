@@ -11,6 +11,10 @@ async function main(){
   const {port}=await hub.listen();
   const response=await fetch(`http://127.0.0.1:${port}/health`);
   if(!response.ok || !(await response.json()).ok)throw Error('PACKAGED_HEALTH_FAILED');
+  for(const asset of ['/','/hub.js','/hub.css']) {
+   const result=await fetch(`http://127.0.0.1:${port}${asset}`);
+   if(!result.ok || !(await result.text()).length)throw Error('PACKAGED_UI_MISSING: '+asset);
+  }
   hub.createLocalBackup();
   console.log('PACKAGED_RUNTIME_OK',process.versions.node);
  }finally{await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
