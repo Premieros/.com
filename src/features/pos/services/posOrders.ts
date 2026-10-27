@@ -83,7 +83,7 @@ export async function fetchActiveOrders(branchId: string): Promise<PosRealtimeDa
   return { orders, tables, orderItems, kitchenSends, watchedOrderIds };
 }
 
-export async function fetchOrderForWorkspace(orderId: string): Promise<{ order: Order | null; items: OrderItem[]; products: Product[] }> {
+export async function fetchOrderForWorkspace(orderId: string): Promise<{ order: Order | null; items: OrderItem[]; products: Product[]; table: DiningTable | null }> {
   // Opening an order is a server-authorized operation. Branch visibility alone
   // is intentionally not enough because the floor plan may show other users'
   // occupied tables without granting access to their operational workspace.
@@ -99,7 +99,7 @@ export async function fetchOrderForWorkspace(orderId: string): Promise<{ order: 
   const { data: o, error: orderError } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
   if (orderError) throw orderError;
   const order = (o as Order | null) || null;
-  if (!order) return { order: null, items: [], products: [] };
+  if (!order) return { order: null, items: [], products: [], table: null };
 
   const { data: items, error: itemsError } = await supabase.from('order_items').select('*').eq('order_id', orderId);
   if (itemsError) throw itemsError;
@@ -111,7 +111,11 @@ export async function fetchOrderForWorkspace(orderId: string): Promise<{ order: 
     if (productsError) throw productsError;
     products = (prods as Product[]) || [];
   }
-  return { order, items: itemRows, products };
+  const tableResult = order.table_id
+    ? await supabase.from('dining_tables').select('*').eq('id', order.table_id).eq('branch_id', order.branch_id).maybeSingle()
+    : null;
+  if (tableResult?.error) throw tableResult.error;
+  return { order, items: itemRows, products, table: (tableResult?.data as DiningTable | null) || null };
 }
 
 export async function resolveMyActiveTableOrder(tableId: string): Promise<MyActiveTableOrderResolution> {
