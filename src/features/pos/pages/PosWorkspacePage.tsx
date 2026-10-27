@@ -197,6 +197,7 @@ export function PosWorkspacePage() {
     activeShift,
     products,
     stockMap: liveStockMap,
+    onInventoryChanged: () => { void refreshLiveStockMap(); },
   });
   const canModifyCurrentOrder = pos.activeOrderId ? perms.canEditOrder : perms.canCreateOrder;
 
