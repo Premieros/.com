@@ -1370,10 +1370,10 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
             </div>
 
             <div className="hidden overflow-x-auto sm:block">
-              <table className="w-full text-sm">
-                <thead>
+              <table className="w-full min-w-max text-sm" data-testid="report-results-table">
+                <thead className="sticky top-0 z-10 bg-ui-page-alt">
                   <tr className="border-b border-ui-border">
-                    {columns.map((key) => <th key={key} className="px-4 py-3 text-start font-semibold text-ui-muted text-xs uppercase tracking-wider">{key}</th>)}
+                    {columns.map((key, columnIndex) => <th key={key} scope="col" className={`px-3 py-2 text-start text-xs font-bold text-ui-muted ${columnIndex === 0 ? 'min-w-[190px]' : 'whitespace-nowrap'}`}>{key}</th>)}
                   </tr>
                 </thead>
                 <tbody>
@@ -1382,7 +1382,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
                       {columns.map((key, columnIndex) => {
                         const value = row[key];
                         return (
-                          <td key={columnIndex} className="px-4 py-3 text-ui-text">
+                          <td key={columnIndex} data-primary={columnIndex === 0} className={`px-3 py-2.5 text-ui-text ${columnIndex === 0 ? 'font-semibold' : 'tabular-nums'}`}>
                             {typeof value === 'number' && moneyKeys.includes(key) ? formatFinancialCurrency(value, currency, lang) : String(value ?? '')}
                           </td>
                         );
