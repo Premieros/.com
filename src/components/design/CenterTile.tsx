@@ -69,7 +69,7 @@ export function CenterGrid({ items, testIdPrefix }: CenterGridProps) {
       data-testid={`${testIdPrefix}-navigation`}
       className="w-full rounded-2xl border border-ui-border bg-ui-surface p-2 shadow-ui-sm"
     >
-      <div className="flex w-full flex-row flex-wrap items-center gap-2">
+      <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-1">
         {visibleItems.map(item => (
           <CenterTile key={item.id} item={item} testIdPrefix={testIdPrefix} />
         ))}
