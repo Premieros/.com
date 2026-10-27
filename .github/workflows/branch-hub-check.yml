@@ -1,0 +1,19 @@
+name: Branch Hub foundation checks
+on:
+  push:
+    paths:
+      - 'branch-hub/**'
+      - '.github/workflows/branch-hub-check.yml'
+  pull_request:
+    paths:
+      - 'branch-hub/**'
+      - '.github/workflows/branch-hub-check.yml'
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - run: node --test branch-hub/server.test.cjs
