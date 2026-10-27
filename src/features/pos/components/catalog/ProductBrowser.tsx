@@ -20,6 +20,8 @@ interface ProductBrowserProps {
   userId?: string | null;
   enableStationNavigation?: boolean;
   products: Product[];
+  stockMap?: Record<string, number>;
+  showAvailableStock?: boolean;
   categories: Category[];
   search: string;
   selectedCategory: string;
@@ -35,7 +37,7 @@ interface ProductBrowserProps {
   inputRef?: React.Ref<HTMLInputElement>;
 }
 
-export function ProductBrowser({ branchId = null, userId = null, enableStationNavigation = false, products, categories, search, selectedCategory, currency, hasBranch, canModifyOrder, shiftChecked, shiftOpen, onSearch, onSelectCategory, onAddToCart, onConfigureProduct, inputRef }: ProductBrowserProps) {
+export function ProductBrowser({ branchId = null, userId = null, enableStationNavigation = false, products, stockMap = {}, showAvailableStock = false, categories, search, selectedCategory, currency, hasBranch, canModifyOrder, shiftChecked, shiftOpen, onSearch, onSelectCategory, onAddToCart, onConfigureProduct, inputRef }: ProductBrowserProps) {
   const { t, lang } = useLanguage();
   const { show } = useToast();
   const isAr = lang === 'ar';
@@ -241,6 +243,9 @@ export function ProductBrowser({ branchId = null, userId = null, enableStationNa
                   <div className="flex flex-1 flex-col p-3">
                     <p className="line-clamp-2 min-h-10 text-[14px] font-black leading-5 text-ui-text" title={productLabel}>{productLabel}</p>
                     {categoryLabel && <p className="mt-0.5 truncate text-[11px] font-medium text-ui-subtle">{categoryLabel}</p>}
+                    {showAvailableStock && <p data-testid={`pos-product-available-${product.id}`} className={`mt-1 text-xs font-bold ${stockMap[product.id] !== undefined && stockMap[product.id] <= 0 ? 'text-red-500' : 'text-ui-muted'}`}>
+                      {isAr ? 'المتاح للبيع: ' : 'Available to sell: '}{stockMap[product.id] === undefined ? (isAr ? 'غير محدد' : 'Unknown') : Math.max(0, Number(stockMap[product.id])).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US', { maximumFractionDigits: 3 })}
+                    </p>}
                     <div className="mt-auto flex items-center justify-between gap-2 pt-3">
                       <span className="min-w-0 truncate text-[15px] font-black text-ui-accent">{formatCurrency(product.sale_price, currency, lang)}</span>
                       {!gated && <div className="flex shrink-0 items-center gap-1.5">
