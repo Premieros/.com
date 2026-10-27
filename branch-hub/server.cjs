@@ -122,6 +122,17 @@ function createHub(config = {}) {
         return send(res, inserted ? 201 : 200, { receiptId:stored.id, duplicated:!inserted, queuedForSync:true });
       } catch { return send(res, 400, { error: 'INVALID_REQUEST' }); }
     }
+    if (pathname === '/api/v1/sync/pending' && req.method === 'GET') {
+      // Read-only staging: no acknowledgement until cloud reconciliation exists.
+      const events = db.prepare("SELECT event_id,entity_type,entity_id,payload,created_at FROM sync_outbox WHERE branch_id=? AND status='pending' ORDER BY created_at,event_id LIMIT 100").all(branchId);
+      return send(res,200,{ events: events.map(e=>({...e,payload:JSON.parse(e.payload)})), cloudAcknowledgementImplemented:false });
+    }
+    if (pathname === '/api/v1/integrity' && req.method === 'GET') {
+      const integrity = db.prepare('PRAGMA quick_check').all();
+      const orphaned = db.prepare("SELECT count(*) AS count FROM local_receipts r LEFT JOIN sync_outbox o ON o.event_id=r.id AND o.branch_id=r.branch_id WHERE r.branch_id=? AND o.event_id IS NULL").get(branchId).count;
+      const counts = db.prepare("SELECT (SELECT count(*) FROM local_receipts WHERE branch_id=?) AS receipts, (SELECT count(*) FROM sync_outbox WHERE branch_id=?) AS outbox").get(branchId,branchId);
+      return send(res,200,{ ok:integrity.length===1 && integrity[0].quick_check==='ok' && orphaned===0, orphaned, ...counts });
+    }
     if (pathname === '/api/v1/sync/status' && req.method === 'GET') {
       const row=db.prepare("SELECT count(*) pending FROM sync_outbox WHERE branch_id=? AND status='pending'").get(branchId);
       return send(res,200,{ pending:row.pending, onlineSyncImplemented:false });
@@ -144,10 +155,12 @@ function createHub(config = {}) {
           return send(res, 400, { error: 'INVALID_JOB' });
         }
         const id = crypto.randomUUID();
+        const payload = JSON.stringify(item.payload);
         db.prepare('INSERT OR IGNORE INTO jobs(id,branch_id,idempotency_key,kind,payload) VALUES(?,?,?,?,?)')
-          .run(id, branchId, item.idempotencyKey, item.kind, JSON.stringify(item.payload));
-        const job = db.prepare('SELECT id,status FROM jobs WHERE branch_id=? AND idempotency_key=?').get(branchId, item.idempotencyKey);
-        return send(res, 202, { job });
+          .run(id, branchId, item.idempotencyKey, item.kind, payload);
+        const job = db.prepare('SELECT id,status,payload FROM jobs WHERE branch_id=? AND idempotency_key=?').get(branchId, item.idempotencyKey);
+        if (job.payload !== payload) return send(res,409,{ error:'IDEMPOTENCY_CONFLICT' });
+        return send(res, 202, { job: {id:job.id,status:job.status} });
       } catch { return send(res, 400, { error: 'INVALID_REQUEST' }); }
     }
     return send(res, 404, { error: 'NOT_FOUND' });
