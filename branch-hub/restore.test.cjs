@@ -5,29 +5,39 @@ const fs = require('node:fs');
 const os = require('node:os');
 const path = require('node:path');
 const { DatabaseSync } = require('node:sqlite');
+const { createHub } = require('./server.cjs');
+const { createOfflineSalesEngine } = require('./offline-sales.cjs');
 const { restoreToEmptyDirectory } = require('./restore.cjs');
 
-test('restore preserves all pending events and branch binding, never overwrites existing data', () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'branch-restore-'));
+test('restore preserves sale, journal, stock and outbox; refuses accounting damage', async () => {
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'branch-restore-'));
+ const config={dataDir:path.join(root,'source'),organizationId:'org_001',branchId:'branch_001',token:'a'.repeat(40),port:0};
+ const hub=createHub(config);
+ let original;
+ try {
+  await hub.listen();
+  const engine=createOfflineSalesEngine(hub.db,'branch_001');
+  engine.setOpeningStock('sku',10,50);
+  engine.commitSale({key:'restore-sale-001',lines:[{sku:'sku',quantity:2,priceMinor:100}]});
+  original=path.join(config.dataDir,'backups',hub.createLocalBackup().filename);
+ } finally { await hub.close(); }
+ try {
+  const args={backupPath:original,dataDir:path.join(root,'fresh'),organizationId:'org_001',branchId:'branch_001'};
+  assert.throws(()=>restoreToEmptyDirectory({...args,organizationId:'other_org'}),/BINDING_MISMATCH/);
+  const result=restoreToEmptyDirectory(args);
+  assert.equal(result.offlineSales,1);assert.equal(result.offlinePending,1);
+  const db=new DatabaseSync(result.destination);
   try {
-    const original = path.join(root, 'snapshot.sqlite');
-    const db = new DatabaseSync(original);
-    db.exec("CREATE TABLE hub_identity(singleton INTEGER PRIMARY KEY, organization_id TEXT, branch_id TEXT); INSERT INTO hub_identity VALUES(1,'org_001','branch_001');");
-    db.exec("CREATE TABLE local_receipts(id TEXT); INSERT INTO local_receipts VALUES('r1');");
-    db.exec("CREATE TABLE sync_outbox(status TEXT); INSERT INTO sync_outbox VALUES('pending');");
-    db.exec("CREATE TABLE jobs(id TEXT); INSERT INTO jobs VALUES('j1');");
-    db.close();
-    const destination = path.join(root, 'fresh');
-    assert.throws(() => restoreToEmptyDirectory({ backupPath:original, dataDir:destination, organizationId:'org_wrong', branchId:'branch_001' }), /BACKUP_BRANCH_BINDING_MISMATCH/);
-    assert.equal(fs.existsSync(destination), false);
-    const result = restoreToEmptyDirectory({ backupPath:original, dataDir:destination, organizationId:'org_001', branchId:'branch_001' });
-    assert.equal(result.receipts, 1);
-    assert.equal(result.pending, 1);
-    const restored = new DatabaseSync(result.destination, { readOnly:true });
-    try { assert.equal(restored.prepare('SELECT branch_id FROM hub_identity').get().branch_id, 'branch_001'); }
-    finally { restored.close(); }
-    assert.throws(() => restoreToEmptyDirectory({ backupPath:original, dataDir:destination, organizationId:'org_001', branchId:'branch_001' }), /RESTORE_TARGET_NOT_EMPTY/);
-  } finally { fs.rmSync(root, { recursive:true, force:true }); }
+   assert.equal(db.prepare('SELECT quantity FROM offline_stock').get().quantity,8);
+   assert.equal(db.prepare('SELECT sum(debit_minor)-sum(credit_minor) n FROM offline_journal').get().n,0);
+  } finally {db.close();}
+  assert.throws(()=>restoreToEmptyDirectory(args),/NOT_EMPTY/);
+  const damaged=path.join(root,'damaged.sqlite');fs.copyFileSync(original,damaged);
+  const bad=new DatabaseSync(damaged);
+  bad.exec('DELETE FROM offline_outbox');bad.close();
+  assert.throws(()=>restoreToEmptyDirectory({...args,backupPath:damaged,dataDir:path.join(root,'bad-target')}),/ACCOUNTING_INTEGRITY_FAILED/);
+  assert.equal(fs.existsSync(path.join(root,'bad-target')),false);
+ } finally { fs.rmSync(root,{recursive:true,force:true}); }
 });
 
 test('corrupt database cannot be restored', () => {

@@ -6,6 +6,7 @@ const http = require('node:http');
 const https = require('node:https');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const { validateRecoveryDatabase } = require('./recovery-validation.cjs');
 const { createOfflineSalesEngine } = require('./offline-sales.cjs');
 
 function createHub(config = {}) {
@@ -81,11 +82,10 @@ function createHub(config = {}) {
     try {
       const check = new DatabaseSync(destination, { readOnly: true });
       try {
-        const outcome = check.prepare('PRAGMA quick_check').all();
-        const identityCheck = check.prepare('SELECT organization_id,branch_id FROM hub_identity WHERE singleton=1').get();
-        if (outcome.length !== 1 || outcome[0].quick_check !== 'ok' ||
-          identityCheck?.organization_id !== organizationId || identityCheck?.branch_id !== branchId)
-          throw Error('BACKUP_VERIFICATION_FAILED');
+        validateRecoveryDatabase(check, organizationId, branchId);
+        fs.chmodSync(destination, 0o600);
+        const fd = fs.openSync(destination, 'r');
+        try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
       } finally { check.close(); }
     } catch (error) { fs.rmSync(destination, { force:true }); throw error; }
     return { filename, bytes:fs.statSync(destination).size };

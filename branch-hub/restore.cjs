@@ -6,23 +6,14 @@ const path = require('node:path');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 
+const { validateRecoveryDatabase } = require('./recovery-validation.cjs');
 function validateBackup(source, organizationId, branchId) {
+  // Recovery accepts standalone snapshots, never a live WAL database with uncheckpointed data.
+  if (fs.existsSync(source + '-wal') && fs.statSync(source + '-wal').size > 0)
+    throw Error('BACKUP_HAS_ACTIVE_WAL');
   const db = new DatabaseSync(source, { readOnly: true });
-  try {
-    const check = db.prepare('PRAGMA integrity_check').all();
-    if (check.length !== 1 || check[0].integrity_check !== 'ok') throw Error('BACKUP_INTEGRITY_FAILED');
-    const binding = db.prepare('SELECT organization_id, branch_id FROM hub_identity WHERE singleton=1').get();
-    if (!binding || binding.organization_id !== organizationId || binding.branch_id !== branchId)
-      throw Error('BACKUP_BRANCH_BINDING_MISMATCH');
-    for (const table of ['local_receipts', 'sync_outbox', 'jobs']) {
-      const found = db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table);
-      if (!found) throw Error('BACKUP_MISSING_TABLE: ' + table);
-    }
-    return {
-      receipts: db.prepare('SELECT count(*) AS n FROM local_receipts').get().n,
-      pending: db.prepare("SELECT count(*) AS n FROM sync_outbox WHERE status='pending'").get().n,
-    };
-  } finally { db.close(); }
+  try { return validateRecoveryDatabase(db, organizationId, branchId); }
+  finally { db.close(); }
 }
 
 function restoreToEmptyDirectory({ backupPath, dataDir, organizationId, branchId }) {
@@ -35,14 +26,16 @@ function restoreToEmptyDirectory({ backupPath, dataDir, organizationId, branchId
       throw Error('INVALID_TARGET_DIRECTORY');
     if (fs.readdirSync(targetDir).length !== 0) throw Error('RESTORE_TARGET_NOT_EMPTY');
   }
-  const summary = validateBackup(source, organizationId, branchId);
+  validateBackup(source, organizationId, branchId);
   fs.mkdirSync(targetDir, { recursive: true, mode: 0o700 });
   const destination = path.join(targetDir, 'branch-hub.sqlite');
   const temporary = path.join(targetDir, '.restore-' + crypto.randomUUID() + '.sqlite');
   try {
     fs.copyFileSync(source, temporary, fs.constants.COPYFILE_EXCL);
     fs.chmodSync(temporary, 0o600);
-    validateBackup(temporary, organizationId, branchId);
+    const summary = validateBackup(temporary, organizationId, branchId);
+    const fd = fs.openSync(temporary, 'r');
+    try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
     // Exclusive create prevents accidentally replacing an existing DB.
     fs.copyFileSync(temporary, destination, fs.constants.COPYFILE_EXCL);
     fs.chmodSync(destination, 0o600);
