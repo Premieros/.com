@@ -14,9 +14,11 @@ function createHub(config = {}) {
   const certFile = config.tlsCert || process.env.BRANCH_HUB_TLS_CERT;
   const token = config.token || process.env.BRANCH_HUB_TOKEN;
   const branchId = config.branchId || process.env.BRANCH_HUB_BRANCH_ID;
+  const organizationId = config.organizationId || process.env.BRANCH_HUB_ORGANIZATION_ID;
   if (!Number.isInteger(port) || port < 0 || port > 65535) throw Error('INVALID_PORT');
   if (!branchId || !/^[a-zA-Z0-9_-]{3,80}$/.test(branchId)) throw Error('BRANCH_ID_REQUIRED');
   if (!token || token.length < 32) throw Error('SECURE_BRANCH_TOKEN_REQUIRED');
+  if (!organizationId || !/^[a-zA-Z0-9_-]{3,80}$/.test(organizationId)) throw Error('ORGANIZATION_ID_REQUIRED');
   // A LAN port MUST be encrypted. Plain HTTP is loopback-only for developer diagnostics.
   if (host !== '127.0.0.1' && host !== '::1' && (!keyFile || !certFile)) {
     throw Error('LAN_REQUIRES_TLS_CERTIFICATE');
@@ -27,6 +29,13 @@ function createHub(config = {}) {
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(path.join(dir, 'branch-hub.sqlite'));
   db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
+  db.exec('CREATE TABLE IF NOT EXISTS hub_identity (singleton INTEGER PRIMARY KEY CHECK(singleton=1), organization_id TEXT NOT NULL, branch_id TEXT NOT NULL, installed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)');
+  const identity = db.prepare('SELECT organization_id, branch_id FROM hub_identity WHERE singleton=1').get();
+  if (identity && (identity.branch_id !== branchId || identity.organization_id !== organizationId)) {
+    db.close();
+    throw Error('BRANCH_BINDING_MISMATCH: existing local database belongs to another branch or organization');
+  }
+  if (!identity) db.prepare('INSERT INTO hub_identity(singleton, organization_id, branch_id) VALUES(1,?,?)').run(organizationId,branchId);
   db.exec(`CREATE TABLE IF NOT EXISTS jobs (
     id TEXT PRIMARY KEY,
     branch_id TEXT NOT NULL,
@@ -62,6 +71,7 @@ function createHub(config = {}) {
           if (Buffer.byteLength(body) > 65536) return send(res, 413, { error: 'PAYLOAD_TOO_LARGE' });
         }
         const item = JSON.parse(body);
+        if (item.branchId !== branchId || item.organizationId !== organizationId) return send(res, 403, { error: 'BRANCH_SCOPE_MISMATCH' });
         if (item.kind !== 'print' || typeof item.idempotencyKey !== 'string' || item.idempotencyKey.length < 8 ||
             item.idempotencyKey.length > 160 || !item.payload || typeof item.payload !== 'object' || Array.isArray(item.payload)) {
           return send(res, 400, { error: 'INVALID_JOB' });
