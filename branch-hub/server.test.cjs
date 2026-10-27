@@ -52,3 +52,27 @@ test('refuses switching a persisted branch database to another branch or organiz
   assert.throws(()=>createHub({...base,organizationId:'org_002'}),/BRANCH_BINDING_MISMATCH/);
  } finally {fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('receipt draft is stored atomically, deduplicated and queued across restarts', async () => {
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'premier-receipt-'));
+ const config={host:'127.0.0.1',port:0,branchId:'branch_001',organizationId:'org_001',token,dataDir:dir};
+ let hub=createHub(config);
+ const item={organizationId:'org_001',branchId:'branch_001',deviceId:'cashier_01',idempotencyKey:'sale-receipt-001',totalMinor:1250,currency:'EGP',receipt:{description:'test'}};
+ try {
+  let {port}=await hub.listen();
+  const first=await request(port,'POST','/api/v1/receipts',item,token);
+  assert.equal(first.status,201);
+  const duplicate=await request(port,'POST','/api/v1/receipts',item,token);
+  assert.equal(duplicate.status,200);
+  assert.equal(duplicate.data.receiptId,first.data.receiptId);
+  const conflict=await request(port,'POST','/api/v1/receipts',{...item,totalMinor:1251},token);
+  assert.equal(conflict.status,409);
+  const cross=await request(port,'POST','/api/v1/receipts',{...item,branchId:'branch_002'},token);
+  assert.equal(cross.status,403);
+  assert.equal((await request(port,'GET','/api/v1/sync/status',null,token)).data.pending,1);
+  await hub.close();hub=null;
+  hub=createHub(config);({port}=await hub.listen());
+  assert.equal((await request(port,'GET','/api/v1/receipts',null,token)).data.receipts.length,1);
+  assert.equal((await request(port,'GET','/api/v1/sync/status',null,token)).data.pending,1);
+ } finally {if(hub)await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
+});
