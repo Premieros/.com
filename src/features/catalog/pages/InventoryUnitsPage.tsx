@@ -195,7 +195,7 @@ export function InventoryUnitsPage() {
     <DesignSurface testId="inventory-units-page">
       <DesignPageHeader
         title={isAr ? 'مجموعات المكونات' : 'Component Groups'}
-        subtitle={isAr ? 'مجموعات خامات مسماة قابلة لإعادة الاستخدام داخل أكثر من منتج، بدون خطوة تصنيع' : 'Reusable named raw-material groups used by products, with no production step'}
+        subtitle={isAr ? 'وحدات مصنّعة ومكوناتها لإدارة المخزون والإنتاج' : 'Manufactured units and their components for stock and production management'}
         actions={can('raw_materials.manage') ? <Button size="sm" onClick={openAdd} data-testid="inventory-units-add"><Plus className="w-4 h-4" /> {isAr ? 'إضافة مجموعة' : 'Add component group'}</Button> : undefined}
       />
       <DesignPanel testId="inventory-units-table-panel">
