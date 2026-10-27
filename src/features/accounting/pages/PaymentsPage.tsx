@@ -236,7 +236,7 @@ export function PaymentsPage() {
     { key: 'bucket_31_60', header: t('days60'), render: (r) => formatCurrency(r.bucket_31_60, currency, lang) },
     { key: 'bucket_61_90', header: t('days90'), render: (r) => formatCurrency(r.bucket_61_90, currency, lang) },
     { key: 'bucket_90_plus', header: t('days90Plus'), render: (r) => <span className={r.bucket_90_plus > 0 ? 'text-ui-danger font-semibold' : ''}>{formatCurrency(r.bucket_90_plus, currency, lang)}</span> },
-    { key: 'actions', header: t('actions'), render: (r) => can('sales.payment.receive') ? <Button size="sm" onClick={() => openCollect(r)}><HandCoins className="w-4 h-4" /> {t('collect')}</Button> },
+    { key: 'actions', header: t('actions'), render: (r) => can('sales.payment.receive') ? <Button size="sm" onClick={() => openCollect(r)}><HandCoins className="w-4 h-4" /> {t('collect')}</Button> : null },
   ];
 
   const apColumns: Column<ScopedApAgingRow>[] = [
@@ -247,7 +247,7 @@ export function PaymentsPage() {
     { key: 'bucket_31_60', header: t('days60'), render: (r) => formatCurrency(r.bucket_31_60, currency, lang) },
     { key: 'bucket_61_90', header: t('days90'), render: (r) => formatCurrency(r.bucket_61_90, currency, lang) },
     { key: 'bucket_90_plus', header: t('days90Plus'), render: (r) => <span className={r.bucket_90_plus > 0 ? 'text-ui-danger font-semibold' : ''}>{formatCurrency(r.bucket_90_plus, currency, lang)}</span> },
-    { key: 'actions', header: t('actions'), render: (r) => <Button size="sm" onClick={() => openPay(r)}><HandCoins className="w-4 h-4" /> {t('paySupplier')}</Button> },
+    { key: 'actions', header: t('actions'), render: (r) => can('procurement.payment.create') ? <Button size="sm" onClick={() => openPay(r)}><HandCoins className="w-4 h-4" /> {t('paySupplier')}</Button> : null },
   ];
 
   const paymentColumns: Column<CustomerPayment>[] = [
