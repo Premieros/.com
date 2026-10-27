@@ -195,6 +195,13 @@ function createHub(config = {}) {
       const counts = db.prepare("SELECT (SELECT count(*) FROM local_receipts WHERE branch_id=?) AS receipts, (SELECT count(*) FROM sync_outbox WHERE branch_id=?) AS outbox").get(branchId,branchId);
       return send(res,200,{ ok:integrity.length===1 && integrity[0].quick_check==='ok' && orphaned===0, orphaned, ...counts });
     }
+    if (pathname === '/api/v1/offline/integrity' && req.method === 'GET') {
+      const check=db.prepare('PRAGMA quick_check').get();
+      const missingOutbox=db.prepare("SELECT count(*) AS n FROM offline_sales s LEFT JOIN offline_outbox o ON o.sale_id=s.id AND o.branch_id=s.branch_id WHERE s.branch_id=? AND o.event_id IS NULL").get(branchId).n;
+      const unbalanced=db.prepare("SELECT count(*) AS n FROM (SELECT s.id FROM offline_sales s LEFT JOIN offline_journal j ON j.sale_id=s.id WHERE s.branch_id=? GROUP BY s.id HAVING COALESCE(SUM(j.debit_minor),0) != COALESCE(SUM(j.credit_minor),0) OR COUNT(j.sale_id)=0)").get(branchId).n;
+      const missingMovements=db.prepare("SELECT count(*) AS n FROM offline_sale_lines l JOIN offline_sales s ON s.id=l.sale_id LEFT JOIN offline_stock_movements m ON m.sale_id=l.sale_id AND m.sku=l.sku AND m.branch_id=s.branch_id WHERE s.branch_id=? AND (m.id IS NULL OR m.delta != -l.quantity)").get(branchId).n;
+      return send(res,200,{ok:check.quick_check==='ok' && missingOutbox===0 && unbalanced===0 && missingMovements===0,missingOutbox,unbalanced,missingMovements});
+    }
     if (pathname === '/api/v1/sync/status' && req.method === 'GET') {
       const row=db.prepare("SELECT count(*) pending FROM sync_outbox WHERE branch_id=? AND status='pending'").get(branchId);
       return send(res,200,{ pending:row.pending, onlineSyncImplemented:false });
