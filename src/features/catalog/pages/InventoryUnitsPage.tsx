@@ -169,13 +169,30 @@ export function InventoryUnitsPage() {
   };
 
   const remove = async () => {
-    if (!deleteId) return;
-    const { error } = await supabase.from('inventory_units').delete().eq('id', deleteId);
-    if (error) show(error.message, 'error');
-    else { show(t('deleteSuccess'), 'success'); await logAudit('delete', 'inventory_units', deleteId); }
+    if (!deleteId || !can('raw_materials.manage')) return;
+    const id = deleteId;
+    const { error } = await supabase.from('inventory_units').delete().eq('id', id);
+    if (error?.code === '23503') {
+      // Referenced records cannot be erased: archive from operational selection
+      // while retaining historical orders, stock movements and audit trails.
+      const { error: archiveError } = await supabase.from('inventory_units')
+        .update({ is_active: false }).eq('id', id);
+      if (archiveError) {
+        show(archiveError.message, 'error');
+      } else {
+        show(isAr ? 'الصنف مرتبط بعمليات سابقة؛ تم تعطيله مع الاحتفاظ بسجلاته.' : 'Used in historical records; deactivated instead of deleting.', 'success');
+        await logAudit('update', 'inventory_units', id, { is_active: false, reason: 'referenced_record_archived' });
+      }
+    } else if (error) {
+      show(error.message, 'error');
+    } else {
+      show(t('deleteSuccess'), 'success');
+      await logAudit('delete', 'inventory_units', id);
+    }
     setDeleteId(null);
+    
     reloadItems();
-  };
+  }
 
   const columns: Column<InventoryUnit>[] = [
     { key: 'code', header: t('code'), render: (unit) => <span className="font-mono text-sm">{unit.code}</span> },
