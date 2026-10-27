@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Download, TrendingUp, ShoppingCart, Receipt, Package, BarChart3, CreditCard, Users, List, Layers, AlertTriangle, FileDown, Printer, UserCheck, RotateCcw, Trash2 } from 'lucide-react';
-import { costing, reporting } from '@/api';
+import { costing, reporting, supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { PageHeader, Card } from '@/components/PageHeader';
 import { Button } from '@/components/Button';
@@ -892,27 +892,43 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
           count: rows.length,
         });
       } else if (reportType === 'raw_material_current_cost') {
-        const targetBranches = reportBranches;
-        const results = await Promise.all(targetBranches.map(async (branch) => {
-          const result = await reporting.getCurrentRawMaterialValuation({ p_branch_id: branch.id });
-          if (result.error) throw result.error;
-          return { branchId: branch.id, rows: Array.isArray(result.data) ? result.data as Record<string, unknown>[] : [] };
+        // A single operational source: signed warehouse balances + published current cost.
+        // Do not display FIFO-derived figures alongside canonical current cost.
+        const allRows: Record<string, unknown>[] = [];
+        for (const branch of reportBranches) {
+          for (let from = 0; ; from += 1000) {
+            const { data, error } = await supabase.from('v_current_stock_position')
+              .select('item_id,item_name,branch_id,warehouse_id,quantity,unit_cost,current_stock_value,cost_source')
+              .eq('branch_id', branch.id).eq('item_type', 'raw')
+              .range(from, from + 999);
+            if (error) throw error;
+            const batch = (data || []) as Record<string, unknown>[];
+            allRows.push(...batch);
+            if (batch.length < 1000) break;
+          }
+        }
+        const grouped = new Map<string, { branchId: string; name: string; quantity: number; value: number; unitCost: number; source: string }>();
+        for (const r of allRows) {
+          const key = String(r.branch_id) + ':' + String(r.item_id);
+          const item = grouped.get(key) || {
+            branchId: String(r.branch_id), name: String(r.item_name || ''),
+            quantity: 0, value: 0, unitCost: Number(r.unit_cost || 0), source: String(r.cost_source || ''),
+          };
+          item.quantity += Number(r.quantity || 0);
+          item.value += Number(r.current_stock_value || 0);
+          grouped.set(key, item);
+        }
+        const rows = [...grouped.values()].map(item => withBranch(item.branchId, {
+          [lang === 'ar' ? 'الخامة' : 'Raw Material']: item.name,
+          [lang === 'ar' ? 'الكمية الحالية' : 'Current Qty']: item.quantity,
+          [lang === 'ar' ? 'تكلفة الوحدة المعتمدة' : 'Canonical Unit Cost']: item.unitCost,
+          [lang === 'ar' ? 'قيمة المخزون الحالية' : 'Current Inventory Value']: item.value,
+          [lang === 'ar' ? 'مصدر التكلفة' : 'Cost Source']: item.source,
         }));
-        const rows = results.flatMap(({ branchId, rows: rawRows }) => rawRows.map((row) => withBranch(branchId, {
-          [lang === 'ar' ? 'الخامة' : 'Raw Material']: row.raw_material_name || '-',
-          [lang === 'ar' ? 'الكود' : 'Code']: row.raw_material_code || '',
-          [lang === 'ar' ? 'الوحدة' : 'Unit']: row.unit_name || '',
-          [lang === 'ar' ? 'الكمية الحالية' : 'Current Qty']: Number(row.current_quantity || 0),
-          [lang === 'ar' ? 'سعر الخامة المعتمد (مركز التكلفة)' : 'Canonical Raw Cost (Costing Center)']: Number(row.latest_authoritative_cost || 0),
-          [lang === 'ar' ? 'متوسط تكلفة المخزون المتبقي FIFO' : 'Remaining Inventory FIFO Average Cost']: Number(row.fifo_current_unit_cost || 0),
-          [lang === 'ar' ? 'قيمة المخزون الحالية' : 'Current Inventory Value']: Number(row.current_inventory_value || 0),
-          [lang === 'ar' ? 'مصدر السعر' : 'Price Source']: row.price_source || '',
-          [lang === 'ar' ? 'طبقات FIFO المفتوحة' : 'Open FIFO Batches']: Number(row.open_fifo_batches || 0),
-        })));
         setData(rows);
         setChartData([]);
         setSummary({
-          total: rows.reduce((sum, row) => sum + Number(row[lang === 'ar' ? 'قيمة المخزون الحالية' : 'Current Inventory Value'] || 0), 0),
+          total: [...grouped.values()].reduce((sum, row) => sum + row.value, 0),
           count: rows.length,
         });
       } else if (reportType === 'raw_material_financial') {
