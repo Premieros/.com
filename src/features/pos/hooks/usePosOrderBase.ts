@@ -235,7 +235,8 @@ export function usePosOrder(input: UsePosOrderInput) {
       : Math.max(0, stock - otherQty);
     if (qty > maxForLine) { show(`${t('insufficientStock')} (${stock})`, 'error'); qty = maxForLine; }
     setCart((prev) => prev
-      .map((i) => cartLineKey(i) === lineKey ? { ...i, quantity: Math.max(1, qty) } : i));
+      .map((i) => cartLineKey(i) === lineKey ? { ...i, quantity: Math.max(0, qty) } : i)
+      .filter((i) => i.quantity > 0));
   }, [cart, getStock, isNegativeEligible, show, t]);
 
   const removeFromCart = useCallback((lineKey: string) => setCart((prev) => prev.filter((i) => cartLineKey(i) !== lineKey)), []);
