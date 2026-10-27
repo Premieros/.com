@@ -2,7 +2,7 @@ import React from 'react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Card } from '@/components/PageHeader';
 import { Input } from '@/components/Input';
-import { formatCurrency } from '@/lib/format';
+import { formatFinancialCurrency } from '@/lib/format';
 import type { Language } from '@/lib/types';
 import type { ReportFilterKey, ReportFilters } from './reportFilters';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
@@ -81,7 +81,7 @@ export function ReportFilterBar({
   const history = useHistoryAccess();
 
   return (
-    <Card className="ui-accent-system mb-3 border-ui-border bg-ui-surface p-3 shadow-ui-sm">
+    <Card className="ui-accent-system mb-2 border-ui-border bg-ui-surface p-2.5 shadow-ui-sm">
       <div className="hidden" aria-hidden="true">
         <select
           data-testid="report-type-select"
@@ -110,10 +110,11 @@ export function ReportFilterBar({
         ))}
       </div>
 
-      <div className="flex flex-col gap-3">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6">
+      <div className="flex flex-col gap-2">
+        <div className="flex items-center justify-between gap-2"><span className="text-xs font-bold text-ui-text">{lang === 'ar' ? 'الفترة والفلاتر' : 'Period & filters'}</span><span className="truncate text-[11px] text-ui-muted">{showDate ? `${from} — ${to}` : (lang === 'ar' ? 'بيانات حالية' : 'Current data')}</span></div>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
           {showDate && (
-            <div>
+            <div className="col-span-2 sm:col-span-1">
               <label className="mb-1 block text-xs font-medium text-ui-muted">{t('filterByPeriod')}</label>
               <select
                 data-testid="report-context-filter"
@@ -196,7 +197,7 @@ export function ReportFilterBar({
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <div className="rounded-lg border border-ui-border bg-ui-page-alt px-3 py-1.5">
               <span className="text-ui-muted">{t('total')}: </span>
-              <span className="font-extrabold tabular-nums text-ui-accent">{formatCurrency(total, currency, lang)}</span>
+              <span className="font-extrabold tabular-nums text-ui-accent">{formatFinancialCurrency(total, currency, lang)}</span>
             </div>
             <div className="rounded-lg border border-ui-border bg-ui-page-alt px-3 py-1.5">
               <span className="text-ui-muted">{t('count')}: </span>
