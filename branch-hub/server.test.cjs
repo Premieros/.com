@@ -222,3 +222,33 @@ test('offline integrity audit detects missing sync event and unbalanced journal'
   assert.equal(second.data.unbalanced,1);
  } finally {await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
 });
+
+test('paired devices keep least privilege across restart, audit actors, and revoke immediately', async()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'premier-devices-'));
+ const config={port:0,branchId:'branch_001',organizationId:'org_001',token,dataDir:dir};
+ let hub=createHub(config);
+ const scope={organizationId:'org_001',branchId:'branch_001'};
+ try {
+  let {port}=await hub.listen();
+  const cashier=await request(port,'POST','/api/v1/devices',{...scope,name:'Tablet 1',role:'cashier'},token);
+  const viewer=await request(port,'POST','/api/v1/devices',{...scope,name:'Viewer',role:'viewer'},token);
+  assert.equal(cashier.status,201);assert.equal(viewer.status,201);
+  const deviceToken=cashier.data.token;
+  assert.equal(hub.db.prepare('SELECT count(*) n FROM hub_devices WHERE token_hash=?').get(deviceToken).n,0);
+  const opening={...scope,sku:'sku',quantity:10,unitCostMinor:25};
+  assert.equal((await request(port,'POST','/api/v1/offline/stock/opening',opening,deviceToken)).status,403);
+  assert.equal((await request(port,'POST','/api/v1/offline/stock/opening',opening,token)).status,201);
+  const sale={...scope,key:'paired-sale-001',lines:[{sku:'sku',quantity:2,priceMinor:100}]};
+  assert.equal((await request(port,'POST','/api/v1/offline/sales',sale,viewer.data.token)).status,403);
+  const responses=await Promise.all(Array.from({length:10},()=>request(port,'POST','/api/v1/offline/sales',sale,deviceToken)));
+  assert.equal(responses.filter(x=>x.status===201).length,1);
+  assert.equal(responses.filter(x=>x.status===200).length,9);
+  assert.equal(hub.db.prepare("SELECT actor FROM hub_audit WHERE action='sale.commit'").get().actor,cashier.data.id);
+  assert.equal(hub.db.prepare("SELECT count(*) n FROM hub_audit WHERE action='sale.commit'").get().n,1);
+  assert.equal((await request(port,'GET','/api/v1/devices',null,deviceToken)).status,403);
+  await hub.close();hub=createHub(config);({port}=await hub.listen());
+  assert.equal((await request(port,'GET','/api/v1/offline/stock',null,deviceToken)).status,200);
+  assert.equal((await request(port,'DELETE','/api/v1/devices/'+cashier.data.id,null,token)).status,200);
+  assert.equal((await request(port,'GET','/api/v1/offline/stock',null,deviceToken)).status,401);
+ } finally {await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
+});

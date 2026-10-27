@@ -7,6 +7,8 @@ const https = require('node:https');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 const { validateRecoveryDatabase } = require('./recovery-validation.cjs');
+const { createPrintWorker } = require('./print-worker.cjs');
+const { createDeviceRegistry } = require('./devices.cjs');
 const { createOfflineSalesEngine } = require('./offline-sales.cjs');
 
 function createHub(config = {}) {
@@ -69,6 +71,10 @@ function createHub(config = {}) {
     status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','acknowledged')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );`);
+  const printerConfig = config.printers || {};
+  const printWorker = createPrintWorker(db, branchId, printerConfig);
+  if (Object.keys(printerConfig).length) printWorker.start();
+  const devices = createDeviceRegistry(db, branchId);
   const offlineSales = createOfflineSalesEngine(db, branchId);
   // SQLite VACUUM INTO creates a consistent snapshot even while WAL is enabled.
   // Backups stay on the server, never returned by the HTTP API.
@@ -102,7 +108,74 @@ function createHub(config = {}) {
   const handler = async (req, res) => {
     const pathname = new URL(req.url || '/', 'https://branch.local').pathname;
     if (pathname === '/health' && req.method === 'GET') return send(res, 200, { ok: true, service: 'premier-branch-hub', version: 1 });
-    if (!checkToken(req.headers.authorization)) return send(res, 401, { error: 'UNAUTHORIZED' });
+    const bearer = String(req.headers.authorization || '').replace(/^Bearer /i, '');
+    const principal = checkToken(req.headers.authorization)
+      ? {id:'administrator',admin:true,allows:()=>true} : devices.authenticate(bearer);
+    if (!principal) return send(res, 401, { error: 'UNAUTHORIZED' });
+    const adminPath = pathname.startsWith('/api/v1/devices') || pathname === '/api/v1/audit' ||
+      pathname === '/api/v1/backups' || pathname === '/api/v1/jobs' && req.method === 'POST' || pathname.endsWith('/retry') || pathname === '/api/v1/offline/stock/opening';
+    const permission = req.method === 'GET' ? 'read' :
+      pathname === '/api/v1/offline/sales' ? 'sell' :
+      pathname.startsWith('/api/v1/offline/sales/') && pathname.endsWith('/print') ? 'print' : 'admin';
+    if ((adminPath && !principal.admin) || (permission === 'admin' && !principal.admin) ||
+        (permission !== 'admin' && !principal.allows(permission))) return send(res,403,{error:'FORBIDDEN'});
+    if (pathname.startsWith('/api/v1/offline/sales/') && pathname.endsWith('/print') && req.method === 'POST') {
+      const saleId=pathname.slice('/api/v1/offline/sales/'.length,-'/print'.length);
+      const sale=db.prepare('SELECT id,total_minor FROM offline_sales WHERE branch_id=? AND id=?').get(branchId,saleId);
+      if(!sale)return send(res,404,{error:'SALE_NOT_FOUND'});
+      try {
+        let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>4096)return send(res,413,{error:'PAYLOAD_TOO_LARGE'});}
+        const input=JSON.parse(raw);
+        if(!Object.hasOwn(printerConfig,input.printerId))return send(res,400,{error:'PRINTER_NOT_CONFIGURED'});
+        const lines=db.prepare('SELECT sku,quantity,price_minor FROM offline_sale_lines WHERE sale_id=? ORDER BY rowid').all(saleId);
+        const text=['Premier', 'Sale: '+sale.id, ...lines.map(l=>`${l.sku} x ${l.quantity} @ ${l.price_minor}`), 'Total (minor units): '+sale.total_minor].join('\n');
+        const payload=JSON.stringify({printerId:input.printerId,text});
+        const key='sale-receipt:'+saleId;
+        db.exec('BEGIN IMMEDIATE');
+        let job;
+        try {
+          const id=crypto.randomUUID();
+          const result=db.prepare("INSERT OR IGNORE INTO jobs(id,branch_id,idempotency_key,kind,payload) VALUES(?,?,?,'print',?)").run(id,branchId,key,payload);
+          job=db.prepare('SELECT id,payload FROM jobs WHERE branch_id=? AND idempotency_key=?').get(branchId,key);
+          if(job.payload!==payload)throw Error('IDEMPOTENCY_CONFLICT');
+          if(result.changes)devices.audit(principal.id,'print.enqueue',job.id,{saleId});
+          db.exec('COMMIT');
+        }catch(e){db.exec('ROLLBACK');throw e;}
+        return send(res,202,{jobId:job.id});
+      }catch(e){return send(res,e.message==='IDEMPOTENCY_CONFLICT'?409:400,{error:'PRINT_REQUEST_REJECTED'});}
+    }
+    if (pathname.startsWith('/api/v1/jobs/') && pathname.endsWith('/retry') && req.method === 'POST') {
+      const id=pathname.slice('/api/v1/jobs/'.length,-'/retry'.length);
+      return send(res,printWorker.retryFailed(id)?200:409,{jobId:id});
+    }
+    if (pathname === '/api/v1/audit' && req.method === 'GET') {
+      return send(res,200,{events:db.prepare('SELECT actor,action,entity_id,details,created_at FROM hub_audit WHERE branch_id=? ORDER BY rowid DESC LIMIT 200').all(branchId)});
+    }
+    if (pathname === '/api/v1/devices' && req.method === 'GET') {
+      return send(res,200,{devices:db.prepare('SELECT id,name,role,revoked,created_at FROM hub_devices WHERE branch_id=? ORDER BY rowid').all(branchId)});
+    }
+    if (pathname.startsWith('/api/v1/devices/') && req.method === 'DELETE') {
+      return send(res,devices.revoke(pathname.slice('/api/v1/devices/'.length))?200:404,{ok:true});
+    }
+    if (pathname === '/api/v1/backups' && req.method === 'POST') {
+      try { return send(res,201,createLocalBackup()); }
+      catch { return send(res,500,{error:'BACKUP_FAILED'}); }
+    }
+    if ((pathname === '/api/v1/devices' || pathname === '/api/v1/offline/stock/opening') && req.method === 'POST') {
+      try {
+        let raw='';
+        for await(const chunk of req) {raw+=chunk;if(Buffer.byteLength(raw)>65536)return send(res,413,{error:'PAYLOAD_TOO_LARGE'});}
+        const input=JSON.parse(raw);
+        if(input.organizationId!==organizationId || input.branchId!==branchId) return send(res,403,{error:'BRANCH_SCOPE_MISMATCH'});
+        if(pathname === '/api/v1/devices') return send(res,201,devices.issue(input));
+        offlineSales.setOpeningStock(input.sku,input.quantity,input.unitCostMinor,principal.id);
+        return send(res,201,{ok:true});
+      } catch { return send(res,400,{error:'INVALID_REQUEST'}); }
+    }
+    if (pathname === '/api/v1/offline/journal' && req.method === 'GET') {
+      return send(res,200,{entries:db.prepare(`SELECT j.*,s.created_at FROM offline_journal j
+        JOIN offline_sales s ON s.id=j.sale_id WHERE s.branch_id=? ORDER BY s.rowid DESC,j.rowid LIMIT 500`).all(branchId)});
+    }
     if (pathname === '/api/v1/offline/sync/pending' && req.method === 'GET') {
       // Local offline-sale outbox is read-only until a verified, idempotent cloud ACK protocol exists.
       const events=db.prepare("SELECT event_id,sale_id,payload FROM offline_outbox WHERE branch_id=? AND status='pending' ORDER BY rowid LIMIT 100").all(branchId);
@@ -134,7 +207,7 @@ function createHub(config = {}) {
         const input=JSON.parse(body);
         if(input.organizationId!==organizationId || input.branchId!==branchId)
           return send(res,403,{error:'BRANCH_SCOPE_MISMATCH'});
-        const result=offlineSales.commitSale(input);
+        const result=offlineSales.commitSale({...input,actor:principal.id});
         return send(res,result.duplicate?200:201,result);
       } catch(error) {
         if(error.message==='IDEMPOTENCY_CONFLICT') return send(res,409,{error:error.message});
@@ -207,7 +280,7 @@ function createHub(config = {}) {
       return send(res,200,{ pending:row.pending, onlineSyncImplemented:false });
     }
     if (pathname === '/api/v1/jobs' && req.method === 'GET') {
-      const jobs = db.prepare('SELECT id,kind,status,created_at FROM jobs WHERE branch_id=? ORDER BY created_at DESC LIMIT 100').all(branchId);
+      const jobs = db.prepare(`SELECT j.id,j.kind,j.status,j.created_at,d.state AS delivery_state,d.error,d.attempts FROM jobs j LEFT JOIN print_dispatches d ON d.job_id=j.id WHERE j.branch_id=? ORDER BY j.rowid DESC LIMIT 100`).all(branchId);
       return send(res, 200, { jobs });
     }
     if (pathname === '/api/v1/jobs' && req.method === 'POST') {
@@ -237,8 +310,8 @@ function createHub(config = {}) {
   const server = keyFile && certFile
     ? https.createServer({ key: fs.readFileSync(keyFile), cert: fs.readFileSync(certFile) }, handler)
     : http.createServer(handler);
-  return { server, db, createLocalBackup, listen: () => new Promise(resolve => server.listen(port, host, () => resolve(server.address()))),
-    close: () => new Promise(resolve => server.close(() => { db.close(); resolve(); })) };
+  return { server, db, createLocalBackup, printWorker, listen: () => new Promise(resolve => server.listen(port, host, () => resolve(server.address()))),
+    close: async () => { await printWorker.stop(); return new Promise(resolve => server.close(() => { db.close(); resolve(); })); } };
 }
 if (require.main === module) {
   const hub = createHub();

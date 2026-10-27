@@ -33,3 +33,17 @@ test('separate branch inventory cannot be consumed',()=>{
   assert.throws(()=>other.commitSale({key:'sale-12345678',lines:[{sku:'sku1',quantity:1,priceMinor:10}]}),/INSUFFICIENT_STOCK/);
  }finally{db.close();}
 });
+
+test('failure after stock debit rolls back sale, movement, ledger, audit and outbox',()=>{
+ const db=new DatabaseSync(':memory:');
+ try {
+  const engine=createOfflineSalesEngine(db,'branch_001');
+  engine.setOpeningStock('sku',4,10);
+  db.exec("CREATE TRIGGER fail_outbox BEFORE INSERT ON offline_outbox BEGIN SELECT RAISE(ABORT,'injected disk write failure'); END");
+  assert.throws(()=>engine.commitSale({key:'rollback-sale-001',lines:[{sku:'sku',quantity:1,priceMinor:25}]}),/injected/);
+  assert.equal(db.prepare('SELECT quantity FROM offline_stock').get().quantity,4);
+  for(const table of ['offline_sales','offline_sale_lines','offline_journal','offline_stock_movements','offline_outbox'])
+    assert.equal(db.prepare(`SELECT count(*) n FROM ${table}`).get().n,0);
+  assert.equal(db.prepare("SELECT count(*) n FROM hub_audit WHERE action='sale.commit'").get().n,0);
+ } finally {db.close();}
+});

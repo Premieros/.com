@@ -1,5 +1,6 @@
 'use strict';
 const crypto = require('node:crypto');
+const { createDeviceRegistry } = require('./devices.cjs');
 
 // Standalone, local-only atomic sales engine. Does not call Supabase.
 // All values are integer minor units; quantities are integer base units.
@@ -41,16 +42,23 @@ function createOfflineSalesEngine(db, branchId) {
       status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','acknowledged'))
     );
   `);
-  function setOpeningStock(sku, quantity, unitCostMinor) {
+  const {audit} = createDeviceRegistry(db, branchId);
+  function setOpeningStock(sku, quantity, unitCostMinor, actor='administrator') {
     if (!/^[a-zA-Z0-9_.-]{1,80}$/.test(sku) ||
       !Number.isSafeInteger(quantity) || quantity<0 ||
       !Number.isSafeInteger(unitCostMinor) || unitCostMinor<0)
       throw Error('INVALID_OPENING_STOCK');
     // Only allow initialization, never use this path to adjust existing balances.
-    db.prepare('INSERT INTO offline_stock(branch_id,sku,quantity,unit_cost_minor) VALUES(?,?,?,?)')
-      .run(branchId,sku,quantity,unitCostMinor);
+    db.exec('BEGIN IMMEDIATE');
+    try {
+      db.prepare('INSERT INTO offline_stock(branch_id,sku,quantity,unit_cost_minor) VALUES(?,?,?,?)')
+        .run(branchId,sku,quantity,unitCostMinor);
+      audit(actor,'stock.opening',sku,{quantity,unitCostMinor});
+      db.exec('COMMIT');
+    } catch(error) {db.exec('ROLLBACK');throw error;}
   }
-  function commitSale({key,lines,paymentAccount='cash'}) {
+
+  function commitSale({key,lines,paymentAccount='cash',actor='administrator'}) {
     if (typeof key!=='string' || key.length<8 || key.length>160 ||
       !['cash','bank'].includes(paymentAccount) || !Array.isArray(lines) ||
       lines.length===0 || lines.length>100) throw Error('INVALID_SALE');
@@ -101,6 +109,9 @@ function createOfflineSalesEngine(db, branchId) {
       if(cost>0){entry.run(id,'cost_of_goods_sold',cost,0);entry.run(id,'inventory',0,cost);}
       db.prepare('INSERT INTO offline_outbox(event_id,sale_id,branch_id,payload) VALUES(?,?,?,?)')
         .run(id,id,branchId,JSON.stringify({saleId:id,branchId,key,totalMinor:total,lines:costing,paymentAccount}));
+      const balance=db.prepare('SELECT sum(debit_minor)-sum(credit_minor) n FROM offline_journal WHERE sale_id=?').get(id).n;
+      if(balance!==0) throw Error('UNBALANCED_JOURNAL');
+      audit(actor,'sale.commit',id,{key,totalMinor:total});
       db.exec('COMMIT');
       return {saleId:id,totalMinor:total,duplicate:false};
     } catch(error) {db.exec('ROLLBACK');throw error;}
