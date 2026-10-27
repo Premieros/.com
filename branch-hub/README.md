@@ -35,3 +35,11 @@ The `branch-hub/desktop.cjs` Electron shell is now packaged by `.github/workflow
 Developers may configure `branch-config.json` under Electron userData containing `organizationId`, `branchId`, and a 32+ character `token` for isolated lab testing only; this file is NOT a secure enrollment mechanism. Never ship it with production credentials.
 
 The new local receipt API stores **draft records, not approved/final sales**. Nothing here debits inventory, receives payments, posts ledger journals or performs cloud sync. No real sales should be made through the prototype.
+
+## Local database backup prototype
+
+The Branch Hub exposes a **server-side only** `createLocalBackup()` method using SQLite `VACUUM INTO`, then verifies `PRAGMA quick_check` and the embedded organization/branch identity. Backups live under the per-branch data folder in `backups/`, retain the pending sync outbox and do not acknowledge unsynced events.
+
+This is **not yet scheduled or off-machine backup**, nor encrypted backup, retention policy, or an administrator-approved restore workflow. The SQLite file may contain customer/transaction data: protect the Windows profile and backup folder and do not copy snapshots to shared/untrusted folders. Never overwrite a live DB while the server is running. Any restoration must verify that the target installation belongs to the same organization and branch.
+
+A Windows installer may be produced only after GitHub Actions succeeds; generating the artifact does not by itself make the prototype safe for real sales.
