@@ -162,7 +162,14 @@ export function PosWorkspacePage() {
       // The IndexedDB stock map is only an offline fallback, never an additional source to sum.
       const warehouseId = await fetchBranchWarehouseId(effectiveBranch, orderIdParam || null);
       if (!warehouseId) {
-        setLiveStockMap(await InventoryRepository.getBranchStockMap(effectiveBranch));
+        // An unresolved online warehouse must NOT expose branch-wide cached stock
+        // as sellable warehouse availability. Offline mode keeps its own verified
+        // warehouse/outbox checks in the payment service.
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          setLiveStockMap(await InventoryRepository.getBranchStockMap(effectiveBranch));
+        } else {
+          setLiveStockMap({});
+        }
         return;
       }
       const live: Record<string, number> = {};
