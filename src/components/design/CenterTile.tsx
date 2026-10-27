@@ -41,7 +41,7 @@ export function CenterTile({ item, testIdPrefix, inline = false, selected = fals
       to={inline ? `?page=${encodeURIComponent(item.route)}` : item.route}
       title={description || label}
       className={() =>
-        `inline-flex min-h-11 shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-xl border px-4 py-2.5 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-ring ${selected
+        `inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-ring ${selected
           ? 'border-ui-primary bg-ui-primary-soft text-ui-primary'
           : 'border-ui-border bg-ui-surface text-ui-text hover:border-ui-primary hover:bg-ui-page-alt'}`
       }
@@ -76,9 +76,9 @@ export function CenterGrid({ items, testIdPrefix }: CenterGridProps) {
     <nav
       aria-label={lang === 'ar' ? 'صفحات المركز' : 'Center pages'}
       data-testid={`${testIdPrefix}-navigation`}
-      className="w-full border-b border-ui-border bg-ui-surface p-2"
+      className="w-full border-b border-ui-border bg-ui-surface px-2 py-1.5"
     >
-      <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-1">
+      <div className="flex w-full flex-nowrap items-center gap-1.5 overflow-x-auto pb-0.5">
         {visibleItems.map(item => (
           <CenterTile key={item.id} item={item} selected={selected?.route === item.route} inline={!['/pos', '/inventory-center', '/procurement-center', '/finance', '/people', '/administration', '/operations'].includes(item.route)} testIdPrefix={testIdPrefix} />
         ))}
@@ -89,7 +89,7 @@ export function CenterGrid({ items, testIdPrefix }: CenterGridProps) {
         </p>
       )}
     </nav>
-    {selected && <section aria-label={lang === 'ar' ? 'محتوى الشاشة المحددة' : 'Selected page content'} className="min-w-0 px-3 pb-4 pt-3 sm:px-5"><EmbeddedCenterPage><CenterPageContent route={selected.route} /></EmbeddedCenterPage></section>}
+    {selected && <section aria-label={lang === 'ar' ? 'محتوى الشاشة المحددة' : 'Selected page content'} className="min-w-0 px-3 pb-3 pt-2 sm:px-4"><EmbeddedCenterPage><CenterPageContent route={selected.route} /></EmbeddedCenterPage></section>}
     </div>
   );
 }
