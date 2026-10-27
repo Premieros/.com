@@ -107,6 +107,10 @@ function createHub(config = {}) {
       const stock=db.prepare('SELECT sku,quantity,unit_cost_minor FROM offline_stock WHERE branch_id=? ORDER BY sku LIMIT 500').all(branchId);
       return send(res,200,{stock});
     }
+    if (pathname === '/api/v1/offline/stock/movements' && req.method === 'GET') {
+      const movements=db.prepare('SELECT id,sku,sale_id,delta,balance_after,created_at FROM offline_stock_movements WHERE branch_id=? ORDER BY created_at DESC,id DESC LIMIT 200').all(branchId);
+      return send(res,200,{movements});
+    }
     if (pathname === '/api/v1/offline/sales' && req.method === 'GET') {
       const sales=db.prepare('SELECT id,total_minor,created_at FROM offline_sales WHERE branch_id=? ORDER BY created_at DESC LIMIT 100').all(branchId);
       return send(res,200,{sales});
