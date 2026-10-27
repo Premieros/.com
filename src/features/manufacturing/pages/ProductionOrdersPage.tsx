@@ -24,21 +24,25 @@ export function ProductionOrdersPage() {
   const [productions, setProductions] = useState<Production[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [unitsError, setUnitsError] = useState('');
+  const [loadingUnits, setLoadingUnits] = useState(false);
   const [notice, setNotice] = useState('');
   const effectiveBranch = fixedBranch || branch;
   const load = useCallback(async () => {
     if (!effectiveBranch) { setProductions([]); setUnits([]); setWarehouses([]); return; }
+    setLoadingUnits(true);
     const [u,w,p] = await Promise.all([
       supabase.from('inventory_units').select('id,name,branch_id').eq('branch_id',effectiveBranch).eq('unit_type','manufactured').eq('is_active',true).order('name'),
       supabase.from('warehouses').select('id,name,branch_id').eq('branch_id',effectiveBranch).eq('is_active',true).order('name'),
       supabase.from('inventory_unit_productions').select('id,unit_id,branch_id,warehouse_id,quantity,status,total_cost,completed_at,created_at').eq('branch_id',effectiveBranch).order('created_at',{ascending:false}).limit(300),
     ]);
-    const failure=u.error||w.error||p.error;
-    if (failure) { setError(failure.message); return; }
+    // Catalog, warehouse and history are independent: inaccessible history must not hide selectable groups.
     setUnits((u.data||[]) as Item[]);
     setWarehouses((w.data||[]) as Item[]);
     setProductions((p.data||[]) as Production[]);
-    setError('');
+    setUnitsError(u.error?.message || '');
+    setError(w.error?.message || p.error?.message || '');
+    setLoadingUnits(false);
   },[effectiveBranch]);
   useEffect(()=>{void load();},[load]);
   const produce = async () => {
@@ -75,6 +79,8 @@ export function ProductionOrdersPage() {
         <button type="button" className="rounded-lg bg-blue-600 px-4 py-2 text-white disabled:opacity-50" disabled={busy||!effectiveBranch||!warehouse||!unit} onClick={()=>void produce()}>{busy?(ar?'جارٍ التنفيذ...':'Producing...'):(ar?'تنفيذ الإنتاج':'Complete production')}</button>
       </div>}
       {error&&<p role="alert" className="text-red-600">{error}</p>}
+      {unitsError&&<p role="alert" className="text-red-600">{ar?'تعذر تحميل مجموعات المكونات: ':'Could not load manufactured component groups: '}{unitsError}</p>}
+      {!loadingUnits && effectiveBranch && units.length===0 && !unitsError && <p role="status" className="text-amber-600">{ar?'لا توجد مجموعات مكونات ظاهرة في الفرع الحالي. تحقق من الفرع النشط وصلاحية قراءة مجموعات المكونات.':'No manufactured component groups are visible in the active branch. Check branch selection and catalog read access.'}</p>}
       {notice&&<p role="status" className="text-green-600">{notice}</p>}
       <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-ui-border">{[ar?'رقم العملية':'Production ID',ar?'المجموعة المصنّعة':'Manufactured group',ar?'المخزن':'Warehouse',ar?'الكمية':'Quantity',ar?'الحالة':'Status',ar?'تاريخ الإنتاج':'Completed at'].map(h=><th key={h} className="p-2 text-start">{h}</th>)}</tr></thead><tbody>{productions.map(p=><tr key={p.id} className="border-b border-ui-border"><td className="p-2">{p.id.slice(0,8)}</td><td className="p-2">{unitNames.get(p.unit_id)||p.unit_id}</td><td className="p-2">{warehouseNames.get(p.warehouse_id)||p.warehouse_id}</td><td className="p-2">{p.quantity}</td><td className="p-2">{p.status}</td><td className="p-2">{p.completed_at?new Date(p.completed_at).toLocaleString(ar?'ar-EG':'en-US'):'—'}</td></tr>)}</tbody></table>{!productions.length&&<p className="p-5 text-center text-ui-muted">{ar?'لا توجد عمليات إنتاج مسجلة للفرع':'No production records for this branch'}</p>}</div>
     </div>
