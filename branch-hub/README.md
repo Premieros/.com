@@ -59,3 +59,7 @@ The destination directory must be empty. Recovery verifies a full SQLite integri
 `offline-sales.cjs` now supplies a branch-scoped SQLite transaction engine for integer-unit stock, checkout idempotency, atomic stock consumption, a balanced four-line cost/revenue journal, and a pending offline outbox event. It rejects insufficient stock, mismatched idempotency payloads, numeric overflow and cross-branch stock access. Run `npm test` inside `branch-hub` to execute its regression tests.
 
 **Not wired into the HTTP API or UI yet.** Opening stock is an initial import-only operation and cannot modify existing balances. This kernel is not a full approved POS: returns, taxes, split tenders, permissions, actual FIFO/batch cost, real Supabase reconciliation, and complete posting into Premier accounting remain separate tasks. Do not process production sales using this module.
+
+### Local stock deduction audit
+
+Each committed offline sale now inserts one immutable (application-level) `offline_stock_movements` record per SKU in the same SQLite transaction as its stock deduction, journal, and outbox event. `GET /api/v1/offline/stock/movements` returns the latest 200 movements under branch authentication. An idempotent retry creates no second movement. Opening stock, returns, transfers, external replenishment and full stock reconciliation still need their own audited workflows; this read endpoint does not make the prototype production-ready.
