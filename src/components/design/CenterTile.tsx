@@ -1,5 +1,6 @@
 import { NavLink, useSearchParams } from 'react-router-dom';
 import { CenterPageContent } from './CenterPageContent';
+import { EmbeddedCenterPage } from './EmbeddedCenterPage';
 import { useLanguage } from '../../context/LanguageContext';
 import type { LucideIcon } from 'lucide-react';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
@@ -71,11 +72,11 @@ export function CenterGrid({ items, testIdPrefix }: CenterGridProps) {
   const firstEmbeddable = visibleItems.find(item => !['/pos', '/inventory-center', '/procurement-center', '/finance', '/people', '/administration', '/operations'].includes(item.route));
   const selected = visibleItems.find(item => item.route === selectedRoute) ?? firstEmbeddable;
   return (
-    <div className="space-y-5">
+    <div className="overflow-hidden rounded-2xl border border-ui-border bg-ui-surface shadow-ui-sm">
     <nav
       aria-label={lang === 'ar' ? 'صفحات المركز' : 'Center pages'}
       data-testid={`${testIdPrefix}-navigation`}
-      className="w-full rounded-2xl border border-ui-border bg-ui-surface p-2 shadow-ui-sm"
+      className="w-full border-b border-ui-border bg-ui-surface p-2"
     >
       <div className="flex w-full flex-nowrap items-center gap-2 overflow-x-auto pb-1">
         {visibleItems.map(item => (
@@ -88,7 +89,7 @@ export function CenterGrid({ items, testIdPrefix }: CenterGridProps) {
         </p>
       )}
     </nav>
-    {selected && <section aria-label={lang === 'ar' ? 'محتوى الشاشة المحددة' : 'Selected page content'} className="min-w-0"><CenterPageContent route={selected.route} /></section>}
+    {selected && <section aria-label={lang === 'ar' ? 'محتوى الشاشة المحددة' : 'Selected page content'} className="min-w-0 px-3 pb-4 pt-3 sm:px-5"><EmbeddedCenterPage><CenterPageContent route={selected.route} /></EmbeddedCenterPage></section>}
     </div>
   );
 }
