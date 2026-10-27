@@ -90,7 +90,7 @@ function createHub(config = {}) {
       try {
         validateRecoveryDatabase(check, organizationId, branchId);
         fs.chmodSync(destination, 0o600);
-        const fd = fs.openSync(destination, 'r');
+        const fd = fs.openSync(destination, 'r+');
         try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
       } finally { check.close(); }
     } catch (error) { fs.rmSync(destination, { force:true }); throw error; }

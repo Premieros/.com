@@ -34,10 +34,10 @@ function restoreToEmptyDirectory({ backupPath, dataDir, organizationId, branchId
     fs.copyFileSync(source, temporary, fs.constants.COPYFILE_EXCL);
     fs.chmodSync(temporary, 0o600);
     const summary = validateBackup(temporary, organizationId, branchId);
-    const fd = fs.openSync(temporary, 'r');
+    const fd = fs.openSync(temporary, 'r+');
     try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); }
     // Exclusive create prevents accidentally replacing an existing DB.
-    fs.copyFileSync(temporary, destination, fs.constants.COPYFILE_EXCL);
+    fs.linkSync(temporary, destination); // Atomic, exclusive publication of the already flushed file.
     fs.chmodSync(destination, 0o600);
     return { destination, ...summary };
   } finally { fs.rmSync(temporary, { force: true }); }
