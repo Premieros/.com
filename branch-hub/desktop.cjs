@@ -4,7 +4,7 @@ const { fork } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 let worker;
-if (!app.requestSingleInstanceLock()) { app.quit(); }
+if (!app.requestSingleInstanceLock()) { app.exit(0); }
 let activeWindow;
 function configPath() { return path.join(app.getPath('userData'), 'branch-config.json'); }
 function loadConfig() {

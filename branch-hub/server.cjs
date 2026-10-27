@@ -6,6 +6,7 @@ const http = require('node:http');
 const https = require('node:https');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const { auditOfflineSales } = require('./integrity.cjs');
 const { validateRecoveryDatabase } = require('./recovery-validation.cjs');
 const { createPrintWorker } = require('./print-worker.cjs');
 const { createDeviceRegistry } = require('./devices.cjs');
@@ -32,6 +33,7 @@ function createHub(config = {}) {
     path.join(process.env.APPDATA || path.join(os.homedir(), '.premieros'), 'PremierOS', 'BranchHub', branchId);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(path.join(dir, 'branch-hub.sqlite'));
+  if (db.prepare('PRAGMA user_version').get().user_version > 1) { db.close(); throw Error('UNSUPPORTED_DATABASE_VERSION'); }
   db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
   db.exec('CREATE TABLE IF NOT EXISTS hub_identity (singleton INTEGER PRIMARY KEY CHECK(singleton=1), organization_id TEXT NOT NULL, branch_id TEXT NOT NULL, installed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)');
   const identity = db.prepare('SELECT organization_id, branch_id FROM hub_identity WHERE singleton=1').get();
@@ -76,6 +78,7 @@ function createHub(config = {}) {
   if (Object.keys(printerConfig).length) printWorker.start();
   const devices = createDeviceRegistry(db, branchId);
   const offlineSales = createOfflineSalesEngine(db, branchId);
+  db.exec('PRAGMA user_version=1');
   // SQLite VACUUM INTO creates a consistent snapshot even while WAL is enabled.
   // Backups stay on the server, never returned by the HTTP API.
   function createLocalBackup() {
@@ -279,10 +282,8 @@ function createHub(config = {}) {
     }
     if (pathname === '/api/v1/offline/integrity' && req.method === 'GET') {
       const check=db.prepare('PRAGMA quick_check').get();
-      const missingOutbox=db.prepare("SELECT count(*) AS n FROM offline_sales s LEFT JOIN offline_outbox o ON o.sale_id=s.id AND o.branch_id=s.branch_id WHERE s.branch_id=? AND o.event_id IS NULL").get(branchId).n;
-      const unbalanced=db.prepare("SELECT count(*) AS n FROM (SELECT s.id FROM offline_sales s LEFT JOIN offline_journal j ON j.sale_id=s.id WHERE s.branch_id=? GROUP BY s.id HAVING COALESCE(SUM(j.debit_minor),0) != COALESCE(SUM(j.credit_minor),0) OR COUNT(j.sale_id)=0)").get(branchId).n;
-      const missingMovements=db.prepare("SELECT count(*) AS n FROM offline_sale_lines l JOIN offline_sales s ON s.id=l.sale_id LEFT JOIN offline_stock_movements m ON m.sale_id=l.sale_id AND m.sku=l.sku AND m.branch_id=s.branch_id WHERE s.branch_id=? AND (m.id IS NULL OR m.delta != -l.quantity)").get(branchId).n;
-      return send(res,200,{ok:check.quick_check==='ok' && missingOutbox===0 && unbalanced===0 && missingMovements===0,missingOutbox,unbalanced,missingMovements});
+      const audit=auditOfflineSales(db,branchId);
+      return send(res,200,{ok:check.quick_check==='ok' && Object.values(audit).every(n=>n===0),...audit});
     }
     if (pathname === '/api/v1/sync/status' && req.method === 'GET') {
       const row=db.prepare("SELECT count(*) pending FROM sync_outbox WHERE branch_id=? AND status='pending'").get(branchId);
@@ -324,6 +325,7 @@ function createHub(config = {}) {
 }
 if (require.main === module) {
   const hub = createHub();
+  if(process.send)process.once('disconnect',()=>hub.close().then(()=>process.exit(0)));
   hub.listen().then(addr => {
     console.log('Premier Branch Hub listening on', addr.address, addr.port);
     if(process.send)process.send({type:'ready',port:addr.port});

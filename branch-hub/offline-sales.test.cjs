@@ -47,3 +47,16 @@ test('failure after stock debit rolls back sale, movement, ledger, audit and out
   assert.equal(db.prepare("SELECT count(*) n FROM hub_audit WHERE action='sale.commit'").get().n,0);
  } finally {db.close();}
 });
+
+test('accounting audit rejects balanced but incorrect financial postings and altered sync payloads',()=>{
+ const {auditOfflineSales}=require('./integrity.cjs');
+ const db=new DatabaseSync(':memory:');
+ try {
+  const engine=createOfflineSalesEngine(db,'branch_001');engine.setOpeningStock('sku',3,10);
+  engine.commitSale({key:'posting-audit-001',lines:[{sku:'sku',quantity:1,priceMinor:100}]});
+  assert.equal(auditOfflineSales(db,'branch_001').invalidPostings,0);
+  db.exec("UPDATE offline_journal SET debit_minor=debit_minor+5 WHERE account='cash'; UPDATE offline_journal SET credit_minor=credit_minor+5 WHERE account='sales_revenue'");
+  const audit=auditOfflineSales(db,'branch_001');assert.equal(audit.unbalanced,0);assert.equal(audit.invalidPostings,1);
+  db.exec("UPDATE offline_outbox SET payload='{}'");assert.equal(auditOfflineSales(db,'branch_001').invalidEvents,1);
+ }finally{db.close();}
+});

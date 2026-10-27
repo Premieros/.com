@@ -1,0 +1,31 @@
+'use strict';
+// One accounting audit shared by recovery and the authenticated health API.
+function auditOfflineSales(db,branchId) {
+ const missingOutbox=db.prepare(`SELECT count(*) n FROM offline_sales s LEFT JOIN offline_outbox o
+  ON o.sale_id=s.id AND o.branch_id=s.branch_id WHERE s.branch_id=? AND o.event_id IS NULL`).get(branchId).n;
+ const unbalanced=db.prepare(`SELECT count(*) n FROM (SELECT s.id FROM offline_sales s
+  LEFT JOIN offline_journal j ON j.sale_id=s.id WHERE s.branch_id=? GROUP BY s.id
+  HAVING count(j.sale_id)=0 OR sum(j.debit_minor)!=sum(j.credit_minor))`).get(branchId).n;
+ const missingMovements=db.prepare(`SELECT count(*) n FROM offline_sale_lines l JOIN offline_sales s ON s.id=l.sale_id
+  LEFT JOIN offline_stock_movements m ON m.sale_id=s.id AND m.sku=l.sku AND m.branch_id=s.branch_id
+  WHERE s.branch_id=? AND (m.id IS NULL OR m.delta != -l.quantity)`).get(branchId).n;
+ const invalidPostings=db.prepare(`SELECT count(*) n FROM offline_sales s WHERE s.branch_id=? AND (
+  s.total_minor != COALESCE((SELECT sum(l.quantity*l.price_minor) FROM offline_sale_lines l WHERE l.sale_id=s.id),-1)
+  OR s.total_minor != COALESCE((SELECT sum(j.debit_minor) FROM offline_journal j WHERE j.sale_id=s.id AND j.account IN ('cash','bank')),0)
+  OR s.total_minor != COALESCE((SELECT sum(j.credit_minor) FROM offline_journal j WHERE j.sale_id=s.id AND j.account='sales_revenue'),0)
+  OR (SELECT sum(l.cost_minor) FROM offline_sale_lines l WHERE l.sale_id=s.id) != COALESCE((SELECT sum(j.debit_minor) FROM offline_journal j WHERE j.sale_id=s.id AND j.account='cost_of_goods_sold'),0)
+  OR (SELECT sum(l.cost_minor) FROM offline_sale_lines l WHERE l.sale_id=s.id) != COALESCE((SELECT sum(j.credit_minor) FROM offline_journal j WHERE j.sale_id=s.id AND j.account='inventory'),0)
+  OR EXISTS(SELECT 1 FROM offline_journal j WHERE j.sale_id=s.id AND (
+   j.account NOT IN ('cash','bank','sales_revenue','cost_of_goods_sold','inventory')
+   OR (j.account IN ('cash','bank','cost_of_goods_sold') AND j.credit_minor!=0)
+   OR (j.account IN ('sales_revenue','inventory') AND j.debit_minor!=0))))`).get(branchId).n;
+ const invalidEvents=db.prepare(`SELECT count(*) n FROM offline_outbox o WHERE o.branch_id=? AND
+  CASE WHEN json_valid(o.payload) THEN
+   COALESCE(json_extract(o.payload,'$.saleId'),'') != o.sale_id
+   OR COALESCE(json_extract(o.payload,'$.branchId'),'') != o.branch_id
+   OR NOT EXISTS(SELECT 1 FROM offline_sales s WHERE s.id=o.sale_id AND s.branch_id=o.branch_id
+      AND s.total_minor=json_extract(o.payload,'$.totalMinor'))
+  ELSE 1 END`).get(branchId).n;
+ return {missingOutbox,unbalanced,missingMovements,invalidPostings,invalidEvents};
+}
+module.exports={auditOfflineSales};

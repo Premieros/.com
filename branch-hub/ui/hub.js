@@ -5,7 +5,7 @@ const message=text=>{$('status').textContent=text;};
 async function api(route,method='GET',body){
  const response=await fetch('/api/v1/'+route,{method,headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});
  const result=await response.json();
- if(!response.ok)throw Error(result.error||'تعذر تنفيذ الطلب');return result;
+ if(!response.ok){const error=Error(result.error||'تعذر تنفيذ الطلب');error.status=response.status;error.code=result.error;throw error;}return result;
 }
 const scope=()=>({organizationId:session.organizationId,branchId:session.branchId});
 const draftKey=()=>`premier-pending:${session.organizationId}:${session.branchId}`;
@@ -14,7 +14,7 @@ function button(parent,text,action){const b=document.createElement('button');b.t
 function drawCart(){
  $('cart').replaceChildren();
  cart.forEach((line,i)=>{const row=addText($('cart'),`${line.sku} × ${line.quantity} — ${(line.quantity*line.priceMinor/100).toFixed(2)}`);if(!pending)button(row,'حذف',async()=>{cart.splice(i,1);drawCart();});});
- $('pending').hidden=!pending;$('line-form').hidden=Boolean(pending);
+ $('pending').hidden=!pending;$('cancel-pending').hidden=true;$('line-form').hidden=Boolean(pending);
  $('checkout').disabled=!cart.length;$('checkout').textContent=pending?'إعادة التحقق من نفس البيع':'تسجيل البيع';
 }
 async function refresh(){
@@ -31,7 +31,7 @@ async function refresh(){
 }
 $('login-form').onsubmit=async event=>{
  event.preventDefault();token=$('credential').value;$('credential').value='';
- try {session=await api('session');$('login').hidden=true;$('workspace').hidden=false;$('logout').hidden=false;$('admin').hidden=!session.admin;$('branch').textContent='الفرع: '+session.branchId;
+ try {session=await api('session');$('login').hidden=true;$('workspace').hidden=false;$('logout').hidden=false;$('admin').hidden=!session.admin;$('sale-panel').hidden=!session.permissions.includes('sell');$('branch').textContent='الفرع: '+session.branchId;
   pending=JSON.parse(localStorage.getItem(draftKey())||'null');cart=pending?.lines||[];drawCart();await refresh();message('متصل بخادم الفرع المحلي.');
  }catch(e){token='';session=null;$('login').hidden=false;$('workspace').hidden=true;message(e.message);}
 };
@@ -48,8 +48,10 @@ $('checkout').onclick=async()=>{
   if(!pending){pending={...scope(),key:crypto.randomUUID(),lines:structuredClone(cart)};localStorage.setItem(draftKey(),JSON.stringify(pending));}
   const result=await api('offline/sales','POST',pending);
   localStorage.removeItem(draftKey());pending=null;cart=[];drawCart();message(`تم حفظ البيع ${result.saleId} بقيمة ${(result.totalMinor/100).toFixed(2)}`);await refresh();
- }catch(e){message('لم يتم تأكيد العملية: '+e.message);drawCart();}
+ }catch(e){message('لم يتم تأكيد العملية: '+e.message);drawCart();if(e.code==='INVALID_SALE'||e.code?.startsWith('INSUFFICIENT_STOCK'))$('cancel-pending').hidden=false;}
 };
 $('device-form').onsubmit=async event=>{event.preventDefault();try{const d=await api('devices','POST',{...scope(),name:$('device-name').value,role:$('device-role').value});$('device-result').textContent='احفظ رمز الجهاز الآن: '+d.token;await refresh();}catch(e){message(e.message);}};
 $('opening-form').onsubmit=async event=>{event.preventDefault();try{await api('offline/stock/opening','POST',{...scope(),sku:$('opening-sku').value,quantity:Number($('opening-qty').value),unitCostMinor:Math.round(Number($('opening-cost').value)*100)});message('تم حفظ الرصيد الافتتاحي.');await refresh();}catch(e){message(e.message);}};
 $('backup').onclick=async()=>{try{const b=await api('backups','POST');$('backup-result').textContent=`تم الحفظ على جهاز الفرع: ${b.filename} (${b.bytes} bytes)`;}catch(e){message(e.message);}};
+
+$('cancel-pending').onclick=()=>{localStorage.removeItem(draftKey());pending=null;cart=[];drawCart();message('تم إلغاء الطلب المرفوض. يمكنك بدء بيع جديد.');};

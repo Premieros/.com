@@ -13,7 +13,7 @@ async function main(){
  const hub=createHub({port:0,dataDir:dir,organizationId:'org_001',branchId:'branch_001',token});
  let browser;
  try {
-  const {port}=await hub.listen();browser=await chromium.launch({headless:true});
+  const {port}=await hub.listen();browser=await chromium.launch({headless:true,channel:process.env.BRANCH_HUB_BROWSER_CHANNEL||undefined});
   const page=await browser.newPage({viewport:{width:1366,height:900}});
   const errors=[];page.on('pageerror',e=>errors.push(e.message));
   await page.route('**/*',route=>new URL(route.request().url()).hostname==='127.0.0.1'?route.continue():route.abort());

@@ -1,69 +1,85 @@
-# PremierOS Branch Hub — foundation (NOT production-ready)
+# PremierOS Branch Hub — development build
 
-This is the **initial local branch gateway**, not a complete offline POS or Windows installer. It keeps an idempotent SQLite print-job queue, provides a local health endpoint, and deliberately does not print or synchronize financial records yet.
+Repository: **Premieros/.com**, directory `branch-hub/`. The only authorized cloud project is **hvqlkapynjfjikqithvd**, `john's 1`, `eu-central-1`. No Johna's repository or database is used.
 
-Requires Node.js >=22.13 (bundling as a Windows installer is a later stage).
+**This is a testable development application, not a production-complete offline ERP.** Do not route real branch transactions through it yet. Cloud accounting reconciliation, taxes, returns, split payments, central enrollment and signed updates remain release blockers.
 
-## Loopback smoke test
+## Implemented and tested
 
-Set BRANCH_HUB_ORGANIZATION_ID (organization identifier), BRANCH_HUB_BRANCH_ID (unique branch identifier) and BRANCH_HUB_TOKEN (random 32+ character secret), then run `node branch-hub/server.cjs`. Default bind: 127.0.0.1:3847. DB lives under APPDATA/PremierOS/BranchHub/<branch id> on Windows. Never put the secret in client-side JavaScript or in a QR code.
+- Local SQLite checkout API and responsive Arabic UI at `/`, served without external assets. Integer base quantities and integer minor money units. Cash or bank posting in the kernel.
+- Atomic sale, stock debit, cost/revenue journal, outbox and actor audit. Insufficient stock or any write failure rolls back all records. Historical line costs remain fixed. No FIFO. Opening cost is supplied by the administrator; a published-price cloud feed is not connected yet.
+- Idempotent checkout, including concurrent devices and browser reload after losing the server response. The browser retains the pending checkout key until a confirmed response; credentials stay in memory.
+- Administrator-issued per-device credentials, hash-only storage, viewer/cashier/stock roles and immediate revocation. The stock role currently has read access only. This is device authorization, **not individual staff login**.
+- TLS-only LAN binding. Certificate verification is exercised in tests. Certificates must be provisioned and trusted separately on each phone/tablet; there is no automated certificate enrollment yet.
+- ESC/POS TCP printer worker with a server-generated receipt and one job key per sale. Configured literal private IPv4 printers only. No shell commands. ASCII receipts only; Arabic raster printing, USB and Windows spooler drivers remain unsupported.
+- Verified SQLite snapshots and fresh-directory restore, including accounting, pending events, branch identity, foreign keys and printer delivery history.
+- Windows NSIS prototype build, packaged-runtime smoke, actual silent installation and installed-runtime smoke in CI, plus an installer SHA-256 checksum. A successful build is not production acceptance or publisher signing.
 
-## Secure LAN mode
+## Run locally
 
-Set BRANCH_HUB_HOST=0.0.0.0, BRANCH_HUB_TLS_CERT, BRANCH_HUB_TLS_KEY, and BRANCH_HUB_TOKEN. LAN bind is rejected without TLS. Install a certificate trusted by tablets/phones. Configure Windows firewall for branch subnet only. Device pairing, per-device credentials, revocation, persistent authenticated sessions, and a certificate provisioning UX are NOT YET implemented; the shared token is for controlled developer testing only. Do not expose the server to the internet.
+Node >=22.13 is required. No npm dependencies are needed to run the server or unit tests.
 
-## Roadmap / production acceptance gates
+Set `BRANCH_HUB_ORGANIZATION_ID`, `BRANCH_HUB_BRANCH_ID` and a random 32+ character `BRANCH_HUB_TOKEN` on the server. Run `node branch-hub/server.cjs`, open `http://127.0.0.1:3847/`, then enter the token for local administrator testing. The token is never embedded in the page. Issue separate device tokens from the administrator panel; share only those device credentials with cashiers.
 
-1. Package Windows installer/service with SQLite backups, encryption at rest, migration/versioning, startup recovery and printer worker.
-2. Build local branch APIs for sales, orders, payments, stock and journals, all atomic, audited, idempotent and branch scoped; retain server-side authority on local hub.
-3. Serve the entire PremierOS frontend locally and support offline login, permissions and same-LAN phones/tablets; device pairing with rotation/revocation.
-4. Durable outbox/inbox and deterministic cloud synchronization with strict ownership and conflict rules; verify double-apply prevention.
-5. Simulate WAN loss and restart; multi-device concurrent transactions and print receipts; restore from backup; security/load test before production.
+The first startup permanently binds SQLite to the supplied organization and branch. Rebinding an existing data directory is refused. IDs are not yet verified against a signed cloud enrollment, so this manual configuration is for isolated testing only.
 
-Current app offline IndexedDB data and cloud Supabase RPCs do **not** satisfy these gates.
+Optional environment variables:
 
-## Permanent branch binding (foundation)
+| Variable | Purpose |
+| --- | --- |
+| `BRANCH_HUB_DATA_DIR` | Dedicated local data directory |
+| `BRANCH_HUB_PORT` | Default 3847 |
+| `BRANCH_HUB_HOST` | Default 127.0.0.1; LAN example 0.0.0.0 |
+| `BRANCH_HUB_TLS_CERT`, `BRANCH_HUB_TLS_KEY` | PEM certificate/key, both required for LAN |
+| `BRANCH_HUB_PRINTERS` | JSON whitelist, e.g. `{"cashier":{"host":"192.168.1.50","port":9100}}` |
 
-The first startup stores the organization and branch identity in the local SQLite database. Later startup refuses a different identity for that same data directory. New print-job submissions must include matching `organizationId` and `branchId` and fail with `BRANCH_SCOPE_MISMATCH` otherwise. This is a defense-in-depth guard **not secure server-side enrollment**: the configuration must ultimately be issued by the cloud after the administrator authenticates, signed, stored securely, and tied to a registered device. Changing branch requires an explicitly audited re-enrollment/migration workflow; never point another branch at an existing data directory.
+Do not expose this listener to the internet. Restrict the host firewall to the branch subnet. Test-only TLS fixtures under `fixtures/` are public test data and are excluded from the installer.
 
-Remote app updates, offline full ERP, printer execution, and synchronization are still not implemented by this foundation.
+## Print outcomes and recovery
 
-## Windows desktop prototype and installer build
+`POST /api/v1/offline/sales/<sale-id>/print` accepts `{ "printerId": "cashier" }`. A repeated request returns the same job. Different printer selection for the same sale conflicts. Cashiers cannot enqueue arbitrary raw jobs; the old generic `/jobs` POST is administrator-only.
 
-The `branch-hub/desktop.cjs` Electron shell is now packaged by `.github/workflows/build-branch-hub-windows.yml` into a **prototype NSIS .exe** in GitHub Actions artifacts (only if the build succeeds). This is **not** the release-ready single installer promised for branches. It does not yet support real branch enrollment, provisioning of trusted TLS for tablets, POS transaction processing, physical printer execution, cloud synchronization, remote update rollout, or automatic recovery. The prototype deliberately shows an unconfigured state rather than silently selecting an organization or branch.
+- `submitted`: the TCP stack accepted the bytes. This **does not confirm paper output**.
+- `failed`: no bytes were attempted. The administrator may explicitly retry using `POST /api/v1/jobs/<job-id>/retry`.
+- `uncertain`: bytes may have reached the printer. Automatic and API retry are blocked.
+- `sending` after a process crash: the outcome is unknown and the job stays blocked. There is deliberately no blind restart retry.
 
-Developers may configure `branch-config.json` under Electron userData containing `organizationId`, `branchId`, and a 32+ character `token` for isolated lab testing only; this file is NOT a secure enrollment mechanism. Never ship it with production credentials.
+Manual inspection of uncertain outcomes is required before any separately authorized reprint. Power loss after paper output cannot be made exactly-once with an ordinary raw TCP printer lacking transactional receipt acknowledgement.
 
-The new local receipt API stores **draft records, not approved/final sales**. Nothing here debits inventory, receives payments, posts ledger journals or performs cloud sync. No real sales should be made through the prototype.
+## Backup and restore
 
-## Local database backup prototype
+The administrator UI or `POST /api/v1/backups` creates a server-side `VACUUM INTO` snapshot in the branch data directory's `backups/` folder. Files are validated, permission restricted and flushed. Nothing is downloaded to the browser. Snapshots preserve device hashes, audit history, stock, journals, pending outboxes and printer dispatch state.
 
-The Branch Hub exposes a **server-side only** `createLocalBackup()` method using SQLite `VACUUM INTO`, then verifies `PRAGMA quick_check` and the embedded organization/branch identity. Backups live under the per-branch data folder in `backups/`, retain the pending sync outbox and do not acknowledge unsynced events.
-
-This is **not yet scheduled or off-machine backup**, nor encrypted backup, retention policy, or an administrator-approved restore workflow. The SQLite file may contain customer/transaction data: protect the Windows profile and backup folder and do not copy snapshots to shared/untrusted folders. Never overwrite a live DB while the server is running. Any restoration must verify that the target installation belongs to the same organization and branch.
-
-A Windows installer may be produced only after GitHub Actions succeeds; generating the artifact does not by itself make the prototype safe for real sales.
-
-## Verified offline restore (fresh directory only)
-
-Stop Branch Hub first. From a trusted administrator terminal, run:
+Stop the old hub before recovery. From a trusted administrator terminal:
 
 ```sh
-node branch-hub/restore.cjs /secure/backup.sqlite /empty/branch-data-dir org_001 branch_001
+node branch-hub/restore.cjs /secure/snapshot.sqlite /empty/branch-directory organization_id branch_id
 ```
 
-The destination directory must be empty. Recovery verifies a full SQLite integrity check, expected organization/branch binding, and the presence of core receipt, sync outbox, and print-job tables. It refuses corrupt backups, mismatched branches, and existing data. Once restored, start the hub with `BRANCH_HUB_DATA_DIR` pointing at the restored directory and matching identity. Never run restoration against a live branch data directory. Keep backup encryption/off-machine rotation and operator approval as separate release blockers.
+Only a standalone snapshot is accepted: active WAL sources, corrupt accounting, missing required tables, newer unsupported schemas, cross-branch data and non-empty targets are rejected. Restore atomically publishes a verified file using an exclusive hard link; the target filesystem must support hard links (NTFS on Windows). It cannot overwrite a running database.
 
-## Offline sales kernel (isolated development module)
+Scheduled retention, encrypted off-machine backup and full disaster-recovery operation remain incomplete. Keep backup copies protected separately.
 
-`offline-sales.cjs` now supplies a branch-scoped SQLite transaction engine for integer-unit stock, checkout idempotency, atomic stock consumption, a balanced four-line cost/revenue journal, and a pending offline outbox event. It rejects insufficient stock, mismatched idempotency payloads, numeric overflow and cross-branch stock access. Run `npm test` inside `branch-hub` to execute its regression tests.
+## Windows desktop
 
-**Not wired into the HTTP API or UI yet.** Opening stock is an initial import-only operation and cannot modify existing balances. This kernel is not a full approved POS: returns, taxes, split tenders, permissions, actual FIFO/batch cost, real Supabase reconciliation, and complete posting into Premier accounting remain separate tasks. Do not process production sales using this module.
+`desktop.cjs` starts the local server and waits for its readiness message before opening the local UI. It reports child-process failure and prevents a second desktop instance. Packaging includes all runtime modules and UI assets; no test key or device configuration is shipped.
 
-### Local stock deduction audit
+For isolated testing only, create `branch-config.json` under Electron userData with `organizationId`, `branchId` and `token`. Optional `host`, `port`, `tlsKey`, `tlsCert`, `localHostname` and `printers` configure the same listener. There is no first-run enrollment wizard or protected credential vault yet. A fresh installation intentionally refuses to assume a branch.
 
-Each committed offline sale now inserts one immutable (application-level) `offline_stock_movements` record per SKU in the same SQLite transaction as its stock deduction, journal, and outbox event. `GET /api/v1/offline/stock/movements` returns the latest 200 movements under branch authentication. An idempotent retry creates no second movement. Opening stock, returns, transfers, external replenishment and full stock reconciliation still need their own audited workflows; this read endpoint does not make the prototype production-ready.
+The prototype installer is unsigned. Automatic update/download/install and rollback are not implemented. A trusted publisher identity and release-signing setup are still required before safe automatic rollout.
 
-### Offline sales sync staging (no cloud acknowledgement yet)
+## Cloud state
 
-Authenticated `GET /api/v1/offline/sync/pending` returns at most 100 unsynchronized sales events from the durable `offline_outbox`; `GET /api/v1/offline/sync/status` returns the pending count. Both remain read-only across restarts. They deliberately cannot acknowledge, delete, or dispatch events: an authenticated, idempotent Supabase ingestion endpoint and verified cloud acknowledgement protocol must be implemented and tested first. These local endpoints do not imply functional cloud synchronization.
+Both local outboxes are durable and read-only through staging APIs. No cloud dispatch or acknowledgement is enabled. No financial events are deleted or marked acknowledged just because internet access returns.
+
+The target project's branch/organization RLS and branch foreign key were inspected read-only. There is no Branch Hub-specific ingestion/inbox endpoint installed. Existing `reconcile_offline_sale` is not a complete protocol for this kernel's SKU, journal and event model. Mapping local identifiers and posting exactly once into the canonical cloud accounting must be implemented and integration-tested before activation. No Supabase schema or production records were changed by this work.
+
+## Verification
+
+```sh
+cd branch-hub
+npm test
+node packaged-smoke.cjs
+```
+
+The complete regression workflow runs on Windows and Linux. The browser workflow uses Chromium to exercise checkout with a lost ACK, reload, stable retry identity and mobile layout while denying external UI requests. Windows build CI installs the generated NSIS EXE into an isolated temporary directory and runs the installed application server. Physical printer/paper, real tablets and production cloud synchronization still require acceptance testing.
