@@ -23,16 +23,16 @@ export interface MenuItemConfig {
 
 export const MENU_GROUPS: Record<MenuGroup, { ar: string; en: string }> = {
   main: { ar: 'الرئيسية', en: 'Main' },
-  centers: { ar: 'المراكز', en: 'Centers' },
-  catalog: { ar: 'المنتجات والخامات', en: 'Products & Materials' },
+  catalog: { ar: 'تعريف الأصناف والإنتاج', en: 'Catalog & Production' },
+  centers: { ar: 'إدارة العمليات', en: 'Management Centers' },
   admin: { ar: 'الإدارة العليا', en: 'Administration' },
 };
 
 export const MENU_ITEMS: MenuItemConfig[] = [
   { id: 'dashboard', route: APP_ROUTES.dashboard, icon: 'dashboard', labelKey: 'dashboard', permission: 'dashboard.view', group: 'main' },
-  { id: 'business-records', route: APP_ROUTES.businessRecords, icon: 'customers', labelKey: 'customers', label: { ar: 'سجلات النشاط', en: 'Business Records' }, permission: 'customers.view', group: 'main' },
   { id: 'pos', route: APP_ROUTES.pos, icon: 'pos', labelKey: 'pos', permission: 'pos.view', group: 'main' },
   { id: 'kitchen-display', route: APP_ROUTES.kitchenDisplay, icon: 'kitchenDisplay', labelKey: 'kitchenDisplay', permission: 'pos.kds_view', group: 'main' },
+  { id: 'business-records', route: APP_ROUTES.businessRecords, icon: 'customers', labelKey: 'customers', label: { ar: 'سجلات النشاط', en: 'Business Records' }, permission: 'customers.view', group: 'main' },
 
   { id: 'operations-center', route: APP_ROUTES.operationsCenter, icon: 'pos', labelKey: 'orders', label: { ar: 'مركز العمليات', en: 'Operations Center' }, permission: 'dashboard.view', group: 'centers' },
   { id: 'inventory-center', route: APP_ROUTES.inventoryCenter, icon: 'inventory', labelKey: 'inventory', label: { ar: 'مركز المخزون', en: 'Inventory Center' }, permission: 'inventory.view', group: 'centers' },
@@ -40,9 +40,6 @@ export const MENU_ITEMS: MenuItemConfig[] = [
   { id: 'people-center', route: APP_ROUTES.peopleCenter, icon: 'customers', labelKey: 'customers', label: { ar: 'مركز الأطراف', en: 'People Center' }, permissionsAny: ['customers.view', 'suppliers.view'], group: 'centers' },
   { id: 'finance-center', route: APP_ROUTES.financeCenter, icon: 'accounts', labelKey: 'reports', label: { ar: 'المركز المالي', en: 'Finance Center' }, permissionsAny: ['accounts.view', 'expenses.view', 'sales.view', 'shifts.view', 'reports.view', 'reports.financial', 'reports.costing'], group: 'centers' },
   { id: 'administration-center', route: APP_ROUTES.administrationCenter, icon: 'settings', labelKey: 'settings', label: { ar: 'مركز الإدارة', en: 'Administration Center' }, permissionsAny: ['branches.manage', 'users.view', 'roles.permissions.manage', 'approvals.review', 'audit.view', 'settings.manage'], group: 'centers' },
-
-  { id: 'stock-counts', route: APP_ROUTES.stockCounts, icon: 'stockCounts', labelKey: 'inventory', label: { ar: 'الجرد والتسويات', en: 'Stock Counts & Adjustments' }, permission: 'inventory.view', group: 'centers' },
-  { id: 'opening-balances', route: APP_ROUTES.openingBalances, icon: 'openingBalances', labelKey: 'accounts', label: { ar: 'الأرصدة الافتتاحية', en: 'Opening Balances' }, permission: 'accounts.view', group: 'centers' },
 
   { id: 'products', route: APP_ROUTES.products, icon: 'products', labelKey: 'products', permission: 'products.view', group: 'catalog' },
   { id: 'raw-materials', route: APP_ROUTES.rawMaterials, icon: 'rawMaterials', labelKey: 'rawMaterials', permission: 'raw_materials.view', group: 'catalog' },
