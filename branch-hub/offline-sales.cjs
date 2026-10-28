@@ -36,7 +36,7 @@ function createOfflineSalesEngine(db, branchId) {
     CREATE TABLE IF NOT EXISTS offline_sale_lines (
       sale_id TEXT NOT NULL REFERENCES offline_sales(id), sku TEXT NOT NULL,
       quantity INTEGER NOT NULL, price_minor INTEGER NOT NULL,
-      cost_minor INTEGER NOT NULL
+      cost_minor INTEGER NOT NULL, canonical TEXT
     );
     CREATE TABLE IF NOT EXISTS offline_journal (
       sale_id TEXT NOT NULL REFERENCES offline_sales(id),
@@ -51,6 +51,13 @@ function createOfflineSalesEngine(db, branchId) {
       status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','acknowledged'))
     );
   `);
+  if(!db.prepare('PRAGMA table_info(offline_sale_lines)').all().some(c=>c.name==='canonical')){
+    db.exec('ALTER TABLE offline_sale_lines ADD COLUMN canonical TEXT');
+    // Preserve the historical snapshot carried by older immutable outbox events, never today's mapping.
+    db.exec(`UPDATE offline_sale_lines SET canonical=(SELECT json_extract(e.value,'$.canonical')
+      FROM offline_outbox o,json_each(o.payload,'$.lines')e WHERE o.sale_id=offline_sale_lines.sale_id
+      AND json_valid(o.payload) AND json_extract(e.value,'$.sku')=offline_sale_lines.sku LIMIT 1)`);
+  }
   const {audit} = createDeviceRegistry(db, branchId);
   function setOpeningStock(sku, quantity, unitCostMinor, actor='administrator') {
     if (!/^[a-zA-Z0-9_.-]{1,80}$/.test(sku) ||
@@ -112,8 +119,8 @@ function createOfflineSalesEngine(db, branchId) {
         const current=db.prepare('SELECT quantity FROM offline_stock WHERE branch_id=? AND sku=?').get(branchId,line.sku);
         db.prepare('INSERT INTO offline_stock_movements(id,branch_id,sku,sale_id,delta,balance_after) VALUES(?,?,?,?,?,?)')
           .run(crypto.randomUUID(),branchId,line.sku,id,-line.quantity,current.quantity);
-        db.prepare('INSERT INTO offline_sale_lines(sale_id,sku,quantity,price_minor,cost_minor) VALUES(?,?,?,?,?)')
-          .run(id,line.sku,line.quantity,line.priceMinor,line.costMinor);
+        db.prepare('INSERT INTO offline_sale_lines(sale_id,sku,quantity,price_minor,cost_minor,canonical) VALUES(?,?,?,?,?,?)')
+          .run(id,line.sku,line.quantity,line.priceMinor,line.costMinor,line.canonical?JSON.stringify(line.canonical):null);
       }
       const entry=db.prepare('INSERT INTO offline_journal(sale_id,account,debit_minor,credit_minor) VALUES(?,?,?,?)');
       entry.run(id,paymentAccount,total,0);

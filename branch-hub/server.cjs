@@ -37,7 +37,7 @@ function createHub(config = {}) {
     path.join(process.env.APPDATA || path.join(os.homedir(), '.premieros'), 'PremierOS', 'BranchHub', branchId);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(path.join(dir, 'branch-hub.sqlite'));
-  if (db.prepare('PRAGMA user_version').get().user_version > 3) { db.close(); throw Error('UNSUPPORTED_DATABASE_VERSION'); }
+  if (db.prepare('PRAGMA user_version').get().user_version > 4) { db.close(); throw Error('UNSUPPORTED_DATABASE_VERSION'); }
   db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
   db.exec('CREATE TABLE IF NOT EXISTS hub_identity (singleton INTEGER PRIMARY KEY CHECK(singleton=1), organization_id TEXT NOT NULL, branch_id TEXT NOT NULL, installed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)');
   const identity = db.prepare('SELECT organization_id, branch_id FROM hub_identity WHERE singleton=1').get();
@@ -88,7 +88,7 @@ function createHub(config = {}) {
   if(installationId && installationBinding && installationBinding!==installationId){db.close();throw Error('INSTALLATION_BINDING_MISMATCH');}
   if(installationId && !installationBinding)db.prepare('UPDATE hub_identity SET installation_id=? WHERE singleton=1').run(installationId);
   const syncStore=createSyncStore(db,{organizationId,branchId,installationId});
-  db.exec('PRAGMA user_version=3');
+  db.exec('PRAGMA user_version=4');
   // SQLite VACUUM INTO creates a consistent snapshot even while WAL is enabled.
   // Backups stay on the server, never returned by the HTTP API.
   function createLocalBackup() {
@@ -169,6 +169,18 @@ function createHub(config = {}) {
       try{return send(res,200,{outcome:syncStore.retryConflict(pathname.slice('/api/v1/cloud/conflicts/'.length,-'/retry'.length),principal.id)});}
       catch{return send(res,409,{error:'PRICE_CONFLICT_UNRESOLVED'});}
     }
+    if(pathname === '/api/v1/cloud/warehouses' && req.method==='GET'){
+      if(!cloudSync)return send(res,409,{error:'CLOUD_ENROLLMENT_REQUIRED'});
+      try{return send(res,200,{warehouses:await cloudSync.warehouses()});}catch{return send(res,503,{error:'CLOUD_CATALOG_UNAVAILABLE'});}
+    }
+    if(pathname === '/api/v1/cloud/catalog/import' && req.method==='POST'){
+      if(!cloudSync)return send(res,409,{error:'CLOUD_ENROLLMENT_REQUIRED'});
+      try{
+       let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>4096)return send(res,413,{error:'PAYLOAD_TOO_LARGE'});}
+       return send(res,200,await cloudSync.importCatalog(JSON.parse(raw).warehouseId,principal.id));
+      }catch{return send(res,409,{error:'CLOUD_CATALOG_IMPORT_REJECTED'});}
+    }
+    if(pathname === '/api/v1/cloud/posting-conflicts' && req.method==='GET')return send(res,200,{conflicts:db.prepare('SELECT event_id,reason,checked_at FROM cloud_posting_errors WHERE branch_id=? ORDER BY checked_at DESC LIMIT 100').all(branchId)});
     if(pathname === '/api/v1/cloud/status' && req.method === 'GET')return send(res,200,cloudSync?cloudSync.status():{configured:false,canonicalPostingImplemented:false});
     if(pathname === '/api/v1/cloud/sync' && req.method === 'POST'){
       if(!cloudSync)return send(res,409,{error:'CLOUD_ENROLLMENT_REQUIRED'});
@@ -244,7 +256,7 @@ function createHub(config = {}) {
       return send(res,200,{pending,onlineSyncImplemented:false});
     }
     if (pathname === '/api/v1/offline/stock' && req.method === 'GET') {
-      const stock=db.prepare('SELECT s.sku,s.quantity,s.unit_cost_minor,c.sale_price_minor FROM offline_stock s LEFT JOIN offline_catalog c ON c.branch_id=s.branch_id AND c.sku=s.sku WHERE s.branch_id=? ORDER BY s.sku LIMIT 500').all(branchId);
+      const stock=db.prepare('SELECT s.sku,s.quantity,s.unit_cost_minor,c.sale_price_minor,l.product_name,l.unit_name FROM offline_stock s LEFT JOIN offline_catalog c ON c.branch_id=s.branch_id AND c.sku=s.sku LEFT JOIN offline_item_links l ON l.branch_id=s.branch_id AND l.sku=s.sku WHERE s.branch_id=? ORDER BY coalesce(l.product_name,s.sku) LIMIT 5000').all(branchId);
       return send(res,200,{stock});
     }
     if (pathname === '/api/v1/offline/stock/movements' && req.method === 'GET') {

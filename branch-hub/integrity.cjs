@@ -19,13 +19,25 @@ function auditOfflineSales(db,branchId) {
    j.account NOT IN ('cash','bank','sales_revenue','cost_of_goods_sold','inventory')
    OR (j.account IN ('cash','bank','cost_of_goods_sold') AND j.credit_minor!=0)
    OR (j.account IN ('sales_revenue','inventory') AND j.debit_minor!=0))))`).get(branchId).n;
- const invalidEvents=db.prepare(`SELECT count(*) n FROM offline_outbox o WHERE o.branch_id=? AND
+ const invalidEvents=invalidOfflineEvents(db,branchId);
+ return {missingOutbox,unbalanced,missingMovements,invalidPostings,invalidEvents};
+}
+function invalidOfflineEvents(db,branchId,eventId){
+ const query=`SELECT count(*) n FROM offline_outbox o WHERE o.branch_id=? ${eventId?'AND o.event_id=?':''} AND
   CASE WHEN json_valid(o.payload) THEN
    COALESCE(json_extract(o.payload,'$.saleId'),'') != o.sale_id
    OR COALESCE(json_extract(o.payload,'$.branchId'),'') != o.branch_id
    OR NOT EXISTS(SELECT 1 FROM offline_sales s WHERE s.id=o.sale_id AND s.branch_id=o.branch_id
-      AND s.total_minor=json_extract(o.payload,'$.totalMinor'))
-  ELSE 1 END`).get(branchId).n;
- return {missingOutbox,unbalanced,missingMovements,invalidPostings,invalidEvents};
+     AND s.total_minor=json_extract(o.payload,'$.totalMinor') AND json_extract(s.canonical,'$.paymentAccount')=json_extract(o.payload,'$.paymentAccount'))
+   OR COALESCE(json_array_length(o.payload,'$.lines'),0)!=(SELECT count(*) FROM offline_sale_lines l WHERE l.sale_id=o.sale_id)
+   OR EXISTS(SELECT 1 FROM json_each(o.payload,'$.lines') e LEFT JOIN offline_sale_lines l
+     ON l.sale_id=o.sale_id AND l.sku=json_extract(e.value,'$.sku') WHERE l.sale_id IS NULL
+     OR l.quantity IS NOT json_extract(e.value,'$.quantity') OR l.price_minor IS NOT json_extract(e.value,'$.priceMinor')
+     OR l.cost_minor IS NOT json_extract(e.value,'$.costMinor')
+     OR json_extract(l.canonical,'$.productId') IS NOT json_extract(e.value,'$.canonical.productId')
+     OR json_extract(l.canonical,'$.warehouseId') IS NOT json_extract(e.value,'$.canonical.warehouseId')
+     OR json_extract(l.canonical,'$.unitName') IS NOT json_extract(e.value,'$.canonical.unitName'))
+  ELSE 1 END`;
+ return db.prepare(query).get(...(eventId?[branchId,eventId]:[branchId])).n;
 }
-module.exports={auditOfflineSales};
+module.exports={auditOfflineSales,invalidOfflineEvents};

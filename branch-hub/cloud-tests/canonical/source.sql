@@ -318,7 +318,7 @@ BEGIN
 
   RETURN v_result;
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.process_sale_idempotent(p_client_operation_key text, p_invoice_number text, p_branch_id uuid, p_warehouse_id uuid, p_customer_id uuid, p_salesperson_id uuid, p_subtotal numeric, p_discount_amount numeric, p_discount_type text, p_tax_amount numeric, p_bonus_amount numeric, p_total numeric, p_paid_amount numeric, p_payment_method text, p_status text, p_items jsonb, p_shift_id uuid, p_order_type text, p_table_id uuid, p_order_id uuid, p_guest_count integer)
  RETURNS jsonb
@@ -470,7 +470,7 @@ BEGIN
 
   RETURN v_result;
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public._process_sale_core(p_invoice_number text, p_branch_id uuid, p_warehouse_id uuid, p_customer_id uuid, p_salesperson_id uuid, p_subtotal numeric, p_discount_amount numeric, p_discount_type text, p_tax_amount numeric, p_bonus_amount numeric, p_total numeric, p_paid_amount numeric, p_payment_method text, p_status text, p_items jsonb, p_shift_id uuid DEFAULT NULL::uuid, p_order_type text DEFAULT 'takeaway'::text, p_table_id uuid DEFAULT NULL::uuid, p_order_id uuid DEFAULT NULL::uuid, p_guest_count integer DEFAULT NULL::integer)
  RETURNS jsonb
@@ -802,7 +802,7 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'TRANSACTION_FAILED', 'detail', SQLERRM);
   END;
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public._post_journal_entry(p_branch_id uuid, p_reference_type text, p_reference_id uuid, p_reference_number text, p_description text, p_lines jsonb)
  RETURNS uuid
@@ -883,7 +883,7 @@ BEGIN
 
   RETURN v_entry_id;
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.deduct_sale_inventory_with_modifiers(p_branch_id uuid, p_warehouse_id uuid, p_items jsonb, p_reference_id uuid DEFAULT NULL::uuid, p_reference_number text DEFAULT NULL::text)
  RETURNS jsonb
@@ -901,7 +901,7 @@ BEGIN
     p_branch_id, p_warehouse_id, p_items, p_reference_id, p_reference_number
   );
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public._deduct_sale_inventory_with_modifiers_core(p_branch_id uuid, p_warehouse_id uuid, p_items jsonb, p_reference_id uuid DEFAULT NULL::uuid, p_reference_number text DEFAULT NULL::text)
  RETURNS jsonb
@@ -1207,7 +1207,7 @@ BEGIN
 EXCEPTION WHEN OTHERS THEN
   RETURN jsonb_build_object('success',false,'error','SALE_INVENTORY_DEDUCTION_FAILED','detail',SQLERRM);
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public._deduct_ready_product_stock_policy(p_product_id uuid, p_branch_id uuid, p_warehouse_id uuid, p_qty numeric, p_reference_id uuid, p_reference_number text, p_allow_negative boolean)
  RETURNS jsonb
@@ -1377,7 +1377,7 @@ BEGIN
     'after_qty',v_running
   );
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.check_product_availability(p_product_id uuid, p_branch_id uuid, p_warehouse_id uuid, p_quantity numeric)
  RETURNS jsonb
@@ -1682,7 +1682,7 @@ BEGIN
 
   RETURN jsonb_build_object('success', true, 'mode', 'recipe', 'quantity', p_quantity);
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public.resolve_account_key(p_branch_id uuid, p_key text, p_fallback_code text DEFAULT NULL::text)
  RETURNS uuid
@@ -1713,4 +1713,4 @@ BEGIN
 
   RETURN NULL;
 END;
-$function$
+$function$;

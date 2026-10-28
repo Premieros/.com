@@ -53,7 +53,7 @@ test('transport retries lost ACK once by cloud identity, commits inbox before AC
   await sync.run();assert.equal(remote.size,1);assert.equal(commandAck,true);assert.ok(persisted>=1);
   assert.equal(db.prepare("SELECT count(*) n FROM offline_outbox WHERE status='pending'").get().n,1);
   assert.equal(db.prepare("SELECT count(*) n FROM hub_audit WHERE action='price.applied'").get().n,1);
-  assert.equal(sync.status().canonicalPostingImplemented,false);
+  assert.equal(sync.status().canonicalPostingImplemented,true);
  }finally{if(sync)await sync.stop();db.close();}
 });
 test('unverified cloud ACK and failed durable credential rotation preserve pending outbox',async()=>{
