@@ -9,6 +9,12 @@ const REPAIR={file:'20261023150600_raw_published_price_asof_helper.sql',
  sourceSha256:'f5a8e02dba0142e117ed039f2401a209696c4cc45eab08d351470b663c8ef6bc',
  before:'$function$\n\nREVOKE',after:'$function$;\n\nREVOKE',
  reason:'pg_get_functiondef snapshot lacks a statement terminator before its separate REVOKE statement'};
+const EMPTY_REPAIR={file:'20261023172500_reconcile_nine_verified_raw_branch_balance_cache_rows.sql',
+ sourceSha256:'4e68f2e06f2a4dd01d044ca91d66035d9526ecfd7a8489a7f373c04d2dc4e3ef',
+ before:'BEGIN\n LOCK TABLE public.raw_material_batches',
+ after:'BEGIN\n -- CI fixture: no production cache reconciliation exists in a completely empty raw-stock database.\n IF NOT EXISTS(SELECT 1 FROM public.raw_material_inventory) AND NOT EXISTS(SELECT 1 FROM public.raw_material_batches) AND NOT EXISTS(SELECT 1 FROM public.inventory_ledger WHERE raw_material_id IS NOT NULL) THEN RETURN; END IF;\n LOCK TABLE public.raw_material_batches',
+ reason:'empty CI raw-stock tables have none of the nine production cache rows; preserve all original populated-data preconditions'};
+const REPAIRS=[REPAIR,EMPTY_REPAIR];
 function validateTarget(env){
  if(env.CI!=='true'||env.GITHUB_ACTIONS!=='true'||env.GITHUB_REPOSITORY!=='Premieros/.com'||env.SUPABASE_PROJECT_REF!=='hvqlkapynjfjikqithvd')throw Error('CI_REPLAY_ENVIRONMENT_REQUIRED');
  let url;try{url=new URL(env.SUPABASE_DB_URL);}catch{throw Error('CI_REPLAY_LOCAL_DATABASE_REQUIRED');}
@@ -20,13 +26,14 @@ function assertFreshDatabase(state){
 }
 function prepareFixtures(sourceDir,outputDir){
  const files=fs.readdirSync(sourceDir).filter(name=>name.endsWith('.sql')).sort();
- if(!files.includes(REPAIR.file))throw Error('CI_REPLAY_SOURCE_MISSING');
+ if(REPAIRS.some(repair=>!files.includes(repair.file)))throw Error('CI_REPLAY_SOURCE_MISSING');
  const staged=files.map(file=>{
   const source=path.join(sourceDir,file);if(!fs.lstatSync(source).isFile()||fs.lstatSync(source).isSymbolicLink())throw Error('CI_REPLAY_REGULAR_FILE_REQUIRED');
   const original=fs.readFileSync(source,'utf8');let sql=original,repair=null;
-  if(file===REPAIR.file){
-   if(sha(original)!==REPAIR.sourceSha256||original.split(REPAIR.before).length!==2)throw Error('CI_REPLAY_SOURCE_CHANGED');
-   sql=original.replace(REPAIR.before,REPAIR.after);repair=REPAIR.reason;
+  const reviewed=REPAIRS.find(item=>item.file===file);
+  if(reviewed){
+   if(sha(original)!==reviewed.sourceSha256||original.split(reviewed.before).length!==2)throw Error('CI_REPLAY_SOURCE_CHANGED');
+   sql=original.replace(reviewed.before,reviewed.after);repair=reviewed.reason;
   }
   return {file,sql,sourceSha256:sha(original),replaySha256:sha(sql),repair};
  });
@@ -56,8 +63,8 @@ async function main(){
   const env={...process.env,SUPABASE_DB_URL:connectionString};
   await run(['--file','supabase/ci/stub_auth.sql'],env);
   await run(['--dir',output],env);
-  console.log('CI_REPLAY_COMPLETE: historical sources unchanged; one pinned delimiter repair in disposable fixtures');
+  console.log('CI_REPLAY_COMPLETE: historical sources unchanged; two hash-pinned compatibility adjustments in disposable fixtures');
  }finally{fs.rmSync(staging,{recursive:true,force:true});}
 }
 if(require.main===module)main().catch(error=>{console.error(error.message);process.exitCode=1;});
-module.exports={validateTarget,assertFreshDatabase,prepareFixtures,REPAIR};
+module.exports={validateTarget,assertFreshDatabase,prepareFixtures,REPAIR,REPAIRS};
