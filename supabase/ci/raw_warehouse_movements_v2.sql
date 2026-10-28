@@ -15,3 +15,14 @@ CREATE TABLE private.raw_warehouse_movements_v2 (
 ALTER TABLE private.raw_warehouse_movements_v2 ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON private.raw_warehouse_movements_v2 FROM PUBLIC,anon,authenticated,service_role;
 GRANT SELECT,INSERT ON private.raw_warehouse_movements_v2 TO service_role;
+
+CREATE TABLE private.raw_warehouse_balances_v2 (
+ branch_id uuid NOT NULL REFERENCES public.branches(id),
+ warehouse_id uuid NOT NULL REFERENCES public.warehouses(id),
+ raw_material_id uuid NOT NULL REFERENCES public.raw_materials(id),
+ quantity numeric(18,4) NOT NULL DEFAULT 0,updated_at timestamptz NOT NULL DEFAULT now(),
+ PRIMARY KEY(branch_id,warehouse_id,raw_material_id)
+);
+ALTER TABLE private.raw_warehouse_balances_v2 ENABLE ROW LEVEL SECURITY;
+REVOKE ALL ON private.raw_warehouse_balances_v2 FROM PUBLIC,anon,authenticated,service_role;
+GRANT SELECT,INSERT,UPDATE ON private.raw_warehouse_balances_v2 TO service_role;
