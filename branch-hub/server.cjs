@@ -7,6 +7,7 @@ const https = require('node:https');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
 const {createStaffRegistry}=require('./staff.cjs');
+const {createPrinterRegistry}=require('./printer-registry.cjs');
 const {stageUpdate}=require('./updates.cjs');
 const {createCloudClient}=require('./cloud-client.cjs');
 const {createSyncStore,createCloudSync}=require('./cloud-sync.cjs');
@@ -38,7 +39,7 @@ function createHub(config = {}) {
     path.join(process.env.APPDATA || path.join(os.homedir(), '.premieros'), 'PremierOS', 'BranchHub', branchId);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(path.join(dir, 'branch-hub.sqlite'));
-  if (db.prepare('PRAGMA user_version').get().user_version > 5) { db.close(); throw Error('UNSUPPORTED_DATABASE_VERSION'); }
+  if (db.prepare('PRAGMA user_version').get().user_version > 6) { db.close(); throw Error('UNSUPPORTED_DATABASE_VERSION'); }
   db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
   db.exec('CREATE TABLE IF NOT EXISTS hub_identity (singleton INTEGER PRIMARY KEY CHECK(singleton=1), organization_id TEXT NOT NULL, branch_id TEXT NOT NULL, installed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)');
   const identity = db.prepare('SELECT organization_id, branch_id FROM hub_identity WHERE singleton=1').get();
@@ -78,9 +79,10 @@ function createHub(config = {}) {
     status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','acknowledged')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );`);
-  const printerConfig = config.printers || JSON.parse(process.env.BRANCH_HUB_PRINTERS || '{}');
-  const printWorker = createPrintWorker(db, branchId, printerConfig);
-  if (Object.keys(printerConfig).length) printWorker.start();
+  const printerRegistry=createPrinterRegistry(db,branchId,config.printers || JSON.parse(process.env.BRANCH_HUB_PRINTERS || '{}'));
+  const printerConfig=printerRegistry.printers;
+  const printWorker = createPrintWorker(db, branchId, printerConfig,undefined,{renderReceipt:config.renderReceipt});
+  printWorker.start();
   const devices = createDeviceRegistry(db, branchId);
   const offlineSales = createOfflineSalesEngine(db, branchId);
   const staff=createStaffRegistry(db,branchId,{resetSessions:true});
@@ -90,7 +92,7 @@ function createHub(config = {}) {
   if(installationId && installationBinding && installationBinding!==installationId){db.close();throw Error('INSTALLATION_BINDING_MISMATCH');}
   if(installationId && !installationBinding)db.prepare('UPDATE hub_identity SET installation_id=? WHERE singleton=1').run(installationId);
   const syncStore=createSyncStore(db,{organizationId,branchId,installationId});
-  db.exec('PRAGMA user_version=5');
+  db.exec('PRAGMA user_version=6');
   // SQLite VACUUM INTO creates a consistent snapshot even while WAL is enabled.
   // Backups stay on the server, never returned by the HTTP API.
   function createLocalBackup() {
@@ -163,7 +165,7 @@ function createHub(config = {}) {
       }
       if(employee)principal=employee;
     }
-    const adminPath = pathname.startsWith('/api/v1/staff') || pathname.startsWith('/api/v1/devices') || pathname === '/api/v1/audit' ||
+    const adminPath = pathname.startsWith('/api/v1/printers/') || pathname.startsWith('/api/v1/staff') || pathname.startsWith('/api/v1/devices') || pathname === '/api/v1/audit' ||
       pathname === '/api/v1/backups' || pathname.startsWith('/api/v1/updates/') || pathname.startsWith('/api/v1/cloud/') || pathname === '/api/v1/jobs' && req.method === 'POST' || pathname.endsWith('/retry') || pathname === '/api/v1/offline/stock/opening';
     const permission = req.method === 'GET' ? 'read' :
       pathname === '/api/v1/offline/sales' ? 'sell' :
@@ -221,18 +223,27 @@ function createHub(config = {}) {
       }catch{return send(res,400,{error:'STAFF_UPDATE_REJECTED'});}
     }
     if(pathname === '/api/v1/session' && req.method === 'GET')return send(res,200,{organizationId,branchId,admin:Boolean(principal.admin),staffName:principal.name||null,staffLoginRequired:false,permissions:['read','sell','print','stock'].filter(p=>principal.allows(p))});
-    if(pathname === '/api/v1/printers' && req.method === 'GET')return send(res,200,{printers:Object.keys(printerConfig)});
+    if(pathname === '/api/v1/printers' && req.method === 'GET')return send(res,200,{printers:Object.keys(printerConfig),...(principal.admin?{details:printerConfig}:{})});
+    if(pathname.startsWith('/api/v1/printers/')&&req.method==='PUT'){
+      try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>2048)return send(res,413,{error:'PAYLOAD_TOO_LARGE'});}
+       const input=JSON.parse(raw);if(input.organizationId!==organizationId||input.branchId!==branchId)return send(res,403,{error:'BRANCH_SCOPE_MISMATCH'});
+       printerRegistry.configure(pathname.slice('/api/v1/printers/'.length),input,principal.id);return send(res,200,{ok:true});
+      }catch(e){return send(res,e.message==='PRINTER_HAS_PENDING_JOBS'?409:400,{error:e.message==='PRINTER_HAS_PENDING_JOBS'?e.message:'PRINTER_CONFIGURATION_REJECTED'});}
+    }
     if (pathname.startsWith('/api/v1/offline/sales/') && pathname.endsWith('/print') && req.method === 'POST') {
       const saleId=pathname.slice('/api/v1/offline/sales/'.length,-'/print'.length);
-      const sale=db.prepare('SELECT id,total_minor FROM offline_sales WHERE branch_id=? AND id=?').get(branchId,saleId);
+      const sale=db.prepare('SELECT id,total_minor,created_at FROM offline_sales WHERE branch_id=? AND id=?').get(branchId,saleId);
       if(!sale)return send(res,404,{error:'SALE_NOT_FOUND'});
       try {
         let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>4096)return send(res,413,{error:'PAYLOAD_TOO_LARGE'});}
         const input=JSON.parse(raw);
         if(!Object.hasOwn(printerConfig,input.printerId))return send(res,400,{error:'PRINTER_NOT_CONFIGURED'});
-        const lines=db.prepare('SELECT sku,quantity,price_minor FROM offline_sale_lines WHERE sale_id=? ORDER BY rowid').all(saleId);
+        const existing=db.prepare('SELECT id,payload FROM jobs WHERE branch_id=? AND idempotency_key=?').get(branchId,'sale-receipt:'+saleId);
+        if(existing){if(JSON.parse(existing.payload).printerId!==input.printerId)return send(res,409,{error:'PRINT_REQUEST_REJECTED'});return send(res,202,{jobId:existing.id});}
+        const lines=db.prepare('SELECT sku,quantity,price_minor,canonical FROM offline_sale_lines WHERE sale_id=? ORDER BY rowid').all(saleId);
         const text=['Premier', 'Sale: '+sale.id, ...lines.map(l=>`${l.sku} x ${l.quantity} @ ${l.price_minor}`), 'Total (minor units): '+sale.total_minor].join('\n');
-        const payload=JSON.stringify({printerId:input.printerId,text});
+        const receipt={saleId:sale.id,createdAt:sale.created_at,totalMinor:sale.total_minor,lines:lines.map(l=>({label:l.canonical?JSON.parse(l.canonical).productName||l.sku:l.sku,quantity:l.quantity,priceMinor:l.price_minor}))};
+        const payload=JSON.stringify({printerId:input.printerId,text,...(printerConfig[input.printerId].format==='raster'?{receipt}:{})});
         const key='sale-receipt:'+saleId;
         db.exec('BEGIN IMMEDIATE');
         let job;
@@ -314,6 +325,7 @@ function createHub(config = {}) {
         const result=offlineSales.commitSale({...input,actor:principal.id});
         return send(res,result.duplicate?200:201,result);
       } catch(error) {
+        if(error.message==='SALE_EVENT_TOO_LARGE')return send(res,413,{error:error.message});
         if(error.message==='IDEMPOTENCY_CONFLICT'||error.message==='PRICE_CHANGED') return send(res,409,{error:error.message});
         if(error.message.startsWith('INSUFFICIENT_STOCK')) return send(res,409,{error:error.message});
         return send(res,400,{error:'INVALID_SALE'});
@@ -423,7 +435,8 @@ if (require.main === module) {
     const listener=message=>{if(message?.type==='cloud-token-saved'&&message.requestId===requestId){clearTimeout(timer);process.off('message',listener);message.ok?resolve():reject(Error('CLOUD_VAULT_SAVE_FAILED'));}};
     process.on('message',listener);process.send({type:'persist-cloud-token',requestId,refreshToken:token});
   }) : undefined;
-  const hub = createHub({persistRefreshToken});
+  const renderReceipt=process.send?require('./raster-ipc.cjs').createParentRasterRenderer():undefined;
+  const hub = createHub({persistRefreshToken,renderReceipt});
   if(process.send)process.once('disconnect',()=>hub.close().then(()=>process.exit(0)));
   hub.listen().then(addr => {
     console.log('Premier Branch Hub listening on', addr.address, addr.port);

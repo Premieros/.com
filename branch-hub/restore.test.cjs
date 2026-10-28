@@ -73,7 +73,7 @@ test('recovery refuses an acknowledged financial outbox without its canonical pr
  }finally{await hub.close();fs.rmSync(root,{recursive:true,force:true});}
 });
 
-for(const legacyVersion of [3,4])test(`v${legacyVersion} backups restore read-only and upgrade to v5 without losing pending sales`,async()=>{
+for(const legacyVersion of [3,4,5])test(`v${legacyVersion} backups restore read-only and upgrade to v6 without losing pending sales`,async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'hub-v3-restore-'));
  const config={port:0,dataDir:path.join(root,'source'),organizationId:'org_001',branchId:'branch_001',token:'t'.repeat(40)};
  const hub=createHub(config);let upgraded;
@@ -82,14 +82,15 @@ for(const legacyVersion of [3,4])test(`v${legacyVersion} backups restore read-on
   engine.setOpeningStock('sku',3,50);engine.commitSale({key:'legacy-v3-sale-001',lines:[{sku:'sku',quantity:1,priceMinor:100}]});
   const file=path.join(config.dataDir,'backups',hub.createLocalBackup().filename);
   const db=new DatabaseSync(file);
-  db.exec('DROP TABLE hub_staff_sessions; DROP TABLE hub_staff_limits; DROP TABLE hub_staff_policy; DROP TABLE hub_staff');
+  db.exec('DROP TABLE hub_printers');
+  if(legacyVersion<5)db.exec('DROP TABLE hub_staff_sessions; DROP TABLE hub_staff_limits; DROP TABLE hub_staff_policy; DROP TABLE hub_staff');
   if(legacyVersion===3)db.exec('ALTER TABLE offline_sale_lines DROP COLUMN canonical; DROP TABLE offline_item_links; DROP TABLE cloud_posted_sales; DROP TABLE cloud_posting_errors');
   db.exec(`PRAGMA user_version=${legacyVersion}`);db.close();
   const dataDir=path.join(root,'restored');const restored=restoreToEmptyDirectory({backupPath:file,dataDir,organizationId:config.organizationId,branchId:config.branchId});
   assert.equal(restored.offlineSales,1);assert.equal(restored.offlinePending,1);
   const source=new DatabaseSync(file,{readOnly:true});assert.equal(source.prepare('PRAGMA user_version').get().user_version,legacyVersion);source.close();
   upgraded=createHub({...config,dataDir});await upgraded.listen();
-  assert.equal(upgraded.db.prepare('PRAGMA user_version').get().user_version,5);
+  assert.equal(upgraded.db.prepare('PRAGMA user_version').get().user_version,6);
   assert.equal(upgraded.db.prepare('SELECT quantity FROM offline_stock').get().quantity,2);
   assert.equal(upgraded.db.prepare('SELECT status FROM offline_outbox').get().status,'pending');
   upgraded.createLocalBackup();

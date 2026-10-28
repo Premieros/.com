@@ -28,7 +28,7 @@ async function refresh(){
  for(const s of sales.sales){const row=addText($('sales'),`${s.id.slice(0,8)} · ${(s.total_minor/100).toFixed(2)} · ${s.created_at}`);if(session.permissions.includes('print'))button(row,'طباعة',async()=>{await api(`offline/sales/${s.id}/print`,'POST',{printerId:$('printer').value});message('تمت إضافة الإيصال لقائمة الطباعة. راجع حالة الإرسال.');await refresh();});}
  $('jobs').replaceChildren();for(const j of jobs.jobs)addText($('jobs'),`${j.id.slice(0,8)}: ${j.delivery_state||j.status}${j.error?' · '+j.error:''}`);
  $('health').textContent=`سلامة البيانات: ${integrity.ok?'سليمة':'تحتاج مراجعة'} · عمليات محلية تنتظر المزامنة: ${sync.pending}`;
- if(session.admin){await refreshStaff();const cloud=await api('cloud/status');$('cloud-status').textContent=cloud.configured?`تم استلام ${cloud.replicatedSales} عملية · رُحلت رسميًا ${cloud.postedSales||0} · معلقة للمراجعة ${cloud.postingConflicts||0} · تعارضات الأسعار ${cloud.priceConflicts}${cloud.lastError?' · تعذر آخر اتصال':''}`:'لم تُربط جلسة المزامنة السحابية لهذا الجهاز.';const postings=await api('cloud/posting-conflicts');$('posting-conflicts').replaceChildren();for(const c of postings.conflicts)addText($('posting-conflicts'),`${c.event_id.slice(0,8)} · ${postingReason(c.reason)}`);const {conflicts}=await api('cloud/conflicts');$('price-conflicts').replaceChildren();for(const c of conflicts){const row=addText($('price-conflicts'),`${c.sku} · ${c.reason==='UNKNOWN_LOCAL_SKU'?'الصنف غير موجود محليًا':'رقم إصدار السعر مستخدم بقيم أخرى'}`);button(row,'إعادة الفحص',async()=>{const r=await api('cloud/conflicts/'+c.id+'/retry','POST');message(r.outcome==='applied'?'تم تطبيق السعر.':'التعارض ما زال يحتاج مراجعة.');await refresh();});}const {devices}=await api('devices');$('devices').replaceChildren();for(const d of devices){const row=addText($('devices'),`${d.name} · ${d.role} · ${d.revoked?'ملغى':'نشط'}`);if(!d.revoked)button(row,'إلغاء الربط',async()=>{await api('devices/'+d.id,'DELETE');await refresh();});}}
+ if(session.admin){drawPrinterSettings(printers.details||{});await refreshStaff();const cloud=await api('cloud/status');$('cloud-status').textContent=cloud.configured?`تم استلام ${cloud.replicatedSales} عملية · رُحلت رسميًا ${cloud.postedSales||0} · معلقة للمراجعة ${cloud.postingConflicts||0} · تعارضات الأسعار ${cloud.priceConflicts}${cloud.lastError?' · تعذر آخر اتصال':''}`:'لم تُربط جلسة المزامنة السحابية لهذا الجهاز.';const postings=await api('cloud/posting-conflicts');$('posting-conflicts').replaceChildren();for(const c of postings.conflicts)addText($('posting-conflicts'),`${c.event_id.slice(0,8)} · ${postingReason(c.reason)}`);const {conflicts}=await api('cloud/conflicts');$('price-conflicts').replaceChildren();for(const c of conflicts){const row=addText($('price-conflicts'),`${c.sku} · ${c.reason==='UNKNOWN_LOCAL_SKU'?'الصنف غير موجود محليًا':'رقم إصدار السعر مستخدم بقيم أخرى'}`);button(row,'إعادة الفحص',async()=>{const r=await api('cloud/conflicts/'+c.id+'/retry','POST');message(r.outcome==='applied'?'تم تطبيق السعر.':'التعارض ما زال يحتاج مراجعة.');await refresh();});}const {devices}=await api('devices');$('devices').replaceChildren();for(const d of devices){const row=addText($('devices'),`${d.name} · ${d.role} · ${d.revoked?'ملغى':'نشط'}`);if(!d.revoked)button(row,'إلغاء الربط',async()=>{await api('devices/'+d.id,'DELETE');await refresh();});}}
 }
 function lockStaff(){staffToken='';$('workspace').hidden=true;$('staff-login').hidden=false;$('login').hidden=true;$('logout').hidden=false;$('staff-switch').hidden=true;$('staff-password').value='';}
 async function openWorkspace(current){
@@ -63,7 +63,7 @@ $('checkout').onclick=async()=>{
   if(!pending){pending={...scope(),key:crypto.randomUUID(),lines:structuredClone(cart)};localStorage.setItem(draftKey(),JSON.stringify(pending));}
   const result=await api('offline/sales','POST',pending);
   localStorage.removeItem(draftKey());pending=null;cart=[];drawCart();message(`تم حفظ البيع ${result.saleId} بقيمة ${(result.totalMinor/100).toFixed(2)}`);await refresh();
- }catch(e){message('لم يتم تأكيد العملية: '+e.message);drawCart();if(e.code==='INVALID_SALE'||e.code==='PRICE_CHANGED'||e.code?.startsWith('INSUFFICIENT_STOCK'))$('cancel-pending').hidden=false;}
+ }catch(e){message(e.code==='SALE_EVENT_TOO_LARGE'?'تفاصيل البيع كبيرة جدًا. ألغ الطلب المرفوض وقسّم الأصناف على عمليتين.':'لم يتم تأكيد العملية: '+e.message);drawCart();if(e.code==='SALE_EVENT_TOO_LARGE'||e.code==='INVALID_SALE'||e.code==='PRICE_CHANGED'||e.code?.startsWith('INSUFFICIENT_STOCK'))$('cancel-pending').hidden=false;}
 };
 $('device-form').onsubmit=async event=>{event.preventDefault();try{const d=await api('devices','POST',{...scope(),name:$('device-name').value,role:$('device-role').value});$('device-result').textContent='احفظ رمز الجهاز الآن: '+d.token;await refresh();}catch(e){message(e.message);}};
 $('opening-form').onsubmit=async event=>{event.preventDefault();try{await api('offline/stock/opening','POST',{...scope(),sku:$('opening-sku').value,quantity:Number($('opening-qty').value),unitCostMinor:Math.round(Number($('opening-cost').value)*100)});message('تم حفظ الرصيد الافتتاحي.');await refresh();}catch(e){message(e.message);}};
@@ -102,4 +102,20 @@ $('staff-reset').onsubmit=async event=>{
  event.preventDefault();const b=event.submitter;b.disabled=true;const password=$('reset-staff-password').value;$('reset-staff-password').value='';
  try{await api('staff/'+$('reset-staff-id').value,'PATCH',{password,role:$('reset-staff-role').value});message('تم تغيير البيانات وإغلاق جلسات الموظف.');await refreshStaff();}
  catch{message('تعذر تغيير بيانات الموظف.');}finally{b.disabled=false;}
+};
+
+function drawPrinterSettings(printers){
+ $('printer-settings-list').replaceChildren();
+ for(const [id,p] of Object.entries(printers)){
+  const row=addText($('printer-settings-list'),`${id} · ${p.host}:${p.port} · ${p.format==='raster'?'صورة':'نص'}`);
+  const b=document.createElement('button');b.type='button';b.textContent='تعديل';b.onclick=()=>{
+   $('settings-printer-id').value=id;$('settings-printer-host').value=p.host;$('settings-printer-port').value=p.port;
+   $('settings-printer-format').value=p.format;$('settings-printer-dots').value=p.dots||576;
+  };row.append(b);
+ }
+}
+$('printer-settings-form').onsubmit=async event=>{
+ event.preventDefault();const b=event.submitter;b.disabled=true;
+ try{await api('printers/'+$('settings-printer-id').value,'PUT',{...scope(),host:$('settings-printer-host').value,port:Number($('settings-printer-port').value),format:$('settings-printer-format').value,dots:Number($('settings-printer-dots').value)});message('تم حفظ إعداد الطابعة على خادم الفرع.');await refresh();}
+ catch(e){message(e.code==='PRINTER_HAS_PENDING_JOBS'?'توجد مهام لهذه الطابعة. راجع حالتها قبل تغيير الوجهة.':'تعذر حفظ الطابعة. استخدم عنوان IPv4 محليًا ومنفذًا صحيحًا.');}finally{b.disabled=false;}
 };

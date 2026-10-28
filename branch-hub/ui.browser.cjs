@@ -21,6 +21,10 @@ async function main(){
   await page.goto(`http://127.0.0.1:${port}`);await login(token);
   await page.locator('#opening-sku').fill('coffee');await page.locator('#opening-qty').fill('10');await page.locator('#opening-cost').fill('1.20');
   await page.locator('#opening-form button').click();await page.waitForFunction(()=>document.getElementById('stock').textContent.includes('coffee'));
+  await page.locator('#settings-printer-host').fill('127.0.0.1');await page.locator('#settings-printer-port').fill('9100');
+  await page.locator('#settings-printer-format').selectOption('raster');await page.locator('#settings-printer-dots').selectOption('384');
+  await page.locator('#printer-settings-form button').first().click();await page.waitForFunction(()=>document.getElementById('printer-settings-list').textContent.includes('127.0.0.1'));
+  assert.equal(JSON.parse(hub.db.prepare('SELECT config FROM hub_printers').get().config).format,'raster');
   const registry=createDeviceRegistry(hub.db,'branch_001');const device=registry.issue({name:'Tablet',role:'cashier'});
   // Create the employee through the real administrator UI before enforcing the second login step.
   await page.locator('#new-staff-username').fill('cashier');await page.locator('#new-staff-name').fill('موظف الاختبار');
