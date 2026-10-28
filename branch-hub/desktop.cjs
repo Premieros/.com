@@ -45,7 +45,7 @@ async function showBrowserApp(){
   erpWindow.webContents.on('will-navigate',(event,target)=>{if(new URL(target).origin!==new URL(url).origin)event.preventDefault();});
   erpWindow.on('close',event=>{if(worker&&!app.isQuitting&&tray){event.preventDefault();erpWindow.hide();}});
   await erpWindow.loadURL(url);
- }catch{dialog.showErrorBox('Premier','تعذر فتح واجهة النظام الكامل. تأكد من توفر المنفذ المحلي 3848 واستخدم قائمة الفرع لفتح التشغيل المحلي.');}finally{browserAppOpening=false;}
+ }catch{if(erpWindow&&!erpWindow.isDestroyed())erpWindow.destroy();erpWindow=null;if(activeWindow&&!activeWindow.isDestroyed())activeWindow.show();dialog.showErrorBox('Premier','تعذر فتح واجهة النظام الكامل. تأكد من توفر المنفذ المحلي 3848 واستخدم قائمة الفرع لفتح التشغيل المحلي.');}finally{browserAppOpening=false;}
 }
 function startHub(c) {
   desktopOrigin({hostname:c.localHostname||'127.0.0.1',port:c.port||3847,tls:Boolean(c.tlsKey)});
@@ -57,7 +57,7 @@ function startHub(c) {
    app.getFileIcon(process.execPath).then(icon=>{
     if(tray)return;tray=new Tray(icon);tray.setToolTip('Premier • خادم الفرع المحلي');
     const show=()=>{showBrowserApp();};
-    tray.on('double-click',show);tray.setContextMenu(Menu.buildFromTemplate([{label:'فتح Premier',click:show},{type:'separator'},{label:'إيقاف خادم الفرع والخروج',click:()=>app.quit()}]));
+    tray.on('double-click',show);tray.setContextMenu(Menu.buildFromTemplate([{label:'فتح Premier',click:show},{label:'التشغيل المحلي وإعدادات الفرع',click:showLocal},{type:'separator'},{label:'إيقاف خادم الفرع والخروج',click:()=>app.quit()}]));
    }).catch(()=>{});
   }
   const env={...process.env,ELECTRON_RUN_AS_NODE:'1',BRANCH_HUB_HOST:c.host||'127.0.0.1',

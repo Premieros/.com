@@ -6,7 +6,25 @@ on:
       - 'branch-hub/**'
       - '.github/workflows/build-branch-hub-windows.yml'
 jobs:
+  browser-application:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.2'
+      - run: npm ci --no-audit --no-fund
+      - run: node branch-hub/build-browser-app.cjs
+      - run: npx playwright install --with-deps chromium
+      - run: node branch-hub/browser-app.browser.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Branch-Hub-Full-Browser-Application
+          path: branch-hub/browser-app/
+          if-no-files-found: error
   windows-build:
+    needs: browser-application
     strategy:
       fail-fast: false
       matrix:
@@ -35,10 +53,10 @@ jobs:
           if ($test.ExitCode -ne 0 -or !(Test-Path $report)) { throw "Desktop security smoke failed" }
           $result = Get-Content $report -Raw | ConvertFrom-Json
           if (!$result.ok -or !$result.dpapi -or !$result.sandboxedSetup) { throw "OS vault or setup UI failed" }
-      - name: Install full browser application dependencies
-        run: npm ci --no-audit --no-fund
-      - name: Bundle the same browser application for desktop
-        run: node branch-hub/build-browser-app.cjs
+      - uses: actions/download-artifact@v4
+        with:
+          name: Branch-Hub-Full-Browser-Application
+          path: branch-hub/browser-app/
       - name: Package Windows installer
         working-directory: branch-hub
         run: npm run build:win
