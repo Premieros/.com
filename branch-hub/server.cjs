@@ -6,6 +6,7 @@ const http = require('node:http');
 const https = require('node:https');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const { createBackupService } = require('./backup-service.cjs');
 const { auditOfflineSales } = require('./integrity.cjs');
 const { validateRecoveryDatabase } = require('./recovery-validation.cjs');
 const { createPrintWorker } = require('./print-worker.cjs');
@@ -99,6 +100,11 @@ function createHub(config = {}) {
     } catch (error) { fs.rmSync(destination, { force:true }); throw error; }
     return { filename, bytes:fs.statSync(destination).size };
   }
+  const backupKey=config.backupKey || process.env.BRANCH_HUB_BACKUP_KEY;
+  const backupService=backupKey ? createBackupService({db,dir,organizationId,branchId,key:backupKey,
+    createSnapshot:createLocalBackup,intervalMs:config.backupIntervalMs,
+    mirrorDir:config.backupMirrorDir || process.env.BRANCH_HUB_BACKUP_MIRROR}) : null;
+  if(backupService)backupService.start();
   const send = (res, status, body) => {
     res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
     res.end(JSON.stringify(body));
@@ -169,8 +175,9 @@ function createHub(config = {}) {
     if (pathname.startsWith('/api/v1/devices/') && req.method === 'DELETE') {
       return send(res,devices.revoke(pathname.slice('/api/v1/devices/'.length))?200:404,{ok:true});
     }
+    if(pathname === '/api/v1/backups' && req.method === 'GET')return send(res,200,{encrypted:Boolean(backupService),scheduled:Boolean(backupService),latest:backupService?.status()||null});
     if (pathname === '/api/v1/backups' && req.method === 'POST') {
-      try { return send(res,201,createLocalBackup()); }
+      try { return send(res,201,backupService?await backupService.run():createLocalBackup()); }
       catch { return send(res,500,{error:'BACKUP_FAILED'}); }
     }
     if ((pathname === '/api/v1/devices' || pathname === '/api/v1/offline/stock/opening') && req.method === 'POST') {
@@ -320,8 +327,8 @@ function createHub(config = {}) {
   const server = keyFile && certFile
     ? https.createServer({ key: fs.readFileSync(keyFile), cert: fs.readFileSync(certFile) }, handler)
     : http.createServer(handler);
-  return { server, db, createLocalBackup, printWorker, listen: () => new Promise(resolve => server.listen(port, host, () => resolve(server.address()))),
-    close: async () => { await printWorker.stop(); return new Promise(resolve => server.close(() => { db.close(); resolve(); })); } };
+  return { server, db, createLocalBackup, printWorker, backupService, listen: () => new Promise(resolve => server.listen(port, host, () => resolve(server.address()))),
+    close: async () => { if(backupService)await backupService.stop(); await printWorker.stop(); return new Promise(resolve => server.close(() => { db.close(); resolve(); })); } };
 }
 if (require.main === module) {
   const hub = createHub();

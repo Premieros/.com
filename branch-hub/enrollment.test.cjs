@@ -64,7 +64,7 @@ test('legacy configuration migrates only after encryption verification; unavaila
   const file=path.join(dir,'branch-config.json');fs.writeFileSync(file,JSON.stringify(legacy));
   const unavailable=createConfigVault(dir,{isEncryptionAvailable:()=>false});
   assert.throws(()=>unavailable.loadOrMigrate(),/OS_CREDENTIAL_VAULT_UNAVAILABLE/);assert.equal(fs.existsSync(file),true);
-  const vault=createConfigVault(dir,storage());assert.deepEqual(vault.loadOrMigrate(),legacy);assert.equal(fs.existsSync(file),false);
+  const vault=createConfigVault(dir,storage());const migrated=vault.loadOrMigrate();assert.match(migrated.backupKey,/^[0-9a-f]{64}$/);delete migrated.backupKey;assert.deepEqual(migrated,legacy);assert.equal(fs.existsSync(file),false);
   const unsafe=createConfigVault(dir,{isEncryptionAvailable:()=>true,getSelectedStorageBackend:()=> 'basic_text'},'linux');
   assert.throws(()=>unsafe.load(),/OS_CREDENTIAL_VAULT_UNAVAILABLE/);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}

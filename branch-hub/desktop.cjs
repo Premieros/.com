@@ -10,7 +10,7 @@ const path = require('node:path');
 let worker;
 if (!app.requestSingleInstanceLock()) { app.exit(0); }
 let activeWindow;
-let setupWindow, localOrigin, localToken;
+let setupWindow, localOrigin, localToken, localBackupKey;
 const setupURL=pathToFileURL(path.join(__dirname,'ui/setup.html')).href;
 function createWindow(status, localURL) {
  const win=new BrowserWindow({width:940,height:650,minWidth:650,minHeight:450,
@@ -29,10 +29,10 @@ function createWindow(status, localURL) {
 }
 function startHub(c) {
   if(c.localHostname && !['localhost','127.0.0.1','::1'].includes(c.localHostname))throw Error('INVALID_DESKTOP_HOST');
-  localToken=c.token;
+  localToken=c.token;localBackupKey=c.backupKey;
   const env={...process.env,ELECTRON_RUN_AS_NODE:'1',BRANCH_HUB_HOST:c.host||'127.0.0.1',
    BRANCH_HUB_BRANCH_ID:c.branchId,BRANCH_HUB_ORGANIZATION_ID:c.organizationId,
-   BRANCH_HUB_TOKEN:c.token,BRANCH_HUB_PORT:String(c.port||3847),
+   BRANCH_HUB_TOKEN:c.token,BRANCH_HUB_BACKUP_KEY:c.backupKey||'',BRANCH_HUB_BACKUP_MIRROR:c.backupMirrorDir||'',BRANCH_HUB_PORT:String(c.port||3847),
    BRANCH_HUB_PRINTERS:JSON.stringify(c.printers||{}),BRANCH_HUB_TLS_KEY:c.tlsKey||'',BRANCH_HUB_TLS_CERT:c.tlsCert||'',
    BRANCH_HUB_DATA_DIR:path.join(app.getPath('userData'),'branch-data')};
   worker=fork(path.join(__dirname,'server.cjs'),[],{execPath:process.execPath,env,stdio:['ignore','ignore','ignore','ipc']});
@@ -59,6 +59,16 @@ app.whenReady().then(()=>{
    if(!activeWindow || event.sender!==activeWindow.webContents || event.senderFrame!==event.sender.mainFrame ||
      !localOrigin || new URL(event.senderFrame.url).origin!==localOrigin)throw Error('FORBIDDEN');
    return localToken;
+  });
+  ipcMain.handle('hub:export-recovery-key',async event=>{
+   if(!activeWindow||event.sender!==activeWindow.webContents||event.senderFrame!==event.sender.mainFrame||
+     !localOrigin||new URL(event.senderFrame.url).origin!==localOrigin||!localBackupKey)return {ok:false};
+   const choice=await dialog.showSaveDialog(activeWindow,{title:'احفظ مفتاح الاستعادة في مكان آمن منفصل عن النسخ الاحتياطية',defaultPath:'Premier-recovery-key.json',filters:[{name:'Recovery key',extensions:['json']}]});
+   if(choice.canceled)return {ok:false,canceled:true};
+   try{
+    fs.writeFileSync(choice.filePath,JSON.stringify({format:'premier-backup-key-v1',projectRef:'hvqlkapynjfjikqithvd',backupKey:localBackupKey},null,2),{flag:'wx',mode:0o600});
+    return {ok:true};
+   }catch{return {ok:false,error:'RECOVERY_KEY_SAVE_FAILED'};}
   });
   if(c){startHub(c);return;}
   const controller=createEnrollmentController({client:createCloudClient(),vault,dataDir:path.join(userDir,'branch-data')});

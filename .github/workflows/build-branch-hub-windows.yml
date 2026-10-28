@@ -27,6 +27,7 @@ jobs:
           $script = Resolve-Path "branch-hub/desktop-shell-smoke.cjs"
           $report = Join-Path $env:RUNNER_TEMP "hub-desktop-security.json"
           $test = Start-Process -FilePath $electron.Path -ArgumentList "`"$($script.Path)`"", "`"$report`"" -Wait -PassThru
+          if (Test-Path $report) { Get-Content $report }
           if ($test.ExitCode -ne 0 -or !(Test-Path $report)) { throw "Desktop security smoke failed" }
           $result = Get-Content $report -Raw | ConvertFrom-Json
           if (!$result.ok -or !$result.dpapi -or !$result.sandboxedSetup) { throw "OS vault or setup UI failed" }

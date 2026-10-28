@@ -21,8 +21,9 @@ function createConfigVault(dir,storage,platform=process.platform){
   if(envelope.version!==1||typeof envelope.ciphertext!=='string')throw Error('INVALID_CONFIG_VAULT');
   return validate(JSON.parse(storage.decryptString(Buffer.from(envelope.ciphertext,'base64'))));
  }
- function save(config){
+ function save(config,replace=false){
   available();validate(config);
+  if(replace){const old=load();if(!old||old.token!==config.token||old.branchId!==config.branchId||old.organizationId!==config.organizationId)throw Error('VAULT_BINDING_MISMATCH');}
   const ciphertext=storage.encryptString(JSON.stringify(config));
   if(JSON.stringify(JSON.parse(storage.decryptString(ciphertext)))!==JSON.stringify(config))throw Error('VAULT_VERIFICATION_FAILED');
   fs.mkdirSync(dir,{recursive:true,mode:0o700});
@@ -30,14 +31,15 @@ function createConfigVault(dir,storage,platform=process.platform){
   try{
    fs.writeFileSync(temporary,JSON.stringify({version:1,ciphertext:ciphertext.toString('base64')}),{flag:'wx',mode:0o600});
    const fd=fs.openSync(temporary,'r+');try{fs.fsyncSync(fd);}finally{fs.closeSync(fd);}
-   fs.linkSync(temporary,file); // Never replace another enrollment, including a concurrent one.
+   if(replace)fs.renameSync(temporary,file);else fs.linkSync(temporary,file); // First enrollment is always exclusive.
   }finally{fs.rmSync(temporary,{force:true});}
  }
  function loadOrMigrate(){
-  const current=load();if(current)return current;
+  const current=load();if(current){if(!current.backupKey){current.backupKey=crypto.randomBytes(32).toString('hex');save(current,true);}return current;}
   const legacy=path.join(dir,'branch-config.json');
   if(!fs.existsSync(legacy))return null;
   const config=validate(JSON.parse(fs.readFileSync(legacy,'utf8')));
+  if(!config.backupKey)config.backupKey=crypto.randomBytes(32).toString('hex');
   save(config);
   const verified=load();
   fs.unlinkSync(legacy);return verified;

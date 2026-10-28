@@ -27,7 +27,7 @@ function createEnrollmentController({client,vault,dataDir,clock=Date.now}){
    }
    const config={projectRef:verified.projectRef,organizationId:verified.organizationId,branchId:verified.id,
     enrolledBy:verified.enrolledBy,enrolledAt:new Date(clock()).toISOString(),hubDeviceId:crypto.randomUUID(),
-    token:crypto.randomBytes(32).toString('base64url')};
+    backupKey:crypto.randomBytes(32).toString('hex'),token:crypto.randomBytes(32).toString('base64url')};
    vault.save(config);session=null;
    return config;
   });},

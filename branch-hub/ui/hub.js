@@ -57,3 +57,5 @@ $('backup').onclick=async()=>{try{const b=await api('backups','POST');$('backup-
 $('cancel-pending').onclick=()=>{localStorage.removeItem(draftKey());pending=null;cart=[];drawCart();message('تم إلغاء الطلب المرفوض. يمكنك بدء بيع جديد.');};
 
 if(window.branchHub){window.branchHub.localCredential().then(value=>{if(value){$('credential').value=value;$('login-form').requestSubmit();}}).catch(()=>{});}
+
+if(window.branchHub){$('recovery-key').hidden=false;$('recovery-key').onclick=async()=>{const result=await window.branchHub.exportRecoveryKey();message(result.ok?'تم حفظ مفتاح الاستعادة. احتفظ به منفصلًا عن النسخ الاحتياطية.':result.canceled?'تم إلغاء الحفظ.':'تعذر حفظ المفتاح. اختر ملفًا جديدًا.');};}
