@@ -44,7 +44,11 @@ function createStaffRegistry(db,branchId,{clock=Date.now,resetSessions=false}={}
    db.prepare('DELETE FROM hub_staff_limits WHERE branch_id=? AND reset_at<=?').run(branchId,now);
    for(const [subject,limit] of [['device:'+deviceId,20],['user:'+digest(username),5]]){
     const row=db.prepare('SELECT attempts FROM hub_staff_limits WHERE branch_id=? AND subject=?').get(branchId,subject);
-    if(row?.attempts>=limit){audit('device:'+deviceId,'staff.login_limited',deviceId);return false;}
+    if(row?.attempts>=limit){
+     // Record the lockout once per budget window; repeated denied calls must not flood the audit table.
+     if(row.attempts===limit){db.prepare('UPDATE hub_staff_limits SET attempts=attempts+1 WHERE branch_id=? AND subject=?').run(branchId,subject);audit('device:'+deviceId,'staff.login_limited',deviceId);}
+     return false;
+    }
    }
    for(const subject of ['device:'+deviceId,'user:'+digest(username)])db.prepare(`INSERT INTO hub_staff_limits(branch_id,subject,attempts,reset_at) VALUES(?,?,1,?)
     ON CONFLICT(branch_id,subject) DO UPDATE SET attempts=attempts+1`).run(branchId,subject,now+WINDOW);

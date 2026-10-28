@@ -46,6 +46,8 @@ test('failed login budget survives restart and applies across devices without re
   for(let n=0;n<5;n++)assert.equal(await registry.login(n%2?a.id:b.id,{username:'cashier',password:'wrong-password'}),null);
   const restarted=createStaffRegistry(db,'branch_001',{clock:()=>10000000});
   await assert.rejects(restarted.login(a.id,{username:'cashier',password}),/STAFF_LOGIN_LIMITED/);
+  for(let n=0;n<20;n++)await assert.rejects(registry.login(a.id,{username:'cashier',password}),/STAFF_LOGIN_LIMITED/);
+  assert.equal(db.prepare("SELECT count(*) n FROM hub_audit WHERE action='staff.login_limited'").get().n,1);
   assert.equal(await registry.login(a.id,{username:'unknown',password}),null);
   advance(15*60*1000);assert((await registry.login(a.id,{username:'cashier',password})).token);
  }finally{await registry.stop();db.close();}
