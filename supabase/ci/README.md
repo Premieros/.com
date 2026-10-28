@@ -1,0 +1,9 @@
+# Disposable database replay
+
+`replay-migrations.cjs` is a GitHub Actions fixture entry point for `Premieros/.com` only. It accepts the locked project reference and the PostgreSQL container at localhost/127.0.0.1:5432/postgres. It rejects URL options, other hosts/projects, non-CI execution, existing public tables and any existing auth schema **before** applying the CI auth stub or migrations.
+
+One historical `pg_get_functiondef` snapshot, `20261023150600_raw_published_price_asof_helper.sql`, lacks the statement terminator between its function definition and the following REVOKE. The fixture generator checks the exact source SHA-256 and exact single replacement, then inserts one semicolon in a temporary copy. All other migration bytes are copied unchanged. Source drift fails closed and requires a new review. Historical repository files and the normal migration runner/checksum rules are unchanged.
+
+The isolated database records checksums of the SQL actually replayed. The uploaded `canonical-ci-replay-manifest` contains both the original and replay checksums for every file and identifies the one delimiter repair. Temporary SQL is removed after the run. This fixture is not a production migration repair or an approved replacement for production migration history; reconciliation of a real database remains a separate reviewed operation.
+
+Run its filesystem/target guard tests with `node --test supabase/ci/replay-migrations.test.cjs`. The workflow verifies the resulting schema and runs the existing integration/RLS suites after replay. Those must pass before considering the replay validated.
