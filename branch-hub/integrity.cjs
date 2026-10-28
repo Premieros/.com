@@ -23,6 +23,8 @@ function auditOfflineSales(db,branchId) {
  return {missingOutbox,unbalanced,missingMovements,invalidPostings,invalidEvents};
 }
 function invalidOfflineEvents(db,branchId,eventId){
+ // Pre-v4 recovery snapshots have no per-line mapping column; their unmapped events remain verifiable read-only.
+ const lineCanonical=db.prepare('PRAGMA table_info(offline_sale_lines)').all().some(c=>c.name==='canonical')?'l.canonical':'NULL';
  const query=`SELECT count(*) n FROM offline_outbox o WHERE o.branch_id=? ${eventId?'AND o.event_id=?':''} AND
   CASE WHEN json_valid(o.payload) THEN
    COALESCE(json_extract(o.payload,'$.saleId'),'') != o.sale_id
@@ -36,9 +38,9 @@ function invalidOfflineEvents(db,branchId,eventId){
      ON l.sale_id=o.sale_id AND l.sku=json_extract(e.value,'$.sku') WHERE l.sale_id IS NULL
      OR l.quantity IS NOT json_extract(e.value,'$.quantity') OR l.price_minor IS NOT json_extract(e.value,'$.priceMinor')
      OR l.cost_minor IS NOT json_extract(e.value,'$.costMinor')
-     OR json_extract(l.canonical,'$.productId') IS NOT json_extract(e.value,'$.canonical.productId')
-     OR json_extract(l.canonical,'$.warehouseId') IS NOT json_extract(e.value,'$.canonical.warehouseId')
-     OR json_extract(l.canonical,'$.unitName') IS NOT json_extract(e.value,'$.canonical.unitName'))
+     OR json_extract(${lineCanonical},'$.productId') IS NOT json_extract(e.value,'$.canonical.productId')
+     OR json_extract(${lineCanonical},'$.warehouseId') IS NOT json_extract(e.value,'$.canonical.warehouseId')
+     OR json_extract(${lineCanonical},'$.unitName') IS NOT json_extract(e.value,'$.canonical.unitName'))
   ELSE 1 END`;
  return db.prepare(query).get(...(eventId?[branchId,eventId]:[branchId])).n;
 }
