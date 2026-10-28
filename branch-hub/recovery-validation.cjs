@@ -24,6 +24,21 @@ function validateRecoveryDatabase(db, organizationId, branchId) {
   }
   if(version>=3 && !db.prepare('PRAGMA table_info(hub_identity)').all().some(c=>c.name==='installation_id'))throw Error('BACKUP_MISSING_INSTALLATION_BINDING');
   if(version>=4&&!db.prepare('PRAGMA table_info(offline_sale_lines)').all().some(c=>c.name==='canonical'))throw Error('BACKUP_MISSING_ITEM_LINK_SNAPSHOT');
+  if(version>=4){
+    const inconsistent=db.prepare(`SELECT count(*) n FROM offline_outbox o
+      LEFT JOIN cloud_posted_sales p ON p.event_id=o.event_id
+      WHERE o.branch_id=? AND ((o.status='acknowledged') != (p.event_id IS NOT NULL)
+       OR (p.event_id IS NOT NULL AND (p.branch_id!=o.branch_id
+         OR p.total_minor!=json_extract(o.payload,'$.totalMinor')
+         OR p.cost_minor!=(SELECT sum(json_extract(value,'$.costMinor')) FROM json_each(o.payload,'$.lines')))))`).get(branchId).n;
+    if(inconsistent)throw Error('BACKUP_CANONICAL_PROOF_MISMATCH');
+    const crypto=require('node:crypto');
+    for(const proof of db.prepare(`SELECT p.payload_hash,o.payload FROM cloud_posted_sales p
+      JOIN offline_outbox o ON o.event_id=p.event_id WHERE p.branch_id=?`).all(branchId)){
+      if(crypto.createHash('sha256').update(proof.payload).digest('hex')!==proof.payload_hash)
+        throw Error('BACKUP_CANONICAL_PROOF_MISMATCH');
+    }
+  }
   const audit=auditOfflineSales(db,branchId);
   const receipts = db.prepare(`SELECT count(*) n FROM local_receipts r LEFT JOIN sync_outbox o
     ON o.entity_id=r.id AND o.branch_id=r.branch_id WHERE o.event_id IS NULL`).get().n;

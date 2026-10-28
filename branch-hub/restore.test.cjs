@@ -60,3 +60,15 @@ test('restore rejects a snapshot missing print delivery history rather than risk
   assert.throws(()=>restoreToEmptyDirectory({backupPath:file,dataDir:path.join(root,'restored'),organizationId:'org_001',branchId:'branch_001'}),/BACKUP_MISSING_TABLE: print_dispatches/);
  }finally{await hub.close();fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('recovery refuses an acknowledged financial outbox without its canonical proof',async()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'hub-proof-restore-'));
+ const hub=createHub({port:0,dataDir:path.join(root,'source'),organizationId:'org_001',branchId:'branch_001',token:'t'.repeat(40)});
+ try{
+  await hub.listen();const engine=createOfflineSalesEngine(hub.db,'branch_001');
+  engine.setOpeningStock('sku',3,50);engine.commitSale({key:'proof-restore-001',lines:[{sku:'sku',quantity:1,priceMinor:100}]});
+  const file=path.join(root,'source','backups',hub.createLocalBackup().filename);
+  const db=new DatabaseSync(file);db.exec("UPDATE offline_outbox SET status='acknowledged'");db.close();
+  assert.throws(()=>restoreToEmptyDirectory({backupPath:file,dataDir:path.join(root,'restored'),organizationId:'org_001',branchId:'branch_001'}),/BACKUP_CANONICAL_PROOF_MISMATCH/);
+ }finally{await hub.close();fs.rmSync(root,{recursive:true,force:true});}
+});

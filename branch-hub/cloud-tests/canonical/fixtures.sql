@@ -26,6 +26,9 @@ CREATE TABLE public.journal_entries(id uuid PRIMARY KEY DEFAULT gen_random_uuid(
 CREATE TABLE public.journal_entry_lines(id bigserial PRIMARY KEY,journal_entry_id uuid REFERENCES journal_entries(id),account_id uuid,debit numeric,credit numeric,customer_id uuid,supplier_id uuid,note text);
 CREATE TABLE public.test_audit(id bigserial PRIMARY KEY,reference_id uuid,details jsonb);
 CREATE TABLE private.pos_sale_idempotency(branch_id uuid,operation_key text,operation_kind text,request_hash text,sale_id uuid,response jsonb,created_by uuid,PRIMARY KEY(branch_id,operation_key));
+CREATE TABLE public.shifts(id uuid,branch_id uuid,status text,opened_at timestamptz);
+CREATE TABLE public.dining_tables(id uuid,branch_id uuid,status text,updated_at timestamptz);
+CREATE TABLE public.orders(id uuid,branch_id uuid,table_id uuid,cashier_id uuid,status text,completed_at timestamptz,updated_at timestamptz);
 CREATE SEQUENCE public.test_document_number;
 CREATE FUNCTION public.next_document_number(p_type text) RETURNS jsonb LANGUAGE sql AS $$SELECT jsonb_build_object('number',nextval('public.test_document_number')::text)$$;
 CREATE FUNCTION public.is_pos_admin() RETURNS boolean LANGUAGE sql STABLE AS $$SELECT public.can_permission('branches.manage')$$;
