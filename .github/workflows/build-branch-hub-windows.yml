@@ -7,6 +7,10 @@ on:
       - '.github/workflows/build-branch-hub-windows.yml'
 jobs:
   windows-build:
+    strategy:
+      fail-fast: false
+      matrix:
+        installation: [1, 2, 3]
     timeout-minutes: 15
     runs-on: windows-latest
     steps:
@@ -50,7 +54,12 @@ jobs:
           $exe = $installers[0]
           $installDir = Join-Path $env:RUNNER_TEMP "hub-install-validation"
           $setup = Start-Process -FilePath $exe.FullName -ArgumentList "/S", "/D=$installDir" -Wait -PassThru
-          if ($setup.ExitCode -ne 0) { throw "Silent installation failed: $($setup.ExitCode)" }
+          if ($setup.ExitCode -ne 0) {
+            Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-5)} -ErrorAction SilentlyContinue |
+              Where-Object { $_.Message -match 'Branch.Hub|System.dll|nsis' } |
+              Select-Object TimeCreated, Id, Message | Format-List
+            throw "Silent installation failed: $($setup.ExitCode)"
+          }
           $installedExe = Join-Path $installDir "PremierOS Branch Hub.exe"
           if (!(Test-Path $installedExe)) { throw "Installed executable missing" }
           $env:ELECTRON_RUN_AS_NODE = "1"
@@ -65,7 +74,7 @@ jobs:
           (Get-FileHash $exe.FullName -Algorithm SHA256).Hash + "  " + $exe.Name | Set-Content ($exe.FullName + ".sha256")
       - uses: actions/upload-artifact@v4
         with:
-          name: PremierOS-Branch-Hub-Windows-Prototype
+          name: PremierOS-Branch-Hub-Windows-Prototype-${{ matrix.installation }}
           path: |
             branch-hub/release/*.exe
             branch-hub/release/*.sha256

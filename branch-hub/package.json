@@ -1,6 +1,6 @@
 {
   "name": "premier-branch-hub",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "private": true,
   "description": "Local-first branch gateway prototype for PremierOS",
   "engines": {
@@ -14,6 +14,6 @@
   "main": "desktop.cjs",
   "devDependencies": {
     "electron": "38.1.0",
-    "electron-builder": "26.0.12"
+    "electron-builder": "26.9.0"
   }
 }
