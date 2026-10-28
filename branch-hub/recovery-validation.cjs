@@ -9,12 +9,13 @@ function validateRecoveryDatabase(db, organizationId, branchId) {
   if (identity?.organization_id !== organizationId || identity?.branch_id !== branchId)
     throw Error('BACKUP_BRANCH_BINDING_MISMATCH');
   const version=db.prepare('PRAGMA user_version').get().user_version;
-  if(version>4)throw Error('BACKUP_UNSUPPORTED_VERSION');
+  if(version>5)throw Error('BACKUP_UNSUPPORTED_VERSION');
   const required = ['local_receipts','sync_outbox','jobs','offline_stock','offline_sales',
     'offline_sale_lines','offline_journal','offline_stock_movements','offline_outbox'];
   if(version>=1)required.push('hub_devices','hub_audit','print_dispatches');
   if(version>=2)required.push('offline_catalog','cloud_sale_receipts','cloud_price_inbox');
   if(version>=4)required.push('offline_item_links','cloud_posted_sales','cloud_posting_errors');
+  if(version>=5)required.push('hub_staff_policy','hub_staff','hub_staff_sessions','hub_staff_limits');
   for (const table of required) {
     if (!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table))
       throw Error('BACKUP_MISSING_TABLE: ' + table);
@@ -38,6 +39,10 @@ function validateRecoveryDatabase(db, organizationId, branchId) {
       if(crypto.createHash('sha256').update(proof.payload).digest('hex')!==proof.payload_hash)
         throw Error('BACKUP_CANONICAL_PROOF_MISMATCH');
     }
+  }
+  if(version>=5){
+    const policy=db.prepare('SELECT required FROM hub_staff_policy WHERE branch_id=?').get(branchId);
+    if(!policy||![0,1].includes(policy.required)||(policy.required===0&&db.prepare('SELECT count(*) n FROM hub_staff WHERE branch_id=?').get(branchId).n))throw Error('BACKUP_STAFF_POLICY_MISMATCH');
   }
   const audit=auditOfflineSales(db,branchId);
   const receipts = db.prepare(`SELECT count(*) n FROM local_receipts r LEFT JOIN sync_outbox o

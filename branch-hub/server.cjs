@@ -6,6 +6,7 @@ const http = require('node:http');
 const https = require('node:https');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const {createStaffRegistry}=require('./staff.cjs');
 const {stageUpdate}=require('./updates.cjs');
 const {createCloudClient}=require('./cloud-client.cjs');
 const {createSyncStore,createCloudSync}=require('./cloud-sync.cjs');
@@ -37,7 +38,7 @@ function createHub(config = {}) {
     path.join(process.env.APPDATA || path.join(os.homedir(), '.premieros'), 'PremierOS', 'BranchHub', branchId);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(path.join(dir, 'branch-hub.sqlite'));
-  if (db.prepare('PRAGMA user_version').get().user_version > 4) { db.close(); throw Error('UNSUPPORTED_DATABASE_VERSION'); }
+  if (db.prepare('PRAGMA user_version').get().user_version > 5) { db.close(); throw Error('UNSUPPORTED_DATABASE_VERSION'); }
   db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
   db.exec('CREATE TABLE IF NOT EXISTS hub_identity (singleton INTEGER PRIMARY KEY CHECK(singleton=1), organization_id TEXT NOT NULL, branch_id TEXT NOT NULL, installed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)');
   const identity = db.prepare('SELECT organization_id, branch_id FROM hub_identity WHERE singleton=1').get();
@@ -82,13 +83,14 @@ function createHub(config = {}) {
   if (Object.keys(printerConfig).length) printWorker.start();
   const devices = createDeviceRegistry(db, branchId);
   const offlineSales = createOfflineSalesEngine(db, branchId);
+  const staff=createStaffRegistry(db,branchId,{resetSessions:true});
   const installationId=config.installationId || process.env.BRANCH_HUB_INSTALLATION_ID;
   if(!db.prepare('PRAGMA table_info(hub_identity)').all().some(c=>c.name==='installation_id'))db.exec('ALTER TABLE hub_identity ADD COLUMN installation_id TEXT');
   const installationBinding=db.prepare('SELECT installation_id FROM hub_identity WHERE singleton=1').get().installation_id;
   if(installationId && installationBinding && installationBinding!==installationId){db.close();throw Error('INSTALLATION_BINDING_MISMATCH');}
   if(installationId && !installationBinding)db.prepare('UPDATE hub_identity SET installation_id=? WHERE singleton=1').run(installationId);
   const syncStore=createSyncStore(db,{organizationId,branchId,installationId});
-  db.exec('PRAGMA user_version=4');
+  db.exec('PRAGMA user_version=5');
   // SQLite VACUUM INTO creates a consistent snapshot even while WAL is enabled.
   // Backups stay on the server, never returned by the HTTP API.
   function createLocalBackup() {
@@ -138,10 +140,30 @@ function createHub(config = {}) {
     }
     if (pathname === '/health' && req.method === 'GET') return send(res, 200, { ok: true, service: 'premier-branch-hub', version: 1 });
     const bearer = String(req.headers.authorization || '').replace(/^Bearer /i, '');
-    const principal = checkToken(req.headers.authorization)
+    let principal = checkToken(req.headers.authorization)
       ? {id:'administrator',admin:true,allows:()=>true} : devices.authenticate(bearer);
     if (!principal) return send(res, 401, { error: 'UNAUTHORIZED' });
-    const adminPath = pathname.startsWith('/api/v1/devices') || pathname === '/api/v1/audit' ||
+    // Pairing identifies the device; an employee session never elevates its assigned role.
+    const device=principal;
+    if(pathname==='/api/v1/staff/login'&&req.method==='POST'&&!device.admin){
+      try{
+        let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>2048)return send(res,413,{error:'PAYLOAD_TOO_LARGE'});}
+        const result=await staff.login(device.id,JSON.parse(raw));
+        return result?send(res,200,result):send(res,401,{error:'STAFF_LOGIN_REJECTED'});
+      }catch(e){return send(res,['STAFF_LOGIN_LIMITED','STAFF_AUTH_BUSY'].includes(e.message)?429:401,{error:['STAFF_LOGIN_LIMITED','STAFF_AUTH_BUSY'].includes(e.message)?e.message:'STAFF_LOGIN_REJECTED'});}
+    }
+    if(pathname==='/api/v1/staff/logout'&&req.method==='POST'&&!device.admin){staff.logout(String(req.headers['x-hub-session']||''),device.id);return send(res,200,{ok:true});}
+    if(!device.admin){
+      const sessionToken=String(req.headers['x-hub-session']||'');
+      const employee=sessionToken?staff.authenticate(sessionToken,device):null;
+      if(sessionToken&&!employee)return send(res,401,{error:'STAFF_SESSION_REQUIRED'});
+      if(staff.required()&&!employee){
+        if(pathname==='/api/v1/session'&&req.method==='GET')return send(res,200,{organizationId,branchId,admin:false,staffLoginRequired:true,permissions:[]});
+        return send(res,401,{error:'STAFF_SESSION_REQUIRED'});
+      }
+      if(employee)principal=employee;
+    }
+    const adminPath = pathname.startsWith('/api/v1/staff') || pathname.startsWith('/api/v1/devices') || pathname === '/api/v1/audit' ||
       pathname === '/api/v1/backups' || pathname.startsWith('/api/v1/updates/') || pathname.startsWith('/api/v1/cloud/') || pathname === '/api/v1/jobs' && req.method === 'POST' || pathname.endsWith('/retry') || pathname === '/api/v1/offline/stock/opening';
     const permission = req.method === 'GET' ? 'read' :
       pathname === '/api/v1/offline/sales' ? 'sell' :
@@ -186,7 +208,19 @@ function createHub(config = {}) {
       if(!cloudSync)return send(res,409,{error:'CLOUD_ENROLLMENT_REQUIRED'});
       try{return send(res,200,await cloudSync.run());}catch{return send(res,503,{error:'CLOUD_SYNC_FAILED'});}
     }
-    if(pathname === '/api/v1/session' && req.method === 'GET')return send(res,200,{organizationId,branchId,admin:Boolean(principal.admin),permissions:['read','sell','print','stock'].filter(p=>principal.allows(p))});
+    if(pathname==='/api/v1/staff'&&req.method==='GET')return send(res,200,{staff:staff.list(),required:staff.required()});
+    if(pathname==='/api/v1/staff'&&req.method==='POST'){
+      try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>2048)return send(res,413,{error:'PAYLOAD_TOO_LARGE'});}
+        const input=JSON.parse(raw);if(input.branchId!==branchId||input.organizationId!==organizationId)return send(res,403,{error:'BRANCH_SCOPE_MISMATCH'});
+        return send(res,201,await staff.create(input,principal.id));
+      }catch{return send(res,400,{error:'STAFF_CREATE_REJECTED'});}
+    }
+    if(pathname.startsWith('/api/v1/staff/')&&req.method==='PATCH'){
+      try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>2048)return send(res,413,{error:'PAYLOAD_TOO_LARGE'});}
+        await staff.update(pathname.slice('/api/v1/staff/'.length),JSON.parse(raw),principal.id);return send(res,200,{ok:true});
+      }catch{return send(res,400,{error:'STAFF_UPDATE_REJECTED'});}
+    }
+    if(pathname === '/api/v1/session' && req.method === 'GET')return send(res,200,{organizationId,branchId,admin:Boolean(principal.admin),staffName:principal.name||null,staffLoginRequired:false,permissions:['read','sell','print','stock'].filter(p=>principal.allows(p))});
     if(pathname === '/api/v1/printers' && req.method === 'GET')return send(res,200,{printers:Object.keys(printerConfig)});
     if (pathname.startsWith('/api/v1/offline/sales/') && pathname.endsWith('/print') && req.method === 'POST') {
       const saleId=pathname.slice('/api/v1/offline/sales/'.length,-'/print'.length);
@@ -375,11 +409,12 @@ function createHub(config = {}) {
     }
     return send(res, 404, { error: 'NOT_FOUND' });
   };
+  const safeHandler=(req,res)=>handler(req,res).catch(()=>{if(!res.headersSent)send(res,503,{error:'LOCAL_SERVICE_UNAVAILABLE'});else res.destroy();});
   const server = keyFile && certFile
-    ? https.createServer({ key: fs.readFileSync(keyFile), cert: fs.readFileSync(certFile) }, handler)
-    : http.createServer(handler);
+    ? https.createServer({ key: fs.readFileSync(keyFile), cert: fs.readFileSync(certFile) }, safeHandler)
+    : http.createServer(safeHandler);
   return { server, db, createLocalBackup, printWorker, backupService, cloudSync, listen: () => new Promise(resolve => server.listen(port, host, () => resolve(server.address()))),
-    close: async () => { if(cloudSync)await cloudSync.stop(); if(backupService)await backupService.stop(); await printWorker.stop(); return new Promise(resolve => server.close(() => { db.close(); resolve(); })); } };
+    close: async () => { await staff.stop(); if(cloudSync)await cloudSync.stop(); if(backupService)await backupService.stop(); await printWorker.stop(); return new Promise(resolve => server.close(() => { db.close(); resolve(); })); } };
 }
 if (require.main === module) {
   const persistRefreshToken=process.send ? token=>new Promise((resolve,reject)=>{

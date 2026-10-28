@@ -73,7 +73,7 @@ test('recovery refuses an acknowledged financial outbox without its canonical pr
  }finally{await hub.close();fs.rmSync(root,{recursive:true,force:true});}
 });
 
-test('v3 backups restore read-only and upgrade to v4 without losing pending sales',async()=>{
+test('v3 backups restore read-only and upgrade to v5 without losing pending sales',async()=>{
  const root=fs.mkdtempSync(path.join(os.tmpdir(),'hub-v3-restore-'));
  const config={port:0,dataDir:path.join(root,'source'),organizationId:'org_001',branchId:'branch_001',token:'t'.repeat(40)};
  const hub=createHub(config);let upgraded;
@@ -87,7 +87,7 @@ test('v3 backups restore read-only and upgrade to v4 without losing pending sale
   assert.equal(restored.offlineSales,1);assert.equal(restored.offlinePending,1);
   const source=new DatabaseSync(file,{readOnly:true});assert.equal(source.prepare('PRAGMA user_version').get().user_version,3);source.close();
   upgraded=createHub({...config,dataDir});await upgraded.listen();
-  assert.equal(upgraded.db.prepare('PRAGMA user_version').get().user_version,4);
+  assert.equal(upgraded.db.prepare('PRAGMA user_version').get().user_version,5);
   assert.equal(upgraded.db.prepare('SELECT quantity FROM offline_stock').get().quantity,2);
   assert.equal(upgraded.db.prepare('SELECT status FROM offline_outbox').get().status,'pending');
   upgraded.createLocalBackup();

@@ -49,4 +49,4 @@ function createDeviceRegistry(db, branchId) {
   }
   return {issue,authenticate,revoke,audit};
 }
-module.exports={createDeviceRegistry};
+module.exports={createDeviceRegistry,roles};
