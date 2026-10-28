@@ -1,5 +1,6 @@
 'use strict';
 const { app, BrowserWindow, dialog, ipcMain, safeStorage, Tray, Menu } = require('electron');
+const {localOrigin:desktopOrigin}=require('./local-origin.cjs');
 const {pathToFileURL}=require('node:url');
 const {createCloudClient}=require('./cloud-client.cjs');
 const {createConfigVault}=require('./config-vault.cjs');
@@ -29,7 +30,7 @@ function createWindow(status, localURL) {
  });
 }
 function startHub(c) {
-  if(c.localHostname && !['localhost','127.0.0.1','::1'].includes(c.localHostname))throw Error('INVALID_DESKTOP_HOST');
+  desktopOrigin({hostname:c.localHostname||'127.0.0.1',port:c.port||3847,tls:Boolean(c.tlsKey)});
   localToken=c.token;localBackupKey=c.backupKey;
   if(process.platform==='win32'){
    app.setLoginItemSettings({openAtLogin:true});
@@ -57,8 +58,7 @@ function startHub(c) {
    }
    if(message?.type!=='ready' || ready)return;
    ready=true;clearTimeout(timer);
-   const scheme=c.tlsKey?'https':'http';
-   const url=`${scheme}://${c.localHostname||'127.0.0.1'}:${message.port}/`;
+   const url=desktopOrigin({hostname:c.localHostname||'127.0.0.1',port:message.port,tls:Boolean(c.tlsKey)})+'/';
    localOrigin=new URL(url).origin;
    createWindow('',url);
    if(setupWindow&&!setupWindow.isDestroyed())setupWindow.close();

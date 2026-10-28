@@ -88,7 +88,7 @@ This does **not install or run the EXE**. Publisher signing, automatic release p
 
 ## Cloud transport state
 
-Migration `20261028064511_branch_hub_replication_v1.sql` was applied to **hvqlkapynjfjikqithvd only**, after isolated PostgreSQL 17 RLS/replay tests. It adds three Branch Hub tables and invoker-only functions. Existing sales, stock and canonical accounting tables/records are untouched. Anonymous access and authenticated UPDATE/DELETE on replicated financial payloads are denied.
+Migration `20261028064511_branch_hub_replication_v1.sql` was applied to **hvqlkapynjfjikqithvd only**, after isolated PostgreSQL 17 RLS/replay tests. It adds three Branch Hub tables and invoker-only functions. Existing sales, stock and canonical accounting tables/records are untouched. Follow-up migrations `20261028065450` and `20261028065739` index these new tables and cache the caller identity in their policies. Anonymous access and authenticated UPDATE/DELETE on replicated financial payloads are denied.
 
 A newly enrolled desktop can refresh its encrypted cloud session and run automatic transport retries with bounded backoff. Rotated credentials must be durably saved by the desktop vault before any financial upload. Failure or internet loss leaves local checkout available.
 
