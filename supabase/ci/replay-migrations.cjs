@@ -58,11 +58,12 @@ async function main(){
    const {rows}=await db.query("SELECT current_user AS actor,current_database() AS database,(SELECT count(*)::int FROM pg_tables WHERE schemaname='public') AS tables,EXISTS(SELECT 1 FROM pg_namespace WHERE nspname='auth') AS auth_schema");
    assertFreshDatabase(rows[0]);
   }finally{await db.end();}
-  const report={ciOnly:true,projectRef:'hvqlkapynjfjikqithvd',sourceDirectory:'supabase/migrations',repairCount:manifest.filter(x=>x.repair).length,files:manifest};
+  const report={ciOnly:true,projectRef:'hvqlkapynjfjikqithvd',sourceDirectory:'supabase/migrations',repairCount:manifest.filter(x=>x.repair).length,supportingFixtures:[{file:'supabase/ci/raw_warehouse_movements_v2.sql',sha256:sha(fs.readFileSync(path.join(__dirname,'raw_warehouse_movements_v2.sql'),'utf8'))}],files:manifest};
   fs.writeFileSync(path.join(process.env.RUNNER_TEMP,'branch-hub-replay-manifest.json'),JSON.stringify(report,null,2),{flag:'wx',mode:0o600});
   const env={...process.env,SUPABASE_DB_URL:connectionString};
   await run(['--file','supabase/ci/stub_auth.sql'],env);
   await run(['--dir',output],env);
+  await run(['--file','supabase/ci/raw_warehouse_movements_v2.sql'],env);
   console.log('CI_REPLAY_COMPLETE: historical sources unchanged; two hash-pinned compatibility adjustments in disposable fixtures');
  }finally{fs.rmSync(staging,{recursive:true,force:true});}
 }
