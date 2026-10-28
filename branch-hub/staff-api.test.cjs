@@ -30,7 +30,15 @@ test('paired devices require offline employee login, enforce both roles, audit s
   const sold=await api('offline/sales',{method:'POST',device:device.token,session,body:sale});assert.equal(sold.status,201);
   assert.equal(hub.db.prepare("SELECT actor FROM hub_audit WHERE action='sale.commit'").get().actor,'staff:'+user.body.id);
   assert.equal((await api('offline/sales',{method:'POST',device:device.token,session,body:sale})).body.duplicate,true);
+  // A session-store write failure returns an unavailable response instead of crashing or bypassing staff auth.
+  hub.db.exec("CREATE TRIGGER fail_session_touch BEFORE UPDATE ON hub_staff_sessions BEGIN SELECT RAISE(ABORT,'injected auth IO failure'); END");
+  assert.equal((await api('session',{device:device.token,session})).status,503);
+  hub.db.exec('DROP TRIGGER fail_session_touch');assert.equal((await api('session',{device:device.token,session})).status,200);
   const file=path.join(config.dataDir,'backups',hub.createLocalBackup().filename);
+  const damaged=path.join(dir,'damaged-policy.sqlite');fs.copyFileSync(file,damaged);
+  const {DatabaseSync}=require('node:sqlite');const bad=new DatabaseSync(damaged);bad.exec('UPDATE hub_staff_policy SET required=0');bad.close();
+  assert.throws(()=>restoreToEmptyDirectory({backupPath:damaged,dataDir:path.join(dir,'bad-target'),...scope}),/BACKUP_STAFF_POLICY_MISMATCH/);
+  assert.equal(fs.existsSync(path.join(dir,'bad-target')),false);
   await hub.close();hub=createHub(config);port=(await hub.listen()).port;
   assert.equal((await api('offline/sales',{device:device.token,session})).status,401);
   session=(await login()).body.token;

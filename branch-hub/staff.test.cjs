@@ -61,3 +61,14 @@ test('staff creation/audit is atomic and an in-flight password check cannot surv
   await registry.update(user.id,{disabled:true});assert.equal(await pending,null);
  }finally{await registry.stop();db.close();}
 });
+test('active employee sessions cannot extend the eight-hour lifetime and concurrent hashing is bounded',async()=>{
+ const {db,devices,registry,advance}=fixture();try{
+  const device=devices.issue({name:'Till',role:'cashier'});await registry.create({username:'cashier',name:'Cashier',role:'cashier',password});
+  const login=await registry.login(device.id,{username:'cashier',password});const principal=devices.authenticate(device.token);
+  for(let n=0;n<16;n++){advance(29*60*1000);assert(registry.authenticate(login.token,principal));}
+  advance(17*60*1000);assert.equal(registry.authenticate(login.token,principal),null);
+  const attempts=await Promise.allSettled(Array.from({length:3},()=>registry.login(device.id,{username:'cashier',password})));
+  assert.equal(attempts.filter(x=>x.status==='rejected'&&x.reason.message==='STAFF_AUTH_BUSY').length,1);
+  assert.equal(attempts.filter(x=>x.status==='fulfilled'&&x.value?.token).length,2);
+ }finally{await registry.stop();db.close();}
+});
