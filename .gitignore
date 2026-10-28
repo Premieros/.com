@@ -36,3 +36,5 @@ test-results
 # Supabase temp
 .temp/
 supabase/.temp/
+
+branch-hub/browser-app/

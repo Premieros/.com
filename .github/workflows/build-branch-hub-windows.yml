@@ -6,7 +6,30 @@ on:
       - 'branch-hub/**'
       - '.github/workflows/build-branch-hub-windows.yml'
 jobs:
+  browser-application:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.22.2'
+      - run: npm ci --no-audit --no-fund
+      - run: node branch-hub/build-browser-app.cjs
+      - run: npx playwright install --with-deps chromium
+      - run: node branch-hub/browser-app.browser.cjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: Branch-Hub-Full-Browser-Application
+          path: branch-hub/browser-app/
+          if-no-files-found: error
   windows-build:
+    needs: browser-application
+    strategy:
+      fail-fast: false
+      matrix:
+        installation: [1, 2, 3]
+    timeout-minutes: 15
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -14,17 +37,69 @@ jobs:
         with:
           node-version: '22.16.0'
       - name: Unit tests
-        run: node --test branch-hub/server.test.cjs
+        working-directory: branch-hub
+        run: npm test
       - name: Install packager
         working-directory: branch-hub
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
+      - name: Verify native Windows credential vault and sandboxed enrollment UI
+        shell: pwsh
+        run: |
+          $electron = Resolve-Path "branch-hub/node_modules/electron/dist/electron.exe"
+          $script = Resolve-Path "branch-hub/desktop-shell-smoke.cjs"
+          $report = Join-Path $env:RUNNER_TEMP "hub-desktop-security.json"
+          $test = Start-Process -FilePath $electron.Path -ArgumentList "`"$($script.Path)`"", "`"$report`"" -Wait -PassThru
+          if (Test-Path $report) { Get-Content $report }
+          if ($test.ExitCode -ne 0 -or !(Test-Path $report)) { throw "Desktop security smoke failed" }
+          $result = Get-Content $report -Raw | ConvertFrom-Json
+          if (!$result.ok -or !$result.dpapi -or !$result.sandboxedSetup) { throw "OS vault or setup UI failed" }
+      - uses: actions/download-artifact@v4
+        with:
+          name: Branch-Hub-Full-Browser-Application
+          path: branch-hub/browser-app/
       - name: Package Windows installer
         working-directory: branch-hub
         run: npm run build:win
         env:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Verify packaged Electron runtime and installer identity
+        shell: pwsh
+        run: |
+          $env:ELECTRON_RUN_AS_NODE = "1"
+          $runtime = Resolve-Path "branch-hub/release/win-unpacked/PremierOS Branch Hub.exe"
+          $smoke = Join-Path (Split-Path $runtime) "resources/app.asar/packaged-smoke.cjs"
+          $process = Start-Process -FilePath $runtime.Path -ArgumentList "`"$smoke`"" -Wait -PassThru -NoNewWindow
+          if ($process.ExitCode -ne 0) { throw "Packaged runtime smoke failed: $($process.ExitCode)" }
+          Remove-Item Env:ELECTRON_RUN_AS_NODE
+          $installers = @(Get-ChildItem branch-hub/release/*Setup*.exe)
+          if ($installers.Count -ne 1) { throw "Expected one Windows installer" }
+          $exe = $installers[0]
+          $installDir = Join-Path $env:RUNNER_TEMP "hub-install-validation"
+          $setup = Start-Process -FilePath $exe.FullName -ArgumentList "/S", "/D=$installDir" -Wait -PassThru
+          if ($setup.ExitCode -ne 0) {
+            Get-WinEvent -FilterHashtable @{LogName='Application'; StartTime=(Get-Date).AddMinutes(-5)} -ErrorAction SilentlyContinue |
+              Where-Object { $_.Message -match 'Branch.Hub|System.dll|nsis' } |
+              Select-Object TimeCreated, Id, Message | Format-List
+            throw "Silent installation failed: $($setup.ExitCode)"
+          }
+          $installedExe = Join-Path $installDir "PremierOS Branch Hub.exe"
+          if (!(Test-Path $installedExe)) { throw "Installed executable missing" }
+          $env:ELECTRON_RUN_AS_NODE = "1"
+          $installedSmoke = Join-Path $installDir "resources/app.asar/packaged-smoke.cjs"
+          $installed = Start-Process -FilePath $installedExe -ArgumentList "`"$installedSmoke`"" -Wait -PassThru -NoNewWindow
+          if ($installed.ExitCode -ne 0) { throw "Installed application smoke failed" }
+          Remove-Item Env:ELECTRON_RUN_AS_NODE
+          $raster = Start-Process -FilePath $installedExe -ArgumentList "--branch-hub-render-self-test" -Wait -PassThru -NoNewWindow
+          if ($raster.ExitCode -ne 0) { throw "Installed Arabic raster/queue/TCP smoke failed" }
+          $stream = [System.IO.File]::OpenRead($exe.FullName)
+          try {
+            if ($stream.ReadByte() -ne 77 -or $stream.ReadByte() -ne 90) { throw "Invalid PE installer" }
+          } finally { $stream.Dispose() }
+          (Get-FileHash $exe.FullName -Algorithm SHA256).Hash + "  " + $exe.Name | Set-Content ($exe.FullName + ".sha256")
       - uses: actions/upload-artifact@v4
         with:
-          name: PremierOS-Branch-Hub-Windows-Prototype
-          path: branch-hub/release/*.exe
+          name: PremierOS-Branch-Hub-Windows-Prototype-${{ matrix.installation }}
+          path: |
+            branch-hub/release/*.exe
+            branch-hub/release/*.sha256
           if-no-files-found: error

@@ -33,6 +33,11 @@ function RouteScopedExtras() {
 export default function App() {
   return (
     <AppProviders>
+      {import.meta.env.VITE_BRANCH_HUB_DESKTOP === 'true' && (
+        <div role="status" dir="rtl" style={{ padding: '8px 16px', background: '#10233e', color: '#fff', fontSize: 13, textAlign: 'center' }}>
+          Premier · النظام الكامل — بياناته وخدماته السحابية تتطلب الإنترنت. للتشغيل المحلي استخدم قائمة «الفرع» في التطبيق.
+        </div>
+      )}
       <PageLoadProgressProvider>
       <SessionProfileGuard>
         <WorkAuthorizationAppBoundary>

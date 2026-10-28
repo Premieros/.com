@@ -1,0 +1,58 @@
+'use strict';
+const test=require('node:test'),assert=require('node:assert/strict'),fs=require('node:fs'),os=require('node:os'),path=require('node:path');
+const {createHub}=require('./server.cjs');
+const {restoreToEmptyDirectory}=require('./restore.cjs');
+const password='Offline-employee-12345';
+test('paired devices require offline employee login, enforce both roles, audit sales and revoke access across restart/recovery',async()=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hub-staff-api-'));
+ const config={dataDir:path.join(dir,'live'),port:0,organizationId:'org_001',branchId:'branch_001',token:'a'.repeat(40)};
+ let hub=createHub(config),restored;let port=(await hub.listen()).port;
+ const api=async(route,{method='GET',body,device=config.token,session=''}={})=>{
+  const r=await fetch(`http://127.0.0.1:${port}/api/v1/${route}`,{method,headers:{authorization:'Bearer '+device,'content-type':'application/json','x-hub-session':session},body:body===undefined?undefined:JSON.stringify(body)});
+  return {status:r.status,body:await r.json()};
+ };
+ try{
+  const scope={organizationId:config.organizationId,branchId:config.branchId};
+  const device=(await api('devices',{method:'POST',body:{...scope,name:'Till',role:'cashier'}})).body;
+  const viewer=(await api('devices',{method:'POST',body:{...scope,name:'Display',role:'viewer'}})).body;
+  assert.equal((await api('staff',{device:device.token})).status,403);
+  const user=await api('staff',{method:'POST',body:{...scope,username:'cashier',name:'موظف الفرع',role:'cashier',password}});assert.equal(user.status,201);
+  assert.equal((await api('session',{device:device.token})).body.staffLoginRequired,true);
+  assert.equal((await api('offline/sales',{device:device.token})).status,401);
+  const login=async(deviceToken=device.token,pw=password)=>(await api('staff/login',{method:'POST',device:deviceToken,body:{username:'cashier',password:pw}}));
+  let auth=await login();assert.equal(auth.status,200);let session=auth.body.token;
+  assert.equal((await api('staff',{device:device.token,session})).status,403);
+  assert.equal((await api('session',{device:viewer.token,session})).status,401);
+  const limited=(await login(viewer.token)).body.token;
+  assert.equal((await api('offline/sales',{method:'POST',device:viewer.token,session:limited,body:{}})).status,403);
+  await api('offline/stock/opening',{method:'POST',body:{...scope,sku:'coffee',quantity:5,unitCostMinor:100}});
+  const sale={...scope,key:'staff-api-sale-001',lines:[{sku:'coffee',quantity:1,priceMinor:250}],actor:'forged-user'};
+  const sold=await api('offline/sales',{method:'POST',device:device.token,session,body:sale});assert.equal(sold.status,201);
+  assert.equal(hub.db.prepare("SELECT actor FROM hub_audit WHERE action='sale.commit'").get().actor,'staff:'+user.body.id);
+  assert.equal((await api('offline/sales',{method:'POST',device:device.token,session,body:sale})).body.duplicate,true);
+  // A session-store write failure returns an unavailable response instead of crashing or bypassing staff auth.
+  hub.db.exec("CREATE TRIGGER fail_session_touch BEFORE UPDATE ON hub_staff_sessions BEGIN SELECT RAISE(ABORT,'injected auth IO failure'); END");
+  assert.equal((await api('session',{device:device.token,session})).status,503);
+  hub.db.exec('DROP TRIGGER fail_session_touch');assert.equal((await api('session',{device:device.token,session})).status,200);
+  const file=path.join(config.dataDir,'backups',hub.createLocalBackup().filename);
+  const damaged=path.join(dir,'damaged-policy.sqlite');fs.copyFileSync(file,damaged);
+  const {DatabaseSync}=require('node:sqlite');const bad=new DatabaseSync(damaged);bad.exec('UPDATE hub_staff_policy SET required=0');bad.close();
+  assert.throws(()=>restoreToEmptyDirectory({backupPath:damaged,dataDir:path.join(dir,'bad-target'),...scope}),/BACKUP_STAFF_POLICY_MISMATCH/);
+  assert.equal(fs.existsSync(path.join(dir,'bad-target')),false);
+  await hub.close();hub=createHub(config);port=(await hub.listen()).port;
+  assert.equal((await api('offline/sales',{device:device.token,session})).status,401);
+  session=(await login()).body.token;
+  assert.equal((await api('offline/sales',{method:'POST',device:device.token,session,body:sale})).body.duplicate,true);
+  await api('staff/'+user.body.id,{method:'PATCH',body:{password:'Changed-employee-12345'}});
+  assert.equal((await api('offline/sales',{device:device.token,session})).status,401);
+  assert.equal((await login()).status,401);
+  session=(await login(device.token,'Changed-employee-12345')).body.token;
+  await api('staff/'+user.body.id,{method:'PATCH',body:{disabled:true}});
+  assert.equal((await api('offline/sales',{device:device.token,session})).status,401);
+  assert.equal((await api('session',{device:device.token})).body.staffLoginRequired,true);
+  const target=path.join(dir,'recovered');restoreToEmptyDirectory({backupPath:file,dataDir:target,...scope});
+  restored=createHub({...config,dataDir:target});port=(await restored.listen()).port;
+  assert.equal((await api('offline/sales',{device:device.token,session:auth.body.token})).status,401);
+  auth=await login();assert.equal(auth.status,200);assert.equal((await api('offline/sales',{device:device.token,session:auth.body.token})).status,200);
+ }finally{if(restored)await restored.close();await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
+});

@@ -1,42 +1,149 @@
 'use strict';
-const { app, BrowserWindow, dialog } = require('electron');
+if(process.argv.includes('--branch-hub-render-self-test')){
+ require('./receipt-render-self-test.cjs');
+}else{
+const { app, BrowserWindow, nativeImage, net, dialog, ipcMain, safeStorage, Tray, Menu } = require('electron');
+const {localOrigin:desktopOrigin}=require('./local-origin.cjs');
+const {pathToFileURL}=require('node:url');
+const {createCloudClient}=require('./cloud-client.cjs');
+const {createConfigVault}=require('./config-vault.cjs');
+const {createEnrollmentController}=require('./enrollment.cjs');
 const { fork } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const renderReceipt=require('./raster-receipt.cjs').createElectronReceiptRenderer({BrowserWindow,nativeImage});
 let worker;
-function configPath() { return path.join(app.getPath('userData'), 'branch-config.json'); }
-function loadConfig() {
- const file=configPath();
- if (!fs.existsSync(file)) return null;
- const c=JSON.parse(fs.readFileSync(file,'utf8'));
- if (!/^[a-zA-Z0-9_-]{3,80}$/.test(c.branchId||'') ||
-     !/^[a-zA-Z0-9_-]{3,80}$/.test(c.organizationId||'') ||
-     typeof c.token!=='string' || c.token.length<32) throw Error('INVALID_BRANCH_ENROLLMENT');
- return c;
-}
-function createWindow(status) {
+if (!app.requestSingleInstanceLock()) { app.exit(0); }
+let activeWindow, tray, erpWindow, browserAppServer, browserAppURL, browserAppOpening;
+let setupWindow, localOrigin, localToken, localBackupKey, configVault;
+const setupURL=pathToFileURL(path.join(__dirname,'ui/setup.html')).href;
+function createWindow(status, localURL) {
  const win=new BrowserWindow({width:940,height:650,minWidth:650,minHeight:450,
-  webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,preload:path.join(__dirname,'setup-preload.cjs')}});
  const markup=`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>PremierOS Branch Hub</title><style>
  body{font-family:Segoe UI,Tahoma,Arial;background:#0b1730;color:#eaf1ff;margin:0;display:grid;place-items:center;min-height:100vh}
  main{max-width:650px;padding:45px;background:#132341;border:1px solid #38537d;border-radius:25px;box-shadow:0 25px 60px #0005}
  h1{font-size:32px}p{line-height:2;color:#bed0e9}.pill{color:#90ddff}
  </style><main><div class="pill">PREMIER OS • LOCAL BRANCH</div><h1>PremierOS Branch Hub</h1><p>${status}</p><p>هذه نسخة تأسيسية لإدارة خادم الفرع المحلي. لا تستخدمها حتى الآن لمعالجة المبيعات أو المدفوعات الفعلية.</p></main></html>`;
- win.loadURL('data:text/html;charset=UTF-8,'+encodeURIComponent(markup));
+ activeWindow=win;
+ win.on('close',event=>{if(worker&&!app.isQuitting&&tray){event.preventDefault();win.hide();}});
+ win.loadURL(localURL || 'data:text/html;charset=UTF-8,'+encodeURIComponent(markup));
  win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
- win.webContents.on('will-navigate',event=>event.preventDefault());
+ win.webContents.on('will-navigate',(event,url)=>{
+  if(!localURL || new URL(url).origin!==new URL(localURL).origin)event.preventDefault();
+ });
+}
+async function showBrowserApp(){
+ if(browserAppOpening)return;
+ if(erpWindow&&!erpWindow.isDestroyed()){erpWindow.show();erpWindow.focus();return;}
+ browserAppOpening=true;
+ try{
+  if(!browserAppServer){const candidate=require('./browser-app-server.cjs').createBrowserAppServer();browserAppURL=await candidate.listen();browserAppServer=candidate;}
+  const url=browserAppURL;
+  erpWindow=new BrowserWindow({width:1440,height:960,minWidth:850,minHeight:650,title:'Premier • النظام الكامل',webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  erpWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+  erpWindow.webContents.on('will-navigate',(event,target)=>{if(new URL(target).origin!==new URL(url).origin)event.preventDefault();});
+  erpWindow.on('close',event=>{if(worker&&!app.isQuitting&&tray){event.preventDefault();erpWindow.hide();}});
+  await erpWindow.loadURL(url);
+ }catch{if(erpWindow&&!erpWindow.isDestroyed())erpWindow.destroy();erpWindow=null;if(activeWindow&&!activeWindow.isDestroyed())activeWindow.show();dialog.showErrorBox('Premier','تعذر فتح واجهة النظام الكامل. تأكد من توفر المنفذ المحلي 3848 واستخدم قائمة الفرع لفتح التشغيل المحلي.');}finally{browserAppOpening=false;}
+}
+function startHub(c) {
+  desktopOrigin({hostname:c.localHostname||'127.0.0.1',port:c.port||3847,tls:Boolean(c.tlsKey)});
+  localToken=c.token;localBackupKey=c.backupKey;
+  const showLocal=()=>{if(activeWindow&&!activeWindow.isDestroyed()){activeWindow.show();activeWindow.focus();}};
+  Menu.setApplicationMenu(Menu.buildFromTemplate([{label:'الفرع',submenu:[{label:'النظام الكامل — يتطلب الإنترنت',click:showBrowserApp},{label:'التشغيل المحلي وإعدادات الفرع',click:showLocal},{type:'separator'},{label:'خروج',click:()=>app.quit()}]},{label:'عرض',submenu:[{role:'reload'},{role:'togglefullscreen'},{role:'zoomIn'},{role:'zoomOut'},{role:'resetZoom'}]}]));
+  if(process.platform==='win32'){
+   app.setLoginItemSettings({openAtLogin:true});
+   app.getFileIcon(process.execPath).then(icon=>{
+    if(tray)return;tray=new Tray(icon);tray.setToolTip('Premier • خادم الفرع المحلي');
+    const show=()=>{showBrowserApp();};
+    tray.on('double-click',show);tray.setContextMenu(Menu.buildFromTemplate([{label:'فتح Premier',click:show},{label:'التشغيل المحلي وإعدادات الفرع',click:showLocal},{type:'separator'},{label:'إيقاف خادم الفرع والخروج',click:()=>app.quit()}]));
+   }).catch(()=>{});
+  }
+  const env={...process.env,ELECTRON_RUN_AS_NODE:'1',BRANCH_HUB_HOST:c.host||'127.0.0.1',
+   BRANCH_HUB_BRANCH_ID:c.branchId,BRANCH_HUB_ORGANIZATION_ID:c.organizationId,
+   BRANCH_HUB_UPDATE_PUBLIC_KEY:c.updatePublicKey||'',BRANCH_HUB_INSTALLATION_ID:c.hubDeviceId||'',BRANCH_HUB_CLOUD_REFRESH_TOKEN:c.cloudRefreshToken||'',BRANCH_HUB_TOKEN:c.token,BRANCH_HUB_BACKUP_KEY:c.backupKey||'',BRANCH_HUB_BACKUP_MIRROR:c.backupMirrorDir||'',BRANCH_HUB_PORT:String(c.port||3847),
+   BRANCH_HUB_PRINTERS:JSON.stringify(c.printers||{}),BRANCH_HUB_TLS_KEY:c.tlsKey||'',BRANCH_HUB_TLS_CERT:c.tlsCert||'',
+   BRANCH_HUB_DATA_DIR:path.join(app.getPath('userData'),'branch-data')};
+  worker=fork(path.join(__dirname,'server.cjs'),[],{execPath:process.execPath,env,stdio:['ignore','ignore','ignore','ipc']});
+  let ready=false;
+  const timer=setTimeout(()=>{if(!ready){worker.kill();createWindow('تعذر بدء خادم الفرع في الوقت المحدد.');}},15000);
+  worker.on('message',message=>{
+   if(message?.type==='render-receipt'){
+    if(typeof message.requestId!=='string'||message.requestId.length>80)return;
+    const caller=worker;
+    renderReceipt(message.receipt,message.dots).then(bytes=>{if(caller.connected)caller.send({type:'receipt-rendered',requestId:message.requestId,ok:true,bytes:bytes.toString('base64')},()=>{});})
+     .catch(()=>{if(caller.connected)caller.send({type:'receipt-rendered',requestId:message.requestId,ok:false},()=>{});});
+    return;
+   }
+   if(message?.type==='persist-cloud-token'){
+    try{if(typeof message.refreshToken!=='string'||message.refreshToken.length<8||message.refreshToken.length>8192)throw Error('INVALID_SESSION');
+     const next={...c,cloudRefreshToken:message.refreshToken};configVault.save(next,true);c.cloudRefreshToken=message.refreshToken;
+     worker.send({type:'cloud-token-saved',requestId:message.requestId,ok:true});
+    }catch{worker.send({type:'cloud-token-saved',requestId:message.requestId,ok:false});}
+    return;
+   }
+   if(message?.type!=='ready' || ready)return;
+   ready=true;clearTimeout(timer);
+   const url=desktopOrigin({hostname:c.localHostname||'127.0.0.1',port:message.port,tls:Boolean(c.tlsKey)})+'/';
+   localOrigin=new URL(url).origin;
+   createWindow('',url);
+   activeWindow.hide();showBrowserApp();
+   if(setupWindow&&!setupWindow.isDestroyed())setupWindow.close();
+  });
+  worker.on('error',()=>{clearTimeout(timer);dialog.showErrorBox('PremierOS','تعذر بدء خادم الفرع المحلي');});
+  worker.on('exit',()=>{clearTimeout(timer);if(!app.isQuitting){if(activeWindow)dialog.showErrorBox('PremierOS','خادم الفرع متوقف. أعد تشغيل التطبيق بعد مراجعة الإعدادات.');else createWindow('تعذر بدء خادم الفرع. راجع الإعدادات.');}});
 }
 app.whenReady().then(()=>{
  try {
-  const c=loadConfig();
-  if (!c) {createWindow('لم يتم ربط الجهاز بفرع بعد. يتطلب التشغيل إعداد ربط فرع آمن؛ لم يتم تنفيذ التسجيل المركزي أو التوقيع بعد.');return;}
-  const env={...process.env,ELECTRON_RUN_AS_NODE:'1',BRANCH_HUB_HOST:'127.0.0.1',
-   BRANCH_HUB_BRANCH_ID:c.branchId,BRANCH_HUB_ORGANIZATION_ID:c.organizationId,
-   BRANCH_HUB_TOKEN:c.token,BRANCH_HUB_DATA_DIR:path.join(app.getPath('userData'),'branch-data')};
-  worker=fork(path.join(__dirname,'server.cjs'),[],{execPath:process.execPath,env,stdio:'ignore'});
-  worker.on('error',()=>dialog.showErrorBox('PremierOS','تعذر بدء خادم الفرع المحلي'));
-  createWindow('خادم الفرع المحلي يعمل على الجهاز فقط. اتصال الشبكة المحلية يحتاج شهادة TLS وإقران الأجهزة أولًا.');
- } catch { createWindow('إعداد ربط الفرع غير صالح؛ تم منع تشغيل الخادم لحماية بيانات الفرع.'); }
+  const userDir=app.getPath('userData');
+  const vault=createConfigVault(userDir,safeStorage);configVault=vault;
+  const c=vault.loadOrMigrate();
+  ipcMain.handle('hub:local-credential',event=>{
+   if(!activeWindow || event.sender!==activeWindow.webContents || event.senderFrame!==event.sender.mainFrame ||
+     !localOrigin || new URL(event.senderFrame.url).origin!==localOrigin)throw Error('FORBIDDEN');
+   return localToken;
+  });
+  ipcMain.handle('hub:export-recovery-key',async event=>{
+   if(!activeWindow||event.sender!==activeWindow.webContents||event.senderFrame!==event.sender.mainFrame||
+     !localOrigin||new URL(event.senderFrame.url).origin!==localOrigin||!localBackupKey)return {ok:false};
+   const choice=await dialog.showSaveDialog(activeWindow,{title:'احفظ مفتاح الاستعادة في مكان آمن منفصل عن النسخ الاحتياطية',defaultPath:'Premier-recovery-key.json',filters:[{name:'Recovery key',extensions:['json']}]});
+   if(choice.canceled)return {ok:false,canceled:true};
+   try{
+    fs.writeFileSync(choice.filePath,JSON.stringify({format:'premier-backup-key-v1',projectRef:'hvqlkapynjfjikqithvd',backupKey:localBackupKey},null,2),{flag:'wx',mode:0o600});
+    return {ok:true};
+   }catch{return {ok:false,error:'RECOVERY_KEY_SAVE_FAILED'};}
+  });
+  if(c){startHub(c);return;}
+  const controller=createEnrollmentController({client:createCloudClient((url,options)=>net.fetch(url,options)),vault,dataDir:path.join(userDir,'branch-data')});
+  const trustedSetup=event=>setupWindow && !setupWindow.isDestroyed() && event.sender===setupWindow.webContents &&
+    event.senderFrame===event.sender.mainFrame && event.senderFrame.url===setupURL;
+  const errorCode=e=>['CLOUD_ACCESS_DENIED','BRANCH_ADMIN_REQUIRED','CLOUD_UNAVAILABLE','BRANCH_ACCESS_DENIED',
+   'CLOUD_TIMEOUT','CLOUD_DNS_FAILED','CLOUD_TLS_FAILED','CLOUD_RATE_LIMITED','CLOUD_TEMPORARY_ERROR','CLOUD_REQUEST_FAILED','CLOUD_INVALID_RESPONSE','LOGIN_REQUIRED','ENROLLMENT_BUSY','BRANCH_BINDING_MISMATCH','OS_CREDENTIAL_VAULT_UNAVAILABLE'].includes(e.message)?e.message:'ENROLLMENT_FAILED';
+  ipcMain.handle('hub:sign-in',async(event,input)=>{
+   if(!trustedSetup(event))return {ok:false,error:'FORBIDDEN'};
+   try{return {ok:true,...await controller.signIn(input)};}catch(e){return {ok:false,error:errorCode(e),phase:['sign_in','account','permission','branch'].includes(e.phase)?e.phase:null,httpStatus:Number.isInteger(e.status)?e.status:null};}
+  });
+  ipcMain.handle('hub:enroll',async(event,id)=>{
+   if(!trustedSetup(event))return {ok:false,error:'FORBIDDEN'};
+   try{
+    const config=await controller.enroll(id);
+    // Keep the setup window until the local UI exists, so window-all-closed cannot quit mid-enrollment.
+    startHub(config);return {ok:true};
+   }catch(e){return {ok:false,error:errorCode(e),phase:['sign_in','account','permission','branch'].includes(e.phase)?e.phase:null,httpStatus:Number.isInteger(e.status)?e.status:null};}
+  });
+  setupWindow=new BrowserWindow({width:760,height:780,minWidth:560,minHeight:550,
+   webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,preload:path.join(__dirname,'setup-preload.cjs')}});
+  setupWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+  setupWindow.webContents.on('will-navigate',event=>event.preventDefault());
+  setupWindow.on('closed',()=>controller.clear());
+  setupWindow.loadFile(path.join(__dirname,'ui/setup.html'));
+ } catch(error) {
+  createWindow(error.message==='OS_CREDENTIAL_VAULT_UNAVAILABLE'?'حماية إعدادات الجهاز غير متاحة. لم تُحفظ أي بيانات دخول.':'إعداد ربط الفرع غير صالح؛ تم منع تشغيل الخادم لحماية بيانات الفرع.');
+ }
 });
-app.on('before-quit',()=>{ if(worker && !worker.killed)worker.kill(); });
+app.on('before-quit',()=>{ app.isQuitting=true; if(browserAppServer)browserAppServer.close(); if(worker && !worker.killed)worker.kill(); });
+app.on('second-instance',()=>{if(activeWindow){if(activeWindow.isMinimized())activeWindow.restore();activeWindow.focus();}});
 app.on('window-all-closed',()=>app.quit());
+
+}
