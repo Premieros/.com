@@ -9,10 +9,11 @@ function validateRecoveryDatabase(db, organizationId, branchId) {
   if (identity?.organization_id !== organizationId || identity?.branch_id !== branchId)
     throw Error('BACKUP_BRANCH_BINDING_MISMATCH');
   const version=db.prepare('PRAGMA user_version').get().user_version;
-  if(version>1)throw Error('BACKUP_UNSUPPORTED_VERSION');
+  if(version>3)throw Error('BACKUP_UNSUPPORTED_VERSION');
   const required = ['local_receipts','sync_outbox','jobs','offline_stock','offline_sales',
     'offline_sale_lines','offline_journal','offline_stock_movements','offline_outbox'];
   if(version>=1)required.push('hub_devices','hub_audit','print_dispatches');
+  if(version>=2)required.push('offline_catalog','cloud_sale_receipts','cloud_price_inbox');
   for (const table of required) {
     if (!db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name=?").get(table))
       throw Error('BACKUP_MISSING_TABLE: ' + table);
@@ -20,6 +21,7 @@ function validateRecoveryDatabase(db, organizationId, branchId) {
         db.prepare(`SELECT 1 FROM ${table} WHERE branch_id != ? LIMIT 1`).get(branchId))
       throw Error('BACKUP_CROSS_BRANCH_DATA');
   }
+  if(version>=3 && !db.prepare('PRAGMA table_info(hub_identity)').all().some(c=>c.name==='installation_id'))throw Error('BACKUP_MISSING_INSTALLATION_BINDING');
   const audit=auditOfflineSales(db,branchId);
   const receipts = db.prepare(`SELECT count(*) n FROM local_receipts r LEFT JOIN sync_outbox o
     ON o.entity_id=r.id AND o.branch_id=r.branch_id WHERE o.event_id IS NULL`).get().n;

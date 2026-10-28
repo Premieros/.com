@@ -6,6 +6,8 @@ const http = require('node:http');
 const https = require('node:https');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const {createCloudClient}=require('./cloud-client.cjs');
+const {createSyncStore,createCloudSync}=require('./cloud-sync.cjs');
 const { createBackupService } = require('./backup-service.cjs');
 const { auditOfflineSales } = require('./integrity.cjs');
 const { validateRecoveryDatabase } = require('./recovery-validation.cjs');
@@ -34,7 +36,7 @@ function createHub(config = {}) {
     path.join(process.env.APPDATA || path.join(os.homedir(), '.premieros'), 'PremierOS', 'BranchHub', branchId);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(path.join(dir, 'branch-hub.sqlite'));
-  if (db.prepare('PRAGMA user_version').get().user_version > 1) { db.close(); throw Error('UNSUPPORTED_DATABASE_VERSION'); }
+  if (db.prepare('PRAGMA user_version').get().user_version > 3) { db.close(); throw Error('UNSUPPORTED_DATABASE_VERSION'); }
   db.exec('PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON; PRAGMA busy_timeout=5000;');
   db.exec('CREATE TABLE IF NOT EXISTS hub_identity (singleton INTEGER PRIMARY KEY CHECK(singleton=1), organization_id TEXT NOT NULL, branch_id TEXT NOT NULL, installed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)');
   const identity = db.prepare('SELECT organization_id, branch_id FROM hub_identity WHERE singleton=1').get();
@@ -79,7 +81,13 @@ function createHub(config = {}) {
   if (Object.keys(printerConfig).length) printWorker.start();
   const devices = createDeviceRegistry(db, branchId);
   const offlineSales = createOfflineSalesEngine(db, branchId);
-  db.exec('PRAGMA user_version=1');
+  const installationId=config.installationId || process.env.BRANCH_HUB_INSTALLATION_ID;
+  if(!db.prepare('PRAGMA table_info(hub_identity)').all().some(c=>c.name==='installation_id'))db.exec('ALTER TABLE hub_identity ADD COLUMN installation_id TEXT');
+  const installationBinding=db.prepare('SELECT installation_id FROM hub_identity WHERE singleton=1').get().installation_id;
+  if(installationId && installationBinding && installationBinding!==installationId){db.close();throw Error('INSTALLATION_BINDING_MISMATCH');}
+  if(installationId && !installationBinding)db.prepare('UPDATE hub_identity SET installation_id=? WHERE singleton=1').run(installationId);
+  createSyncStore(db,{organizationId,branchId,installationId});
+  db.exec('PRAGMA user_version=3');
   // SQLite VACUUM INTO creates a consistent snapshot even while WAL is enabled.
   // Backups stay on the server, never returned by the HTTP API.
   function createLocalBackup() {
@@ -105,6 +113,10 @@ function createHub(config = {}) {
     createSnapshot:createLocalBackup,intervalMs:config.backupIntervalMs,
     mirrorDir:config.backupMirrorDir || process.env.BRANCH_HUB_BACKUP_MIRROR}) : null;
   if(backupService)backupService.start();
+  const cloudRefreshToken=config.cloudRefreshToken || process.env.BRANCH_HUB_CLOUD_REFRESH_TOKEN;
+  const cloudSync=cloudRefreshToken && config.persistRefreshToken ? createCloudSync({db,client:config.cloudClient||createCloudClient(),organizationId,branchId,installationId,
+    refreshToken:cloudRefreshToken,persistRefreshToken:config.persistRefreshToken}) : null;
+  if(cloudSync)cloudSync.start();
   const send = (res, status, body) => {
     res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
     res.end(JSON.stringify(body));
@@ -129,12 +141,17 @@ function createHub(config = {}) {
       ? {id:'administrator',admin:true,allows:()=>true} : devices.authenticate(bearer);
     if (!principal) return send(res, 401, { error: 'UNAUTHORIZED' });
     const adminPath = pathname.startsWith('/api/v1/devices') || pathname === '/api/v1/audit' ||
-      pathname === '/api/v1/backups' || pathname === '/api/v1/jobs' && req.method === 'POST' || pathname.endsWith('/retry') || pathname === '/api/v1/offline/stock/opening';
+      pathname === '/api/v1/backups' || pathname.startsWith('/api/v1/cloud/') || pathname === '/api/v1/jobs' && req.method === 'POST' || pathname.endsWith('/retry') || pathname === '/api/v1/offline/stock/opening';
     const permission = req.method === 'GET' ? 'read' :
       pathname === '/api/v1/offline/sales' ? 'sell' :
       pathname.startsWith('/api/v1/offline/sales/') && pathname.endsWith('/print') ? 'print' : 'admin';
     if ((adminPath && !principal.admin) || (permission === 'admin' && !principal.admin) ||
         (permission !== 'admin' && !principal.allows(permission))) return send(res,403,{error:'FORBIDDEN'});
+    if(pathname === '/api/v1/cloud/status' && req.method === 'GET')return send(res,200,cloudSync?cloudSync.status():{configured:false,canonicalPostingImplemented:false});
+    if(pathname === '/api/v1/cloud/sync' && req.method === 'POST'){
+      if(!cloudSync)return send(res,409,{error:'CLOUD_ENROLLMENT_REQUIRED'});
+      try{return send(res,200,await cloudSync.run());}catch{return send(res,503,{error:'CLOUD_SYNC_FAILED'});}
+    }
     if(pathname === '/api/v1/session' && req.method === 'GET')return send(res,200,{organizationId,branchId,admin:Boolean(principal.admin),permissions:['read','sell','print','stock'].filter(p=>principal.allows(p))});
     if(pathname === '/api/v1/printers' && req.method === 'GET')return send(res,200,{printers:Object.keys(printerConfig)});
     if (pathname.startsWith('/api/v1/offline/sales/') && pathname.endsWith('/print') && req.method === 'POST') {
@@ -205,7 +222,7 @@ function createHub(config = {}) {
       return send(res,200,{pending,onlineSyncImplemented:false});
     }
     if (pathname === '/api/v1/offline/stock' && req.method === 'GET') {
-      const stock=db.prepare('SELECT sku,quantity,unit_cost_minor FROM offline_stock WHERE branch_id=? ORDER BY sku LIMIT 500').all(branchId);
+      const stock=db.prepare('SELECT s.sku,s.quantity,s.unit_cost_minor,c.sale_price_minor FROM offline_stock s LEFT JOIN offline_catalog c ON c.branch_id=s.branch_id AND c.sku=s.sku WHERE s.branch_id=? ORDER BY s.sku LIMIT 500').all(branchId);
       return send(res,200,{stock});
     }
     if (pathname === '/api/v1/offline/stock/movements' && req.method === 'GET') {
@@ -229,7 +246,7 @@ function createHub(config = {}) {
         const result=offlineSales.commitSale({...input,actor:principal.id});
         return send(res,result.duplicate?200:201,result);
       } catch(error) {
-        if(error.message==='IDEMPOTENCY_CONFLICT') return send(res,409,{error:error.message});
+        if(error.message==='IDEMPOTENCY_CONFLICT'||error.message==='PRICE_CHANGED') return send(res,409,{error:error.message});
         if(error.message.startsWith('INSUFFICIENT_STOCK')) return send(res,409,{error:error.message});
         return send(res,400,{error:'INVALID_SALE'});
       }
@@ -327,11 +344,17 @@ function createHub(config = {}) {
   const server = keyFile && certFile
     ? https.createServer({ key: fs.readFileSync(keyFile), cert: fs.readFileSync(certFile) }, handler)
     : http.createServer(handler);
-  return { server, db, createLocalBackup, printWorker, backupService, listen: () => new Promise(resolve => server.listen(port, host, () => resolve(server.address()))),
-    close: async () => { if(backupService)await backupService.stop(); await printWorker.stop(); return new Promise(resolve => server.close(() => { db.close(); resolve(); })); } };
+  return { server, db, createLocalBackup, printWorker, backupService, cloudSync, listen: () => new Promise(resolve => server.listen(port, host, () => resolve(server.address()))),
+    close: async () => { if(cloudSync)await cloudSync.stop(); if(backupService)await backupService.stop(); await printWorker.stop(); return new Promise(resolve => server.close(() => { db.close(); resolve(); })); } };
 }
 if (require.main === module) {
-  const hub = createHub();
+  const persistRefreshToken=process.send ? token=>new Promise((resolve,reject)=>{
+    const requestId=crypto.randomUUID();
+    const timer=setTimeout(()=>{process.off('message',listener);reject(Error('CLOUD_VAULT_SAVE_TIMEOUT'));},10000);
+    const listener=message=>{if(message?.type==='cloud-token-saved'&&message.requestId===requestId){clearTimeout(timer);process.off('message',listener);message.ok?resolve():reject(Error('CLOUD_VAULT_SAVE_FAILED'));}};
+    process.on('message',listener);process.send({type:'persist-cloud-token',requestId,refreshToken:token});
+  }) : undefined;
+  const hub = createHub({persistRefreshToken});
   if(process.send)process.once('disconnect',()=>hub.close().then(()=>process.exit(0)));
   hub.listen().then(addr => {
     console.log('Premier Branch Hub listening on', addr.address, addr.port);

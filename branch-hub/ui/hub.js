@@ -27,7 +27,7 @@ async function refresh(){
  for(const s of sales.sales){const row=addText($('sales'),`${s.id.slice(0,8)} · ${(s.total_minor/100).toFixed(2)} · ${s.created_at}`);if(session.permissions.includes('print'))button(row,'طباعة',async()=>{await api(`offline/sales/${s.id}/print`,'POST',{printerId:$('printer').value});message('تمت إضافة الإيصال لقائمة الطباعة. راجع حالة الإرسال.');await refresh();});}
  $('jobs').replaceChildren();for(const j of jobs.jobs)addText($('jobs'),`${j.id.slice(0,8)}: ${j.delivery_state||j.status}${j.error?' · '+j.error:''}`);
  $('health').textContent=`سلامة البيانات: ${integrity.ok?'سليمة':'تحتاج مراجعة'} · عمليات محلية تنتظر المزامنة: ${sync.pending}`;
- if(session.admin){const {devices}=await api('devices');$('devices').replaceChildren();for(const d of devices){const row=addText($('devices'),`${d.name} · ${d.role} · ${d.revoked?'ملغى':'نشط'}`);if(!d.revoked)button(row,'إلغاء الربط',async()=>{await api('devices/'+d.id,'DELETE');await refresh();});}}
+ if(session.admin){const cloud=await api('cloud/status');$('cloud-status').textContent=cloud.configured?`تم رفع ${cloud.replicatedSales} عملية للاستقبال · تعارضات الأسعار: ${cloud.priceConflicts}${cloud.lastError?' · تعذر آخر اتصال':''} · الترحيل المحاسبي السحابي غير مكتمل`:'لم تُربط جلسة المزامنة السحابية لهذا الجهاز.';const {devices}=await api('devices');$('devices').replaceChildren();for(const d of devices){const row=addText($('devices'),`${d.name} · ${d.role} · ${d.revoked?'ملغى':'نشط'}`);if(!d.revoked)button(row,'إلغاء الربط',async()=>{await api('devices/'+d.id,'DELETE');await refresh();});}}
 }
 $('login-form').onsubmit=async event=>{
  event.preventDefault();token=$('credential').value;$('credential').value='';
@@ -48,7 +48,7 @@ $('checkout').onclick=async()=>{
   if(!pending){pending={...scope(),key:crypto.randomUUID(),lines:structuredClone(cart)};localStorage.setItem(draftKey(),JSON.stringify(pending));}
   const result=await api('offline/sales','POST',pending);
   localStorage.removeItem(draftKey());pending=null;cart=[];drawCart();message(`تم حفظ البيع ${result.saleId} بقيمة ${(result.totalMinor/100).toFixed(2)}`);await refresh();
- }catch(e){message('لم يتم تأكيد العملية: '+e.message);drawCart();if(e.code==='INVALID_SALE'||e.code?.startsWith('INSUFFICIENT_STOCK'))$('cancel-pending').hidden=false;}
+ }catch(e){message('لم يتم تأكيد العملية: '+e.message);drawCart();if(e.code==='INVALID_SALE'||e.code==='PRICE_CHANGED'||e.code?.startsWith('INSUFFICIENT_STOCK'))$('cancel-pending').hidden=false;}
 };
 $('device-form').onsubmit=async event=>{event.preventDefault();try{const d=await api('devices','POST',{...scope(),name:$('device-name').value,role:$('device-role').value});$('device-result').textContent='احفظ رمز الجهاز الآن: '+d.token;await refresh();}catch(e){message(e.message);}};
 $('opening-form').onsubmit=async event=>{event.preventDefault();try{await api('offline/stock/opening','POST',{...scope(),sku:$('opening-sku').value,quantity:Number($('opening-qty').value),unitCostMinor:Math.round(Number($('opening-cost').value)*100)});message('تم حفظ الرصيد الافتتاحي.');await refresh();}catch(e){message(e.message);}};
@@ -59,3 +59,5 @@ $('cancel-pending').onclick=()=>{localStorage.removeItem(draftKey());pending=nul
 if(window.branchHub){window.branchHub.localCredential().then(value=>{if(value){$('credential').value=value;$('login-form').requestSubmit();}}).catch(()=>{});}
 
 if(window.branchHub){$('recovery-key').hidden=false;$('recovery-key').onclick=async()=>{const result=await window.branchHub.exportRecoveryKey();message(result.ok?'تم حفظ مفتاح الاستعادة. احتفظ به منفصلًا عن النسخ الاحتياطية.':result.canceled?'تم إلغاء الحفظ.':'تعذر حفظ المفتاح. اختر ملفًا جديدًا.');};}
+
+$('cloud-sync').onclick=async()=>{try{await api('cloud/sync','POST');message('تمت دورة النقل. الاستقبال السحابي لا يعني الترحيل المحاسبي.');await refresh();}catch(e){message(e.message);}};

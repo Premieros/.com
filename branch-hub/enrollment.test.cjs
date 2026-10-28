@@ -23,6 +23,7 @@ function cloudMock(){
   let result=route==='/auth/v1/token'?{access_token:'signed-test-session-token-long'}:
    route==='/auth/v1/user'?{id:userId}:
    route==='/rest/v1/rpc/can_permission'?allowed:
+   route==='/rest/v1/rpc/is_platform_admin'?false:
    route==='/rest/v1/branches'?[{id:branch,organization_id:org,name:'Branch 1',is_active:true}]:null;
   assert.notEqual(result,null);return {ok:true,status:200,json:async()=>result};
  });

@@ -47,3 +47,29 @@ jobs:
           name: Branch-Hub-UI-acceptance
           path: branch-hub/test-output/*.png
           if-no-files-found: ignore
+  cloud-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: isolated_ci_only
+          POSTGRES_DB: hub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - run: npm ci --no-audit --no-fund
+      - name: Verify PostgreSQL RLS, immutable replication, hashes and acknowledgement replay
+        run: node branch-hub/cloud-tests/replication.pg.cjs
+        env:
+          HUB_TEST_DATABASE_URL: postgresql://postgres:isolated_ci_only@127.0.0.1:5432/hub_test

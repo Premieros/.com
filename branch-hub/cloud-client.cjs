@@ -5,12 +5,12 @@ const PROJECT_URL=`https://${PROJECT_REF}.supabase.co`;
 const PUBLISHABLE_KEY='sb_publishable_9W6651rcdIsyBoegwGe_qw_MvCPRIPK';
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 function createCloudClient(fetchImpl=fetch) {
- async function request(route,{accessToken,body,method}={}) {
+ async function request(route,{accessToken,body,method,prefer}={}) {
   if(!route.startsWith('/auth/v1/')&&!route.startsWith('/rest/v1/'))throw Error('INVALID_CLOUD_ROUTE');
   let response;
   try {response=await fetchImpl(PROJECT_URL+route,{
    method:method||(body?'POST':'GET'),redirect:'error',cache:'no-store',signal:AbortSignal.timeout(15000),
-   headers:{apikey:PUBLISHABLE_KEY,'content-type':'application/json',...(accessToken?{authorization:'Bearer '+accessToken}:{})},
+   headers:{apikey:PUBLISHABLE_KEY,'content-type':'application/json',...(prefer?{prefer}:{}),...(accessToken?{authorization:'Bearer '+accessToken}:{})},
    body:body?JSON.stringify(body):undefined,
   });}catch{throw Error('CLOUD_UNAVAILABLE');}
   if(!response.ok)throw Error(response.status===401||response.status===403?'CLOUD_ACCESS_DENIED':'CLOUD_REQUEST_FAILED');
@@ -24,7 +24,7 @@ function createCloudClient(fetchImpl=fetch) {
  async function assertAdministrator(accessToken){
   await user(accessToken);
   const allowed=await request('/rest/v1/rpc/can_permission',{accessToken,body:{p_permission:'branches.manage'}});
-  if(allowed!==true)throw Error('BRANCH_ADMIN_REQUIRED');
+  if(allowed!==true && await request('/rest/v1/rpc/is_platform_admin',{accessToken,method:'POST',body:{}})!==true)throw Error('BRANCH_ADMIN_REQUIRED');
  }
  async function branches(accessToken){
   await assertAdministrator(accessToken);
@@ -39,7 +39,7 @@ function createCloudClient(fetchImpl=fetch) {
   if(typeof auth?.access_token!=='string'||auth.access_token.length<20)throw Error('INVALID_CLOUD_SESSION');
   const actor=await user(auth.access_token);
   const choices=await branches(auth.access_token);
-  return {accessToken:auth.access_token,userId:actor.id,branches:choices};
+  return {accessToken:auth.access_token,refreshToken:auth.refresh_token,userId:actor.id,branches:choices};
  }
  async function validateEnrollment(accessToken,branchId){
   if(!UUID.test(branchId||''))throw Error('INVALID_BRANCH');

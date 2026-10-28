@@ -50,7 +50,7 @@ jobs:
           $exe = $installers[0]
           $installDir = Join-Path $env:RUNNER_TEMP "hub-install-validation"
           $setup = Start-Process -FilePath $exe.FullName -ArgumentList "/S", "/D=$installDir" -Wait -PassThru
-          if ($setup.ExitCode -ne 0) { throw "Silent installation failed" }
+          if ($setup.ExitCode -ne 0) { throw "Silent installation failed: $($setup.ExitCode)" }
           $installedExe = Join-Path $installDir "PremierOS Branch Hub.exe"
           if (!(Test-Path $installedExe)) { throw "Installed executable missing" }
           $env:ELECTRON_RUN_AS_NODE = "1"

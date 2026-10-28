@@ -10,7 +10,7 @@ const path = require('node:path');
 let worker;
 if (!app.requestSingleInstanceLock()) { app.exit(0); }
 let activeWindow;
-let setupWindow, localOrigin, localToken, localBackupKey;
+let setupWindow, localOrigin, localToken, localBackupKey, configVault;
 const setupURL=pathToFileURL(path.join(__dirname,'ui/setup.html')).href;
 function createWindow(status, localURL) {
  const win=new BrowserWindow({width:940,height:650,minWidth:650,minHeight:450,
@@ -32,13 +32,20 @@ function startHub(c) {
   localToken=c.token;localBackupKey=c.backupKey;
   const env={...process.env,ELECTRON_RUN_AS_NODE:'1',BRANCH_HUB_HOST:c.host||'127.0.0.1',
    BRANCH_HUB_BRANCH_ID:c.branchId,BRANCH_HUB_ORGANIZATION_ID:c.organizationId,
-   BRANCH_HUB_TOKEN:c.token,BRANCH_HUB_BACKUP_KEY:c.backupKey||'',BRANCH_HUB_BACKUP_MIRROR:c.backupMirrorDir||'',BRANCH_HUB_PORT:String(c.port||3847),
+   BRANCH_HUB_INSTALLATION_ID:c.hubDeviceId||'',BRANCH_HUB_CLOUD_REFRESH_TOKEN:c.cloudRefreshToken||'',BRANCH_HUB_TOKEN:c.token,BRANCH_HUB_BACKUP_KEY:c.backupKey||'',BRANCH_HUB_BACKUP_MIRROR:c.backupMirrorDir||'',BRANCH_HUB_PORT:String(c.port||3847),
    BRANCH_HUB_PRINTERS:JSON.stringify(c.printers||{}),BRANCH_HUB_TLS_KEY:c.tlsKey||'',BRANCH_HUB_TLS_CERT:c.tlsCert||'',
    BRANCH_HUB_DATA_DIR:path.join(app.getPath('userData'),'branch-data')};
   worker=fork(path.join(__dirname,'server.cjs'),[],{execPath:process.execPath,env,stdio:['ignore','ignore','ignore','ipc']});
   let ready=false;
   const timer=setTimeout(()=>{if(!ready){worker.kill();createWindow('تعذر بدء خادم الفرع في الوقت المحدد.');}},15000);
   worker.on('message',message=>{
+   if(message?.type==='persist-cloud-token'){
+    try{if(typeof message.refreshToken!=='string'||message.refreshToken.length<8||message.refreshToken.length>8192)throw Error('INVALID_SESSION');
+     const next={...c,cloudRefreshToken:message.refreshToken};configVault.save(next,true);c.cloudRefreshToken=message.refreshToken;
+     worker.send({type:'cloud-token-saved',requestId:message.requestId,ok:true});
+    }catch{worker.send({type:'cloud-token-saved',requestId:message.requestId,ok:false});}
+    return;
+   }
    if(message?.type!=='ready' || ready)return;
    ready=true;clearTimeout(timer);
    const scheme=c.tlsKey?'https':'http';
@@ -53,7 +60,7 @@ function startHub(c) {
 app.whenReady().then(()=>{
  try {
   const userDir=app.getPath('userData');
-  const vault=createConfigVault(userDir,safeStorage);
+  const vault=createConfigVault(userDir,safeStorage);configVault=vault;
   const c=vault.loadOrMigrate();
   ipcMain.handle('hub:local-credential',event=>{
    if(!activeWindow || event.sender!==activeWindow.webContents || event.senderFrame!==event.sender.mainFrame ||

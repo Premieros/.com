@@ -6,6 +6,10 @@ const { createDeviceRegistry } = require('./devices.cjs');
 // All values are integer minor units; quantities are integer base units.
 function createOfflineSalesEngine(db, branchId) {
   db.exec(`
+    CREATE TABLE IF NOT EXISTS offline_catalog (
+      branch_id TEXT NOT NULL,sku TEXT NOT NULL,revision INTEGER NOT NULL,
+      sale_price_minor INTEGER NOT NULL,unit_cost_minor INTEGER NOT NULL,PRIMARY KEY(branch_id,sku)
+    );
     CREATE TABLE IF NOT EXISTS offline_stock (
       branch_id TEXT NOT NULL, sku TEXT NOT NULL, quantity INTEGER NOT NULL CHECK(quantity>=0),
       unit_cost_minor INTEGER NOT NULL CHECK(unit_cost_minor>=0),
@@ -84,6 +88,8 @@ function createOfflineSalesEngine(db, branchId) {
       for(const line of normalized) {
         const stock=db.prepare('SELECT quantity,unit_cost_minor FROM offline_stock WHERE branch_id=? AND sku=?').get(branchId,line.sku);
         if (!stock || stock.quantity<line.quantity) throw Error('INSUFFICIENT_STOCK: '+line.sku);
+        const published=db.prepare('SELECT sale_price_minor FROM offline_catalog WHERE branch_id=? AND sku=?').get(branchId,line.sku);
+        if(published && published.sale_price_minor!==line.priceMinor)throw Error('PRICE_CHANGED');
         const revenue=line.quantity*line.priceMinor;
         const cogs=line.quantity*stock.unit_cost_minor;
         if (!Number.isSafeInteger(revenue)||!Number.isSafeInteger(cogs) ||
