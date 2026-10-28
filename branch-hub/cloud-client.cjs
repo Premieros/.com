@@ -36,7 +36,7 @@ function createCloudClient(fetchImpl=fetch) {
  async function signIn({email,password}){
   if(typeof email!=='string'||email.length>320||!email.includes('@')||typeof password!=='string'||password.length<1||password.length>1024)throw Error('INVALID_LOGIN');
   const auth=await request('/auth/v1/token?grant_type=password',{body:{email,password}});
-  if(typeof auth?.access_token!=='string'||auth.access_token.length<20)throw Error('INVALID_CLOUD_SESSION');
+  if(typeof auth?.access_token!=='string'||auth.access_token.length<20||typeof auth.refresh_token!=='string'||auth.refresh_token.length<8)throw Error('INVALID_CLOUD_SESSION');
   const actor=await user(auth.access_token);
   const choices=await branches(auth.access_token);
   return {accessToken:auth.access_token,refreshToken:auth.refresh_token,userId:actor.id,branches:choices};

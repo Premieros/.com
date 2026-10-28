@@ -11,7 +11,7 @@ function createConfigVault(dir,storage,platform=process.platform){
  function validate(config){
   if(!config||config.projectRef&&config.projectRef!==PROJECT_REF||
     !/^[a-zA-Z0-9_-]{3,80}$/.test(config.organizationId||'')||!/^[a-zA-Z0-9_-]{3,80}$/.test(config.branchId||'')||
-    typeof config.token!=='string'||config.token.length<32)throw Error('INVALID_BRANCH_ENROLLMENT');
+    typeof config.token!=='string'||config.token.length<32||config.backupKey!==undefined&&!/^[0-9a-f]{64}$/i.test(config.backupKey))throw Error('INVALID_BRANCH_ENROLLMENT');
   return config;
  }
  function load(){

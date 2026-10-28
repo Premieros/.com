@@ -57,3 +57,18 @@ test('successful mirror has identical checksum; encrypted backup API remains adm
   const state=await fetch(`http://127.0.0.1:${port}/api/v1/backups`,{headers:{authorization:'Bearer '+token}}).then(r=>r.json());assert.equal(state.encrypted,true);assert.equal(state.scheduled,true);
  }finally{await hub.close();fs.rmSync(root,{recursive:true,force:true});}
 });
+
+test('a fresh requested checkpoint waits for an older in-flight snapshot and includes newly committed sales',async()=>{
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'hub-fresh-backup-')),dir=path.join(root,'data');
+ const hub=createHub({port:0,dataDir:dir,organizationId,branchId,token:'x'.repeat(40)});let service;
+ try{
+  await hub.listen();const engine=createOfflineSalesEngine(hub.db,branchId);engine.setOpeningStock('sku',5,10);
+  service=createBackupService({db:hub.db,dir,organizationId,branchId,key,createSnapshot:hub.createLocalBackup});
+  const older=service.run();
+  engine.commitSale({key:'fresh-checkpoint-001',lines:[{sku:'sku',quantity:1,priceMinor:25}]});
+  const fresh=service.run({fresh:true});
+  const [a,b]=await Promise.all([older,fresh]);assert.notEqual(a.filename,b.filename);
+  const restored=await restoreEncryptedToEmptyDirectory({backupPath:path.join(dir,'backups',b.filename),dataDir:path.join(root,'restored'),organizationId,branchId,key});
+  assert.equal(restored.offlineSales,1);assert.equal(restored.offlinePending,1);
+ }finally{if(service)await service.stop();await hub.close();fs.rmSync(root,{recursive:true,force:true});}
+});

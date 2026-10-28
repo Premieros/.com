@@ -6,6 +6,7 @@ const http = require('node:http');
 const https = require('node:https');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const {stageUpdate}=require('./updates.cjs');
 const {createCloudClient}=require('./cloud-client.cjs');
 const {createSyncStore,createCloudSync}=require('./cloud-sync.cjs');
 const { createBackupService } = require('./backup-service.cjs');
@@ -141,12 +142,25 @@ function createHub(config = {}) {
       ? {id:'administrator',admin:true,allows:()=>true} : devices.authenticate(bearer);
     if (!principal) return send(res, 401, { error: 'UNAUTHORIZED' });
     const adminPath = pathname.startsWith('/api/v1/devices') || pathname === '/api/v1/audit' ||
-      pathname === '/api/v1/backups' || pathname.startsWith('/api/v1/cloud/') || pathname === '/api/v1/jobs' && req.method === 'POST' || pathname.endsWith('/retry') || pathname === '/api/v1/offline/stock/opening';
+      pathname === '/api/v1/backups' || pathname.startsWith('/api/v1/updates/') || pathname.startsWith('/api/v1/cloud/') || pathname === '/api/v1/jobs' && req.method === 'POST' || pathname.endsWith('/retry') || pathname === '/api/v1/offline/stock/opening';
     const permission = req.method === 'GET' ? 'read' :
       pathname === '/api/v1/offline/sales' ? 'sell' :
       pathname.startsWith('/api/v1/offline/sales/') && pathname.endsWith('/print') ? 'print' : 'admin';
     if ((adminPath && !principal.admin) || (permission === 'admin' && !principal.admin) ||
         (permission !== 'admin' && !principal.allows(permission))) return send(res,403,{error:'FORBIDDEN'});
+    if(pathname === '/api/v1/updates/status' && req.method === 'GET')return send(res,200,{signatureKeyConfigured:Boolean(config.updatePublicKey||process.env.BRANCH_HUB_UPDATE_PUBLIC_KEY),automaticInstallImplemented:false});
+    if(pathname === '/api/v1/updates/stage' && req.method === 'POST'){
+      const publicKey=config.updatePublicKey||process.env.BRANCH_HUB_UPDATE_PUBLIC_KEY;
+      if(!publicKey||!backupService)return send(res,409,{error:'UPDATE_SIGNER_AND_BACKUP_REQUIRED'});
+      try{
+        let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>24576)return send(res,413,{error:'PAYLOAD_TOO_LARGE'});}
+        const input=JSON.parse(raw);
+        const result=await stageUpdate({manifestText:input.manifestText,signature:input.signature,publicKey,
+          currentVersion:require('./package.json').version,databaseVersion:db.prepare('PRAGMA user_version').get().user_version,
+          dir:path.join(dir,'updates'),createRecoveryBackup:()=>backupService.run({fresh:true})});
+        return send(res,201,result);
+      }catch{return send(res,400,{error:'SIGNED_UPDATE_REJECTED'});}
+    }
     if(pathname === '/api/v1/cloud/status' && req.method === 'GET')return send(res,200,cloudSync?cloudSync.status():{configured:false,canonicalPostingImplemented:false});
     if(pathname === '/api/v1/cloud/sync' && req.method === 'POST'){
       if(!cloudSync)return send(res,409,{error:'CLOUD_ENROLLMENT_REQUIRED'});
@@ -194,7 +208,7 @@ function createHub(config = {}) {
     }
     if(pathname === '/api/v1/backups' && req.method === 'GET')return send(res,200,{encrypted:Boolean(backupService),scheduled:Boolean(backupService),latest:backupService?.status()||null});
     if (pathname === '/api/v1/backups' && req.method === 'POST') {
-      try { return send(res,201,backupService?await backupService.run():createLocalBackup()); }
+      try { return send(res,201,backupService?await backupService.run({fresh:true}):createLocalBackup()); }
       catch { return send(res,500,{error:'BACKUP_FAILED'}); }
     }
     if ((pathname === '/api/v1/devices' || pathname === '/api/v1/offline/stock/opening') && req.method === 'POST') {

@@ -20,7 +20,8 @@ function drawCart(){
 async function refresh(){
  const [stock,sales,jobs,sync,integrity,printers]=await Promise.all(['offline/stock','offline/sales','jobs','offline/sync/status','offline/integrity','printers'].map(x=>api(x)));
  $('stock').replaceChildren();$('sku').replaceChildren();
- for(const s of stock.stock){const row=document.createElement('tr');for(const value of [s.sku,s.quantity,(s.unit_cost_minor/100).toFixed(2)]){const td=document.createElement('td');td.textContent=value;row.append(td);}$('stock').append(row);const option=document.createElement('option');option.value=s.sku;option.textContent=s.sku;$('sku').append(option);}
+ for(const s of stock.stock){const row=document.createElement('tr');for(const value of [s.sku,s.quantity,(s.unit_cost_minor/100).toFixed(2)]){const td=document.createElement('td');td.textContent=value;row.append(td);}$('stock').append(row);const option=document.createElement('option');option.value=s.sku;option.textContent=s.sku;if(s.sale_price_minor!==null&&s.sale_price_minor!==undefined)option.dataset.price=String(s.sale_price_minor);$('sku').append(option);}
+ if(!pending)updatePublishedPrice();
  const printerId=$('printer').value;$('printer').replaceChildren();
  for(const id of printers.printers){const opt=document.createElement('option');opt.value=id;opt.textContent=id;$('printer').append(opt);}if(printers.printers.includes(printerId))$('printer').value=printerId;
  $('sales').replaceChildren();
@@ -61,3 +62,6 @@ if(window.branchHub){window.branchHub.localCredential().then(value=>{if(value){$
 if(window.branchHub){$('recovery-key').hidden=false;$('recovery-key').onclick=async()=>{const result=await window.branchHub.exportRecoveryKey();message(result.ok?'تم حفظ مفتاح الاستعادة. احتفظ به منفصلًا عن النسخ الاحتياطية.':result.canceled?'تم إلغاء الحفظ.':'تعذر حفظ المفتاح. اختر ملفًا جديدًا.');};}
 
 $('cloud-sync').onclick=async()=>{try{await api('cloud/sync','POST');message('تمت دورة النقل. الاستقبال السحابي لا يعني الترحيل المحاسبي.');await refresh();}catch(e){message(e.message);}};
+
+function updatePublishedPrice(){const value=$('sku').selectedOptions[0]?.dataset.price;$('price').readOnly=value!==undefined;$('price').value=value!==undefined?(Number(value)/100).toFixed(2):'';}
+$('sku').onchange=updatePublishedPrice;

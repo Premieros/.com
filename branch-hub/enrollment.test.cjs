@@ -20,7 +20,7 @@ function cloudMock(){
  const client=createCloudClient(async(url,options)=>{
   calls.push({url,options});assert.equal(new URL(url).origin,PROJECT_URL);assert.equal(options.redirect,'error');
   const route=new URL(url).pathname;
-  let result=route==='/auth/v1/token'?{access_token:'signed-test-session-token-long'}:
+  let result=route==='/auth/v1/token'?{access_token:'signed-test-session-token-long',refresh_token:'signed-test-refresh-token'}:
    route==='/auth/v1/user'?{id:userId}:
    route==='/rest/v1/rpc/can_permission'?allowed:
    route==='/rest/v1/rpc/is_platform_admin'?false:
@@ -52,7 +52,7 @@ test('verified first-run binding is encrypted, cannot be replaced, and persists 
   assert.equal(config.projectRef,PROJECT_REF);assert.equal(config.organizationId,org);assert.equal(config.branchId,branch);
   assert.equal(vault.load().token,config.token);assert.equal(config.enrolledBy,userId);
   const disk=fs.readFileSync(vault.file,'utf8');
-  for(const value of [config.token,org,branch,'super-secret-password','signed-test-session-token-long'])assert.equal(disk.includes(value),false);
+  for(const value of [config.token,org,branch,'super-secret-password','signed-test-session-token-long','signed-test-refresh-token'])assert.equal(disk.includes(value),false);
   assert.equal(config.accessToken,undefined);assert.equal(config.password,undefined);
   assert.throws(()=>vault.save({...config,branchId:'other_branch'}),/EEXIST/);
   await assert.rejects(controller.enroll(branch),/LOGIN_REQUIRED/);
@@ -84,4 +84,20 @@ test('enrollment cannot switch an existing SQLite branch or accept a stale login
   await controller.signIn({email:'admin@example.test',password:'test'});
   await assert.rejects(controller.enroll(branch),/BRANCH_BINDING_MISMATCH/);assert.equal(fs.existsSync(vault.file),false);
  }finally{fs.rmSync(dir,{recursive:true,force:true});}
+});
+
+test('re-enrollment after backup restore preserves installation identity used for cloud replay',async()=>{
+ const {createHub}=require('./server.cjs');
+ const {restoreToEmptyDirectory}=require('./restore.cjs');
+ const root=fs.mkdtempSync(path.join(os.tmpdir(),'hub-installation-restore-'));
+ const installation='55555555-5555-4555-8555-555555555555';
+ const hub=createHub({port:0,dataDir:path.join(root,'source'),organizationId:org,branchId:branch,installationId:installation,token:'a'.repeat(40)});
+ try{
+  await hub.listen();const snapshot=path.join(root,'source','backups',hub.createLocalBackup().filename);
+  const dataDir=path.join(root,'restored');restoreToEmptyDirectory({backupPath:snapshot,dataDir,organizationId:org,branchId:branch});
+  const vault=createConfigVault(path.join(root,'new-profile'),storage());
+  const controller=createEnrollmentController({client:cloudMock().client,vault,dataDir});
+  await controller.signIn({email:'admin@example.test',password:'test'});
+  const result=await controller.enroll(branch);assert.equal(result.hubDeviceId,installation);
+ }finally{await hub.close();fs.rmSync(root,{recursive:true,force:true});}
 });

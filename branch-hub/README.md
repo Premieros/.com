@@ -2,17 +2,17 @@
 
 Repository: **Premieros/.com**, directory `branch-hub/`. The only authorized cloud project is **hvqlkapynjfjikqithvd**, `john's 1`, `eu-central-1`. No Johna's repository or database is used.
 
-**This is a testable development application, not a production-complete offline ERP.** Do not route real branch transactions through it yet. Cloud accounting reconciliation, taxes, returns, split payments, central enrollment and signed updates remain release blockers.
+**This is a testable development application, not a production-complete offline ERP.** Do not route real branch transactions through it yet. Cloud accounting reconciliation, taxes, returns, split payments, central certificate provisioning and automatic installation/rollback remain release blockers.
 
 ## Implemented and tested
 
 - Local SQLite checkout API and responsive Arabic UI at `/`, served without external assets. Integer base quantities and integer minor money units. Cash or bank posting in the kernel.
-- Atomic sale, stock debit, cost/revenue journal, outbox and actor audit. Insufficient stock or any write failure rolls back all records. Historical line costs remain fixed. No FIFO. Opening cost is supplied by the administrator; a published-price cloud feed is not connected yet.
+- Atomic sale, stock debit, cost/revenue journal, outbox and actor audit. Insufficient stock or any write failure rolls back all records. Historical line costs remain fixed. No FIFO. Opening cost is supplied by the administrator; a versioned cloud price command can update future cost and sale price without overwriting quantities or historical costs. An automatic feed from canonical ERP price views is not connected yet.
 - Idempotent checkout, including concurrent devices and browser reload after losing the server response. The browser retains the pending checkout key until a confirmed response; credentials stay in memory.
 - Administrator-issued per-device credentials, hash-only storage, viewer/cashier/stock roles and immediate revocation. The stock role currently has read access only. This is device authorization, **not individual staff login**.
 - TLS-only LAN binding. Certificate verification is exercised in tests. Certificates must be provisioned and trusted separately on each phone/tablet; there is no automated certificate enrollment yet.
 - ESC/POS TCP printer worker with a server-generated receipt and one job key per sale. Configured literal private IPv4 printers only. No shell commands. ASCII receipts only; Arabic raster printing, USB and Windows spooler drivers remain unsupported.
-- Verified SQLite snapshots and fresh-directory restore, including accounting, pending events, branch identity, foreign keys and printer delivery history.
+- Verified SQLite snapshots, AES-256-GCM encrypted archives, six-hour scheduled backups, retention of 14 successful archives, optional checksum-verified mirroring, and fresh-directory restore. Backups preserve accounting, pending events, inbox outcomes, installation identity and printer delivery history.
 - Windows NSIS prototype build, packaged-runtime smoke, actual silent installation and installed-runtime smoke in CI, plus an installer SHA-256 checksum. A successful build is not production acceptance or publisher signing.
 
 ## Run locally
@@ -58,21 +58,45 @@ node branch-hub/restore.cjs /secure/snapshot.sqlite /empty/branch-directory orga
 
 Only a standalone snapshot is accepted: active WAL sources, corrupt accounting, missing required tables, newer unsupported schemas, cross-branch data and non-empty targets are rejected. Restore atomically publishes a verified file using an exclusive hard link; the target filesystem must support hard links (NTFS on Windows). It cannot overwrite a running database.
 
-Scheduled retention, encrypted off-machine backup and full disaster-recovery operation remain incomplete. Keep backup copies protected separately.
+Desktop enrollment generates a private backup key inside the OS-protected configuration. The scheduled service starts an initial encrypted backup and then runs every six hours. It retains the latest 14 successful local archives, and never deletes old archives after a failed backup. `backupMirrorDir` optionally copies and checksum-verifies archives to another configured directory; that directory is not automatically an off-site service.
+
+Export the recovery key from the desktop administrator panel and keep it separately from archives. The native save dialog writes the key directly to the chosen new file; the key is not returned to LAN browsers. Losing both the protected profile and the exported key makes encrypted archives unrecoverable.
+
+Encrypted recovery, after stopping the old hub and setting `BRANCH_HUB_BACKUP_KEY` to the exported key:
+
+```sh
+node branch-hub/restore-encrypted.cjs /secure/archive.pbh /empty/branch-directory organization_id branch_id
+```
+
+Wrong keys, altered ciphertext or mismatched scope cannot publish a restored database. The low-level raw snapshot API remains available to server-side tests; manually configured CLI servers without a backup key still use raw protected SQLite snapshots. Set `BRANCH_HUB_BACKUP_KEY` and optionally `BRANCH_HUB_BACKUP_MIRROR` for encrypted CLI backups.
 
 ## Windows desktop
 
 `desktop.cjs` starts the local server and waits for its readiness message before opening the local UI. It reports child-process failure and prevents a second desktop instance. Packaging includes all runtime modules and UI assets; no test key or device configuration is shipped.
 
-For isolated testing only, create `branch-config.json` under Electron userData with `organizationId`, `branchId` and `token`. Optional `host`, `port`, `tlsKey`, `tlsCert`, `localHostname` and `printers` configure the same listener. There is no first-run enrollment wizard or protected credential vault yet. A fresh installation intentionally refuses to assume a branch.
+A fresh desktop installation now shows a first-run account/branch wizard. Login goes only to the pinned Supabase project; the server checks the account, `branches.manage` (or platform administrator), current branch RLS and active branch identity again at confirmation. It never invents or silently selects a branch. No password is persisted. The cloud refresh token, local administrator token and backup key are protected in `branch-config.secure.json` using Electron safeStorage (Windows DPAPI). A plaintext legacy configuration is migrated only after encryption verification; unsupported/insecure OS vaults fail closed.
 
-The prototype installer is unsigned. Automatic update/download/install and rollback are not implemented. A trusted publisher identity and release-signing setup are still required before safe automatic rollout.
+The Windows desktop starts at user login and keeps the local hub running in the tray when its window closes. The tray provides an explicit stop/exit action. This is per-user startup, **not a Windows service running before login**.
 
-## Cloud state
+Online enrollment logic is tested with controlled responses and the native sandboxed setup UI/DPAPI are exercised on Windows. A real owner's successful sign-in must still be acceptance-tested; no user password was available to this development session. Hardware certificate provisioning remains separate. Existing manual lab profiles without a cloud session do not gain automatic cloud authorization.
 
-Both local outboxes are durable and read-only through staging APIs. No cloud dispatch or acknowledgement is enabled. No financial events are deleted or marked acknowledged just because internet access returns.
+### Signed update staging
 
-The target project's branch/organization RLS and branch foreign key were inspected read-only. There is no Branch Hub-specific ingestion/inbox endpoint installed. Existing `reconcile_offline_sale` is not a complete protocol for this kernel's SKU, journal and event model. Mapping local identifiers and posting exactly once into the canonical cloud accounting must be implemented and integration-tested before activation. No Supabase schema or production records were changed by this work.
+The administrator-only `/api/v1/updates/stage` accepts a signed manifest and signature only when a trusted Ed25519 public key and encrypted recovery backups have been configured. It enforces project/repository/platform identity, increasing version, expiry, database compatibility, exact size and SHA-256, and allowed GitHub release redirects. A verified encrypted checkpoint is required before the executable becomes staged. The manifest cannot supply its own trusted key.
+
+This does **not install or run the EXE**. Publisher signing, automatic release polling, installation handoff and tested application rollback remain incomplete. No production update authority/key has been configured. The prototype installer itself remains unsigned.
+
+## Cloud transport state
+
+Migration `20261028064511_branch_hub_replication_v1.sql` was applied to **hvqlkapynjfjikqithvd only**, after isolated PostgreSQL 17 RLS/replay tests. It adds three Branch Hub tables and invoker-only functions. Existing sales, stock and canonical accounting tables/records are untouched. Anonymous access and authenticated UPDATE/DELETE on replicated financial payloads are denied.
+
+A newly enrolled desktop can refresh its encrypted cloud session and run automatic transport retries with bounded backoff. Rotated credentials must be durably saved by the desktop vault before any financial upload. Failure or internet loss leaves local checkout available.
+
+- Local `offline_outbox` events upload idempotently with matching project, branch, event ID and payload hash. The cloud returns **received**, which is recorded separately in `cloud_sale_receipts`. Financial outboxes remain pending and are never falsely marked posted/acknowledged.
+- Published price commands download into a durable inbox, update only newer revisions, preserve quantity and historical costs, and reject stale checkout prices. Unknown SKUs and conflicting revisions are retained as conflicts for review. Missing published cost is represented explicitly by zero.
+- A cloud command is acknowledged only after its local inbox/outcome/audit commit. Delivery uses per-installation acknowledgements, avoiding cursor gaps from transactions that commit out of order. Backups preserve installation identity for idempotent replay after recovery.
+
+**Canonical ERP reconciliation remains unimplemented.** Transport reception is not a sale posted into the main cloud sales, inventory or accounting reports. SKU/warehouse mapping, canonical posting and full reconciliation must be finished before real sales are processed. No production financial sample event was created during development.
 
 ## Verification
 

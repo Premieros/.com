@@ -9,7 +9,7 @@ function createBackupService({db,dir,organizationId,branchId,key,createSnapshot,
  db.exec(`CREATE TABLE IF NOT EXISTS backup_runs (
   id TEXT PRIMARY KEY,branch_id TEXT NOT NULL,filename TEXT,sha256 TEXT,bytes INTEGER,
   error TEXT,mirror_error TEXT,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP);`);
- let timer,active=null,stopped=false;
+ let timer,active=null,nextFresh=null,stopped=false;
  async function execute(){
   const id=crypto.randomUUID();let snapshot,file,result,mirrorError=null;
   try{
@@ -39,9 +39,9 @@ function createBackupService({db,dir,organizationId,branchId,key,createSnapshot,
    throw error;
   }
  }
- function run(){if(stopped)return Promise.reject(Error('BACKUP_SERVICE_STOPPED'));if(active)return active;active=execute().finally(()=>{active=null;});return active;}
+ function run({fresh=false}={}){if(stopped)return Promise.reject(Error('BACKUP_SERVICE_STOPPED'));if(active){if(!fresh)return active;if(!nextFresh)nextFresh=active.catch(()=>{}).then(()=>{nextFresh=null;return run();});return nextFresh;}active=execute().finally(()=>{active=null;});return active;}
  return {run,status(){return db.prepare('SELECT filename,sha256,bytes,error,mirror_error,created_at FROM backup_runs WHERE branch_id=? ORDER BY rowid DESC LIMIT 1').get(branchId)||null;},
-  start(){timer=setInterval(()=>run().catch(()=>{}),intervalMs);timer.unref();},
-  async stop(){stopped=true;clearInterval(timer);if(active)await active.catch(()=>{});}};
+  start(){queueMicrotask(()=>{if(!stopped)run().catch(()=>{});});timer=setInterval(()=>run().catch(()=>{}),intervalMs);timer.unref();},
+  async stop(){stopped=true;clearInterval(timer);if(active)await active.catch(()=>{});if(nextFresh)await nextFresh.catch(()=>{});}};
 }
 module.exports={createBackupService};

@@ -1,5 +1,5 @@
 'use strict';
-const { app, BrowserWindow, dialog, ipcMain, safeStorage } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, safeStorage, Tray, Menu } = require('electron');
 const {pathToFileURL}=require('node:url');
 const {createCloudClient}=require('./cloud-client.cjs');
 const {createConfigVault}=require('./config-vault.cjs');
@@ -9,7 +9,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 let worker;
 if (!app.requestSingleInstanceLock()) { app.exit(0); }
-let activeWindow;
+let activeWindow, tray;
 let setupWindow, localOrigin, localToken, localBackupKey, configVault;
 const setupURL=pathToFileURL(path.join(__dirname,'ui/setup.html')).href;
 function createWindow(status, localURL) {
@@ -21,6 +21,7 @@ function createWindow(status, localURL) {
  h1{font-size:32px}p{line-height:2;color:#bed0e9}.pill{color:#90ddff}
  </style><main><div class="pill">PREMIER OS • LOCAL BRANCH</div><h1>PremierOS Branch Hub</h1><p>${status}</p><p>هذه نسخة تأسيسية لإدارة خادم الفرع المحلي. لا تستخدمها حتى الآن لمعالجة المبيعات أو المدفوعات الفعلية.</p></main></html>`;
  activeWindow=win;
+ win.on('close',event=>{if(worker&&!app.isQuitting&&tray){event.preventDefault();win.hide();}});
  win.loadURL(localURL || 'data:text/html;charset=UTF-8,'+encodeURIComponent(markup));
  win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
  win.webContents.on('will-navigate',(event,url)=>{
@@ -30,9 +31,17 @@ function createWindow(status, localURL) {
 function startHub(c) {
   if(c.localHostname && !['localhost','127.0.0.1','::1'].includes(c.localHostname))throw Error('INVALID_DESKTOP_HOST');
   localToken=c.token;localBackupKey=c.backupKey;
+  if(process.platform==='win32'){
+   app.setLoginItemSettings({openAtLogin:true});
+   app.getFileIcon(process.execPath).then(icon=>{
+    if(tray)return;tray=new Tray(icon);tray.setToolTip('Premier • خادم الفرع المحلي');
+    const show=()=>{if(activeWindow&&!activeWindow.isDestroyed()){activeWindow.show();activeWindow.focus();}};
+    tray.on('double-click',show);tray.setContextMenu(Menu.buildFromTemplate([{label:'فتح Premier',click:show},{type:'separator'},{label:'إيقاف خادم الفرع والخروج',click:()=>app.quit()}]));
+   }).catch(()=>{});
+  }
   const env={...process.env,ELECTRON_RUN_AS_NODE:'1',BRANCH_HUB_HOST:c.host||'127.0.0.1',
    BRANCH_HUB_BRANCH_ID:c.branchId,BRANCH_HUB_ORGANIZATION_ID:c.organizationId,
-   BRANCH_HUB_INSTALLATION_ID:c.hubDeviceId||'',BRANCH_HUB_CLOUD_REFRESH_TOKEN:c.cloudRefreshToken||'',BRANCH_HUB_TOKEN:c.token,BRANCH_HUB_BACKUP_KEY:c.backupKey||'',BRANCH_HUB_BACKUP_MIRROR:c.backupMirrorDir||'',BRANCH_HUB_PORT:String(c.port||3847),
+   BRANCH_HUB_UPDATE_PUBLIC_KEY:c.updatePublicKey||'',BRANCH_HUB_INSTALLATION_ID:c.hubDeviceId||'',BRANCH_HUB_CLOUD_REFRESH_TOKEN:c.cloudRefreshToken||'',BRANCH_HUB_TOKEN:c.token,BRANCH_HUB_BACKUP_KEY:c.backupKey||'',BRANCH_HUB_BACKUP_MIRROR:c.backupMirrorDir||'',BRANCH_HUB_PORT:String(c.port||3847),
    BRANCH_HUB_PRINTERS:JSON.stringify(c.printers||{}),BRANCH_HUB_TLS_KEY:c.tlsKey||'',BRANCH_HUB_TLS_CERT:c.tlsCert||'',
    BRANCH_HUB_DATA_DIR:path.join(app.getPath('userData'),'branch-data')};
   worker=fork(path.join(__dirname,'server.cjs'),[],{execPath:process.execPath,env,stdio:['ignore','ignore','ignore','ipc']});
