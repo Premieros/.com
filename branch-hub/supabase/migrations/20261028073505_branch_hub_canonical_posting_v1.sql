@@ -15,11 +15,11 @@ CREATE INDEX branch_hub_posted_sales_branch_idx ON public.branch_hub_posted_sale
 ALTER TABLE public.branch_hub_posted_sales ENABLE ROW LEVEL SECURITY;
 CREATE POLICY hub_post_read ON public.branch_hub_posted_sales FOR SELECT TO authenticated
  USING ((public.can_permission('branches.manage') OR public.is_platform_admin()) AND EXISTS
- (SELECT 1 FROM public.branches b WHERE b.id=branch_id AND b.organization_id=branch_hub_posted_sales.organization_id AND (public.is_platform_admin() OR public.user_may_access_branch(b.id))));
+ (SELECT 1 FROM public.branches b WHERE b.id=branch_hub_posted_sales.branch_id AND b.organization_id=branch_hub_posted_sales.organization_id AND (public.is_platform_admin() OR public.user_may_access_branch(b.id))));
 CREATE POLICY hub_post_insert ON public.branch_hub_posted_sales FOR INSERT TO authenticated
  WITH CHECK (posted_by=(SELECT auth.uid()) AND public.can_permission('pos.payment.take') AND
  (public.can_permission('branches.manage') OR public.is_platform_admin()) AND EXISTS
- (SELECT 1 FROM public.branches b WHERE b.id=branch_id AND b.organization_id=branch_hub_posted_sales.organization_id AND b.is_active AND (public.is_platform_admin() OR public.user_may_access_branch(b.id))));
+ (SELECT 1 FROM public.branches b WHERE b.id=branch_hub_posted_sales.branch_id AND b.organization_id=branch_hub_posted_sales.organization_id AND b.is_active AND (public.is_platform_admin() OR public.user_may_access_branch(b.id))));
 REVOKE ALL ON public.branch_hub_posted_sales FROM PUBLIC,anon,authenticated;
 GRANT SELECT,INSERT ON public.branch_hub_posted_sales TO authenticated;
 
@@ -40,7 +40,8 @@ BEGIN
  OR sale.cashier_id IS DISTINCT FROM NEW.posted_by OR sale.total*100!=NEW.total_minor OR sale.paid_amount*100!=NEW.total_minor
  OR coalesce(sale.tax_amount,0)!=0 OR coalesce(sale.discount_amount,0)!=0 OR coalesce(sale.bonus_amount,0)!=0 OR sale.payment_method!='cash'
  THEN RAISE EXCEPTION 'HUB_POST_SALE_MISMATCH'; END IF;
- IF (SELECT count(*) FROM public.sale_items WHERE sale_id=NEW.sale_id)!=jsonb_array_length(payload->'lines') OR EXISTS(
+ IF (SELECT count(*) FROM public.sale_items WHERE sale_id=NEW.sale_id)!=jsonb_array_length(payload->'lines')
+ OR (SELECT count(*) FROM public.sale_item_inventory_effects WHERE sale_id=NEW.sale_id)!=jsonb_array_length(payload->'lines') OR EXISTS(
   SELECT 1 FROM jsonb_array_elements(payload->'lines')l LEFT JOIN public.sale_items si
   ON si.sale_id=NEW.sale_id AND si.product_id=(l->'canonical'->>'productId')::uuid
   WHERE si.id IS NULL OR si.unit_name IS DISTINCT FROM l->'canonical'->>'unitName' OR si.quantity!=(l->>'quantity')::numeric

@@ -19,7 +19,7 @@ async function main(){
  const makeEvent=()=>{const id=crypto.randomUUID();return {id,text:JSON.stringify({saleId:id,branchId:branch,key:'canonical-'+id,totalMinor:500,paymentAccount:'cash',lines:[{sku:`p_${product}_${warehouse}`,quantity:2,priceMinor:250,costMinor:200,canonical:{productId:product,warehouseId:warehouse,unitName:'piece'}}]})};};
  const receive=e=>asUser(()=>client.query('SELECT public.receive_branch_hub_sale_v1($1,$2,$3,$4,$5)',[org,branch,installation,e.id,e.text]));
  const post=(e,settings={})=>asUser(()=>client.query('SELECT public.post_branch_hub_sale_v1($1,$2,$3,$4) result',[org,branch,installation,e.id]),settings).then(r=>r.rows[0].result);
- const counts=async()=> (await client.query(`SELECT (SELECT count(*)::int FROM sales) sales,(SELECT sum(quantity) FROM inventory_batches) stock,(SELECT count(*)::int FROM journal_entries) journals,(SELECT count(*)::int FROM branch_hub_posted_sales) posts,(SELECT count(*)::int FROM private.pos_sale_idempotency) dedup`)).rows[0];
+ const counts=async()=> (await client.query(`SELECT (SELECT count(*)::int FROM sales) sales,(SELECT sum(quantity)::float8 FROM inventory_batches) stock,(SELECT count(*)::int FROM journal_entries) journals,(SELECT count(*)::int FROM branch_hub_posted_sales) posts,(SELECT count(*)::int FROM private.pos_sale_idempotency) dedup`)).rows[0];
  try{
   const manifest=JSON.parse(file('canonical/source-manifest.json'));assert.equal(manifest.projectRef,'hvqlkapynjfjikqithvd');assert.equal(crypto.createHash('sha256').update(file('canonical/source.sql')).digest('hex'),manifest.sha256);
   await client.query(file('fixtures.sql'));await client.query(file('canonical/fixtures.sql'));await client.query(file('canonical/source.sql'));
@@ -33,8 +33,8 @@ async function main(){
    throw Error('CANONICAL_TEST_DIAGNOSTIC '+JSON.stringify({first,canonical:diagnostic.rows[0].result}));
   });
   assert.equal(first.stage,'posted',JSON.stringify(first));assert.equal(first.costMinor,200);
-  assert.deepEqual(await post(event),first);assert.deepEqual(await counts(),{sales:1,stock:'18',journals:1,posts:1,dedup:1});
-  assert.equal((await client.query('SELECT sum(total_cost) total FROM inventory_ledger')).rows[0].total,'-2.00');
+  assert.deepEqual(await post(event),first);assert.deepEqual(await counts(),{sales:1,stock:18,journals:1,posts:1,dedup:1});
+  assert.equal(Number((await client.query('SELECT sum(total_cost) total FROM inventory_ledger')).rows[0].total),-2);
   const original=await counts();
   const wrongPrice=makeEvent();await receive(wrongPrice);await client.query('UPDATE products SET sale_price=3 WHERE id=$1',[product]);
   assert.equal((await post(wrongPrice)).reason,'HUB_PRICE_CHANGED');assert.deepEqual(await counts(),original);await client.query('UPDATE products SET sale_price=2.50 WHERE id=$1',[product]);
