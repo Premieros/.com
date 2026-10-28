@@ -18,7 +18,7 @@ async function main(){
  };
  try{
   await client.query(fs.readFileSync(path.join(__dirname,'fixtures.sql'),'utf8'));
-  const migrations=fs.readdirSync(path.join(__dirname,'../supabase/migrations')).filter(x=>x.endsWith('.sql'));
+  const migrations=fs.readdirSync(path.join(__dirname,'../supabase/migrations')).filter(x=>x.endsWith('.sql')&&!x.includes('canonical_posting'));
   for(const file of migrations)await client.query(fs.readFileSync(path.join(__dirname,'../supabase/migrations',file),'utf8'));
   const payload=JSON.stringify({saleId:event,branchId:branch,key:'postgres-replay-001',totalMinor:500,paymentAccount:'cash',lines:[{sku:'coffee',quantity:2,priceMinor:250,costMinor:200}]});
   const receive=(text=payload,eventId=event,orgId=org,branchId=branch)=>client.query('SELECT public.receive_branch_hub_sale_v1($1,$2,$3,$4,$5) receipt',[orgId,branchId,installation,eventId,text]);

@@ -15,6 +15,11 @@ function createOfflineSalesEngine(db, branchId) {
       unit_cost_minor INTEGER NOT NULL CHECK(unit_cost_minor>=0),
       PRIMARY KEY(branch_id,sku)
     );
+    CREATE TABLE IF NOT EXISTS offline_item_links (
+      branch_id TEXT NOT NULL,sku TEXT NOT NULL,product_id TEXT NOT NULL,warehouse_id TEXT NOT NULL,
+      unit_name TEXT NOT NULL,product_name TEXT NOT NULL,PRIMARY KEY(branch_id,sku),
+      FOREIGN KEY(branch_id,sku) REFERENCES offline_stock(branch_id,sku)
+    );
     CREATE TABLE IF NOT EXISTS offline_stock_movements (
       id TEXT PRIMARY KEY, branch_id TEXT NOT NULL, sku TEXT NOT NULL,
       sale_id TEXT NOT NULL, delta INTEGER NOT NULL CHECK(delta < 0),
@@ -95,7 +100,8 @@ function createOfflineSalesEngine(db, branchId) {
         if (!Number.isSafeInteger(revenue)||!Number.isSafeInteger(cogs) ||
             !Number.isSafeInteger(total+revenue)||!Number.isSafeInteger(cost+cogs)) throw Error('AMOUNT_OVERFLOW');
         total+=revenue;cost+=cogs;
-        costing.push({...line,costMinor:cogs});
+        const link=db.prepare('SELECT product_id,warehouse_id,unit_name FROM offline_item_links WHERE branch_id=? AND sku=?').get(branchId,line.sku);
+        costing.push({...line,costMinor:cogs,...(link?{canonical:{productId:link.product_id,warehouseId:link.warehouse_id,unitName:link.unit_name}}:{})});
       }
       const id=crypto.randomUUID();
       db.prepare('INSERT INTO offline_sales(id,branch_id,key,canonical,total_minor) VALUES(?,?,?,?,?)').run(id,branchId,key,canonical,total);

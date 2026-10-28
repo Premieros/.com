@@ -30,10 +30,10 @@ function createSyncStore(db,{organizationId,branchId,installationId}){
   const text=JSON.stringify({id:command.id,organization_id:command.organization_id,branch_id:command.branch_id,sku:command.sku,
    revision:command.revision,sale_price_minor:command.sale_price_minor,unit_cost_minor:command.unit_cost_minor});
   const fingerprint=hash(text);
-  db.exec('BEGIN IMMEDIATE');
+  db.exec('SAVEPOINT hub_price_command');
   try{
    const previous=db.prepare('SELECT payload_hash,outcome FROM cloud_price_inbox WHERE id=?').get(command.id);
-   if(previous){if(previous.payload_hash!==fingerprint)throw Error('INBOX_IDEMPOTENCY_CONFLICT');if(!(retryConflict&&previous.outcome==='conflict')){db.exec('COMMIT');return previous.outcome;}}
+   if(previous){if(previous.payload_hash!==fingerprint)throw Error('INBOX_IDEMPOTENCY_CONFLICT');if(!(retryConflict&&previous.outcome==='conflict')){db.exec('RELEASE hub_price_command');return previous.outcome;}}
    const stock=db.prepare('SELECT quantity FROM offline_stock WHERE branch_id=? AND sku=?').get(branchId,command.sku);
    const current=db.prepare('SELECT * FROM offline_catalog WHERE branch_id=? AND sku=?').get(branchId,command.sku);
    let outcome='applied',reason=null;
@@ -50,8 +50,8 @@ function createSyncStore(db,{organizationId,branchId,installationId}){
    }
    db.prepare('INSERT INTO cloud_price_inbox(id,branch_id,payload_hash,payload,outcome,reason) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET outcome=excluded.outcome,reason=excluded.reason').run(command.id,branchId,fingerprint,text,outcome,reason);
    audit(actor,'price.'+outcome,command.id,{sku:command.sku,revision:command.revision,reason});
-   db.exec('COMMIT');return outcome;
-  }catch(error){db.exec('ROLLBACK');throw error;}
+   db.exec('RELEASE hub_price_command');return outcome;
+  }catch(error){db.exec('ROLLBACK TO hub_price_command; RELEASE hub_price_command');throw error;}
  }
  function pending(){return db.prepare(`SELECT o.event_id,o.payload FROM offline_outbox o LEFT JOIN cloud_sale_receipts r ON r.event_id=o.event_id
   WHERE o.branch_id=? AND o.status='pending' AND r.event_id IS NULL ORDER BY o.rowid LIMIT 100`).all(branchId);}
