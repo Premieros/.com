@@ -1,24 +1,20 @@
 'use strict';
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, ipcMain, safeStorage } = require('electron');
+const {pathToFileURL}=require('node:url');
+const {createCloudClient}=require('./cloud-client.cjs');
+const {createConfigVault}=require('./config-vault.cjs');
+const {createEnrollmentController}=require('./enrollment.cjs');
 const { fork } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
 let worker;
 if (!app.requestSingleInstanceLock()) { app.exit(0); }
 let activeWindow;
-function configPath() { return path.join(app.getPath('userData'), 'branch-config.json'); }
-function loadConfig() {
- const file=configPath();
- if (!fs.existsSync(file)) return null;
- const c=JSON.parse(fs.readFileSync(file,'utf8'));
- if (!/^[a-zA-Z0-9_-]{3,80}$/.test(c.branchId||'') ||
-     !/^[a-zA-Z0-9_-]{3,80}$/.test(c.organizationId||'') ||
-     typeof c.token!=='string' || c.token.length<32) throw Error('INVALID_BRANCH_ENROLLMENT');
- return c;
-}
+let setupWindow, localOrigin, localToken;
+const setupURL=pathToFileURL(path.join(__dirname,'ui/setup.html')).href;
 function createWindow(status, localURL) {
  const win=new BrowserWindow({width:940,height:650,minWidth:650,minHeight:450,
-  webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,preload:path.join(__dirname,'setup-preload.cjs')}});
  const markup=`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>PremierOS Branch Hub</title><style>
  body{font-family:Segoe UI,Tahoma,Arial;background:#0b1730;color:#eaf1ff;margin:0;display:grid;place-items:center;min-height:100vh}
  main{max-width:650px;padding:45px;background:#132341;border:1px solid #38537d;border-radius:25px;box-shadow:0 25px 60px #0005}
@@ -31,10 +27,9 @@ function createWindow(status, localURL) {
   if(!localURL || new URL(url).origin!==new URL(localURL).origin)event.preventDefault();
  });
 }
-app.whenReady().then(()=>{
- try {
-  const c=loadConfig();
-  if (!c) {createWindow('لم يتم ربط الجهاز بفرع بعد. يتطلب التشغيل إعداد ربط فرع آمن؛ لم يتم تنفيذ التسجيل المركزي أو التوقيع بعد.');return;}
+function startHub(c) {
+  if(c.localHostname && !['localhost','127.0.0.1','::1'].includes(c.localHostname))throw Error('INVALID_DESKTOP_HOST');
+  localToken=c.token;
   const env={...process.env,ELECTRON_RUN_AS_NODE:'1',BRANCH_HUB_HOST:c.host||'127.0.0.1',
    BRANCH_HUB_BRANCH_ID:c.branchId,BRANCH_HUB_ORGANIZATION_ID:c.organizationId,
    BRANCH_HUB_TOKEN:c.token,BRANCH_HUB_PORT:String(c.port||3847),
@@ -47,11 +42,51 @@ app.whenReady().then(()=>{
    if(message?.type!=='ready' || ready)return;
    ready=true;clearTimeout(timer);
    const scheme=c.tlsKey?'https':'http';
-   createWindow('',`${scheme}://${c.localHostname||'127.0.0.1'}:${message.port}/`);
+   const url=`${scheme}://${c.localHostname||'127.0.0.1'}:${message.port}/`;
+   localOrigin=new URL(url).origin;
+   createWindow('',url);
+   if(setupWindow&&!setupWindow.isDestroyed())setupWindow.close();
   });
   worker.on('error',()=>{clearTimeout(timer);dialog.showErrorBox('PremierOS','تعذر بدء خادم الفرع المحلي');});
   worker.on('exit',()=>{clearTimeout(timer);if(!app.isQuitting){if(activeWindow)dialog.showErrorBox('PremierOS','خادم الفرع متوقف. أعد تشغيل التطبيق بعد مراجعة الإعدادات.');else createWindow('تعذر بدء خادم الفرع. راجع الإعدادات.');}});
- } catch { createWindow('إعداد ربط الفرع غير صالح؛ تم منع تشغيل الخادم لحماية بيانات الفرع.'); }
+}
+app.whenReady().then(()=>{
+ try {
+  const userDir=app.getPath('userData');
+  const vault=createConfigVault(userDir,safeStorage);
+  const c=vault.loadOrMigrate();
+  ipcMain.handle('hub:local-credential',event=>{
+   if(!activeWindow || event.sender!==activeWindow.webContents || event.senderFrame!==event.sender.mainFrame ||
+     !localOrigin || new URL(event.senderFrame.url).origin!==localOrigin)throw Error('FORBIDDEN');
+   return localToken;
+  });
+  if(c){startHub(c);return;}
+  const controller=createEnrollmentController({client:createCloudClient(),vault,dataDir:path.join(userDir,'branch-data')});
+  const trustedSetup=event=>setupWindow && !setupWindow.isDestroyed() && event.sender===setupWindow.webContents &&
+    event.senderFrame===event.sender.mainFrame && event.senderFrame.url===setupURL;
+  const errorCode=e=>['CLOUD_ACCESS_DENIED','BRANCH_ADMIN_REQUIRED','CLOUD_UNAVAILABLE','BRANCH_ACCESS_DENIED',
+   'LOGIN_REQUIRED','ENROLLMENT_BUSY','BRANCH_BINDING_MISMATCH','OS_CREDENTIAL_VAULT_UNAVAILABLE'].includes(e.message)?e.message:'ENROLLMENT_FAILED';
+  ipcMain.handle('hub:sign-in',async(event,input)=>{
+   if(!trustedSetup(event))return {ok:false,error:'FORBIDDEN'};
+   try{return {ok:true,...await controller.signIn(input)};}catch(e){return {ok:false,error:errorCode(e)};}
+  });
+  ipcMain.handle('hub:enroll',async(event,id)=>{
+   if(!trustedSetup(event))return {ok:false,error:'FORBIDDEN'};
+   try{
+    const config=await controller.enroll(id);
+    // Keep the setup window until the local UI exists, so window-all-closed cannot quit mid-enrollment.
+    startHub(config);return {ok:true};
+   }catch(e){return {ok:false,error:errorCode(e)};}
+  });
+  setupWindow=new BrowserWindow({width:760,height:780,minWidth:560,minHeight:550,
+   webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,preload:path.join(__dirname,'setup-preload.cjs')}});
+  setupWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+  setupWindow.webContents.on('will-navigate',event=>event.preventDefault());
+  setupWindow.on('closed',()=>controller.clear());
+  setupWindow.loadFile(path.join(__dirname,'ui/setup.html'));
+ } catch(error) {
+  createWindow(error.message==='OS_CREDENTIAL_VAULT_UNAVAILABLE'?'حماية إعدادات الجهاز غير متاحة. لم تُحفظ أي بيانات دخول.':'إعداد ربط الفرع غير صالح؛ تم منع تشغيل الخادم لحماية بيانات الفرع.');
+ }
 });
 app.on('before-quit',()=>{ app.isQuitting=true; if(worker && !worker.killed)worker.kill(); });
 app.on('second-instance',()=>{if(activeWindow){if(activeWindow.isMinimized())activeWindow.restore();activeWindow.focus();}});

@@ -55,3 +55,5 @@ $('opening-form').onsubmit=async event=>{event.preventDefault();try{await api('o
 $('backup').onclick=async()=>{try{const b=await api('backups','POST');$('backup-result').textContent=`تم الحفظ على جهاز الفرع: ${b.filename} (${b.bytes} bytes)`;}catch(e){message(e.message);}};
 
 $('cancel-pending').onclick=()=>{localStorage.removeItem(draftKey());pending=null;cart=[];drawCart();message('تم إلغاء الطلب المرفوض. يمكنك بدء بيع جديد.');};
+
+if(window.branchHub){window.branchHub.localCredential().then(value=>{if(value){$('credential').value=value;$('login-form').requestSubmit();}}).catch(()=>{});}

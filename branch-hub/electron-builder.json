@@ -8,6 +8,7 @@
     "*.cjs",
     "!*.test.cjs",
     "!*.browser.cjs",
+    "!desktop-shell-smoke.cjs",
     "package.json",
     "ui/**"
   ],

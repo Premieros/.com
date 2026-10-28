@@ -20,6 +20,16 @@ jobs:
       - name: Install packager
         working-directory: branch-hub
         run: npm ci --no-audit --no-fund
+      - name: Verify native Windows credential vault and sandboxed enrollment UI
+        shell: pwsh
+        run: |
+          $electron = Resolve-Path "branch-hub/node_modules/electron/dist/electron.exe"
+          $script = Resolve-Path "branch-hub/desktop-shell-smoke.cjs"
+          $report = Join-Path $env:RUNNER_TEMP "hub-desktop-security.json"
+          $test = Start-Process -FilePath $electron.Path -ArgumentList "`"$($script.Path)`"", "`"$report`"" -Wait -PassThru
+          if ($test.ExitCode -ne 0 -or !(Test-Path $report)) { throw "Desktop security smoke failed" }
+          $result = Get-Content $report -Raw | ConvertFrom-Json
+          if (!$result.ok -or !$result.dpapi -or !$result.sandboxedSetup) { throw "OS vault or setup UI failed" }
       - name: Package Windows installer
         working-directory: branch-hub
         run: npm run build:win
