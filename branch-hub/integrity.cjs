@@ -28,7 +28,9 @@ function invalidOfflineEvents(db,branchId,eventId){
    COALESCE(json_extract(o.payload,'$.saleId'),'') != o.sale_id
    OR COALESCE(json_extract(o.payload,'$.branchId'),'') != o.branch_id
    OR NOT EXISTS(SELECT 1 FROM offline_sales s WHERE s.id=o.sale_id AND s.branch_id=o.branch_id
-     AND s.total_minor=json_extract(o.payload,'$.totalMinor') AND json_extract(s.canonical,'$.paymentAccount')=json_extract(o.payload,'$.paymentAccount'))
+     AND s.key=json_extract(o.payload,'$.key') AND s.total_minor=json_extract(o.payload,'$.totalMinor') AND json_extract(s.canonical,'$.paymentAccount')=json_extract(o.payload,'$.paymentAccount'))
+   OR json_type(o.payload,'$.lines') IS NOT 'array'
+   OR EXISTS(SELECT 1 FROM json_each(o.payload,'$.lines') GROUP BY json_extract(value,'$.sku') HAVING count(*)>1)
    OR COALESCE(json_array_length(o.payload,'$.lines'),0)!=(SELECT count(*) FROM offline_sale_lines l WHERE l.sale_id=o.sale_id)
    OR EXISTS(SELECT 1 FROM json_each(o.payload,'$.lines') e LEFT JOIN offline_sale_lines l
      ON l.sale_id=o.sale_id AND l.sku=json_extract(e.value,'$.sku') WHERE l.sale_id IS NULL

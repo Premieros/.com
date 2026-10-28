@@ -64,3 +64,10 @@ CREATE POLICY test_update ON public.products FOR UPDATE TO authenticated USING(p
 CREATE POLICY test_update ON public.warehouses FOR UPDATE TO authenticated USING(public.user_may_access_branch(branch_id)) WITH CHECK(public.user_may_access_branch(branch_id));
 
 REVOKE ALL ON FUNCTION public._effective_branch_tax(uuid) FROM PUBLIC,anon,authenticated;
+
+-- Tax fixtures let the real canonical routine compute a taxable sale, which the bridge must roll back.
+INSERT INTO public.chart_of_accounts(id,branch_id,code) VALUES
+ ('a5555555-5555-4555-8555-555555555555','22222222-2222-4222-8222-222222222222','AR'),
+ ('a6666666-6666-4666-8666-666666666666','22222222-2222-4222-8222-222222222222','VAT');
+INSERT INTO public.account_mappings(branch_id,semantic_key,account_id)
+ SELECT branch_id,CASE code WHEN 'AR' THEN 'ar' ELSE 'vat_payable' END,id FROM public.chart_of_accounts WHERE code IN ('AR','VAT');

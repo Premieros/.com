@@ -60,3 +60,18 @@ test('accounting audit rejects balanced but incorrect financial postings and alt
   db.exec("UPDATE offline_outbox SET payload='{}'");assert.equal(auditOfflineSales(db,'branch_001').invalidEvents,1);
  }finally{db.close();}
 });
+
+test('outbox audit rejects duplicated lines even when totals and line count still match',()=>{
+ const {invalidOfflineEvents}=require('./integrity.cjs');const db=new DatabaseSync(':memory:');
+ try{
+  const engine=createOfflineSalesEngine(db,'branch_001');
+  for(const sku of ['a','b'])engine.setOpeningStock(sku,3,10);
+  engine.commitSale({key:'duplicate-event-001',lines:[{sku:'a',quantity:1,priceMinor:100},{sku:'b',quantity:1,priceMinor:100}]});
+  const original=db.prepare('SELECT payload FROM offline_outbox').get().payload;
+  const payload=JSON.parse(original);payload.lines[1]={...payload.lines[0]};
+  db.prepare('UPDATE offline_outbox SET payload=?').run(JSON.stringify(payload));
+  assert.equal(invalidOfflineEvents(db,'branch_001'),1);
+  const changed=JSON.parse(original);changed.key='different-key';db.prepare('UPDATE offline_outbox SET payload=?').run(JSON.stringify(changed));
+  assert.equal(invalidOfflineEvents(db,'branch_001'),1);
+ }finally{db.close();}
+});
