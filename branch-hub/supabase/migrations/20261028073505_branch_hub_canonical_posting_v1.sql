@@ -55,7 +55,7 @@ BEGIN
  IF journal_count!=1 OR actual_journal IS DISTINCT FROM NEW.journal_id THEN RAISE EXCEPTION 'HUB_POST_JOURNAL_MISSING'; END IF;
  SELECT coalesce(sum(debit),0),coalesce(sum(credit),0),count(*) INTO dr,cr,line_count
  FROM public.journal_entry_lines WHERE journal_entry_id=NEW.journal_id;
- IF dr!=cr OR dr*100!=NEW.total_minor+NEW.cost_minor OR line_count!=CASE WHEN NEW.cost_minor>0 THEN 4 ELSE 2 END
+ IF dr!=cr OR dr*100!=NEW.total_minor+NEW.cost_minor OR line_count!=(CASE WHEN NEW.cost_minor>0 THEN 4 ELSE 2 END)
  OR (SELECT coalesce(sum(debit),0)*100 FROM public.journal_entry_lines WHERE journal_entry_id=NEW.journal_id AND account_id=public.resolve_account_key(NEW.branch_id,'cash',NULL))!=NEW.total_minor
  OR (SELECT coalesce(sum(credit),0)*100 FROM public.journal_entry_lines WHERE journal_entry_id=NEW.journal_id AND account_id=public.resolve_account_key(NEW.branch_id,'revenue',NULL))!=NEW.total_minor
  OR (SELECT coalesce(sum(debit),0)*100 FROM public.journal_entry_lines WHERE journal_entry_id=NEW.journal_id AND account_id=public.resolve_account_key(NEW.branch_id,'cogs',NULL))!=NEW.cost_minor

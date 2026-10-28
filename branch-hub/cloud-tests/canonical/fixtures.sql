@@ -57,3 +57,5 @@ INSERT INTO public.chart_of_accounts(id,branch_id,code) VALUES
  ('a3333333-3333-4333-8333-333333333333','22222222-2222-4222-8222-222222222222','COGS'),
  ('a4444444-4444-4444-8444-444444444444','22222222-2222-4222-8222-222222222222','INVENTORY');
 INSERT INTO public.account_mappings(branch_id,semantic_key,account_id) SELECT branch_id,CASE code WHEN 'CASH' THEN 'cash' WHEN 'REVENUE' THEN 'revenue' WHEN 'COGS' THEN 'cogs' ELSE 'inventory_fg' END,id FROM public.chart_of_accounts;
+CREATE POLICY test_update ON public.products FOR UPDATE TO authenticated USING(public.user_may_access_branch(branch_id)) WITH CHECK(public.user_may_access_branch(branch_id));
+CREATE POLICY test_update ON public.warehouses FOR UPDATE TO authenticated USING(public.user_may_access_branch(branch_id)) WITH CHECK(public.user_may_access_branch(branch_id));

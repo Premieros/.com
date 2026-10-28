@@ -27,7 +27,12 @@ async function main(){
   const catalog=(await asUser(()=>client.query('SELECT public.get_branch_hub_catalog_v1($1,$2,$3) snapshot',[org,branch,warehouse]))).rows[0].snapshot;
   assert.equal(catalog.products.length,1);assert.equal(catalog.products[0].quantity,20);assert.equal(catalog.products[0].priceCommand.unit_cost_minor,100); // current price, not batch cost 10
   const event=makeEvent();await receive(event);
-  const first=await post(event);assert.equal(first.stage,'posted',JSON.stringify(first));assert.equal(first.costMinor,200);
+  const first=await post(event);
+  if(first.stage!=='posted')await asUser(async()=>{
+   const diagnostic=await client.query("SELECT public.process_sale_idempotent('diagnostic-operation-001','DIAG',$1,$2,NULL,auth.uid(),5,0,'amount',0,0,5,5,'cash','completed',$3,NULL,'takeaway',NULL,NULL,NULL) result",[branch,warehouse,JSON.stringify([{product_id:product,unit_name:'piece',quantity:2,unit_price:2.50,discount_amount:0,bonus_quantity:0,modifier_option_ids:[]}])]);
+   throw Error('CANONICAL_TEST_DIAGNOSTIC '+JSON.stringify({first,canonical:diagnostic.rows[0].result}));
+  });
+  assert.equal(first.stage,'posted',JSON.stringify(first));assert.equal(first.costMinor,200);
   assert.deepEqual(await post(event),first);assert.deepEqual(await counts(),{sales:1,stock:'18',journals:1,posts:1,dedup:1});
   assert.equal((await client.query('SELECT sum(total_cost) total FROM inventory_ledger')).rows[0].total,'-2.00');
   const original=await counts();
@@ -42,6 +47,34 @@ async function main(){
   // A rejected event can be retried once the conflict is corrected; it creates one official sale.
   const recovered=await post(fault);assert.equal(recovered.stage,'posted',JSON.stringify(recovered));assert.deepEqual(await post(fault),recovered);
   assert.equal((await counts()).sales,2);assert.equal((await counts()).posts,2);
+  // Full local SQLite -> PostgreSQL canonical stock/journal -> durable local ACK, with a lost committed response.
+  const {DatabaseSync}=require('node:sqlite');
+  const {createOfflineSalesEngine}=require('../offline-sales.cjs');
+  const {createCatalogImporter}=require('../catalog-import.cjs');
+  const {createCloudSync}=require('../cloud-sync.cjs');
+  const local=new DatabaseSync(':memory:');local.exec('PRAGMA foreign_keys=ON');let sync;
+  try{
+   const engine=createOfflineSalesEngine(local,branch);
+   const fresh=(await asUser(()=>client.query('SELECT public.get_branch_hub_catalog_v1($1,$2,$3) snapshot',[org,branch,warehouse]))).rows[0].snapshot;
+   createCatalogImporter(local,{organizationId:org,branchId:branch,installationId:installation}).apply(fresh);
+   engine.commitSale({key:'full-offline-flow-001',lines:[{sku:fresh.products[0].sku,quantity:1,priceMinor:250}]});
+   let drop=true;const before=(await counts()).sales;
+   const transport={validateEnrollment:async()=>({}),request:async(route,{body}={})=>{
+    if(route.startsWith('/auth/'))return {access_token:'fixture-session',refresh_token:'fixture-refresh',expires_in:3600};
+    if(route.includes('receive_branch_hub_sale'))return (await asUser(()=>client.query('SELECT public.receive_branch_hub_sale_v1($1,$2,$3,$4,$5) receipt',[org,branch,installation,body.p_event_id,body.p_payload_text]))).rows[0].receipt;
+    if(route.includes('post_branch_hub_sale')){const result=await post({id:body.p_event_id});if(drop){drop=false;throw Error('LOST_CANONICAL_ACK');}return result;}
+    if(route.includes('pull_branch_hub_prices'))return (await asUser(()=>client.query('SELECT public.pull_branch_hub_prices_v1($1,$2,$3) commands',[org,branch,installation]))).rows[0].commands;
+    if(route.includes('command_receipts')){await asUser(()=>client.query('INSERT INTO public.branch_hub_command_receipts(installation_id,command_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[installation,body.command_id]));return null;}
+    throw Error('UNEXPECTED_TRANSPORT_ROUTE');
+   }};
+   sync=createCloudSync({db:local,client:transport,organizationId:org,branchId:branch,installationId:installation,refreshToken:'fixture-initial',persistRefreshToken:async()=>{}});
+   await assert.rejects(sync.run(),/LOST_CANONICAL_ACK/);assert.equal(local.prepare('SELECT status FROM offline_outbox').get().status,'pending');
+   await sync.run();await sync.run();
+   assert.equal(local.prepare('SELECT status FROM offline_outbox').get().status,'acknowledged');
+   assert.equal((await counts()).sales,before+1);
+   assert.equal(Number((await counts()).stock),local.prepare('SELECT quantity FROM offline_stock').get().quantity);
+   assert.equal(local.prepare('SELECT count(*) n FROM cloud_posted_sales').get().n,1);
+  }finally{if(sync)await sync.stop();local.close();}
   console.log('REAL_CANONICAL_SALE_STOCK_JOURNAL_REPLAY_ROLLBACK_OK');
  }finally{await client.end();}
 }
