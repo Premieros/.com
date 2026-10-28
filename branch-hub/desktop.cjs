@@ -14,7 +14,7 @@ const path = require('node:path');
 const renderReceipt=require('./raster-receipt.cjs').createElectronReceiptRenderer({BrowserWindow,nativeImage});
 let worker;
 if (!app.requestSingleInstanceLock()) { app.exit(0); }
-let activeWindow, tray;
+let activeWindow, tray, erpWindow, browserAppServer, browserAppURL, browserAppOpening;
 let setupWindow, localOrigin, localToken, localBackupKey, configVault;
 const setupURL=pathToFileURL(path.join(__dirname,'ui/setup.html')).href;
 function createWindow(status, localURL) {
@@ -33,14 +33,30 @@ function createWindow(status, localURL) {
   if(!localURL || new URL(url).origin!==new URL(localURL).origin)event.preventDefault();
  });
 }
+async function showBrowserApp(){
+ if(browserAppOpening)return;
+ if(erpWindow&&!erpWindow.isDestroyed()){erpWindow.show();erpWindow.focus();return;}
+ browserAppOpening=true;
+ try{
+  if(!browserAppServer){const candidate=require('./browser-app-server.cjs').createBrowserAppServer();browserAppURL=await candidate.listen();browserAppServer=candidate;}
+  const url=browserAppURL;
+  erpWindow=new BrowserWindow({width:1440,height:960,minWidth:850,minHeight:650,title:'Premier • النظام الكامل',webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  erpWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+  erpWindow.webContents.on('will-navigate',(event,target)=>{if(new URL(target).origin!==new URL(url).origin)event.preventDefault();});
+  erpWindow.on('close',event=>{if(worker&&!app.isQuitting&&tray){event.preventDefault();erpWindow.hide();}});
+  await erpWindow.loadURL(url);
+ }catch{dialog.showErrorBox('Premier','تعذر فتح واجهة النظام الكامل. تأكد من توفر المنفذ المحلي 3848 واستخدم قائمة الفرع لفتح التشغيل المحلي.');}finally{browserAppOpening=false;}
+}
 function startHub(c) {
   desktopOrigin({hostname:c.localHostname||'127.0.0.1',port:c.port||3847,tls:Boolean(c.tlsKey)});
   localToken=c.token;localBackupKey=c.backupKey;
+  const showLocal=()=>{if(activeWindow&&!activeWindow.isDestroyed()){activeWindow.show();activeWindow.focus();}};
+  Menu.setApplicationMenu(Menu.buildFromTemplate([{label:'الفرع',submenu:[{label:'النظام الكامل — يتطلب الإنترنت',click:showBrowserApp},{label:'التشغيل المحلي وإعدادات الفرع',click:showLocal},{type:'separator'},{label:'خروج',click:()=>app.quit()}]},{label:'عرض',submenu:[{role:'reload'},{role:'togglefullscreen'},{role:'zoomIn'},{role:'zoomOut'},{role:'resetZoom'}]}]));
   if(process.platform==='win32'){
    app.setLoginItemSettings({openAtLogin:true});
    app.getFileIcon(process.execPath).then(icon=>{
     if(tray)return;tray=new Tray(icon);tray.setToolTip('Premier • خادم الفرع المحلي');
-    const show=()=>{if(activeWindow&&!activeWindow.isDestroyed()){activeWindow.show();activeWindow.focus();}};
+    const show=()=>{showBrowserApp();};
     tray.on('double-click',show);tray.setContextMenu(Menu.buildFromTemplate([{label:'فتح Premier',click:show},{type:'separator'},{label:'إيقاف خادم الفرع والخروج',click:()=>app.quit()}]));
    }).catch(()=>{});
   }
@@ -72,6 +88,7 @@ function startHub(c) {
    const url=desktopOrigin({hostname:c.localHostname||'127.0.0.1',port:message.port,tls:Boolean(c.tlsKey)})+'/';
    localOrigin=new URL(url).origin;
    createWindow('',url);
+   activeWindow.hide();showBrowserApp();
    if(setupWindow&&!setupWindow.isDestroyed())setupWindow.close();
   });
   worker.on('error',()=>{clearTimeout(timer);dialog.showErrorBox('PremierOS','تعذر بدء خادم الفرع المحلي');});
@@ -125,7 +142,7 @@ app.whenReady().then(()=>{
   createWindow(error.message==='OS_CREDENTIAL_VAULT_UNAVAILABLE'?'حماية إعدادات الجهاز غير متاحة. لم تُحفظ أي بيانات دخول.':'إعداد ربط الفرع غير صالح؛ تم منع تشغيل الخادم لحماية بيانات الفرع.');
  }
 });
-app.on('before-quit',()=>{ app.isQuitting=true; if(worker && !worker.killed)worker.kill(); });
+app.on('before-quit',()=>{ app.isQuitting=true; if(browserAppServer)browserAppServer.close(); if(worker && !worker.killed)worker.kill(); });
 app.on('second-instance',()=>{if(activeWindow){if(activeWindow.isMinimized())activeWindow.restore();activeWindow.focus();}});
 app.on('window-all-closed',()=>app.quit());
 

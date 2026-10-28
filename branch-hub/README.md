@@ -129,3 +129,9 @@ The installed application diagnostic `--branch-hub-render-self-test` uses only f
 ### 0.5.1 enrollment network diagnostics
 
 Desktop enrollment uses Electron Chromium networking, including system proxy settings. Safe account/permission/branch reads retry one transient failure; password grants, rotating refresh tokens, and financial operations do not. Confirmation still revalidates account, permission and the selected active RLS-visible branch before saving. Setup displays bounded phase and HTTP diagnostics, distinguishes DNS, TLS, timeout and rate limiting, and permits retry or renewed login without saving an unverified binding. No certificate verification bypass is enabled.
+
+### 0.6.0 full browser interface inside Windows
+
+The installer bundles the same React application from `src/`, built with the pinned project's public publishable key. After branch startup the full interface opens; the native Branch menu switches to the local operational UI. The full browser interface still uses Supabase and requires cloud login/connectivity for its cloud functions. It is not a complete SQLite adapter and does not extend the supported offline financial scope.
+
+A separate loopback-only asset server on port 3848 serves the full application. Its window has no preload or hub IPC bridge, and cannot read the local admin credential or backup key. Cloud auth stays in that separate origin; it is not copied from enrollment. CSP restricts network access to the approved Supabase project. Service worker registration is disabled for this desktop build. The local hub remains on its own origin and device/employee authorization remains enforced. Generated browser assets are packaged by CI, not committed. Installed-app tests load the bundled React login and check bridge isolation.

@@ -21,8 +21,19 @@ function inspect(bytes,width){
  assert.deepEqual([...bytes.subarray(offset)],[10,10,10,29,86,0]);assert(rows>80&&black>200);return {width,rows,black};
 }
 app.whenReady().then(async()=>{
- let hub,printer;
+ let hub,printer,appAssets,erp;
  try{
+  // The installed package must contain the actual built React app, isolated from hub IPC.
+  appAssets=require('./browser-app-server.cjs').createBrowserAppServer({port:0});
+  const appURL=await appAssets.listen();
+  erp=new BrowserWindow({show:false,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});
+  await erp.loadURL(appURL);
+  const ui=await erp.webContents.executeJavaScript(`(async()=>{
+   for(let i=0;i<150;i++){if(document.body.textContent.includes('النظام الكامل'))break;await new Promise(r=>setTimeout(r,100));}
+   return {text:document.body.textContent,require:typeof window.require,bridge:typeof window.branchHub,root:!!document.querySelector('#root')};
+  })()`);
+  assert(ui.root);assert.match(ui.text,/النظام الكامل/);assert.match(ui.text,/تسجيل الدخول|دخول|Login|Sign in/);assert.equal(ui.require,'undefined');assert.equal(ui.bridge,'undefined');
+  console.log('INSTALLED_FULL_BROWSER_APP_ISOLATED_OK');erp.destroy();erp=null;
   const render=createElectronReceiptRenderer({BrowserWindow,nativeImage});
   const sample={saleId:'77777777-7777-4777-8777-777777777777',createdAt:'2026-10-28 12:00:00',totalMinor:500,lines:[{label:'قهوة عربية — اختبار الإيصال',quantity:2,priceMinor:250}]};
   assert(!receiptHtml({...sample,lines:[{...sample.lines[0],label:'<img src="https://invalid.test" onerror="alert(1)">'}]},384).includes('<img'));
@@ -49,5 +60,5 @@ app.whenReady().then(async()=>{
   assert.equal(await hub.printWorker.processOnce(),false);assert.equal(connections,1);hub.createLocalBackup();
   console.log('NATIVE_ARABIC_RASTER_TCP_ONCE_OK',JSON.stringify(sizes));
  }catch(error){console.error(error);process.exitCode=1;}
- finally{if(hub)await hub.close();if(printer)await new Promise(resolve=>printer.close(resolve));try{fs.rmSync(root,{recursive:true,force:true});}catch{}app.exit(process.exitCode||0);}
+ finally{if(erp)erp.destroy();if(appAssets)await appAssets.close();if(hub)await hub.close();if(printer)await new Promise(resolve=>printer.close(resolve));try{fs.rmSync(root,{recursive:true,force:true});}catch{}app.exit(process.exitCode||0);}
 });

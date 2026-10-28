@@ -10,7 +10,8 @@
     "!*.browser.cjs",
     "!desktop-shell-smoke.cjs",
     "package.json",
-    "ui/**"
+    "ui/**",
+    "browser-app/**"
   ],
   "asar": true,
   "win": {
