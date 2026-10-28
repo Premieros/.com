@@ -31,6 +31,15 @@ async function main(){
   assert.equal(hub.db.prepare('SELECT quantity FROM offline_stock').get().quantity,2);
   assert.equal(hub.db.prepare('SELECT count(*) n FROM offline_sales').get().n,1);
   assert.equal(JSON.parse(hub.db.prepare('SELECT payload FROM offline_outbox').get().payload).lines[0].canonical.productId,productId);
+  const call=async(route,body,credential='s'.repeat(40),employeeSession='')=>{
+   const result=await fetch(`http://127.0.0.1:${port}/api/v1/${route}`,{method:'POST',headers:{authorization:'Bearer '+credential,'content-type':'application/json','x-hub-session':employeeSession},body:JSON.stringify(body)});
+   assert(result.ok,route+' '+result.status);return result.json();
+  };
+  const device=await call('devices',{organizationId,branchId,name:'Packaged till',role:'cashier'});
+  await call('staff',{organizationId,branchId,username:'packaged',name:'Packaged employee',role:'cashier',password:'Packaged-employee-12345'});
+  const employee=await call('staff/login',{username:'packaged',password:'Packaged-employee-12345'},device.token);
+  const staffResponse=await fetch(`http://127.0.0.1:${port}/api/v1/session`,{headers:{authorization:'Bearer '+device.token,'x-hub-session':employee.token}});
+  const staffSession=await staffResponse.json();assert.equal(staffSession.staffName,'Packaged employee');assert(staffSession.permissions.includes('sell'));
   hub.createLocalBackup();
   console.log('PACKAGED_RUNTIME_OK',process.versions.node);
  }finally{await hub.close();fs.rmSync(dir,{recursive:true,force:true});}

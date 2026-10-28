@@ -22,7 +22,17 @@ async function main(){
   await page.locator('#opening-sku').fill('coffee');await page.locator('#opening-qty').fill('10');await page.locator('#opening-cost').fill('1.20');
   await page.locator('#opening-form button').click();await page.waitForFunction(()=>document.getElementById('stock').textContent.includes('coffee'));
   const registry=createDeviceRegistry(hub.db,'branch_001');const device=registry.issue({name:'Tablet',role:'cashier'});
-  await page.locator('#logout').click();await login(device.token);
+  // Create the employee through the real administrator UI before enforcing the second login step.
+  await page.locator('#new-staff-username').fill('cashier');await page.locator('#new-staff-name').fill('موظف الاختبار');
+  await page.locator('#new-staff-password').fill('Browser-offline-employee-123');await page.locator('#staff-create button').click();
+  await page.waitForFunction(()=>document.getElementById('staff-list').textContent.includes('موظف الاختبار'));
+  const employeeLogin=async()=>{
+   await page.locator('#staff-login').waitFor({state:'visible'});await page.locator('#staff-username').fill('cashier');
+   await page.locator('#staff-password').fill('Browser-offline-employee-123');await page.locator('#staff-login-form button').click();
+   await page.locator('#workspace').waitFor({state:'visible'});
+  };
+  const deviceLogin=async()=>{await page.locator('#credential').fill(device.token);await page.locator('#login-form button').click();await employeeLogin();};
+  await page.locator('#logout').click();await deviceLogin();
   await page.locator('#sku').selectOption('coffee');await page.locator('#quantity').fill('2');await page.locator('#price').fill('3.00');await page.locator('#line-form button').click();
   // Server commits but the browser loses the ACK. Reload must reuse the durable checkout key.
   let dropped=false;
@@ -30,7 +40,7 @@ async function main(){
    if(route.request().method()==='POST'&&!dropped){dropped=true;await route.fetch();await route.abort();}else await route.continue();
   });
   await page.locator('#checkout').click();await page.locator('#pending').waitFor({state:'visible'});
-  await page.reload();await login(device.token);await page.locator('#pending').waitFor({state:'visible'});
+  await page.reload();await deviceLogin();await page.locator('#pending').waitFor({state:'visible'});
   await page.locator('#checkout').click();await page.locator('#pending').waitFor({state:'hidden'});
   assert.equal(hub.db.prepare('SELECT count(*) n FROM offline_sales').get().n,1);
   assert.equal(hub.db.prepare('SELECT quantity FROM offline_stock').get().quantity,8);
@@ -41,7 +51,12 @@ async function main(){
   await page.setViewportSize({width:390,height:844});
   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth),true);
   await page.screenshot({path:path.join(__dirname,'test-output/mobile.png'),fullPage:true});
-  assert.deepEqual(errors,[]);console.log('BROWSER_OFFLINE_SALE_RETRY_OK');
+  const employee=hub.db.prepare('SELECT id FROM hub_staff').get();
+  assert.equal(hub.db.prepare("SELECT actor FROM hub_audit WHERE action='sale.commit'").get().actor,'staff:'+employee.id);
+  assert.equal(await page.evaluate(()=>Object.values(localStorage).some(x=>x.includes('Browser-offline-employee-123'))),false);
+  await page.locator('#staff-switch').click();await page.locator('#staff-login').waitFor({state:'visible'});
+  await employeeLogin();assert.equal(await page.locator('#pending').isVisible(),false);
+  assert.deepEqual(errors,[]);console.log('BROWSER_OFFLINE_STAFF_SALE_RETRY_OK');
  }finally{if(browser)await browser.close();await hub.close();fs.rmSync(dir,{recursive:true,force:true});}
 }
 main().catch(e=>{console.error(e);process.exitCode=1;});

@@ -1,11 +1,11 @@
 'use strict';
 const $=id=>document.getElementById(id);
-let token='',session=null,cart=[],pending=null;
+let token='',staffToken='',session=null,cart=[],pending=null;
 const message=text=>{$('status').textContent=text;};
 async function api(route,method='GET',body){
- const response=await fetch('/api/v1/'+route,{method,headers:{authorization:'Bearer '+token,'content-type':'application/json'},body:body?JSON.stringify(body):undefined});
+ const response=await fetch('/api/v1/'+route,{method,headers:{authorization:'Bearer '+token,'content-type':'application/json','x-hub-session':staffToken},body:body?JSON.stringify(body):undefined});
  const result=await response.json();
- if(!response.ok){const error=Error(result.error||'تعذر تنفيذ الطلب');error.status=response.status;error.code=result.error;throw error;}return result;
+ if(!response.ok){if(result.error==='STAFF_SESSION_REQUIRED')lockStaff();const error=Error(result.error||'تعذر تنفيذ الطلب');error.status=response.status;error.code=result.error;throw error;}return result;
 }
 const scope=()=>({organizationId:session.organizationId,branchId:session.branchId});
 const draftKey=()=>`premier-pending:${session.organizationId}:${session.branchId}`;
@@ -28,15 +28,29 @@ async function refresh(){
  for(const s of sales.sales){const row=addText($('sales'),`${s.id.slice(0,8)} · ${(s.total_minor/100).toFixed(2)} · ${s.created_at}`);if(session.permissions.includes('print'))button(row,'طباعة',async()=>{await api(`offline/sales/${s.id}/print`,'POST',{printerId:$('printer').value});message('تمت إضافة الإيصال لقائمة الطباعة. راجع حالة الإرسال.');await refresh();});}
  $('jobs').replaceChildren();for(const j of jobs.jobs)addText($('jobs'),`${j.id.slice(0,8)}: ${j.delivery_state||j.status}${j.error?' · '+j.error:''}`);
  $('health').textContent=`سلامة البيانات: ${integrity.ok?'سليمة':'تحتاج مراجعة'} · عمليات محلية تنتظر المزامنة: ${sync.pending}`;
- if(session.admin){const cloud=await api('cloud/status');$('cloud-status').textContent=cloud.configured?`تم استلام ${cloud.replicatedSales} عملية · رُحلت رسميًا ${cloud.postedSales||0} · معلقة للمراجعة ${cloud.postingConflicts||0} · تعارضات الأسعار ${cloud.priceConflicts}${cloud.lastError?' · تعذر آخر اتصال':''}`:'لم تُربط جلسة المزامنة السحابية لهذا الجهاز.';const postings=await api('cloud/posting-conflicts');$('posting-conflicts').replaceChildren();for(const c of postings.conflicts)addText($('posting-conflicts'),`${c.event_id.slice(0,8)} · ${postingReason(c.reason)}`);const {conflicts}=await api('cloud/conflicts');$('price-conflicts').replaceChildren();for(const c of conflicts){const row=addText($('price-conflicts'),`${c.sku} · ${c.reason==='UNKNOWN_LOCAL_SKU'?'الصنف غير موجود محليًا':'رقم إصدار السعر مستخدم بقيم أخرى'}`);button(row,'إعادة الفحص',async()=>{const r=await api('cloud/conflicts/'+c.id+'/retry','POST');message(r.outcome==='applied'?'تم تطبيق السعر.':'التعارض ما زال يحتاج مراجعة.');await refresh();});}const {devices}=await api('devices');$('devices').replaceChildren();for(const d of devices){const row=addText($('devices'),`${d.name} · ${d.role} · ${d.revoked?'ملغى':'نشط'}`);if(!d.revoked)button(row,'إلغاء الربط',async()=>{await api('devices/'+d.id,'DELETE');await refresh();});}}
+ if(session.admin){await refreshStaff();const cloud=await api('cloud/status');$('cloud-status').textContent=cloud.configured?`تم استلام ${cloud.replicatedSales} عملية · رُحلت رسميًا ${cloud.postedSales||0} · معلقة للمراجعة ${cloud.postingConflicts||0} · تعارضات الأسعار ${cloud.priceConflicts}${cloud.lastError?' · تعذر آخر اتصال':''}`:'لم تُربط جلسة المزامنة السحابية لهذا الجهاز.';const postings=await api('cloud/posting-conflicts');$('posting-conflicts').replaceChildren();for(const c of postings.conflicts)addText($('posting-conflicts'),`${c.event_id.slice(0,8)} · ${postingReason(c.reason)}`);const {conflicts}=await api('cloud/conflicts');$('price-conflicts').replaceChildren();for(const c of conflicts){const row=addText($('price-conflicts'),`${c.sku} · ${c.reason==='UNKNOWN_LOCAL_SKU'?'الصنف غير موجود محليًا':'رقم إصدار السعر مستخدم بقيم أخرى'}`);button(row,'إعادة الفحص',async()=>{const r=await api('cloud/conflicts/'+c.id+'/retry','POST');message(r.outcome==='applied'?'تم تطبيق السعر.':'التعارض ما زال يحتاج مراجعة.');await refresh();});}const {devices}=await api('devices');$('devices').replaceChildren();for(const d of devices){const row=addText($('devices'),`${d.name} · ${d.role} · ${d.revoked?'ملغى':'نشط'}`);if(!d.revoked)button(row,'إلغاء الربط',async()=>{await api('devices/'+d.id,'DELETE');await refresh();});}}
+}
+function lockStaff(){staffToken='';$('workspace').hidden=true;$('staff-login').hidden=false;$('login').hidden=true;$('logout').hidden=false;$('staff-switch').hidden=true;$('staff-password').value='';}
+async function openWorkspace(current){
+ session=current;
+ if(session.staffLoginRequired){lockStaff();return;}
+ $('login').hidden=true;$('staff-login').hidden=true;$('workspace').hidden=false;$('logout').hidden=false;$('staff-switch').hidden=!session.staffName;
+ $('admin').hidden=!session.admin;$('sale-panel').hidden=!session.permissions.includes('sell');$('branch').textContent='الفرع: '+session.branchId+(session.staffName?' · '+session.staffName:'');
+ pending=JSON.parse(localStorage.getItem(draftKey())||'null');cart=pending?.lines||[];drawCart();await refresh();message('متصل بخادم الفرع المحلي.');
 }
 $('login-form').onsubmit=async event=>{
- event.preventDefault();token=$('credential').value;$('credential').value='';
- try {session=await api('session');$('login').hidden=true;$('workspace').hidden=false;$('logout').hidden=false;$('admin').hidden=!session.admin;$('sale-panel').hidden=!session.permissions.includes('sell');$('branch').textContent='الفرع: '+session.branchId;
-  pending=JSON.parse(localStorage.getItem(draftKey())||'null');cart=pending?.lines||[];drawCart();await refresh();message('متصل بخادم الفرع المحلي.');
- }catch(e){token='';session=null;$('login').hidden=false;$('workspace').hidden=true;message(e.message);}
+ event.preventDefault();token=$('credential').value;$('credential').value='';staffToken='';
+ try{await openWorkspace(await api('session'));}
+ catch(e){token='';session=null;$('login').hidden=false;$('workspace').hidden=true;message(e.message);}
 };
-$('logout').onclick=()=>{token='';session=null;location.reload();};
+$('staff-login-form').onsubmit=async event=>{
+ event.preventDefault();const b=event.submitter;b.disabled=true;const password=$('staff-password').value;$('staff-password').value='';
+ try{const result=await api('staff/login','POST',{username:$('staff-username').value.toLowerCase(),password});staffToken=result.token;await openWorkspace(await api('session'));}
+ catch(e){message(e.code==='STAFF_LOGIN_LIMITED'?'محاولات كثيرة. انتظر 15 دقيقة قبل إعادة المحاولة.':e.code==='STAFF_AUTH_BUSY'?'الخادم يتحقق من حساب آخر. أعد المحاولة.':'تعذر دخول الموظف. تحقق من البيانات أو راجع المدير.');}
+ finally{b.disabled=false;}
+};
+$('logout').onclick=async()=>{if(staffToken)try{await api('staff/logout','POST');}catch{}token='';staffToken='';session=null;location.reload();};
+$('staff-switch').onclick=async()=>{if(staffToken)try{await api('staff/logout','POST');}catch{}lockStaff();message('أدخل حساب الموظف. أي بيع معلق سيُعاد التحقق منه بنفس رقمه.');};
 $('refresh').onclick=()=>refresh().catch(e=>message(e.message));
 $('line-form').onsubmit=event=>{event.preventDefault();if(pending)return;
  const line={sku:$('sku').value,quantity:Number($('quantity').value),priceMinor:Math.round(Number($('price').value)*100)};
@@ -69,3 +83,23 @@ $('sku').onchange=updatePublishedPrice;
 function postingReason(reason){return ({HUB_MAPPING_REQUIRED:'البيع غير مرتبط بصنف ومخزن رسميين',HUB_PRICE_CHANGED:'سعر البيع السحابي تغير',HUB_COST_CHANGED:'التكلفة السحابية تغيرت',HUB_CLOUD_STOCK_SHORTAGE:'الرصيد السحابي غير كافٍ',HUB_TAX_RULE_CONFLICT:'إعداد الضريبة لا يطابق البيع المحلي',HUB_BANK_METHOD_REQUIRED:'بيانات الدفع البنكي غير مكتملة',HUB_READY_PRODUCT_REQUIRED:'نوع الصنف غير مدعوم في الترحيل الحالي',HUB_CANONICAL_SALE_REJECTED:'النظام الرسمي رفض الترحيل؛ راجع إعدادات الفرع'})[reason]||'العملية معلقة وتحتاج مراجعة';}
 $('load-warehouses').onclick=async()=>{try{const result=await api('cloud/warehouses');$('cloud-warehouse').replaceChildren();for(const w of result.warehouses){const o=document.createElement('option');o.value=w.id;o.textContent=w.name;$('cloud-warehouse').append(o);}}catch(e){message(e.message);}};
 $('catalog-import').onsubmit=async event=>{event.preventDefault();const b=event.submitter;b.disabled=true;try{const r=await api('cloud/catalog/import','POST',{warehouseId:$('cloud-warehouse').value});message(`تم ربط ${r.products} صنف، وتهيئة ${r.seeded} رصيد جديد. أصناف غير مدعومة: ${r.skipped.length}`);await refresh();}catch(e){message(e.message);}finally{b.disabled=false;}};
+
+const roleLabel=role=>({cashier:'كاشير',viewer:'عرض فقط',stock:'عرض المخزون'})[role]||role;
+async function refreshStaff(){
+ const result=await api('staff');$('staff-list').replaceChildren();$('reset-staff-id').replaceChildren();
+ for(const user of result.staff){
+  const row=addText($('staff-list'),`${user.name} · ${user.username} · ${roleLabel(user.role)} · ${user.disabled?'معطل':'نشط'}`);
+  button(row,user.disabled?'إعادة تفعيل':'تعطيل وإغلاق الجلسات',async()=>{await api('staff/'+user.id,'PATCH',{disabled:!user.disabled});await refreshStaff();});
+  const option=document.createElement('option');option.value=user.id;option.textContent=user.name;$('reset-staff-id').append(option);
+ }
+}
+$('staff-create').onsubmit=async event=>{
+ event.preventDefault();const b=event.submitter;b.disabled=true;const password=$('new-staff-password').value;$('new-staff-password').value='';
+ try{await api('staff','POST',{...scope(),username:$('new-staff-username').value,name:$('new-staff-name').value,role:$('new-staff-role').value,password});message('تم إنشاء الموظف وتفعيل تسجيل الدخول على الأجهزة المرتبطة.');await refreshStaff();}
+ catch{message('تعذر إنشاء الحساب. تحقق من الاسم الفريد وكلمة مرور من 12 حرفًا على الأقل.');}finally{b.disabled=false;}
+};
+$('staff-reset').onsubmit=async event=>{
+ event.preventDefault();const b=event.submitter;b.disabled=true;const password=$('reset-staff-password').value;$('reset-staff-password').value='';
+ try{await api('staff/'+$('reset-staff-id').value,'PATCH',{password,role:$('reset-staff-role').value});message('تم تغيير البيانات وإغلاق جلسات الموظف.');await refreshStaff();}
+ catch{message('تعذر تغيير بيانات الموظف.');}finally{b.disabled=false;}
+};
