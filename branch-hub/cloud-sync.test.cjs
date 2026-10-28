@@ -68,3 +68,16 @@ test('unverified cloud ACK and failed durable credential rotation preserve pendi
   await assert.rejects(sync.run(),/DISK_WRITE_FAILED/);assert.equal(writes,0);assert.equal(store.pending().length,1);
  }finally{if(sync)await sync.stop();db.close();}
 });
+
+test('unknown local SKU stays reviewable and can be applied after explicit administrator repair without rewriting its quantity',()=>{
+ const {db,engine}=create();
+ try{
+  const store=createSyncStore(db,scope),command=price(1,{sku:'new_sku'});
+  assert.equal(store.applyPrice(command),'conflict');
+  engine.setOpeningStock('new_sku',7,0);
+  assert.equal(store.applyPrice(command),'conflict');
+  assert.equal(store.retryConflict(command.id,'administrator'),'applied');
+  assert.equal(db.prepare("SELECT quantity,unit_cost_minor FROM offline_stock WHERE sku='new_sku'").get().quantity,7);
+  assert.equal(db.prepare("SELECT actor FROM hub_audit WHERE action='price.applied'").get().actor,'administrator');
+ }finally{db.close();}
+});

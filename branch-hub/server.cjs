@@ -87,7 +87,7 @@ function createHub(config = {}) {
   const installationBinding=db.prepare('SELECT installation_id FROM hub_identity WHERE singleton=1').get().installation_id;
   if(installationId && installationBinding && installationBinding!==installationId){db.close();throw Error('INSTALLATION_BINDING_MISMATCH');}
   if(installationId && !installationBinding)db.prepare('UPDATE hub_identity SET installation_id=? WHERE singleton=1').run(installationId);
-  createSyncStore(db,{organizationId,branchId,installationId});
+  const syncStore=createSyncStore(db,{organizationId,branchId,installationId});
   db.exec('PRAGMA user_version=3');
   // SQLite VACUUM INTO creates a consistent snapshot even while WAL is enabled.
   // Backups stay on the server, never returned by the HTTP API.
@@ -160,6 +160,14 @@ function createHub(config = {}) {
           dir:path.join(dir,'updates'),createRecoveryBackup:()=>backupService.run({fresh:true})});
         return send(res,201,result);
       }catch{return send(res,400,{error:'SIGNED_UPDATE_REJECTED'});}
+    }
+    if(pathname === '/api/v1/cloud/conflicts' && req.method === 'GET'){
+      const conflicts=db.prepare("SELECT id,payload,reason,received_at FROM cloud_price_inbox WHERE branch_id=? AND outcome='conflict' ORDER BY rowid DESC LIMIT 100").all(branchId);
+      return send(res,200,{conflicts:conflicts.map(c=>({id:c.id,sku:JSON.parse(c.payload).sku,revision:JSON.parse(c.payload).revision,reason:c.reason,receivedAt:c.received_at}))});
+    }
+    if(pathname.startsWith('/api/v1/cloud/conflicts/') && pathname.endsWith('/retry') && req.method==='POST'){
+      try{return send(res,200,{outcome:syncStore.retryConflict(pathname.slice('/api/v1/cloud/conflicts/'.length,-'/retry'.length),principal.id)});}
+      catch{return send(res,409,{error:'PRICE_CONFLICT_UNRESOLVED'});}
     }
     if(pathname === '/api/v1/cloud/status' && req.method === 'GET')return send(res,200,cloudSync?cloudSync.status():{configured:false,canonicalPostingImplemented:false});
     if(pathname === '/api/v1/cloud/sync' && req.method === 'POST'){

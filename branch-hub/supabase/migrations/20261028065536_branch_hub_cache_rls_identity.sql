@@ -1,0 +1,6 @@
+-- Evaluate caller identity once per statement on Branch Hub tables only.
+ALTER POLICY hub_sales_insert ON public.branch_hub_replicated_sales WITH CHECK (received_by=(SELECT auth.uid()) AND (public.can_permission('branches.manage') OR public.is_platform_admin()) AND
+ EXISTS(SELECT 1 FROM public.branches b WHERE b.id=branch_id AND b.organization_id=branch_hub_replicated_sales.organization_id AND b.is_active AND (public.is_platform_admin() OR public.user_may_access_branch(b.id))));
+ALTER POLICY hub_price_publish ON public.branch_hub_price_commands WITH CHECK (published_by=(SELECT auth.uid()) AND (public.can_permission('branches.manage') OR public.is_platform_admin()) AND EXISTS(SELECT 1 FROM public.branches b WHERE b.id=branch_id AND b.organization_id=branch_hub_price_commands.organization_id AND b.is_active AND (public.is_platform_admin() OR public.user_may_access_branch(b.id))));
+ALTER POLICY hub_command_ack_insert ON public.branch_hub_command_receipts WITH CHECK (received_by=(SELECT auth.uid()) AND EXISTS(SELECT 1 FROM public.branch_hub_price_commands c WHERE c.id=command_id));
+ALTER POLICY hub_command_ack_read ON public.branch_hub_command_receipts USING (received_by=(SELECT auth.uid()) AND EXISTS(SELECT 1 FROM public.branch_hub_price_commands c WHERE c.id=command_id));

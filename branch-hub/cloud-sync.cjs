@@ -23,7 +23,7 @@ function createSyncStore(db,{organizationId,branchId,installationId}){
   db.prepare("INSERT INTO cloud_sale_receipts(event_id,branch_id,payload_hash,stage) VALUES(?,?,?,'received') ON CONFLICT(event_id) DO NOTHING").run(event.event_id,branchId,receipt.payloadHash);
   // Transport receipt does not acknowledge or delete financial outbox records.
  }
- function applyPrice(command){
+ function applyPrice(command,{retryConflict=false,actor='cloud-sync'}={}){
   if(!command||!UUID.test(command.id||'')||command.organization_id!==organizationId||command.branch_id!==branchId||
    !/^[a-zA-Z0-9_.-]{1,80}$/.test(command.sku||'')||!Number.isSafeInteger(command.revision)||command.revision<1||
    !Number.isSafeInteger(command.sale_price_minor)||command.sale_price_minor<0||!Number.isSafeInteger(command.unit_cost_minor)||command.unit_cost_minor<0)throw Error('INVALID_CLOUD_COMMAND');
@@ -33,7 +33,7 @@ function createSyncStore(db,{organizationId,branchId,installationId}){
   db.exec('BEGIN IMMEDIATE');
   try{
    const previous=db.prepare('SELECT payload_hash,outcome FROM cloud_price_inbox WHERE id=?').get(command.id);
-   if(previous){if(previous.payload_hash!==fingerprint)throw Error('INBOX_IDEMPOTENCY_CONFLICT');db.exec('COMMIT');return previous.outcome;}
+   if(previous){if(previous.payload_hash!==fingerprint)throw Error('INBOX_IDEMPOTENCY_CONFLICT');if(!(retryConflict&&previous.outcome==='conflict')){db.exec('COMMIT');return previous.outcome;}}
    const stock=db.prepare('SELECT quantity FROM offline_stock WHERE branch_id=? AND sku=?').get(branchId,command.sku);
    const current=db.prepare('SELECT * FROM offline_catalog WHERE branch_id=? AND sku=?').get(branchId,command.sku);
    let outcome='applied',reason=null;
@@ -48,14 +48,14 @@ function createSyncStore(db,{organizationId,branchId,installationId}){
      .run(branchId,command.sku,command.revision,command.sale_price_minor,command.unit_cost_minor);
     db.prepare('UPDATE offline_stock SET unit_cost_minor=? WHERE branch_id=? AND sku=?').run(command.unit_cost_minor,branchId,command.sku);
    }
-   db.prepare('INSERT INTO cloud_price_inbox(id,branch_id,payload_hash,payload,outcome,reason) VALUES(?,?,?,?,?,?)').run(command.id,branchId,fingerprint,text,outcome,reason);
-   audit('cloud-sync','price.'+outcome,command.id,{sku:command.sku,revision:command.revision,reason});
+   db.prepare('INSERT INTO cloud_price_inbox(id,branch_id,payload_hash,payload,outcome,reason) VALUES(?,?,?,?,?,?) ON CONFLICT(id) DO UPDATE SET outcome=excluded.outcome,reason=excluded.reason').run(command.id,branchId,fingerprint,text,outcome,reason);
+   audit(actor,'price.'+outcome,command.id,{sku:command.sku,revision:command.revision,reason});
    db.exec('COMMIT');return outcome;
   }catch(error){db.exec('ROLLBACK');throw error;}
  }
  function pending(){return db.prepare(`SELECT o.event_id,o.payload FROM offline_outbox o LEFT JOIN cloud_sale_receipts r ON r.event_id=o.event_id
   WHERE o.branch_id=? AND o.status='pending' AND r.event_id IS NULL ORDER BY o.rowid LIMIT 100`).all(branchId);}
- return {acceptReceipt,applyPrice,pending,scope:{organizationId,branchId,installationId}};
+ return {acceptReceipt,applyPrice,pending,retryConflict(id,actor){const row=db.prepare("SELECT payload FROM cloud_price_inbox WHERE id=? AND branch_id=? AND outcome='conflict'").get(id,branchId);if(!row)throw Error('PRICE_CONFLICT_NOT_FOUND');return applyPrice(JSON.parse(row.payload),{retryConflict:true,actor});},scope:{organizationId,branchId,installationId}};
 }
 function createCloudSync({db,client,organizationId,branchId,installationId,refreshToken,persistRefreshToken,clock=Date.now}){
  if(![organizationId,branchId,installationId].every(x=>UUID.test(x||''))||typeof persistRefreshToken!=='function')throw Error('CLOUD_ENROLLMENT_REQUIRED');
