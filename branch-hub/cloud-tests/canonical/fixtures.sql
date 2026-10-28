@@ -62,3 +62,5 @@ INSERT INTO public.chart_of_accounts(id,branch_id,code) VALUES
 INSERT INTO public.account_mappings(branch_id,semantic_key,account_id) SELECT branch_id,CASE code WHEN 'CASH' THEN 'cash' WHEN 'REVENUE' THEN 'revenue' WHEN 'COGS' THEN 'cogs' ELSE 'inventory_fg' END,id FROM public.chart_of_accounts;
 CREATE POLICY test_update ON public.products FOR UPDATE TO authenticated USING(public.user_may_access_branch(branch_id)) WITH CHECK(public.user_may_access_branch(branch_id));
 CREATE POLICY test_update ON public.warehouses FOR UPDATE TO authenticated USING(public.user_may_access_branch(branch_id)) WITH CHECK(public.user_may_access_branch(branch_id));
+
+REVOKE ALL ON FUNCTION public._effective_branch_tax(uuid) FROM PUBLIC,anon,authenticated;

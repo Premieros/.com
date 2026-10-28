@@ -86,7 +86,6 @@ BEGIN
   BEGIN
    payload:=source.payload_text::jsonb;
    IF payload->>'paymentAccount'!='cash' THEN RAISE EXCEPTION 'HUB_BANK_METHOD_REQUIRED'; END IF;
-   IF EXISTS(SELECT 1 FROM public._effective_branch_tax(p_branch_id)t WHERE t.tax_enabled AND t.tax_rate!=0) THEN RAISE EXCEPTION 'HUB_TAX_RULE_CONFLICT'; END IF;
    FOR line IN SELECT l FROM jsonb_array_elements(payload->'lines')l ORDER BY l->'canonical'->>'productId' LOOP
     IF jsonb_typeof(line->'canonical') IS DISTINCT FROM 'object' THEN RAISE EXCEPTION 'HUB_MAPPING_REQUIRED'; END IF;
     v_product_id:=(line->'canonical'->>'productId')::uuid;row_warehouse:=(line->'canonical'->>'warehouseId')::uuid;
@@ -110,6 +109,8 @@ BEGIN
      (payload->>'totalMinor')::numeric/100,'cash','completed',items,NULL,'takeaway',NULL,NULL,NULL);
    IF coalesce((result->>'success')::boolean,false) IS NOT TRUE THEN RAISE EXCEPTION 'HUB_CANONICAL_SALE_REJECTED'; END IF;
    v_sale_id:=(result->>'sale_id')::uuid;
+   -- Internal tax helper is not granted to authenticated. Inspect the authoritative sale, then roll back taxable results.
+   IF EXISTS(SELECT 1 FROM public.sales s WHERE s.id=v_sale_id AND coalesce(s.tax_amount,0)!=0) THEN RAISE EXCEPTION 'HUB_TAX_RULE_CONFLICT'; END IF;
    SELECT sum((l->>'costMinor')::numeric) INTO v_cost_minor FROM jsonb_array_elements(payload->'lines')l;
    IF coalesce((result->>'cogs')::numeric,-1)*100!=v_cost_minor THEN RAISE EXCEPTION 'HUB_CANONICAL_COST_CONFLICT'; END IF;
    SELECT j.id INTO v_journal_id FROM public.journal_entries j WHERE j.branch_id=p_branch_id AND j.reference_type='sale' AND j.reference_id=v_sale_id AND j.posting_status='POSTED';

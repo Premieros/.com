@@ -247,13 +247,13 @@ function createHub(config = {}) {
         JOIN offline_sales s ON s.id=j.sale_id WHERE s.branch_id=? ORDER BY s.rowid DESC,j.rowid LIMIT 500`).all(branchId)});
     }
     if (pathname === '/api/v1/offline/sync/pending' && req.method === 'GET') {
-      // Local offline-sale outbox is read-only until a verified, idempotent cloud ACK protocol exists.
+      // Local outbox stays read-only here; only the scoped canonical posting worker can acknowledge it.
       const events=db.prepare("SELECT event_id,sale_id,payload FROM offline_outbox WHERE branch_id=? AND status='pending' ORDER BY rowid LIMIT 100").all(branchId);
-      return send(res,200,{events:events.map(e=>({eventId:e.event_id,saleId:e.sale_id,payload:JSON.parse(e.payload)})),cloudAcknowledgementImplemented:false});
+      return send(res,200,{events:events.map(e=>({eventId:e.event_id,saleId:e.sale_id,payload:JSON.parse(e.payload)})),cloudAcknowledgementImplemented:!!cloudSync});
     }
     if (pathname === '/api/v1/offline/sync/status' && req.method === 'GET') {
       const pending=db.prepare("SELECT count(*) AS n FROM offline_outbox WHERE branch_id=? AND status='pending'").get(branchId).n;
-      return send(res,200,{pending,onlineSyncImplemented:false});
+      return send(res,200,{pending,onlineSyncImplemented:!!cloudSync});
     }
     if (pathname === '/api/v1/offline/stock' && req.method === 'GET') {
       const stock=db.prepare('SELECT s.sku,s.quantity,s.unit_cost_minor,c.sale_price_minor,l.product_name,l.unit_name FROM offline_stock s LEFT JOIN offline_catalog c ON c.branch_id=s.branch_id AND c.sku=s.sku LEFT JOIN offline_item_links l ON l.branch_id=s.branch_id AND l.sku=s.sku WHERE s.branch_id=? ORDER BY coalesce(l.product_name,s.sku) LIMIT 5000').all(branchId);
