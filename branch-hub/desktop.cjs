@@ -2,7 +2,7 @@
 if(process.argv.includes('--branch-hub-render-self-test')){
  require('./receipt-render-self-test.cjs');
 }else{
-const { app, BrowserWindow, nativeImage, dialog, ipcMain, safeStorage, Tray, Menu } = require('electron');
+const { app, BrowserWindow, nativeImage, net, dialog, ipcMain, safeStorage, Tray, Menu } = require('electron');
 const {localOrigin:desktopOrigin}=require('./local-origin.cjs');
 const {pathToFileURL}=require('node:url');
 const {createCloudClient}=require('./cloud-client.cjs');
@@ -98,14 +98,14 @@ app.whenReady().then(()=>{
    }catch{return {ok:false,error:'RECOVERY_KEY_SAVE_FAILED'};}
   });
   if(c){startHub(c);return;}
-  const controller=createEnrollmentController({client:createCloudClient(),vault,dataDir:path.join(userDir,'branch-data')});
+  const controller=createEnrollmentController({client:createCloudClient((url,options)=>net.fetch(url,options)),vault,dataDir:path.join(userDir,'branch-data')});
   const trustedSetup=event=>setupWindow && !setupWindow.isDestroyed() && event.sender===setupWindow.webContents &&
     event.senderFrame===event.sender.mainFrame && event.senderFrame.url===setupURL;
   const errorCode=e=>['CLOUD_ACCESS_DENIED','BRANCH_ADMIN_REQUIRED','CLOUD_UNAVAILABLE','BRANCH_ACCESS_DENIED',
-   'LOGIN_REQUIRED','ENROLLMENT_BUSY','BRANCH_BINDING_MISMATCH','OS_CREDENTIAL_VAULT_UNAVAILABLE'].includes(e.message)?e.message:'ENROLLMENT_FAILED';
+   'CLOUD_TIMEOUT','CLOUD_DNS_FAILED','CLOUD_TLS_FAILED','CLOUD_RATE_LIMITED','CLOUD_TEMPORARY_ERROR','CLOUD_REQUEST_FAILED','CLOUD_INVALID_RESPONSE','LOGIN_REQUIRED','ENROLLMENT_BUSY','BRANCH_BINDING_MISMATCH','OS_CREDENTIAL_VAULT_UNAVAILABLE'].includes(e.message)?e.message:'ENROLLMENT_FAILED';
   ipcMain.handle('hub:sign-in',async(event,input)=>{
    if(!trustedSetup(event))return {ok:false,error:'FORBIDDEN'};
-   try{return {ok:true,...await controller.signIn(input)};}catch(e){return {ok:false,error:errorCode(e)};}
+   try{return {ok:true,...await controller.signIn(input)};}catch(e){return {ok:false,error:errorCode(e),phase:['sign_in','account','permission','branch'].includes(e.phase)?e.phase:null,httpStatus:Number.isInteger(e.status)?e.status:null};}
   });
   ipcMain.handle('hub:enroll',async(event,id)=>{
    if(!trustedSetup(event))return {ok:false,error:'FORBIDDEN'};
@@ -113,7 +113,7 @@ app.whenReady().then(()=>{
     const config=await controller.enroll(id);
     // Keep the setup window until the local UI exists, so window-all-closed cannot quit mid-enrollment.
     startHub(config);return {ok:true};
-   }catch(e){return {ok:false,error:errorCode(e)};}
+   }catch(e){return {ok:false,error:errorCode(e),phase:['sign_in','account','permission','branch'].includes(e.phase)?e.phase:null,httpStatus:Number.isInteger(e.status)?e.status:null};}
   });
   setupWindow=new BrowserWindow({width:760,height:780,minWidth:560,minHeight:550,
    webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,preload:path.join(__dirname,'setup-preload.cjs')}});
