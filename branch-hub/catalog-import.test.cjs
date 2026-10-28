@@ -14,7 +14,7 @@ test('canonical catalog seeds only once, preserves offline quantities on refresh
   assert.equal(importer.apply(snapshot()).seeded,1);
   const sale=engine.commitSale({key:'mapped-checkout-001',lines:[{sku,quantity:2,priceMinor:250}]});
   const event=JSON.parse(db.prepare('SELECT payload FROM offline_outbox WHERE sale_id=?').get(sale.saleId).payload);
-  assert.deepEqual(event.lines[0].canonical,{productId:product,warehouseId:warehouse,unitName:'piece'});
+  assert.deepEqual(event.lines[0].canonical,{productId:product,warehouseId:warehouse,unitName:'piece',productName:'منتج تجريبي'});
   assert.equal(importer.apply(snapshot(2,99)).seeded,0);
   assert.equal(db.prepare('SELECT quantity FROM offline_stock').get().quantity,8);
   assert.equal(db.prepare('SELECT cost_minor FROM offline_sale_lines').get().cost_minor,200);

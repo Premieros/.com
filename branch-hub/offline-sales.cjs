@@ -107,10 +107,12 @@ function createOfflineSalesEngine(db, branchId) {
         if (!Number.isSafeInteger(revenue)||!Number.isSafeInteger(cogs) ||
             !Number.isSafeInteger(total+revenue)||!Number.isSafeInteger(cost+cogs)) throw Error('AMOUNT_OVERFLOW');
         total+=revenue;cost+=cogs;
-        const link=db.prepare('SELECT product_id,warehouse_id,unit_name FROM offline_item_links WHERE branch_id=? AND sku=?').get(branchId,line.sku);
-        costing.push({...line,costMinor:cogs,...(link?{canonical:{productId:link.product_id,warehouseId:link.warehouse_id,unitName:link.unit_name}}:{})});
+        const link=db.prepare('SELECT product_id,warehouse_id,unit_name,product_name FROM offline_item_links WHERE branch_id=? AND sku=?').get(branchId,line.sku);
+        costing.push({...line,costMinor:cogs,...(link?{canonical:{productId:link.product_id,warehouseId:link.warehouse_id,unitName:link.unit_name,productName:Array.from(link.product_name).slice(0,120).join('')}}:{})});
       }
       const id=crypto.randomUUID();
+      const eventPayload=JSON.stringify({saleId:id,branchId,key,totalMinor:total,lines:costing,paymentAccount});
+      if(Buffer.byteLength(eventPayload)>65536)throw Error('SALE_EVENT_TOO_LARGE');
       db.prepare('INSERT INTO offline_sales(id,branch_id,key,canonical,total_minor) VALUES(?,?,?,?,?)').run(id,branchId,key,canonical,total);
       for(const line of costing) {
         const changed=db.prepare('UPDATE offline_stock SET quantity=quantity-? WHERE branch_id=? AND sku=? AND quantity>=?')
@@ -127,7 +129,7 @@ function createOfflineSalesEngine(db, branchId) {
       entry.run(id,'sales_revenue',0,total);
       if(cost>0){entry.run(id,'cost_of_goods_sold',cost,0);entry.run(id,'inventory',0,cost);}
       db.prepare('INSERT INTO offline_outbox(event_id,sale_id,branch_id,payload) VALUES(?,?,?,?)')
-        .run(id,id,branchId,JSON.stringify({saleId:id,branchId,key,totalMinor:total,lines:costing,paymentAccount}));
+        .run(id,id,branchId,eventPayload);
       const balance=db.prepare('SELECT sum(debit_minor)-sum(credit_minor) n FROM offline_journal WHERE sale_id=?').get(id).n;
       if(balance!==0) throw Error('UNBALANCED_JOURNAL');
       audit(actor,'sale.commit',id,{key,totalMinor:total});

@@ -29,11 +29,12 @@ function sendTcp(printer, bytes, timeoutMs=5000) {
   });
  });
 }
-function createPrintWorker(db,branchId,printers={},transport=sendTcp) {
- for(const [id,p] of Object.entries(printers)) {
-  if(!/^[a-zA-Z0-9_-]{1,80}$/.test(id)||!privateIPv4(p.host)||!Number.isInteger(p.port)||p.port<1||p.port>65535)
-   throw Error('INVALID_PRINTER_CONFIGURATION');
- }
+function validatePrinter(id,p){
+ if(typeof id!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(id)||!p||typeof p!=='object'||Array.isArray(p)||typeof p.host!=='string'||!privateIPv4(p.host)||!Number.isInteger(p.port)||p.port<1||p.port>65535||(p.format!==undefined&&!['text','raster'].includes(p.format))||(p.dots!==undefined&&![384,512,576].includes(p.dots)))throw Error('INVALID_PRINTER_CONFIGURATION');
+ return {host:p.host,port:p.port,format:p.format||'text',...(p.format==='raster'?{dots:p.dots||576}:{})};
+}
+function createPrintWorker(db,branchId,printers={},transport=sendTcp,{renderReceipt}={}) {
+ for(const [id,p] of Object.entries(printers))validatePrinter(id,p);
  db.exec(`CREATE TABLE IF NOT EXISTS print_dispatches (
   job_id TEXT PRIMARY KEY REFERENCES jobs(id),
   state TEXT NOT NULL CHECK(state IN ('queued','sending','submitted','failed','uncertain')),
@@ -55,17 +56,21 @@ function createPrintWorker(db,branchId,printers={},transport=sendTcp) {
  }
  async function dispatch() {
   const job=claim();if(!job)return false;
-  let state='submitted',error=null;
+  let state='submitted',error=null,target=null;
   try {
    const payload=JSON.parse(job.payload),printer=printers[payload.printerId];
    if(!printer)throw Error('PRINTER_NOT_CONFIGURED');
-   await transport(printer,encodeReceipt(payload));
+   target={printerId:payload.printerId,host:printer.host,port:printer.port,format:printer.format||'text',...(printer.format==='raster'?{dots:printer.dots||576}:{})};
+   let bytes;
+   if(printer.format==='raster'){if(typeof renderReceipt!=='function')throw Error('RASTER_RENDERER_REQUIRED');bytes=await renderReceipt(payload.receipt,printer.dots||576);if(!Buffer.isBuffer(bytes)||bytes.length<16||bytes.length>2*1024*1024||bytes[0]!==27||bytes[1]!==64)throw Error('INVALID_RASTER_OUTPUT');}
+   else bytes=encodeReceipt(payload);
+   await transport(printer,bytes);
   } catch(e) {state=e.deliveryUncertain?'uncertain':'failed';error=e.message;}
   db.exec('BEGIN IMMEDIATE');
   try {
    db.prepare('UPDATE print_dispatches SET state=?,error=?,updated_at=CURRENT_TIMESTAMP WHERE job_id=?').run(state,error,job.id);
    db.prepare('UPDATE jobs SET status=? WHERE id=?').run(state==='submitted'?'done':'failed',job.id);
-   audit('printer-worker','print.'+state,job.id,{error});
+   audit('printer-worker','print.'+state,job.id,{error,target});
    db.exec('COMMIT');
   } catch(e){db.exec('ROLLBACK');throw e;}
   return true;
@@ -85,7 +90,7 @@ function createPrintWorker(db,branchId,printers={},transport=sendTcp) {
   }catch(e){db.exec('ROLLBACK');throw e;}
  }
  return {processOnce,retryFailed,
-  start(){timer=setInterval(()=>processOnce().catch(()=>{}),1000);timer.unref();},
+  start(){if(timer||stopped)return;timer=setInterval(()=>{if(Object.keys(printers).length)processOnce().catch(()=>{});},1000);timer.unref();},
   async stop(){stopped=true;clearInterval(timer);if(active)await active;}};
 }
-module.exports={createPrintWorker,sendTcp,encodeReceipt};
+module.exports={createPrintWorker,sendTcp,encodeReceipt,validatePrinter};

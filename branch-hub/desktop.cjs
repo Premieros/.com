@@ -1,5 +1,8 @@
 'use strict';
-const { app, BrowserWindow, dialog, ipcMain, safeStorage, Tray, Menu } = require('electron');
+if(process.argv.includes('--branch-hub-render-self-test')){
+ require('./receipt-render-self-test.cjs');
+}else{
+const { app, BrowserWindow, nativeImage, dialog, ipcMain, safeStorage, Tray, Menu } = require('electron');
 const {localOrigin:desktopOrigin}=require('./local-origin.cjs');
 const {pathToFileURL}=require('node:url');
 const {createCloudClient}=require('./cloud-client.cjs');
@@ -8,6 +11,7 @@ const {createEnrollmentController}=require('./enrollment.cjs');
 const { fork } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const renderReceipt=require('./raster-receipt.cjs').createElectronReceiptRenderer({BrowserWindow,nativeImage});
 let worker;
 if (!app.requestSingleInstanceLock()) { app.exit(0); }
 let activeWindow, tray;
@@ -49,6 +53,13 @@ function startHub(c) {
   let ready=false;
   const timer=setTimeout(()=>{if(!ready){worker.kill();createWindow('تعذر بدء خادم الفرع في الوقت المحدد.');}},15000);
   worker.on('message',message=>{
+   if(message?.type==='render-receipt'){
+    if(typeof message.requestId!=='string'||message.requestId.length>80)return;
+    const caller=worker;
+    renderReceipt(message.receipt,message.dots).then(bytes=>{if(caller.connected)caller.send({type:'receipt-rendered',requestId:message.requestId,ok:true,bytes:bytes.toString('base64')},()=>{});})
+     .catch(()=>{if(caller.connected)caller.send({type:'receipt-rendered',requestId:message.requestId,ok:false},()=>{});});
+    return;
+   }
    if(message?.type==='persist-cloud-token'){
     try{if(typeof message.refreshToken!=='string'||message.refreshToken.length<8||message.refreshToken.length>8192)throw Error('INVALID_SESSION');
      const next={...c,cloudRefreshToken:message.refreshToken};configVault.save(next,true);c.cloudRefreshToken=message.refreshToken;
@@ -117,3 +128,5 @@ app.whenReady().then(()=>{
 app.on('before-quit',()=>{ app.isQuitting=true; if(worker && !worker.killed)worker.kill(); });
 app.on('second-instance',()=>{if(activeWindow){if(activeWindow.isMinimized())activeWindow.restore();activeWindow.focus();}});
 app.on('window-all-closed',()=>app.quit());
+
+}

@@ -40,6 +40,7 @@ function invalidOfflineEvents(db,branchId,eventId){
      OR l.cost_minor IS NOT json_extract(e.value,'$.costMinor')
      OR json_extract(${lineCanonical},'$.productId') IS NOT json_extract(e.value,'$.canonical.productId')
      OR json_extract(${lineCanonical},'$.warehouseId') IS NOT json_extract(e.value,'$.canonical.warehouseId')
+     OR json_extract(${lineCanonical},'$.productName') IS NOT json_extract(e.value,'$.canonical.productName')
      OR json_extract(${lineCanonical},'$.unitName') IS NOT json_extract(e.value,'$.canonical.unitName'))
   ELSE 1 END`;
  return db.prepare(query).get(...(eventId?[branchId,eventId]:[branchId])).n;
