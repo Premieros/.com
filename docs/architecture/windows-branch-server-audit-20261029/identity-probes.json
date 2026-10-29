@@ -1,0 +1,30 @@
+[
+  {
+    "name": "canonical",
+    "expectedExit": 0,
+    "actualExit": 0,
+    "passed": true,
+    "output": "Project identity verified: Premieros/.com -> hvqlkapynjfjikqithvd"
+  },
+  {
+    "name": "reject wrong project",
+    "expectedExit": 1,
+    "actualExit": 1,
+    "passed": true,
+    "output": "DATABASE_IDENTITY_LOCK_FAILED: SUPABASE_PROJECT_REF must be hvqlkapynjfjikqithvd, received unrelated-project"
+  },
+  {
+    "name": "reject wrong repository",
+    "expectedExit": 1,
+    "actualExit": 1,
+    "passed": true,
+    "output": "DATABASE_IDENTITY_LOCK_FAILED: GITHUB_REPOSITORY must be Premieros/.com, received example/unrelated-project"
+  },
+  {
+    "name": "reject wrong URL",
+    "expectedExit": 1,
+    "actualExit": 1,
+    "passed": true,
+    "output": "DATABASE_IDENTITY_LOCK_FAILED: VITE_SUPABASE_URL must be https://hvqlkapynjfjikqithvd.supabase.co, received https://example.invalid"
+  }
+]

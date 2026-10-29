@@ -1,0 +1,21 @@
+npm notice run vite-react-typescript-starter@0.0.0 npx
+npm notice run npm ci --ignore-scripts --no-audit --no-fund
+npm warn ERESOLVE overriding peer dependency
+npm warn While resolving: @vitest/mocker@4.1.11
+npm warn Found: vite@5.4.21
+npm warn node_modules/vite
+npm warn   dev vite@"^5.4.2" from the root project
+npm warn   1 more (@vitejs/plugin-react)
+npm warn
+npm warn Could not resolve dependency:
+npm warn peerOptional vite@"^6.0.0 || ^7.0.0 || ^8.0.0" from @vitest/mocker@4.1.11
+npm warn node_modules/@vitest/mocker
+npm warn   @vitest/mocker@"4.1.11" from vitest@4.1.11
+npm warn   node_modules/vitest
+npm warn
+npm warn Conflicting peer dependency: vite@8.3.5
+npm warn node_modules/vite
+npm warn   peerOptional vite@"^6.0.0 || ^7.0.0 || ^8.0.0" from @vitest/mocker@4.1.11
+npm warn   node_modules/@vitest/mocker
+npm warn     @vitest/mocker@"4.1.11" from vitest@4.1.11
+npm warn     node_modules/vitest

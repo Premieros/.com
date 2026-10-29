@@ -1,0 +1,42 @@
+[
+  {
+    "file": "src/features/accounting/pages/FinancialReportsPage.tsx",
+    "line": 142,
+    "expression": "table"
+  },
+  {
+    "file": "src/features/admin/work-authorization/supabaseWorkAuthorizationProvider.ts",
+    "line": 31,
+    "expression": "name, params"
+  },
+  {
+    "file": "src/features/catalog/services/productImages.ts",
+    "line": 23,
+    "expression": "PRODUCT_IMAGES_BUCKET"
+  },
+  {
+    "file": "src/features/catalog/services/productImages.ts",
+    "line": 29,
+    "expression": "PRODUCT_IMAGES_BUCKET"
+  },
+  {
+    "file": "src/features/costing/components/CostBreakdownButton.tsx",
+    "line": 56,
+    "expression": "table"
+  },
+  {
+    "file": "src/features/import-export/export-service.ts",
+    "line": 222,
+    "expression": "tableName"
+  },
+  {
+    "file": "src/features/inventory/pages/StockBalancesPage.tsx",
+    "line": 16,
+    "expression": "table"
+  },
+  {
+    "file": "src/hooks/usePaginatedRows.ts",
+    "line": 170,
+    "expression": "table"
+  }
+]

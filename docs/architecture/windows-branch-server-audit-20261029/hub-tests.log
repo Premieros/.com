@@ -1,0 +1,16 @@
+✔ WAN-independent hub persists one job per idempotency key and enforces auth (244.5663ms)
+✔ LAN binding without TLS is rejected (2.7652ms)
+✔ refuses switching a persisted branch database to another branch or organization (87.3753ms)
+✔ receipt draft is stored atomically, deduplicated and queued across restarts (98.1857ms)
+✔ parallel submissions share one receipt and one outbox event (116.5969ms)
+✔ integrity audit and read-only pending sync survive restart without premature acknowledgement (86.8659ms)
+✔ print job key cannot be reused for a different document (59.4824ms)
+✔ consistent backup restores branch binding, receipt, and pending outbox (128.0338ms)
+ℹ tests 8
+ℹ suites 0
+ℹ pass 8
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 1111.2774
