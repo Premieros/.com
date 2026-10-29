@@ -14,6 +14,9 @@
     "browser-app/**"
   ],
   "asar": true,
+  "extraResources": [
+    { "from": "native-runtime", "to": "branch-windows", "filter": ["Premier.Windows.exe", "LICENSE.txt", "ThirdPartyNotices.txt"] }
+  ],
   "win": {
     "target": [
       {
@@ -28,8 +31,9 @@
   },
   "nsis": {
     "oneClick": false,
-    "perMachine": false,
+    "perMachine": true,
     "allowToChangeInstallationDirectory": true,
-    "createDesktopShortcut": true
+    "createDesktopShortcut": true,
+    "runAfterFinish": false
   }
 }

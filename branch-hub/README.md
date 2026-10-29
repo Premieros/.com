@@ -1,5 +1,11 @@
 # PremierOS Branch Hub — development build
 
+## 0.7.0 development checkpoint
+
+Windows/USB printers can now be discovered and selected by the administrator, with native RAW spooler delivery and an audited spool job ID. Saving/discovering printers never prints. Spooler submission does not confirm paper output; uncertain attempts remain blocked. Native Arabic raster rendering and DPAPI machine-protection are bundled in a self-contained Windows helper.
+
+Service-host and independent runtime primitives are included as **unfinished infrastructure**. They are not automatically registered/activated and do not yet provide a verified desktop-to-service data handoff or reboot/upgrade acceptance. The real React application remains cloud-dependent for its cloud functions. This version does not complete the full offline ERP product contract. See [the implementation report](../docs/architecture/WINDOWS_BRANCH_SERVER_IMPLEMENTATION_2026-10-29.md) for exact tested and remaining scope.
+
 Repository: **Premieros/.com**, directory `branch-hub/`. The only authorized cloud project is **hvqlkapynjfjikqithvd**, `john's 1`, `eu-central-1`. No Johna's repository or database is used.
 
 **This is a testable development application, not a production-complete offline ERP.** Do not route real branch transactions through it yet. Cloud accounting reconciliation, taxes, returns, split payments, central certificate provisioning and automatic installation/rollback remain release blockers.

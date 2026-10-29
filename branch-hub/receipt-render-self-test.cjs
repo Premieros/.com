@@ -27,9 +27,12 @@ app.whenReady().then(async()=>{
   appAssets=require('./browser-app-server.cjs').createBrowserAppServer({port:0});
   const appURL=await appAssets.listen();
   erp=new BrowserWindow({show:false,webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false}});
+  erp.webContents.session.webRequest.onBeforeRequest({urls:['<all_urls>']},(details,callback)=>{
+   const protocol=new URL(details.url).protocol;callback({cancel:protocol==='https:'||protocol==='wss:'});
+  });
   await erp.loadURL(appURL);
   const ui=await erp.webContents.executeJavaScript(`(async()=>{
-   for(let i=0;i<150;i++){if(document.body.textContent.includes('النظام الكامل'))break;await new Promise(r=>setTimeout(r,100));}
+   for(let i=0;i<150;i++){if(document.querySelector('input[type="password"]'))break;await new Promise(r=>setTimeout(r,100));}
    return {text:document.body.textContent,require:typeof window.require,bridge:typeof window.branchHub,root:!!document.querySelector('#root')};
   })()`);
   assert(ui.root);assert.match(ui.text,/النظام الكامل/);assert.match(ui.text,/تسجيل الدخول|دخول|Login|Sign in/);assert.equal(ui.require,'undefined');assert.equal(ui.bridge,'undefined');

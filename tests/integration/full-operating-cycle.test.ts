@@ -98,10 +98,12 @@ describe('full ERP/POS operating cycle', () => {
         [rawId, `CIR-${token}`, unitId, branchId],
       );
 
+      // Current sale policy uses the published catalog cost, not the production batch's historical cost.
+      // Publish 4 here (two raw units at 2) so the unchanged COGS=8 assertion has a valid source.
       await client.query(
         `insert into public.products(id,name,sku,cost_price,sale_price,wholesale_price,is_active,product_type,branch_id)
          values
-           ($1,'CI Manufactured',$2,0,15,15,true,'manufactured',$4),
+           ($1,'CI Manufactured',$2,4,15,15,true,'manufactured',$4),
            ($3,'CI Ready',$5,5,10,10,true,'ready',$4)`,
         [productId, `CIP-${token}`, readyProductId, branchId, `CIRP-${token}`],
       );

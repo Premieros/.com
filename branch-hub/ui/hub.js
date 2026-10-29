@@ -107,15 +107,27 @@ $('staff-reset').onsubmit=async event=>{
 function drawPrinterSettings(printers){
  $('printer-settings-list').replaceChildren();
  for(const [id,p] of Object.entries(printers)){
-  const row=addText($('printer-settings-list'),`${id} · ${p.host}:${p.port} · ${p.format==='raster'?'صورة':'نص'}`);
+  const row=addText($('printer-settings-list'),`${id} · ${p.kind==='windows'?p.name:p.host+':'+p.port} · ${p.format==='raster'?'صورة':'نص'}`);
   const b=document.createElement('button');b.type='button';b.textContent='تعديل';b.onclick=()=>{
-   $('settings-printer-id').value=id;$('settings-printer-host').value=p.host;$('settings-printer-port').value=p.port;
+   $('settings-printer-id').value=id;$('settings-printer-kind').value=p.kind==='windows'?'windows':'tcp';$('settings-printer-host').value=p.host||'';$('settings-printer-port').value=p.port||9100;
+   if(p.kind==='windows'){if(!Array.from($('settings-printer-name').options).some(o=>o.value===p.name)){const option=document.createElement('option');option.value=p.name;option.textContent=p.name;$('settings-printer-name').append(option);}$('settings-printer-name').value=p.name;}selectPrinterKind();
    $('settings-printer-format').value=p.format;$('settings-printer-dots').value=p.dots||576;
   };row.append(b);
  }
 }
 $('printer-settings-form').onsubmit=async event=>{
  event.preventDefault();const b=event.submitter;b.disabled=true;
- try{await api('printers/'+$('settings-printer-id').value,'PUT',{...scope(),host:$('settings-printer-host').value,port:Number($('settings-printer-port').value),format:$('settings-printer-format').value,dots:Number($('settings-printer-dots').value)});message('تم حفظ إعداد الطابعة على خادم الفرع.');await refresh();}
- catch(e){message(e.code==='PRINTER_HAS_PENDING_JOBS'?'توجد مهام لهذه الطابعة. راجع حالتها قبل تغيير الوجهة.':'تعذر حفظ الطابعة. استخدم عنوان IPv4 محليًا ومنفذًا صحيحًا.');}finally{b.disabled=false;}
+ try{await api('printers/'+$('settings-printer-id').value,'PUT',{...scope(),...($('settings-printer-kind').value==='windows'?{kind:'windows',name:$('settings-printer-name').value}:{host:$('settings-printer-host').value,port:Number($('settings-printer-port').value)}),format:$('settings-printer-format').value,dots:Number($('settings-printer-dots').value)});message('تم حفظ إعداد الطابعة على خادم الفرع.');await refresh();}
+ catch(e){message(e.code==='PRINTER_HAS_PENDING_JOBS'?'توجد مهام لهذه الطابعة. راجع حالتها قبل تغيير الوجهة.':'تعذر حفظ الطابعة. اختر طابعة مثبتة أو عنوان شبكة محليًا صحيحًا.');}finally{b.disabled=false;}
+};
+
+function selectPrinterKind(){
+ const windows=$('settings-printer-kind').value==='windows';$('windows-printer-fields').hidden=!windows;$('tcp-printer-fields').hidden=windows;
+ $('settings-printer-host').required=!windows;$('settings-printer-port').required=!windows;$('settings-printer-name').required=windows;
+}
+$('settings-printer-kind').onchange=selectPrinterKind;
+$('discover-windows-printers').onclick=async()=>{
+ const button=$('discover-windows-printers');button.disabled=true;
+ try{const result=await api('printers/windows');$('settings-printer-name').replaceChildren();const placeholder=document.createElement('option');placeholder.value='';placeholder.textContent='اختر الطابعة الحرارية';$('settings-printer-name').append(placeholder);for(const name of result.printers){const option=document.createElement('option');option.value=name;option.textContent=name;$('settings-printer-name').append(option);}message(result.printers.length?'اختر الطابعة ثم احفظ الإعداد. لم يُرسل أي إيصال.':'لا توجد طابعات مثبتة.');}
+ catch{message('تعذر جلب الطابعات. افتح خادم Windows وتحقق من تعريف الطابعة.');}finally{button.disabled=false;}
 };

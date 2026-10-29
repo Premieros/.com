@@ -10,7 +10,7 @@ const {createDeviceRegistry}=require('./devices.cjs');
 async function main(){
  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'hub-browser-'));
  const token='browser-admin-test-token-32-characters';
- const hub=createHub({port:0,dataDir:dir,organizationId:'org_001',branchId:'branch_001',token});
+ const hub=createHub({port:0,dataDir:dir,organizationId:'org_001',branchId:'branch_001',token,enumerateWindowsPrinters:async()=>({printers:['XP-80C']})});
  let browser;
  try {
   const {port}=await hub.listen();browser=await chromium.launch({headless:true,channel:process.env.BRANCH_HUB_BROWSER_CHANNEL||undefined});
@@ -23,8 +23,13 @@ async function main(){
   await page.locator('#opening-form button').click();await page.waitForFunction(()=>document.getElementById('stock').textContent.includes('coffee'));
   await page.locator('#settings-printer-host').fill('127.0.0.1');await page.locator('#settings-printer-port').fill('9100');
   await page.locator('#settings-printer-format').selectOption('raster');await page.locator('#settings-printer-dots').selectOption('384');
-  await page.locator('#printer-settings-form button').first().click();await page.waitForFunction(()=>document.getElementById('printer-settings-list').textContent.includes('127.0.0.1'));
+  await page.getByRole('button',{name:'حفظ إعداد الطابعة',exact:true}).click();await page.waitForFunction(()=>document.getElementById('printer-settings-list').textContent.includes('127.0.0.1'));
   assert.equal(JSON.parse(hub.db.prepare('SELECT config FROM hub_printers').get().config).format,'raster');
+  await page.locator('#settings-printer-kind').selectOption('windows');await page.locator('#discover-windows-printers').click();
+  await page.locator('#settings-printer-name option[value="XP-80C"]').waitFor({state:'attached'});await page.locator('#settings-printer-name').selectOption('XP-80C');
+  await page.getByRole('button',{name:'حفظ إعداد الطابعة',exact:true}).click();await page.waitForFunction(()=>document.getElementById('printer-settings-list').textContent.includes('XP-80C'));
+  assert.equal(JSON.parse(hub.db.prepare('SELECT config FROM hub_printers').get().config).kind,'windows');
+  assert.equal(hub.db.prepare('SELECT count(*) n FROM jobs').get().n,0); // Discovery and configuration never print.
   const registry=createDeviceRegistry(hub.db,'branch_001');const device=registry.issue({name:'Tablet',role:'cashier'});
   // Create the employee through the real administrator UI before enforcing the second login step.
   await page.locator('#new-staff-username').fill('cashier');await page.locator('#new-staff-name').fill('موظف الاختبار');

@@ -1,0 +1,2 @@
+CONTRACT STALE: supabase/api-contract.json does not match src. Run `node scripts/db/gen-contract.js`.
+Tables newly referenced: inventory_unit_productions, v_current_sale_prices, v_current_stock_position

@@ -81,7 +81,7 @@ function createHub(config = {}) {
   );`);
   const printerRegistry=createPrinterRegistry(db,branchId,config.printers || JSON.parse(process.env.BRANCH_HUB_PRINTERS || '{}'));
   const printerConfig=printerRegistry.printers;
-  const printWorker = createPrintWorker(db, branchId, printerConfig,undefined,{renderReceipt:config.renderReceipt});
+  const printWorker = createPrintWorker(db, branchId, printerConfig,undefined,{renderReceipt:config.renderReceipt,windowsTransport:config.windowsTransport});
   printWorker.start();
   const devices = createDeviceRegistry(db, branchId);
   const offlineSales = createOfflineSalesEngine(db, branchId);
@@ -224,6 +224,10 @@ function createHub(config = {}) {
     }
     if(pathname === '/api/v1/session' && req.method === 'GET')return send(res,200,{organizationId,branchId,admin:Boolean(principal.admin),staffName:principal.name||null,staffLoginRequired:false,permissions:['read','sell','print','stock'].filter(p=>principal.allows(p))});
     if(pathname === '/api/v1/printers' && req.method === 'GET')return send(res,200,{printers:Object.keys(printerConfig),...(principal.admin?{details:printerConfig}:{})});
+    if(pathname === '/api/v1/printers/windows' && req.method === 'GET'){
+      try{const result=await (config.enumerateWindowsPrinters||(()=>require('./windows-print.cjs').invoke('printers')))();return send(res,200,{printers:result.printers});}
+      catch{return send(res,503,{error:'WINDOWS_PRINTER_DISCOVERY_UNAVAILABLE'});}
+    }
     if(pathname.startsWith('/api/v1/printers/')&&req.method==='PUT'){
       try{let raw='';for await(const chunk of req){raw+=chunk;if(Buffer.byteLength(raw)>2048)return send(res,413,{error:'PAYLOAD_TOO_LARGE'});}
        const input=JSON.parse(raw);if(input.organizationId!==organizationId||input.branchId!==branchId)return send(res,403,{error:'BRANCH_SCOPE_MISMATCH'});

@@ -57,6 +57,12 @@ jobs:
         with:
           name: Branch-Hub-Full-Browser-Application
           path: branch-hub/browser-app/
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - name: Build self-contained Windows printer and service helper
+        working-directory: branch-hub
+        run: npm run build:native
       - name: Package Windows installer
         working-directory: branch-hub
         run: npm run build:win
@@ -88,6 +94,10 @@ jobs:
           $installedSmoke = Join-Path $installDir "resources/app.asar/packaged-smoke.cjs"
           $installed = Start-Process -FilePath $installedExe -ArgumentList "`"$installedSmoke`"" -Wait -PassThru -NoNewWindow
           if ($installed.ExitCode -ne 0) { throw "Installed application smoke failed" }
+          $nativeSmoke = Join-Path $installDir "resources/app.asar/windows-native-smoke.cjs"
+          $nativeReport = Join-Path $env:RUNNER_TEMP "hub-native-windows-smoke.json"
+          $native = Start-Process -FilePath $installedExe -ArgumentList "`"$nativeSmoke`"", "`"$nativeReport`"" -Wait -PassThru -WindowStyle Hidden
+          if ($native.ExitCode -ne 0 -or !(Test-Path $nativeReport)) { throw "Installed native Windows helper smoke failed" }
           Remove-Item Env:ELECTRON_RUN_AS_NODE
           $raster = Start-Process -FilePath $installedExe -ArgumentList "--branch-hub-render-self-test" -Wait -PassThru -NoNewWindow
           if ($raster.ExitCode -ne 0) { throw "Installed Arabic raster/queue/TCP smoke failed" }

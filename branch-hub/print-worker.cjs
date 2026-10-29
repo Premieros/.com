@@ -30,10 +30,14 @@ function sendTcp(printer, bytes, timeoutMs=5000) {
  });
 }
 function validatePrinter(id,p){
+ if(p?.kind==='windows'){
+  if(typeof id!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(id)||typeof p.name!=='string'||p.name.length<1||p.name.length>256||/[\x00-\x1f\x7f]/.test(p.name)||(p.format!==undefined&&!['text','raster'].includes(p.format))||(p.dots!==undefined&&![384,512,576].includes(p.dots)))throw Error('INVALID_PRINTER_CONFIGURATION');
+  return {kind:'windows',name:p.name,format:p.format||'raster',...((p.format||'raster')==='raster'?{dots:p.dots||576}:{})};
+ }
  if(typeof id!=='string'||!/^[a-zA-Z0-9_-]{1,80}$/.test(id)||!p||typeof p!=='object'||Array.isArray(p)||typeof p.host!=='string'||!privateIPv4(p.host)||!Number.isInteger(p.port)||p.port<1||p.port>65535||(p.format!==undefined&&!['text','raster'].includes(p.format))||(p.dots!==undefined&&![384,512,576].includes(p.dots)))throw Error('INVALID_PRINTER_CONFIGURATION');
  return {host:p.host,port:p.port,format:p.format||'text',...(p.format==='raster'?{dots:p.dots||576}:{})};
 }
-function createPrintWorker(db,branchId,printers={},transport=sendTcp,{renderReceipt}={}) {
+function createPrintWorker(db,branchId,printers={},transport=sendTcp,{renderReceipt,windowsTransport=require('./windows-print.cjs').sendWindows}={}) {
  for(const [id,p] of Object.entries(printers))validatePrinter(id,p);
  db.exec(`CREATE TABLE IF NOT EXISTS print_dispatches (
   job_id TEXT PRIMARY KEY REFERENCES jobs(id),
@@ -60,11 +64,15 @@ function createPrintWorker(db,branchId,printers={},transport=sendTcp,{renderRece
   try {
    const payload=JSON.parse(job.payload),printer=printers[payload.printerId];
    if(!printer)throw Error('PRINTER_NOT_CONFIGURED');
-   target={printerId:payload.printerId,host:printer.host,port:printer.port,format:printer.format||'text',...(printer.format==='raster'?{dots:printer.dots||576}:{})};
+   target={printerId:payload.printerId,...(printer.kind==='windows'?{kind:'windows',name:printer.name}:{host:printer.host,port:printer.port}),format:printer.format||'text',...(printer.format==='raster'?{dots:printer.dots||576}:{})};
    let bytes;
    if(printer.format==='raster'){if(typeof renderReceipt!=='function')throw Error('RASTER_RENDERER_REQUIRED');bytes=await renderReceipt(payload.receipt,printer.dots||576);if(!Buffer.isBuffer(bytes)||bytes.length<16||bytes.length>2*1024*1024||bytes[0]!==27||bytes[1]!==64)throw Error('INVALID_RASTER_OUTPUT');}
    else bytes=encodeReceipt(payload);
-   await transport(printer,bytes);
+   const delivery=await (printer.kind==='windows'?windowsTransport:transport)(printer,bytes);
+   if(printer.kind==='windows'){
+    if(!Number.isSafeInteger(delivery?.jobId)||delivery.jobId<=0||delivery.submitted!==true){const error=Error('WINDOWS_PRINT_ACK_INVALID');error.deliveryUncertain=true;throw error;}
+    target.spoolJobId=delivery.jobId;target.paperConfirmed=false;
+   }
   } catch(e) {state=e.deliveryUncertain?'uncertain':'failed';error=e.message;}
   db.exec('BEGIN IMMEDIATE');
   try {

@@ -1,0 +1,6 @@
+
+> vite-react-typescript-starter@0.0.0 typecheck
+> tsc --noEmit -p tsconfig.app.json
+
+'tsc' is not recognized as an internal or external command,
+operable program or batch file.
