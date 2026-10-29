@@ -1,0 +1,13 @@
+const fs=require('node:fs');
+const path=require('node:path');
+const {spawnSync}=require('node:child_process');
+const root=path.resolve(process.argv[2]||path.join(__dirname,'premier-com'));
+const out=path.resolve(process.argv[3]||path.join(__dirname,'audit-evidence'));
+fs.mkdirSync(out,{recursive:true});
+const script=path.join(root,'scripts/db/verify-database-identity.js');
+const canonical={...process.env,GITHUB_REPOSITORY:'Premieros/.com',SUPABASE_PROJECT_REF:'hvqlkapynjfjikqithvd',VITE_SUPABASE_URL:'https://hvqlkapynjfjikqithvd.supabase.co',SUPABASE_DB_URL:''};
+const cases=[{name:'canonical',overrides:{},expected:0},{name:'reject wrong project',overrides:{SUPABASE_PROJECT_REF:'unrelated-project'},expected:1},{name:'reject wrong repository',overrides:{GITHUB_REPOSITORY:'example/unrelated-project'},expected:1},{name:'reject wrong URL',overrides:{VITE_SUPABASE_URL:'https://example.invalid'},expected:1}];
+const results=cases.map(c=>{const r=spawnSync(process.execPath,[script],{env:{...canonical,...c.overrides},encoding:'utf8'});return{name:c.name,expectedExit:c.expected,actualExit:r.status,passed:r.status===c.expected,output:(r.stdout+r.stderr).trim()};});
+fs.writeFileSync(path.join(out,'identity-probes.json'),JSON.stringify(results,null,2)+'\n');
+console.log(JSON.stringify(results));
+if(results.some(r=>!r.passed))process.exitCode=1;
