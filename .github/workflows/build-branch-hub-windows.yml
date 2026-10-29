@@ -123,6 +123,8 @@ jobs:
           Remove-Item Env:ELECTRON_RUN_AS_NODE
           $raster = Start-Process -FilePath $installedExe -ArgumentList "--branch-hub-render-self-test" -Wait -PassThru -NoNewWindow
           if ($raster.ExitCode -ne 0) { throw "Installed Arabic raster/queue/TCP smoke failed" }
+          $erpPrint = Start-Process -FilePath $installedExe -ArgumentList "--branch-hub-erp-print-self-test" -Wait -PassThru -WindowStyle Hidden
+          if ($erpPrint.ExitCode -ne 0) { throw "Installed real-ERP print bridge/PDF sink smoke failed" }
           $stream = [System.IO.File]::OpenRead($exe.FullName)
           try {
             if ($stream.ReadByte() -ne 77 -or $stream.ReadByte() -ne 90) { throw "Invalid PE installer" }

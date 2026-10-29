@@ -69,6 +69,7 @@ declare global {
   interface Window {
     electronAPI?: {
       isElectron: boolean;
+      supportsHtmlTemplates?: boolean;
       getPrinters: () => Promise<Array<{ name: string; displayName?: string; isDefault?: boolean; status?: number }>>;
       printSilent: (options: { html?: string; text?: string; printerName: string; copies?: number; paperWidthMm?: number }) => Promise<{ success: boolean; error?: string }>;
       kickDrawer: (printerName?: string) => Promise<{ success: boolean; error?: string }>;
@@ -656,6 +657,18 @@ export async function executeSilentPrintDetailed(options: {
     // That renderer consumes structured template v1 and produces the approved
     // receipt/kitchen form without ever exposing HTML/CSS to the printer.
     if (options.template) {
+      if (window.electronAPI.supportsHtmlTemplates) {
+        try {
+          return await window.electronAPI.printSilent({
+            printerName,
+            html: buildFixedThermalTemplateHtml(options.template),
+            copies: Math.max(1, Math.min(5, Number(options.copies || 1))),
+            paperWidthMm: Number(options.paperWidthMm || options.template.paperWidthMm || 80),
+          });
+        } catch {
+          return { success: false, error: 'DESKTOP_PRINT_UNCONFIRMED' };
+        }
+      }
       let localTemplateServiceAvailable = false;
       try {
         const health = await fetchWithTimeout(`${PRINT_AGENT_URL}/health`);

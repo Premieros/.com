@@ -1,6 +1,8 @@
 'use strict';
 if(process.argv.includes('--branch-hub-render-self-test')){
  require('./receipt-render-self-test.cjs');
+}else if(process.argv.includes('--branch-hub-erp-print-self-test')){
+ require('./erp-print-self-test.cjs');
 }else{
 const { app, BrowserWindow, nativeImage, net, dialog, ipcMain, safeStorage, Tray, Menu } = require('electron');
 const {localOrigin:desktopOrigin}=require('./local-origin.cjs');
@@ -11,11 +13,13 @@ const {createEnrollmentController}=require('./enrollment.cjs');
 const { fork } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const {createErpPrinter,createElectronPrintDispatcher,registerErpPrinting}=require('./erp-print.cjs');
 const renderReceipt=require('./raster-receipt.cjs').createElectronReceiptRenderer({BrowserWindow,nativeImage});
 let worker;
 if (!app.requestSingleInstanceLock()) { app.exit(0); }
 let activeWindow, tray, erpWindow, browserAppServer, browserAppURL, browserAppOpening;
 let setupWindow, localOrigin, localToken, localBackupKey, configVault;
+let erpPrinter,erpDispatcher;
 const setupURL=pathToFileURL(path.join(__dirname,'ui/setup.html')).href;
 function createWindow(status, localURL) {
  const win=new BrowserWindow({width:940,height:650,minWidth:650,minHeight:450,
@@ -40,7 +44,7 @@ async function showBrowserApp(){
  try{
   if(!browserAppServer){const candidate=require('./browser-app-server.cjs').createBrowserAppServer();browserAppURL=await candidate.listen();browserAppServer=candidate;}
   const url=browserAppURL;
-  erpWindow=new BrowserWindow({width:1440,height:960,minWidth:850,minHeight:650,title:'Premier • النظام الكامل',webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
+  erpWindow=new BrowserWindow({width:1440,height:960,minWidth:850,minHeight:650,title:'Premier • النظام الكامل',webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true,preload:path.join(__dirname,'erp-preload.cjs')}});
   erpWindow.webContents.setWindowOpenHandler(()=>({action:'deny'}));
   erpWindow.webContents.on('will-navigate',(event,target)=>{if(new URL(target).origin!==new URL(url).origin)event.preventDefault();});
   erpWindow.on('close',event=>{if(worker&&!app.isQuitting&&tray){event.preventDefault();erpWindow.hide();}});
@@ -50,6 +54,9 @@ async function showBrowserApp(){
 function startHub(c) {
   desktopOrigin({hostname:c.localHostname||'127.0.0.1',port:c.port||3847,tls:Boolean(c.tlsKey)});
   localToken=c.token;localBackupKey=c.backupKey;
+  erpDispatcher=createElectronPrintDispatcher(BrowserWindow);
+  erpPrinter=createErpPrinter({file:path.join(app.getPath('userData'),'branch-data','erp-print.sqlite'),organizationId:c.organizationId,branchId:c.branchId,
+   printers:async()=>erpWindow&&!erpWindow.isDestroyed()?erpWindow.webContents.getPrintersAsync():[],dispatch:erpDispatcher.dispatch});
   const showLocal=()=>{if(activeWindow&&!activeWindow.isDestroyed()){activeWindow.show();activeWindow.focus();}};
   Menu.setApplicationMenu(Menu.buildFromTemplate([{label:'الفرع',submenu:[{label:'النظام الكامل — يتطلب الإنترنت',click:showBrowserApp},{label:'التشغيل المحلي وإعدادات الفرع',click:showLocal},{type:'separator'},{label:'خروج',click:()=>app.quit()}]},{label:'عرض',submenu:[{role:'reload'},{role:'togglefullscreen'},{role:'zoomIn'},{role:'zoomOut'},{role:'resetZoom'}]}]));
   if(process.platform==='win32'){
@@ -99,6 +106,7 @@ app.whenReady().then(()=>{
   const userDir=app.getPath('userData');
   const vault=createConfigVault(userDir,safeStorage);configVault=vault;
   const c=vault.loadOrMigrate();
+  registerErpPrinting({ipcMain,getWindow:()=>erpWindow,getOrigin:()=>browserAppURL,getPrinter:()=>erpPrinter,version:app.getVersion()});
   ipcMain.handle('hub:local-credential',event=>{
    if(!activeWindow || event.sender!==activeWindow.webContents || event.senderFrame!==event.sender.mainFrame ||
      !localOrigin || new URL(event.senderFrame.url).origin!==localOrigin)throw Error('FORBIDDEN');
@@ -142,7 +150,7 @@ app.whenReady().then(()=>{
   createWindow(error.message==='OS_CREDENTIAL_VAULT_UNAVAILABLE'?'حماية إعدادات الجهاز غير متاحة. لم تُحفظ أي بيانات دخول.':'إعداد ربط الفرع غير صالح؛ تم منع تشغيل الخادم لحماية بيانات الفرع.');
  }
 });
-app.on('before-quit',()=>{ app.isQuitting=true; if(browserAppServer)browserAppServer.close(); if(worker && !worker.killed)worker.kill(); });
+app.on('before-quit',()=>{ app.isQuitting=true;if(erpDispatcher)erpDispatcher.close();if(erpPrinter)erpPrinter.close(); if(browserAppServer)browserAppServer.close(); if(worker && !worker.killed)worker.kill(); });
 app.on('second-instance',()=>{if(activeWindow){if(activeWindow.isMinimized())activeWindow.restore();activeWindow.focus();}});
 app.on('window-all-closed',()=>app.quit());
 
