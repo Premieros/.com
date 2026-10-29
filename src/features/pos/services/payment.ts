@@ -243,8 +243,10 @@ export async function getManualPaymentApprovalStatus(requestId: string): Promise
 }
 
 export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ result: ProcessSaleResult | null; error: string | null }> {
-  // Authoritative Business Logic Check: Negative Stock Policy
-  // If negative stock is disabled, check effective available stock (accounting for unsynced local outbox sales)
+  // Online settlement must use the server's transactional stock checks. The
+  // local product cache cannot represent recipes, manufactured components, or
+  // stock already consumed when an order was sent to the kitchen.
+  // Only explicit offline capture uses the verified warehouse snapshot below.
   const branchSettings = await SettingsRepository.getBranchSettings(p.p_branch_id);
   const globalSettings = await SettingsRepository.getGlobalSettings();
   const allowNegative = branchSettings?.allow_negative_stock ?? globalSettings?.allow_negative_stock ?? false;
@@ -254,7 +256,7 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
     return { result: null, error: 'WAREHOUSE_REQUIRED_OFFLINE_CAPTURE' };
   }
 
-  if (!allowNegative && Array.isArray(p.p_items) && p.p_items.length > 0) {
+  if (explicitlyOffline && !allowNegative && Array.isArray(p.p_items) && p.p_items.length > 0) {
     const productQuantities: Record<string, number> = {};
     for (const item of p.p_items) {
       if (!item.product_id) continue;
@@ -262,23 +264,19 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
     }
     for (const [productId, requestedQty] of Object.entries(productQuantities)) {
       let available: number;
-      if (explicitlyOffline) {
-        // Branch totals are NEVER evidence of stock in the pinned warehouse.
-        // If the exact warehouse snapshot is not known, refuse offline capture
-        // rather than borrowing inventory from another warehouse.
-        try {
-          const stock = await InventoryRepository.getWarehouseAvailableStock(
-            productId, p.p_branch_id, p.p_warehouse_id!,
-          );
-          if (stock.status !== 'known') {
-            return { result: null, error: `OFFLINE_WAREHOUSE_STOCK_UNVERIFIED: ${stock.reason}` };
-          }
-          available = stock.quantity;
-        } catch {
-          return { result: null, error: 'OFFLINE_WAREHOUSE_STOCK_UNVERIFIED' };
+      // Branch totals are NEVER evidence of stock in the pinned warehouse.
+      // If the exact warehouse snapshot is not known, refuse offline capture
+      // rather than borrowing inventory from another warehouse.
+      try {
+        const stock = await InventoryRepository.getWarehouseAvailableStock(
+          productId, p.p_branch_id, p.p_warehouse_id!,
+        );
+        if (stock.status !== 'known') {
+          return { result: null, error: `OFFLINE_WAREHOUSE_STOCK_UNVERIFIED: ${stock.reason}` };
         }
-      } else {
-        available = await InventoryRepository.getEffectiveAvailableStock(productId, p.p_branch_id);
+        available = stock.quantity;
+      } catch {
+        return { result: null, error: 'OFFLINE_WAREHOUSE_STOCK_UNVERIFIED' };
       }
       if (requestedQty > available) {
         return {

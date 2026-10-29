@@ -110,8 +110,10 @@ describe('Negative Stock: Architectural & UI Contract Verification', () => {
     expect(paymentService).toContain('SettingsRepository.getBranchSettings');
     expect(paymentService).toContain('SettingsRepository.getGlobalSettings');
     expect(paymentService).toContain('allow_negative_stock');
-    // Verifies effective available stock check with unsynced local outbox sales
-    expect(paymentService).toContain('InventoryRepository.getEffectiveAvailableStock');
+    // Offline stock must be verified for the exact warehouse; online settlement
+    // relies on the server's recipe/component and kitchen-consumption checks.
+    expect(paymentService).toContain('InventoryRepository.getWarehouseAvailableStock');
+    expect(paymentService).not.toContain('InventoryRepository.getEffectiveAvailableStock');
     expect(paymentService).toContain('INSUFFICIENT_STOCK');
     // Offline movements stay pending; server-confirmed movements are explicitly synced
     expect(paymentService).toContain('InventoryRepository.recordLocalMovement');
