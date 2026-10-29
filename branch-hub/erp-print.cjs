@@ -35,6 +35,7 @@ function createErpPrinter({file,organizationId,branchId,printers,dispatch}){
  const result=row=>({success:row.state==='submitted',jobId:row.id,state:row.state,paperConfirmed:false,...(row.error?{error:row.error}:{})});
  async function send(input){
   if(closing)throw Error('PRINT_SERVICE_STOPPING');
+  if(input?.branchId!==undefined&&input.branchId!==branchId)throw Error('BRANCH_BINDING_MISMATCH');
   const job=validatePrint(input),payload=JSON.stringify(job),fingerprint=crypto.createHash('sha256').update(payload).digest('hex');
   const existing=db.prepare('SELECT * FROM erp_print_jobs WHERE id=?').get(job.requestId);
   if(existing){if(existing.fingerprint!==fingerprint)throw Error('PRINT_IDEMPOTENCY_CONFLICT');return active.get(job.requestId)||result(existing);}
@@ -85,7 +86,7 @@ function registerErpPrinting({ipcMain,getWindow,getOrigin,getPrinter,version}){
  ipcMain.handle('erp:printers',async event=>{if(!trusted(event))throw Error('FORBIDDEN');return (await getWindow().webContents.getPrintersAsync()).map(p=>({name:p.name,displayName:p.displayName||p.name,isDefault:p.isDefault,status:p.status}));});
  ipcMain.handle('erp:print',async(event,options)=>{
   if(!trusted(event)||!getPrinter())return {success:false,error:'FORBIDDEN'};
-  try{return await getPrinter().send({...options,requestId:crypto.randomUUID()});}catch(error){return {success:false,error:['INVALID_PRINT_REQUEST','INVALID_PRINT_CONTENT','INVALID_PRINT_LAYOUT','WINDOWS_PRINTER_NOT_FOUND','PRINT_SERVICE_STOPPING'].includes(error.message)?error.message:'PRINT_REQUEST_FAILED'};}
+  try{return await getPrinter().send({...options,requestId:options?.requestId??crypto.randomUUID()});}catch(error){return {success:false,error:['INVALID_PRINT_REQUEST','INVALID_PRINT_CONTENT','INVALID_PRINT_LAYOUT','WINDOWS_PRINTER_NOT_FOUND','PRINT_SERVICE_STOPPING','PRINT_IDEMPOTENCY_CONFLICT','BRANCH_BINDING_MISMATCH'].includes(error.message)?error.message:'PRINT_REQUEST_FAILED'};}
  });
  ipcMain.handle('erp:system-info',event=>{if(!trusted(event))throw Error('FORBIDDEN');return {isElectron:true,platform:process.platform,version,hostname:require('node:os').hostname()};});
  return ()=>{for(const channel of ['erp:printers','erp:print','erp:system-info'])ipcMain.removeHandler(channel);};

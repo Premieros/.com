@@ -71,7 +71,7 @@ declare global {
       isElectron: boolean;
       supportsHtmlTemplates?: boolean;
       getPrinters: () => Promise<Array<{ name: string; displayName?: string; isDefault?: boolean; status?: number }>>;
-      printSilent: (options: { html?: string; text?: string; printerName: string; copies?: number; paperWidthMm?: number }) => Promise<{ success: boolean; error?: string }>;
+      printSilent: (options: { requestId?: string; branchId?: string; html?: string; text?: string; printerName: string; copies?: number; paperWidthMm?: number }) => Promise<{ success: boolean; error?: string }>;
       kickDrawer: (printerName?: string) => Promise<{ success: boolean; error?: string }>;
       getSystemInfo: () => Promise<{ isElectron: boolean; platform: string; hostname: string }>;
     };
@@ -641,6 +641,8 @@ export async function getAvailablePrinters(): Promise<DetectedPrinter[]> {
 }
 
 export async function executeSilentPrintDetailed(options: {
+  requestId?: string;
+  branchId?: string;
   printerName: string;
   text?: string;
   html?: string;
@@ -660,6 +662,8 @@ export async function executeSilentPrintDetailed(options: {
       if (window.electronAPI.supportsHtmlTemplates) {
         try {
           return await window.electronAPI.printSilent({
+            requestId: options.requestId,
+            branchId: options.branchId,
             printerName,
             html: buildFixedThermalTemplateHtml(options.template),
             copies: Math.max(1, Math.min(5, Number(options.copies || 1))),
@@ -718,6 +722,8 @@ export async function executeSilentPrintDetailed(options: {
         ? htmlToThermalText(buildFixedThermalTemplateHtml(options.template))
         : '';
       const result = await window.electronAPI.printSilent({
+        requestId: options.requestId,
+        branchId: options.branchId,
         printerName,
         text: options.template ? (options.text || templateText) : options.text,
         html: options.template ? undefined : options.html,

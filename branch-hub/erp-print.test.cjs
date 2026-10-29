@@ -12,7 +12,7 @@ test('real ERP print persists one submission for concurrent requests and restart
 }));
 test('printer names are exact, layout bounded and unknown driver ACK blocks retries',async()=>fixture(async file=>{
  let sent=0;const printer=createErpPrinter({file,organizationId,branchId,printers:async()=>[{name:'XP-80C'}],dispatch:async()=>{sent++;throw Error('lost ACK');}});
- try{await assert.rejects(printer.send({...job(),printerName:'Microsoft Print to PDF'}),/PRINTER_NOT_FOUND/);await assert.rejects(printer.send({...job(),copies:1.5}),/LAYOUT/);await assert.rejects(printer.send({...job(),paperWidthMm:100}),/LAYOUT/);const input=job();assert.equal((await printer.send(input)).state,'uncertain');assert.equal((await printer.send(input)).state,'uncertain');assert.equal(sent,1);}finally{printer.close();}
+ try{await assert.rejects(printer.send({...job(),branchId:'33333333-3333-4333-8333-333333333333'}),/BINDING_MISMATCH/);await assert.rejects(printer.send({...job(),printerName:'Microsoft Print to PDF'}),/PRINTER_NOT_FOUND/);await assert.rejects(printer.send({...job(),copies:1.5}),/LAYOUT/);await assert.rejects(printer.send({...job(),paperWidthMm:100}),/LAYOUT/);const input=job();assert.equal((await printer.send(input)).state,'uncertain');assert.equal((await printer.send(input)).state,'uncertain');assert.equal(sent,1);}finally{printer.close();}
 }));
 test('a crashed sending job becomes uncertain while an unattempted job fails without auto-printing',async()=>fixture(async file=>{
  let sent=0;const create=()=>createErpPrinter({file,organizationId,branchId,printers:async()=>[{name:'XP-80C'}],dispatch:async()=>{sent++;return {state:'submitted'};}});
