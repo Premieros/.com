@@ -15,7 +15,8 @@ describe('POS authoritative warehouse and stock policy contract', () => {
     const page = read('src/features/pos/pages/PosWorkspacePage.tsx');
     const payment = read('src/features/pos/services/payment.ts');
     expect(page).toContain('InventoryRepository.getBranchStockMap(effectiveBranch)');
-    expect(payment).toContain('InventoryRepository.getEffectiveAvailableStock');
+    expect(payment).toContain('InventoryRepository.getWarehouseAvailableStock');
+    expect(payment).not.toContain('InventoryRepository.getEffectiveAvailableStock');
     expect(payment).toContain('INSUFFICIENT_STOCK');
   });
   it('uses the canonical signed stock source in the online POS and inventory UI', () => {

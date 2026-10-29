@@ -61,6 +61,8 @@ async function executeJob(job: CloudPrintJob, agentId: string, printerName: stri
     ? legacyThermalHtmlToText(job.payload.html)
     : '';
   const result = await executeSilentPrintDetailed({
+    requestId: job.id,
+    branchId: job.branch_id,
     printerName,
     text: job.payload?.text || legacyText || undefined,
     html: isThermalDocument ? undefined : job.payload?.html,

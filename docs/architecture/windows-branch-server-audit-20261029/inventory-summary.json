@@ -1,0 +1,14 @@
+{
+  "sourceFiles": 345,
+  "routeEntries": 77,
+  "routeConstants": 70,
+  "lazyComponents": 61,
+  "dependencyReferences": 879,
+  "uniqueRelationLiterals": 64,
+  "uniqueRelationsIncludingPagination": 71,
+  "uniqueRpcLiterals": 243,
+  "uniqueFeatureGatedRpcNames": 6,
+  "dynamicCandidates": 8,
+  "migrationFiles": 575,
+  "functionDefinitions": 1029
+}

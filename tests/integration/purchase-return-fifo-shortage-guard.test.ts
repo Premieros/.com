@@ -7,7 +7,7 @@ import { Client } from 'pg';
 const url = process.env.SUPABASE_DB_URL;
 if (!url) throw new Error('SUPABASE_DB_URL required');
 
-describe('Purchase returns must fail closed on FIFO shortage', () => {
+describe('Purchase returns must fail closed on stock shortage', () => {
   const db = new Client({ connectionString: url });
   beforeAll(async () => db.connect());
   afterAll(async () => db.end());
@@ -68,15 +68,15 @@ describe('Purchase returns must fail closed on FIFO shortage', () => {
         [productPurchase, product],
       );
 
-      // Both helpers return success=true with shortage=1 on an empty inventory.
-      // A purchase-return wrapper MUST NOT accept those partial/no-op removals.
+      // The unified raw engine rejects insufficient stock; the legacy product helper
+      // can report a partial shortage. Both paths must leave all financial/stock state unchanged.
       for (const purchaseId of [rawPurchase, productPurchase]) {
         const { rows: [result] } = await db.query<{ result: { success: boolean; error?: string; detail?: string } }>(
           "select public.process_purchase_return($1,NULL,'CI rollback-only shortage test') result",
           [purchaseId],
         );
         expect(result.result.success).toBe(false);
-        expect(result.result.detail).toContain('PURCHASE_RETURN_INSUFFICIENT_STOCK');
+        expect(result.result.detail).toMatch(/^PURCHASE_RETURN_(?:INSUFFICIENT_STOCK|FIFO_FAILED: INSUFFICIENT_STOCK|RAW_MOVEMENT_FAILED: INSUFFICIENT_PRODUCT_STOCK)$/);
       }
 
       const { rows: [state] } = await db.query<{
@@ -141,7 +141,7 @@ describe('Purchase returns must fail closed on FIFO shortage', () => {
         [partialPurchase],
       );
       expect(partialResult.result.success).toBe(false);
-      expect(partialResult.result.detail).toContain('PURCHASE_RETURN_INSUFFICIENT_STOCK');
+      expect(partialResult.result.detail).toMatch(/^PURCHASE_RETURN_(?:INSUFFICIENT_STOCK|FIFO_FAILED: INSUFFICIENT_STOCK)$/);
 
       const { rows: [partialState] } = await db.query<{
         inventory: string; batches: string; returned_qty: string; purchase_status: string; reversal_ledger: string;
@@ -180,7 +180,7 @@ describe('Purchase returns must fail closed on FIFO shortage', () => {
         [mixedPurchase],
       );
       expect(mixedResult.result.success).toBe(false);
-      expect(mixedResult.result.detail).toContain('PURCHASE_RETURN_INSUFFICIENT_STOCK');
+      expect(mixedResult.result.detail).toMatch(/^PURCHASE_RETURN_(?:INSUFFICIENT_STOCK|RAW_MOVEMENT_FAILED: INSUFFICIENT_PRODUCT_STOCK)$/);
       const { rows: [mixedState] } = await db.query<{
         raw_inventory: string; raw_batch_qty: string; returned_lines: string;
         purchase_status: string; reversed_movements: string;

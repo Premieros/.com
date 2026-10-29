@@ -1,6 +1,6 @@
 {
   "name": "premier-branch-hub",
-  "version": "0.1.0",
+  "version": "0.7.1",
   "private": true,
   "description": "Local-first branch gateway prototype for PremierOS",
   "engines": {
@@ -8,12 +8,13 @@
   },
   "scripts": {
     "start": "node server.cjs",
-    "test": "node --test server.test.cjs",
-    "build:win": "electron-builder --win nsis"
+    "test": "node --test *.test.cjs",
+    "build:win": "electron-builder --win nsis",
+    "build:native": "node build-native.cjs"
   },
   "main": "desktop.cjs",
   "devDependencies": {
     "electron": "38.1.0",
-    "electron-builder": "26.0.12"
+    "electron-builder": "26.9.0"
   }
 }

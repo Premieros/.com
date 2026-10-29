@@ -93,6 +93,13 @@ describe('Architecture V2 Phase 4D component evidence', () => {
         [pricedRawId, unpricedRawId, `CI-R1-${token}`, `CI-R2-${token}`,
           materialUnitId, branchId],
       );
+      // Snapshots and current component evidence use published prices, not the catalog fallback.
+      // Explicit transaction time keeps the price visible to the as-of-now snapshot below.
+      await client.query(
+        `insert into public.raw_material_price_events(raw_material_id,branch_id,unit_cost,reference_number,priced_at)
+         values($1,$2,10,$3,now())`,
+        [pricedRawId, branchId, `CI-PUBLISHED-${token}`],
+      );
       await client.query(
         `insert into public.products(id,name,sku,cost_price,sale_price,wholesale_price,is_active,product_type,branch_id)
          values($1,'CI Manufactured Cost Evidence',$2,0,50,50,true,'manufactured',$3)`,

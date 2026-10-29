@@ -1,0 +1,102 @@
+name: Branch Hub complete regression suite
+on:
+  pull_request:
+    paths:
+      - 'branch-hub/**'
+      - '.github/workflows/branch-hub-full-tests.yml'
+  push:
+    branches:
+      - 'feature/branch-hub-safe-sqlite-restore'
+    paths:
+      - 'branch-hub/**'
+      - '.github/workflows/branch-hub-full-tests.yml'
+  workflow_dispatch:
+jobs:
+  offline-tests:
+    timeout-minutes: 5
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - name: Verify SQLite backup and restoration, offline sales, and local server
+        working-directory: branch-hub
+        run: npm test
+  browser-offline:
+    timeout-minutes: 10
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - run: npm ci --no-audit --no-fund
+      - run: google-chrome --version
+      - name: Local UI checkout, lost acknowledgement, reload and mobile layout
+        run: node branch-hub/ui.browser.cjs
+        env:
+          BRANCH_HUB_BROWSER_CHANNEL: chrome
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: Branch-Hub-UI-acceptance
+          path: branch-hub/test-output/*.png
+          if-no-files-found: ignore
+  cloud-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: isolated_ci_only
+          POSTGRES_DB: hub_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - run: npm ci --no-audit --no-fund
+      - name: Verify PostgreSQL RLS, immutable replication, hashes and acknowledgement replay
+        run: node branch-hub/cloud-tests/replication.pg.cjs
+        env:
+          HUB_TEST_DATABASE_URL: postgresql://postgres:isolated_ci_only@127.0.0.1:5432/hub_test
+
+  canonical-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: isolated_ci_only
+          POSTGRES_DB: hub_canonical
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.16.0'
+      - run: npm ci --no-audit --no-fund
+      - name: Verify existing canonical sale, stock and journal functions with replay and full rollback
+        run: node branch-hub/cloud-tests/canonical.pg.cjs
+        env:
+          HUB_TEST_DATABASE_URL: postgresql://postgres:isolated_ci_only@127.0.0.1:5432/hub_canonical

@@ -5,7 +5,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
 import './mobile-layer-fix.css';
 
-if (typeof window !== 'undefined' && 'serviceWorker' in navigator && import.meta.env.PROD) {
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator && import.meta.env.PROD && import.meta.env.VITE_BRANCH_HUB_DESKTOP !== 'true') {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/sw.js').catch((err) => {
       console.warn('[ServiceWorker] Registration failed:', err);

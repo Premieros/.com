@@ -50,3 +50,15 @@ No phase can be declared complete on screenshots or prototype artifacts alone.
 
 ## Agent next action (ONLY)
 Complete **WBS-00** as a read-only architecture audit. Create dependency matrix and explicit gap report in this branch. Do not start implementation, refactor, deploy, alter schema, or write production data.
+
+The owner subsequently authorized implementing the remaining phases. That authorization supersedes the audit-only next-action restriction above; it does not waive truthful acceptance evidence, identity locks, production database-change authorization or data-preservation gates. The binding scope remains the complete Windows Branch Server product contract.
+
+## WBS-00 discovery checkpoint — 2026-10-29
+
+**Status: BLOCKED for acceptance; discovery evidence prepared for review.** The source inventory and [gap report](architecture/WINDOWS_BRANCH_SERVER_DISCOVERY_WBS00_2026-10-29.md) cover routes, cloud/local dependencies, business boundaries, printing and WAN limitations. The [dependency appendix](architecture/WINDOWS_BRANCH_SERVER_DEPENDENCY_MATRIX_2026-10-29.md) records the source call sites.
+
+Canonical hosted database identity was verified directly as `hvqlkapynjfjikqithvd`; repository identity remains `Premieros/.com`. Eight local Branch Hub foundation tests passed. An isolated browser WAN-blocking probe observed the missing real Premier UI (authenticated root returns 404) and unimplemented cloud sync. The source API contract is stale, and frontend clean-install/typecheck prerequisites are unresolved. Full frontend/network-loss business acceptance and owner sign-off are still outstanding. No hosted SQL/schema/data writes, application implementation, main merge or deployment are authorized by this checkpoint. All later WBS items remain NOT STARTED.
+
+## Implementation checkpoint — 2026-10-29
+
+See [the combined implementation report](architecture/WINDOWS_BRANCH_SERVER_IMPLEMENTATION_2026-10-29.md). Clean installation, API contract, TypeScript, 144 root unit/component tests, 76 hub tests and 88 isolated PostgreSQL integration tests now pass. Windows printer discovery/raster and the packaged development runtime have additional evidence. Version 0.7.0 remains a development build; the full local ERP adapter, complete synchronization and real Windows service lifecycle/release acceptance are unfinished. No WBS checkbox is marked ACCEPTED by a build or test count alone.

@@ -36,3 +36,10 @@ test-results
 # Supabase temp
 .temp/
 supabase/.temp/
+
+branch-hub/browser-app/
+branch-hub/native/bin/
+branch-hub/native/obj/
+branch-hub/native-runtime/
+branch-hub/release/
+branch-hub/test-output/

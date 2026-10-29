@@ -95,10 +95,10 @@ jobs:
         run: node scripts/db/verify-database-identity.js
       - name: Verify repository project references
         run: node scripts/db/verify-project-references.js
-      - name: Apply auth stub
-        run: node scripts/db/apply-migration.js --file supabase/ci/stub_auth.sql
-      - name: Apply canonical migrations
-        run: node scripts/db/apply-migration.js --dir supabase/migrations
+      - name: Verify guarded replay and immutable source fixtures
+        run: node --test supabase/ci/replay-migrations.test.cjs
+      - name: Replay canonical migrations in a guarded empty CI database
+        run: node supabase/ci/replay-migrations.cjs
       - name: Verify schema
         run: node scripts/db/verify-schema.js
       - name: Prepare integration fixtures

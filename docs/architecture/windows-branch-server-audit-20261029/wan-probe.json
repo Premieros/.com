@@ -1,0 +1,70 @@
+{
+  "scope": "Synthetic isolated branch; browser blocks all non-loopback network. This is WAN fault injection, not a physical unplug or production acceptance.",
+  "checks": [
+    {
+      "name": "real Premier UI on branch hub",
+      "status": 404,
+      "body": "{\"error\":\"NOT_FOUND\"}",
+      "outcome": "MISSING: handler returns JSON NOT_FOUND, not Premier UI"
+    },
+    {
+      "pathname": "/health",
+      "status": 200,
+      "body": {
+        "ok": true,
+        "service": "premier-branch-hub",
+        "version": 1
+      }
+    },
+    {
+      "pathname": "/api/v1/sync/status",
+      "status": 200,
+      "body": {
+        "pending": 0,
+        "onlineSyncImplemented": false
+      }
+    },
+    {
+      "pathname": "/api/v1/orders",
+      "status": 404,
+      "body": {
+        "error": "NOT_FOUND"
+      }
+    },
+    {
+      "pathname": "/api/v1/sales",
+      "status": 404,
+      "body": {
+        "error": "NOT_FOUND"
+      }
+    },
+    {
+      "pathname": "/api/v1/inventory",
+      "status": 404,
+      "body": {
+        "error": "NOT_FOUND"
+      }
+    },
+    {
+      "pathname": "/api/v1/journals",
+      "status": 404,
+      "body": {
+        "error": "NOT_FOUND"
+      }
+    },
+    {
+      "pathname": "/printers",
+      "status": 404,
+      "body": {
+        "error": "NOT_FOUND"
+      }
+    }
+  ],
+  "blockedExternal": [
+    {
+      "host": "hvqlkapynjfjikqithvd.supabase.co",
+      "path": "/rest/v1/"
+    }
+  ],
+  "wanCanaryBlocked": true
+}
