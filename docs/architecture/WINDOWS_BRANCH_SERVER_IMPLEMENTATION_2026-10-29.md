@@ -16,7 +16,7 @@ The older audit correctly described its audited development branch's 0.1 foundat
 - Administrator-only printer discovery and USB/Windows configuration in the local management interface. Discovery/configuration never sends an invoice. The operator must explicitly select a thermal printer; no automatically selected default printer is saved.
 - Native Arabic raster rendering at 384, 512 and 576 dots without an interactive desktop renderer, plus DPAPI machine-protection primitives for the service configuration. The existing Electron raster renderer remains available.
 - A Windows SCM host and independently owned server/asset lifecycle, LocalService account registration, automatic start and recovery settings, protected ProgramData configuration, graceful stop protocol and credential rotation persistence. **This is preparatory service infrastructure. Secure desktop-to-service state handoff, actual SCM installation/start/reboot/upgrade acceptance and desktop lifecycle integration are not complete. It is not automatically installed or activated by this build.**
-- Clean npm installation repaired through the lockfile. The earlier missing optional-platform entries no longer prevent a clean install. The source API contract, application typecheck, unit tests and build pass.
+- Clean npm installation repaired through the lockfile. The earlier missing optional-platform entries no longer prevent a clean install with the local npm 11 toolchain. The first GitHub run exposed an additional npm 10 lockfile validation difference (nested Vitest esbuild); the lockfile was regenerated with npm 10.9.7 and its clean-install validation rerun. Both toolchains must pass before CI acceptance. The source API contract, application typecheck, unit tests and build pass locally.
 - Integration fixtures now publish a manufactured catalog cost of 4 for the existing unchanged COGS=8 assertion, matching the source's current published-cost policy. Return tests recognize the specific current shortage codes while retaining stock, return-line, successful-return, partial-removal rollback and journal assertions. No financial database routine or historical migration was edited.
 - Windows build workflow builds and packages the native helper and defines an installed-helper smoke test. A workflow definition is not evidence that the new CI run has completed.
 
@@ -38,6 +38,8 @@ The older audit correctly described its audited development branch's 0.1 foundat
 | Bundled real React UI | PASS: login renders, no Node/preload/hub credential bridge, no desktop service worker |
 | Native Windows helper | PASS: DPAPI roundtrip, 18 installed printers discovered, Arabic raster at three widths; **no physical print sent** |
 | Packaged Electron runtime | PASS: local health/assets, catalog import, SQLite sale/idempotency, employee access and backup/recovery in fresh synthetic data |
+| Final packaged Arabic raster and print queue | PASS: three widths; concurrent submissions/retry yield one receipt at a private loopback TCP emulator, with external requests denied; no physical print |
+| GitHub pull request | Draft [#129](https://github.com/Premieros/.com/pull/129); initial npm 10 clean-install failures under repair, CI acceptance pending |
 | Publisher signature | NotSigned, as requested for this test build |
 | Physical printer/paper, two real branch hosts and devices, SCM restart/reboot, automatic installer update rollback | NOT TESTED / remaining acceptance work |
 
