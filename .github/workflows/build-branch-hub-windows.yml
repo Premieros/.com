@@ -4,6 +4,28 @@ on:
   push:
     paths:
       - 'branch-hub/**'
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.*'
+      - 'tailwind.config.*'
+      - 'postcss.config.*'
+      - 'tsconfig*.json'
+      - '.github/workflows/build-branch-hub-windows.yml'
+  pull_request:
+    paths:
+      - 'branch-hub/**'
+      - 'src/**'
+      - 'public/**'
+      - 'index.html'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'vite.config.*'
+      - 'tailwind.config.*'
+      - 'postcss.config.*'
+      - 'tsconfig*.json'
       - '.github/workflows/build-branch-hub-windows.yml'
 jobs:
   browser-application:
