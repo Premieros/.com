@@ -5,11 +5,12 @@ import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { useBranchFilter } from '@/lib/useBranchFilter';
 import { Button } from '@/components/Button';
+import { AgentSupportWidget } from '@/components/AgentSupportWidget';
 
 const INTRO_AR = 'يرجى إرسال وصف المشكلة + رقم التواصل + الفرع + رقم الفاتورة/الطلب إن وجد.';
 const INTRO_EN = 'Please send: problem description + contact number + branch + invoice/order number if available.';
 
-export function CustomerSupportLauncher() {
+function NativeCustomerSupportLauncher() {
   const { user } = useAuth();
   const { lang } = useLanguage();
   const ar = lang === 'ar';
@@ -274,4 +275,31 @@ export function CustomerSupportLauncher() {
       )}
     </>
   );
+}
+
+/**
+ * One support button only:
+ * - Native Premier human support by default.
+ * - AGENT assistant only when explicitly configured and enabled.
+ * - Automatically restore human support if the AGENT script cannot load.
+ */
+export function CustomerSupportLauncher() {
+  const { user } = useAuth();
+  const [agentFailed, setAgentFailed] = useState(false);
+  const onAgentFailure = useCallback(() => setAgentFailed(true), []);
+  // Opt-in trial on the known Premier site only. All other visitors keep
+  // existing human support. This allows a real-origin test without exposing
+  // AGENT integration to every user before acceptance.
+  const trialEnabled = typeof window !== 'undefined' &&
+    window.location.hostname === 'premieros-sage.vercel.app' &&
+    new URLSearchParams(window.location.search).get('agent_support_test') === '1';
+  const agentEnabled = trialEnabled || (
+    import.meta.env.VITE_AGENT_SUPPORT_ENABLED === 'true' &&
+    Boolean(import.meta.env.VITE_AGENT_SUPPORT_ORIGIN) &&
+    Boolean(import.meta.env.VITE_AGENT_SUPPORT_WIDGET_KEY)
+  );
+
+  if (!user || user.role === 'super_admin') return null;
+  if (!agentEnabled || agentFailed) return <NativeCustomerSupportLauncher />;
+  return <AgentSupportWidget onFailure={onAgentFailure} trialEnabled={trialEnabled} />;
 }
