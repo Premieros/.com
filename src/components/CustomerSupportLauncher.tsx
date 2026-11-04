@@ -287,13 +287,12 @@ export function CustomerSupportLauncher() {
   const { user } = useAuth();
   const [agentFailed, setAgentFailed] = useState(false);
   const onAgentFailure = useCallback(() => setAgentFailed(true), []);
-  // Opt-in trial on the known Premier site only. All other visitors keep
-  // existing human support. This allows a real-origin test without exposing
-  // AGENT integration to every user before acceptance.
-  const trialEnabled = typeof window !== 'undefined' &&
-    window.location.hostname === 'premieros-sage.vercel.app' &&
-    new URLSearchParams(window.location.search).get('agent_support_test') === '1';
-  const agentEnabled = trialEnabled || (
+  // Premier's approved public domain has a working, origin-scoped AGENT
+  // support endpoint. Use the same support button on normal app pages;
+  // if the API fails, the customer can return to the native human support.
+  const approvedPremierSite = typeof window !== 'undefined' &&
+    window.location.hostname === 'premieros-sage.vercel.app';
+  const agentEnabled = approvedPremierSite || (
     import.meta.env.VITE_AGENT_SUPPORT_ENABLED === 'true' &&
     Boolean(import.meta.env.VITE_AGENT_SUPPORT_ORIGIN) &&
     Boolean(import.meta.env.VITE_AGENT_SUPPORT_WIDGET_KEY)
@@ -301,5 +300,5 @@ export function CustomerSupportLauncher() {
 
   if (!user || user.role === 'super_admin') return null;
   if (!agentEnabled || agentFailed) return <NativeCustomerSupportLauncher />;
-  return <AgentSupportWidget onFailure={onAgentFailure} trialEnabled={trialEnabled} />;
+  return <AgentSupportWidget onFailure={onAgentFailure} trialEnabled={approvedPremierSite} />;
 }
