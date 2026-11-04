@@ -23,11 +23,11 @@
 
 ```env
 VITE_AGENT_SUPPORT_ENABLED=true
-VITE_AGENT_SUPPORT_ORIGIN=https://YOUR-AGENT-DEPLOYMENT-HOST
+VITE_AGENT_SUPPORT_ORIGIN=https://premieros-ai-sales-agent-git-feature-3d3de3-sayedalaa82285-7634.vercel.app
 VITE_AGENT_SUPPORT_WIDGET_KEY=YOUR_48_CHARACTER_PUBLIC_WIDGET_KEY
 ```
 
-`VITE_AGENT_SUPPORT_ORIGIN` هو **أصل موقع AGENT** HTTPS فقط، من دون `/support` أو مسار، مثل نطاق AGENT الثابت الذي تديره. لا تستخدم نطاقًا مختلفًا كل مرة؛ يجب أن تسمح سياسة الموقع في AGENT بالـ origin الفعلي لنشر Premier.
+`VITE_AGENT_SUPPORT_ORIGIN` هو **أصل موقع AGENT** HTTPS فقط، من دون `/support` أو مسار، مثل نطاق AGENT الثابت الذي تديره. النطاق المعتمد حاليًا لنسخة فرع AGENT التجريبية هو `https://premieros-ai-sales-agent-git-feature-3d3de3-sayedalaa82285-7634.vercel.app`. لا تستخدم نطاقًا مختلفًا كل مرة؛ يجب أن تسمح سياسة الموقع في AGENT بالـ origin الفعلي لنشر Premier.
 
 أعِد بناء Premier بعد تغيير المتغيرات: Vite يستبدل `VITE_*` أثناء البناء وليس وقت تشغيل المتصفح.
 
@@ -47,3 +47,9 @@ VITE_AGENT_SUPPORT_WIDGET_KEY=YOUR_48_CHARACTER_PUBLIC_WIDGET_KEY
 - رسائل AGENT تخزن في قاعدة AGENT عندما ينجح تفعيل واجهاتها العامة، وليس في جداول دعم Premier الأصلية.
 - لا تضع أي مفتاح سري مثل `SUPABASE_SERVICE_ROLE_KEY` أو رموز مزود AI في متغيرات `VITE_*`.
 - استخدام مفتاح عام هنا متوقع؛ حماية الربط تعتمد على قائمة `allowed_origin` والتحقق من الجلسات وحدود الطلبات على خادم AGENT.
+
+## حالة التطبيق (2026-11-04)
+- تم إعداد التكامل في فرع `feature/agent-support-widget`، وليس على الموقع الحي `premieros-sage.vercel.app`.
+- لا ترفع `VITE_AGENT_SUPPORT_ENABLED=true` حتى ينجح الاختبار الأمني وتفعيل حدّ الطلبات على AGENT.
+- لم يتم توفير `Widget Key` الحقيقي حتى الآن؛ أنشئه من لوحة AGENT لموقع `https://premieros-sage.vercel.app`.
+- اختبار CI العام للمستودع فشل في اختبارات سابقة تخص `matchMedia` ومداخل القائمة، بينما نجح فحص TypeScript وESLint؛ يلزم إصلاح CI قبل الدمج.
