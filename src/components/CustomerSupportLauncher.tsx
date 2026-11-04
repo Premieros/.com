@@ -287,12 +287,19 @@ export function CustomerSupportLauncher() {
   const { user } = useAuth();
   const [agentFailed, setAgentFailed] = useState(false);
   const onAgentFailure = useCallback(() => setAgentFailed(true), []);
-  const agentEnabled =
+  // Opt-in trial on the known Premier site only. All other visitors keep
+  // existing human support. This allows a real-origin test without exposing
+  // AGENT integration to every user before acceptance.
+  const trialEnabled = typeof window !== 'undefined' &&
+    window.location.hostname === 'premieros-sage.vercel.app' &&
+    new URLSearchParams(window.location.search).get('agent_support_test') === '1';
+  const agentEnabled = trialEnabled || (
     import.meta.env.VITE_AGENT_SUPPORT_ENABLED === 'true' &&
     Boolean(import.meta.env.VITE_AGENT_SUPPORT_ORIGIN) &&
-    Boolean(import.meta.env.VITE_AGENT_SUPPORT_WIDGET_KEY);
+    Boolean(import.meta.env.VITE_AGENT_SUPPORT_WIDGET_KEY)
+  );
 
   if (!user || user.role === 'super_admin') return null;
   if (!agentEnabled || agentFailed) return <NativeCustomerSupportLauncher />;
-  return <AgentSupportWidget onFailure={onAgentFailure} />;
+  return <AgentSupportWidget onFailure={onAgentFailure} trialEnabled={trialEnabled} />;
 }
