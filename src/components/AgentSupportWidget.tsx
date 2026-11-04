@@ -99,14 +99,14 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
     <div dir="rtl" className="fixed bottom-20 end-4 z-[65] font-[Cairo]">
       {open && (
         <section
-          aria-label="مساعد خدمة العملاء الذكي"
+          aria-label="محادثة خدمة عملاء Premier"
           className="mb-3 flex h-[min(70dvh,540px)] w-[min(94vw,390px)] flex-col overflow-hidden rounded-2xl border border-[#dbe8ea] bg-white shadow-2xl"
         >
           <header className="flex items-center gap-3 bg-[#0b5f76] px-4 py-3 text-white">
             <Headphones className="h-6 w-6" />
             <div className="flex-1">
-              <h2 className="text-sm font-black">مساعد Premier</h2>
-              <p className="text-[11px] text-cyan-100">مدعوم بخدمة AGENT</p>
+              <h2 className="text-sm font-black">خدمة عملاء Premier</h2>
+              <p className="text-[11px] text-cyan-100">كيف يمكننا مساعدتك؟</p>
             </div>
             <button type="button" onClick={restart} aria-label="محادثة جديدة" className="rounded-lg p-2 hover:bg-white/15">
               <RotateCcw className="h-4 w-4" />
@@ -158,7 +158,7 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
-        aria-label={open ? 'إغلاق مساعد العملاء' : 'فتح مساعد العملاء'}
+        aria-label={open ? 'إغلاق خدمة العملاء' : 'فتح خدمة العملاء'}
         className="flex h-14 w-14 items-center justify-center rounded-full bg-[#0b758b] text-white shadow-xl transition hover:bg-[#0b5f76]"
       >
         {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
