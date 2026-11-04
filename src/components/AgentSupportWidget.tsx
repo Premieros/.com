@@ -1,9 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Headphones, Loader2, MessageCircle, RotateCcw, Send, X } from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
 
 type VisitorSession = { conversationId: string; visitorToken: string };
 type ChatLine = { id: number; sender: 'visitor' | 'assistant'; text: string };
-type ApiReply = { error?: string; answer?: string; conversationId?: string; visitorToken?: string };
+type ApiReply = { error?: string; code?: string; answer?: string; conversationId?: string; visitorToken?: string; messages?: Array<{sender:'visitor'|'assistant';text:string}> };
 type PageHint = { route: string; title: string; section: string; alertsVisible: number; alertKinds: string[] };
 const mentionsProblem = (message: string) =>
   /(?:مشكلة|خطأ|خطا|فشل|تعذر|عطل|مش شغال|مش بتشتغل|مش بيفتح|مش ظاهر|مش راضي|مش قادر|لا يعمل|لا يفتح|error|bug|issue|failed|not working)/i.test(message);
@@ -42,7 +43,9 @@ function currentPageHint(): PageHint {
  * go to AGENT's separate public-support API.
  */
 export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFailure: () => void; trialEnabled?: boolean }) {
+  const { user } = useAuth();
   const [open, setOpen] = useState(false);
+  const [restoring, setRestoring] = useState(true);
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState(false);
   const [session, setSession] = useState<VisitorSession | null>(null);
@@ -56,6 +59,58 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
   // No credentials or Premier Supabase tokens leave this app.
   const key = (trialEnabled ? 'dc926f2840ca4334fd94c0dc811e481c73c9b6843d178729' : (import.meta.env.VITE_AGENT_SUPPORT_WIDGET_KEY || '')).trim();
   const endpoint = (trialEnabled ? 'https://premieros-agent-support-public.vercel.app' : (import.meta.env.VITE_AGENT_SUPPORT_ORIGIN || '')).trim();
+
+  // Persist only a scoped visitor conversation capability, never Premier login credentials.
+  // The server checks the widget, allowed origin and visitor token before returning history.
+  const storageKey = user?.id ? 'premier:customer-support:v1:' + user.id + ':' + key : '';
+  useEffect(() => {
+    let active = true;
+    setRestoring(true);
+    setSession(null);
+    setLines([{ id: 1, sender: 'assistant', text: 'أهلًا بك في Premier! كيف يمكنني مساعدتك؟' }]);
+    setNextId(2);
+    if (!storageKey) { setRestoring(false); return; }
+    let stored: VisitorSession | null = null;
+    try {
+      const serialized = window.localStorage.getItem(storageKey);
+      if (serialized) {
+        const value = JSON.parse(serialized) as VisitorSession;
+        if (/^[0-9a-f-]{36}$/i.test(value.conversationId) && /^[a-zA-Z0-9_-]{40,60}$/.test(value.visitorToken))
+          stored = value;
+        else window.localStorage.removeItem(storageKey);
+      }
+    } catch { window.localStorage.removeItem(storageKey); }
+    if (!stored) { setRestoring(false); return; }
+    const prior = stored;
+    void fetch(endpoint + '/api/support/public/history', {
+      method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ widgetKey: key, conversationId: prior.conversationId, visitorToken: prior.visitorToken }),
+    }).then(async response => {
+      const data = await response.json() as ApiReply;
+      if (!response.ok) {
+        if (response.status === 401) window.localStorage.removeItem(storageKey);
+        throw new Error(data.error || 'تعذر استعادة المحادثة.');
+      }
+      if (!active) return;
+      const restored = (data.messages || []).filter(line =>
+        (line.sender === 'visitor' || line.sender === 'assistant') && typeof line.text === 'string'
+      ).slice(-100);
+      setLines(restored.length ? restored.map((line, index) => ({
+        id: index + 1, sender: line.sender, text: line.text
+      })) : [{ id: 1, sender: 'assistant', text: 'أهلًا بك في Premier! كيف يمكنني مساعدتك؟' }]);
+      setNextId(restored.length ? restored.length + 1 : 2);
+      setSession(prior);
+    }).catch(() => {
+      // A temporary network failure must not destroy an otherwise valid session.
+      if (active) {
+        setSession(prior);
+        setError('تعذر تحميل الرسائل القديمة مؤقتًا. يمكن إعادة تحميل الصفحة للمحاولة مجددًا.');
+      }
+    }).finally(() => { if (active) setRestoring(false); });
+    return () => { active = false; };
+  }, [endpoint, key, storageKey]);
+
 
   useEffect(() => {
     try {
@@ -85,7 +140,7 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
   const send = async (event: FormEvent) => {
     event.preventDefault();
     const question = draft.trim();
-    if (!question || pending || question.length > 1500) return;
+    if (!question || pending || restoring || question.length > 1500) return;
     const pageContext = mentionsProblem(question) ? currentPageHint() : undefined;
     setPending(true);
     setError('');
@@ -99,6 +154,9 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
         if (!started.conversationId || !started.visitorToken) throw new Error('تعذّر بدء المحادثة.');
         current = { conversationId: started.conversationId, visitorToken: started.visitorToken };
         setSession(current);
+        if (storageKey) {
+          try { window.localStorage.setItem(storageKey, JSON.stringify(current)); } catch { /* Private browsing */ }
+        }
       }
       const reply = await api('/api/support/public/messages', {
         widgetKey: key,
@@ -121,6 +179,7 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
   };
 
   const restart = () => {
+    if (storageKey) { try { window.localStorage.removeItem(storageKey); } catch { /* Private browsing */ } }
     setSession(null);
     setError('');
     setLines([{ id: 1, sender: 'assistant', text: 'أهلًا بك! كيف يمكنني مساعدتك؟' }]);
@@ -188,12 +247,13 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
             <button
               type="submit"
               aria-label="إرسال"
-              disabled={pending || !draft.trim()}
+              disabled={pending || restoring || !draft.trim()}
               className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#0b758b] text-white disabled:opacity-50"
             >
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </button>
           </form>
+          {restoring && <p role="status" className="bg-white text-center text-xs text-slate-500">استعادة المحادثة السابقة…</p>}
           <p className="bg-white pb-2 text-center text-xs text-slate-500">لا ترسل كلمات مرور أو معلومات دفع حساسة.</p>
         </section>
       )}
