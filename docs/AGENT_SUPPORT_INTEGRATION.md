@@ -24,7 +24,7 @@
 ```env
 VITE_AGENT_SUPPORT_ENABLED=true
 VITE_AGENT_SUPPORT_ORIGIN=https://premieros-ai-sales-agent-git-feature-3d3de3-sayedalaa82285-7634.vercel.app
-VITE_AGENT_SUPPORT_WIDGET_KEY=YOUR_48_CHARACTER_PUBLIC_WIDGET_KEY
+VITE_AGENT_SUPPORT_WIDGET_KEY=dc926f2840ca4334fd94c0dc811e481c73c9b6843d178729
 ```
 
 `VITE_AGENT_SUPPORT_ORIGIN` هو **أصل موقع AGENT** HTTPS فقط، من دون `/support` أو مسار، مثل نطاق AGENT الثابت الذي تديره. النطاق المعتمد حاليًا لنسخة فرع AGENT التجريبية هو `https://premieros-ai-sales-agent-git-feature-3d3de3-sayedalaa82285-7634.vercel.app`. لا تستخدم نطاقًا مختلفًا كل مرة؛ يجب أن تسمح سياسة الموقع في AGENT بالـ origin الفعلي لنشر Premier.
@@ -50,6 +50,9 @@ VITE_AGENT_SUPPORT_WIDGET_KEY=YOUR_48_CHARACTER_PUBLIC_WIDGET_KEY
 
 ## حالة التطبيق (2026-11-04)
 - تم إعداد التكامل في فرع `feature/agent-support-widget`، وليس على الموقع الحي `premieros-sage.vercel.app`.
-- لا ترفع `VITE_AGENT_SUPPORT_ENABLED=true` حتى ينجح الاختبار الأمني وتفعيل حدّ الطلبات على AGENT.
-- لم يتم توفير `Widget Key` الحقيقي حتى الآن؛ أنشئه من لوحة AGENT لموقع `https://premieros-sage.vercel.app`.
+- تبقى قيمة `VITE_AGENT_SUPPORT_ENABLED=false` حتى ينجح الاختبار الأمني وتفعيل حدّ الطلبات على AGENT. (ملف `.env.example` يحتوي المفتاح العام فقط كمرجع.)
+- تم توفير المفتاح العام `dc926f2840ca4334fd94c0dc811e481c73c9b6843d178729` من لوحة AGENT، لكن يجب التأكد أنه مرتبط بالنطاق `https://premieros-sage.vercel.app` ومفعّل داخل مشروع Premier.
 - اختبار CI العام للمستودع فشل في اختبارات سابقة تخص `matchMedia` ومداخل القائمة، بينما نجح فحص TypeScript وESLint؛ يلزم إصلاح CI قبل الدمج.
+
+## إعدادات النشر الحي
+نطاق Premier الحالي: `https://premieros-sage.vercel.app`، ولا يوجد وصول من اتصال Vercel المتاح هنا إلى مشروع نشر هذا النطاق؛ لذلك لا يمكن اعتبار متغيرات الإنتاج محدثة. لا تقم بلصق عنصر `<script>` في صفحات Premier، لأن الواجهة المدمجة تملك شات React محليًا وسيؤدي السكربت إلى زر إضافي وكود خارجي غير مطلوب.
