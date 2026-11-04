@@ -4,18 +4,34 @@ import { Headphones, Loader2, MessageCircle, RotateCcw, Send, X } from 'lucide-r
 type VisitorSession = { conversationId: string; visitorToken: string };
 type ChatLine = { id: number; sender: 'visitor' | 'assistant'; text: string };
 type ApiReply = { error?: string; answer?: string; conversationId?: string; visitorToken?: string };
-type PageHint = { route: string; title: string; section: string; alertsVisible: number };
+type PageHint = { route: string; title: string; section: string; alertsVisible: number; alertKinds: string[] };
 const mentionsProblem = (message: string) =>
   /(?:مشكلة|خطأ|خطا|فشل|تعذر|عطل|مش شغال|مش بتشتغل|مش بيفتح|مش ظاهر|مش راضي|مش قادر|لا يعمل|لا يفتح|error|bug|issue|failed|not working)/i.test(message);
 function currentPageHint(): PageHint {
   // Only page identity and alert count. Never send form, table or customer data.
   const heading = document.querySelector('main h1, [role="main"] h1');
   const section = (heading?.textContent || '').trim().slice(0, 70);
+  // Only classify visible error notices on-device; never transmit their raw text.
+  const notices = Array.from(document.querySelectorAll('[role="alert"]'))
+    .filter(el => !el.closest('[data-premier-support-widget]'))
+    .filter(el => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    }).slice(0, 8);
+  const labels = notices.map(el => {
+    const text = (el.textContent || '').toLowerCase();
+    if (/صلاحية|مسموح|مرفوض|permission|forbidden|denied|unauthorized/.test(text)) return 'صلاحيات الوصول';
+    if (/اتصال|شبكة|انترنت|شبكه|network|fetch|connection|timeout/.test(text)) return 'الاتصال بالشبكة';
+    if (/حفظ|فشل|تعذر|failed|save|server/.test(text)) return 'إتمام العملية أو الحفظ';
+    if (/مطلوب|ناقص|غير صالح|invalid|required|validation/.test(text)) return 'التحقق من البيانات';
+    return 'تنبيه في الصفحة';
+  });
   return {
     route: (window.location.hash.split('?')[0] || window.location.pathname).slice(0, 90),
     title: document.title.slice(0, 80),
     section,
-    alertsVisible: document.querySelectorAll('[role="alert"]').length,
+    alertsVisible: notices.length,
+    alertKinds: Array.from(new Set(labels)).slice(0, 3),
   };
 }
 
