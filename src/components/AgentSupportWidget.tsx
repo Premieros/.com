@@ -4,6 +4,21 @@ import { Headphones, Loader2, MessageCircle, RotateCcw, Send, X } from 'lucide-r
 type VisitorSession = { conversationId: string; visitorToken: string };
 type ChatLine = { id: number; sender: 'visitor' | 'assistant'; text: string };
 type ApiReply = { error?: string; answer?: string; conversationId?: string; visitorToken?: string };
+type PageHint = { route: string; title: string; section: string; alertsVisible: number };
+const mentionsProblem = (message: string) =>
+  /(?:مشكلة|خطأ|خطا|فشل|تعذر|عطل|مش شغال|مش بتشتغل|مش بيفتح|مش ظاهر|مش راضي|مش قادر|لا يعمل|لا يفتح|error|bug|issue|failed|not working)/i.test(message);
+function currentPageHint(): PageHint {
+  // Only page identity and alert count. Never send form, table or customer data.
+  const heading = document.querySelector('main h1, [role="main"] h1');
+  const section = (heading?.textContent || '').trim().slice(0, 70);
+  return {
+    route: (window.location.hash.split('?')[0] || window.location.pathname).slice(0, 90),
+    title: document.title.slice(0, 80),
+    section,
+    alertsVisible: document.querySelectorAll('[role="alert"]').length,
+  };
+}
+
 
 /**
  * Locally rendered support UI. No remote JavaScript or Premier auth token is
@@ -55,6 +70,7 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
     event.preventDefault();
     const question = draft.trim();
     if (!question || pending || question.length > 1500) return;
+    const pageContext = mentionsProblem(question) ? currentPageHint() : undefined;
     setPending(true);
     setError('');
     setDraft('');
@@ -73,6 +89,7 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
         conversationId: current.conversationId,
         visitorToken: current.visitorToken,
         text: question,
+        ...(pageContext ? { pageContext } : {}),
       });
       setLines((prev) => [...prev, {
         id: nextId + 1,
