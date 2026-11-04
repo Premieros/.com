@@ -24,7 +24,7 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
   // This public key is scoped on AGENT to https://premieros-sage.vercel.app.
   // No credentials or Premier Supabase tokens leave this app.
   const key = (trialEnabled ? 'dc926f2840ca4334fd94c0dc811e481c73c9b6843d178729' : (import.meta.env.VITE_AGENT_SUPPORT_WIDGET_KEY || '')).trim();
-  const endpoint = (trialEnabled ? 'https://premieros-ai-sales-agent-git-feature-3d3de3-sayedalaa82285-7634.vercel.app' : (import.meta.env.VITE_AGENT_SUPPORT_ORIGIN || '')).trim();
+  const endpoint = (trialEnabled ? 'https://premieros-agent-support-public.vercel.app' : (import.meta.env.VITE_AGENT_SUPPORT_ORIGIN || '')).trim();
 
   useEffect(() => {
     try {
