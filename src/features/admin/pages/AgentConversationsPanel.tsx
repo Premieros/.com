@@ -9,6 +9,8 @@ const AGENT_ORIGIN = 'https://premieros-ai-sales-agent-git-feature-3d3de3-sayeda
 type AgentConversation = {
   id: string; projectId: string; projectName: string; origin: string;
   mode: 'ai' | 'human'; createdAt: string; updatedAt: string;
+  employeeName?: string | null; branchName?: string | null;
+  organizationName?: string | null; identityVerified?: boolean;
 };
 type AgentMessage = {
   id: string; conversationId: string; role: 'customer' | 'assistant' | 'employee' | 'system';
@@ -20,7 +22,10 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 function isConversation(v: unknown): v is AgentConversation {
   return isRecord(v) && typeof v.id === 'string' && typeof v.projectId === 'string'
     && typeof v.projectName === 'string' && typeof v.origin === 'string'
-    && typeof v.updatedAt === 'string';
+    && typeof v.updatedAt === 'string'
+    && (v.employeeName == null || typeof v.employeeName === 'string')
+    && (v.branchName == null || typeof v.branchName === 'string')
+    && (v.organizationName == null || typeof v.organizationName === 'string');
 }
 function isMessage(v: unknown): v is AgentMessage {
   return isRecord(v) && typeof v.id === 'string' && typeof v.conversationId === 'string'
@@ -91,7 +96,7 @@ export function AgentConversationsPanel() {
   const projects = useMemo(() => Array.from(new Map(rows.map(row => [row.projectId, row.projectName]))), [rows]);
   const filtered = useMemo(() => rows.filter(row =>
     (!filter || row.projectId === filter) &&
-    (!search.trim() || [row.projectName, row.origin, row.id].some(value =>
+    (!search.trim() || [row.projectName, row.origin, row.id, row.employeeName || '', row.branchName || '', row.organizationName || ''].some(value =>
       value.toLowerCase().includes(search.toLowerCase().trim())
     ))
   ), [rows, filter, search]);
@@ -142,10 +147,11 @@ export function AgentConversationsPanel() {
               className={`w-full border-b border-ui-border p-3 text-start ${row.id === selectedId ? 'bg-ui-primary-soft' : 'hover:bg-ui-page-alt'}`}>
               <div className="flex items-center gap-2">
                 <MessageSquare className="h-4 w-4 shrink-0 text-ui-primary"/>
-                <strong className="truncate text-sm">{row.projectName}</strong>
+                <strong className="truncate text-sm">{row.employeeName || (ar ? 'موظف غير معروف' : 'Unknown employee')}</strong>
               </div>
-              <p className="mt-1 break-all text-xs text-ui-subtle">{row.origin}</p>
-              <p className="mt-1 text-[11px] text-ui-muted">{format(row.updatedAt)}</p>
+              <p className="mt-1 text-xs text-ui-muted">{ar ? 'الفرع:' : 'Branch:'} {row.branchName || (ar ? 'غير محدد' : 'Unknown')}</p>
+              <p className="mt-1 text-xs text-ui-muted">{ar ? 'المؤسسة:' : 'Organization:'} {row.organizationName || (ar ? 'غير محددة' : 'Unknown')}</p>
+              <p className="mt-1 text-[11px] text-ui-subtle">{row.projectName} · {format(row.updatedAt)}</p>
             </button>)}
             {!filtered.length && <p className="p-5 text-center text-sm text-ui-muted">
               {ar ? 'لا توجد محادثات معروضة.' : 'No conversations available.'}
@@ -155,8 +161,11 @@ export function AgentConversationsPanel() {
         <section className="flex min-h-[550px] flex-col overflow-hidden rounded-2xl border border-ui-border bg-ui-surface">
           {selected ? <>
             <div className="border-b border-ui-border p-4">
-              <h4 className="font-black">{selected.projectName}</h4>
-              <p className="text-xs text-ui-subtle">{selected.origin} · {format(selected.createdAt)}</p>
+              <h4 className="font-black">{selected.employeeName || (ar ? 'موظف غير معروف' : 'Unknown employee')}</h4>
+              <p className="mt-1 text-sm text-ui-muted">{ar ? 'الفرع:' : 'Branch:'} {selected.branchName || (ar ? 'غير محدد' : 'Unknown')}</p>
+              <p className="text-sm text-ui-muted">{ar ? 'المؤسسة:' : 'Organization:'} {selected.organizationName || (ar ? 'غير محددة' : 'Unknown')}</p>
+              <p className="mt-1 text-xs text-ui-subtle">{selected.projectName} · {selected.origin} · {format(selected.createdAt)}</p>
+              {!selected.identityVerified && <p className="mt-2 text-xs text-amber-700">{ar ? 'هذه المحادثة لم تُربط بعد بهوية موظف موثقة.' : 'Employee identity has not yet been verified for this conversation.'}</p>}
             </div>
             <div className="flex-1 space-y-3 overflow-y-auto bg-ui-page-alt p-4">
               {selectedMessages.map(message => {
