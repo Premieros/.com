@@ -123,7 +123,16 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
                 }`}>{line.text}</p>
               </div>
             ))}
-            {pending && <p className="text-xs text-slate-500">جارٍ إعداد الرد…</p>}
+            {pending && (
+              <div className="flex justify-start" role="status" aria-label="خدمة العملاء تكتب الآن">
+                <span className="sr-only">خدمة العملاء تكتب الآن</span>
+                <div aria-hidden="true" className="flex items-center gap-1.5 rounded-2xl bg-[#e9f4f7] px-4 py-3">
+                  <span className="h-2 w-2 rounded-full bg-[#0b758b] animate-bounce [animation-delay:0ms] motion-reduce:animate-none" />
+                  <span className="h-2 w-2 rounded-full bg-[#0b758b] animate-bounce [animation-delay:150ms] motion-reduce:animate-none" />
+                  <span className="h-2 w-2 rounded-full bg-[#0b758b] animate-bounce [animation-delay:300ms] motion-reduce:animate-none" />
+                </div>
+              </div>
+            )}
           </div>
           {error && (
             <div role="alert" className="space-y-2 border-t border-red-100 bg-red-50 px-4 py-2 text-xs text-red-700">
