@@ -10,7 +10,7 @@ type ApiReply = { error?: string; answer?: string; conversationId?: string; visi
  * loaded/sent. Only the explicit visitor question and an AGENT visitor token
  * go to AGENT's separate public-support API.
  */
-export function AgentSupportWidget({ onFailure }: { onFailure: () => void }) {
+export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFailure: () => void; trialEnabled?: boolean }) {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState('');
   const [pending, setPending] = useState(false);
@@ -21,8 +21,10 @@ export function AgentSupportWidget({ onFailure }: { onFailure: () => void }) {
   const [error, setError] = useState('');
   const [nextId, setNextId] = useState(2);
 
-  const key = (import.meta.env.VITE_AGENT_SUPPORT_WIDGET_KEY || '').trim();
-  const endpoint = (import.meta.env.VITE_AGENT_SUPPORT_ORIGIN || '').trim();
+  // This public key is scoped on AGENT to https://premieros-sage.vercel.app.
+  // No credentials or Premier Supabase tokens leave this app.
+  const key = (trialEnabled ? 'dc926f2840ca4334fd94c0dc811e481c73c9b6843d178729' : (import.meta.env.VITE_AGENT_SUPPORT_WIDGET_KEY || '')).trim();
+  const endpoint = (trialEnabled ? 'https://premieros-ai-sales-agent-git-feature-3d3de3-sayedalaa82285-7634.vercel.app' : (import.meta.env.VITE_AGENT_SUPPORT_ORIGIN || '')).trim();
 
   useEffect(() => {
     try {
