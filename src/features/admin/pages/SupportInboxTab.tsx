@@ -1,5 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
-import { CheckCircle2, Loader2, MessageSquareReply, RefreshCw, RotateCcw, Search, Send } from 'lucide-react';
+import { CheckCircle2, ExternalLink, Loader2, MessageSquareReply, RefreshCw, RotateCcw, Search, Send } from 'lucide-react';
 import { support, type SupportConversation, type SupportMessage } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
@@ -146,9 +146,21 @@ export function SupportInboxTab() {
               <h3 className="font-black text-ui-text">{ar ? 'دعم العملاء' : 'Customer Support'}</h3>
               <p className="text-xs text-ui-subtle">{ar ? 'محادثات المؤسسات والعملاء' : 'Tenant and customer conversations'}</p>
             </div>
-            <Button size="sm" variant="outline" onClick={() => void loadRows()} disabled={loadingRows}>
-              <RefreshCw className={`h-4 w-4 ${loadingRows ? 'animate-spin' : ''}`} />
-            </Button>
+            <div className="flex items-center gap-2">
+              <a
+                href="https://premieros-ai-sales-agent-git-feature-3d3de3-sayedalaa82285-7634.vercel.app/support/conversations"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-1.5 rounded-xl border border-ui-primary bg-ui-primary-soft px-3 py-2 text-xs font-black text-ui-primary transition hover:opacity-80"
+                title={ar ? 'عرض رسائل العملاء والردود المحفوظة في AGENT' : 'View AGENT customer conversations'}
+              >
+                {ar ? 'محادثات الشات الجديد' : 'AGENT conversations'}
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+              <Button size="sm" variant="outline" onClick={() => void loadRows()} disabled={loadingRows}>
+                <RefreshCw className={`h-4 w-4 ${loadingRows ? 'animate-spin' : ''}`} />
+              </Button>
+            </div>
           </div>
 
           <div className="relative mb-3">
