@@ -113,7 +113,7 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
   };
 
   return (
-    <div dir="rtl" className="fixed bottom-4 start-3 z-[65] font-[Cairo] sm:bottom-5 sm:start-5">
+    <div dir="rtl" className="fixed bottom-4 end-3 z-[65] font-[Cairo] sm:bottom-5 sm:end-5">
       {open && (
         <section
           aria-label="محادثة خدمة عملاء Premier"
