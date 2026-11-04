@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Headphones, Loader2, MessageCircle, RotateCcw, Send, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { getActiveBranchId } from '@/lib/activeBranch';
 
 type VisitorSession = { conversationId: string; visitorToken: string };
 type ChatLine = { id: number; sender: 'visitor' | 'assistant'; text: string };
@@ -82,11 +84,17 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
     } catch { window.localStorage.removeItem(storageKey); }
     if (!stored) { setRestoring(false); return; }
     const prior = stored;
-    void fetch(endpoint + '/api/support/public/history', {
+    void supabase.auth.getSession().then(({ data }) => fetch(endpoint + '/api/support/public/history', {
       method: 'POST', mode: 'cors', credentials: 'omit', cache: 'no-store',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ widgetKey: key, conversationId: prior.conversationId, visitorToken: prior.visitorToken }),
-    }).then(async response => {
+      headers: {
+        'Content-Type': 'application/json',
+        ...(data.session?.access_token ? { Authorization: 'Bearer ' + data.session.access_token } : {}),
+      },
+      body: JSON.stringify({
+        widgetKey: key, conversationId: prior.conversationId,
+        visitorToken: prior.visitorToken, selectedBranchId: getActiveBranchId(),
+      }),
+    })).then(async response => {
       const data = await response.json() as ApiReply;
       if (!response.ok) {
         if (response.status === 401) window.localStorage.removeItem(storageKey);
@@ -124,13 +132,23 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
   }, [endpoint, key, onFailure]);
 
   const api = async (route: string, data: unknown): Promise<ApiReply> => {
+    // Identity is verified by Premier Auth on AGENT's server, not trusted from UI.
+    // Premier credentials are never sent to an AI provider.
+    const isSessionStart = route === '/api/support/public/sessions';
+    const premierToken = isSessionStart
+      ? (await supabase.auth.getSession()).data.session?.access_token : null;
+    const requestBody = isSessionStart
+      ? { ...(data as object), selectedBranchId: getActiveBranchId() } : data;
     const response = await fetch(endpoint + route, {
       method: 'POST',
       mode: 'cors',
       credentials: 'omit',
       cache: 'no-store',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(premierToken ? { Authorization: 'Bearer ' + premierToken } : {}),
+      },
+      body: JSON.stringify(requestBody),
     });
     const payload = await response.json() as ApiReply;
     if (!response.ok) throw new Error(payload.error || 'تعذّر الاتصال بخدمة العملاء.');
