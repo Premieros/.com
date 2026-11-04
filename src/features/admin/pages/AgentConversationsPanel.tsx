@@ -1,7 +1,9 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAuth } from '@/context/AuthContext';
 import { ExternalLink, MessageSquare, RefreshCw } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 
+const SUPPORT_API = 'https://premieros-agent-support-public.vercel.app/api/support/premier-inbox';
 const AGENT_ORIGIN = 'https://premieros-ai-sales-agent-git-feature-3d3de3-sayedalaa82285-7634.vercel.app';
 
 type AgentConversation = {
@@ -11,12 +13,6 @@ type AgentConversation = {
 type AgentMessage = {
   id: string; conversationId: string; role: 'customer' | 'assistant' | 'employee' | 'system';
   body: string; createdAt: string;
-};
-type BridgeMessage = {
-  type: 'premier:agent-support-inbox';
-  requestId: string;
-  conversations: AgentConversation[];
-  messages: AgentMessage[];
 };
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   typeof v === 'object' && v !== null;
@@ -34,6 +30,7 @@ function isMessage(v: unknown): v is AgentMessage {
 
 export function AgentConversationsPanel() {
   const { lang } = useLanguage();
+  const { session, user } = useAuth();
   const ar = lang === 'ar';
   const [rows, setRows] = useState<AgentConversation[]>([]);
   const [messages, setMessages] = useState<AgentMessage[]>([]);
@@ -43,36 +40,29 @@ export function AgentConversationsPanel() {
   const [connecting, setConnecting] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
-  const bridge = useRef<Window | null>(null);
-  const request = useRef('');
-
-  const connect = useCallback(() => {
-    // A separate AGENT-authenticated window reads its own protected inbox.
-    // Only its conversation snapshot (never auth credentials) crosses origins.
-    const id = typeof crypto !== 'undefined' && crypto.randomUUID
-      ? crypto.randomUUID() : String(Date.now()) + '-inbox';
-    request.current = id;
-    setError('');
-    const popup = window.open(
-      AGENT_ORIGIN + '/support/bridge?requestId=' + encodeURIComponent(id),
-      'premier-agent-support-bridge',
-      'width=620,height=720'
-    );
-    if (!popup) {
-      setError(ar ? 'المتصفح منع فتح نافذة AGENT. اسمح بالنوافذ المنبثقة ثم حاول مجددًا.' : 'Allow the AGENT popup to connect conversations.');
+  const loadConversations = useCallback(async (silent = false) => {
+    if (user?.role !== 'super_admin' || !session?.access_token) {
+      setError(ar ? 'المحادثات متاحة للمدير العام بعد تسجيل الدخول إلى Premier.' : 'Premier super admin access required.');
+      setConnecting(false);
       return;
     }
-    bridge.current = popup;
-    setConnecting(true);
-  }, [ar]);
-
-  useEffect(() => {
-    const receive = (event: MessageEvent<unknown>) => {
-      if (event.origin !== AGENT_ORIGIN || event.source !== bridge.current) return;
-      const payload = event.data;
-      if (!isRecord(payload) || payload.type !== 'premier:agent-support-inbox'
-        || payload.requestId !== request.current) return;
-      if (!Array.isArray(payload.conversations) || !Array.isArray(payload.messages)) return;
+    if (!silent) setConnecting(true);
+    try {
+      const response = await fetch(SUPPORT_API, {
+        method: 'GET',
+        mode: 'cors',
+        cache: 'no-store',
+        credentials: 'omit',
+        headers: { Authorization: 'Bearer ' + session.access_token },
+      });
+      const payload: unknown = await response.json();
+      if (!response.ok) {
+        const message = isRecord(payload) && typeof payload.error === 'string'
+          ? payload.error : (ar ? 'تعذر تحميل محادثات العملاء.' : 'Failed to load conversations.');
+        throw new Error(message);
+      }
+      if (!isRecord(payload) || !Array.isArray(payload.conversations) || !Array.isArray(payload.messages))
+        throw new Error(ar ? 'بيانات المحادثات غير صحيحة.' : 'Invalid conversation data.');
       const nextRows = payload.conversations.filter(isConversation).slice(0, 40);
       const allowedIds = new Set(nextRows.map(row => row.id));
       const nextMessages = payload.messages.filter(isMessage)
@@ -81,13 +71,22 @@ export function AgentConversationsPanel() {
       setMessages(nextMessages);
       setSelectedId(current => nextRows.some(row => row.id === current) ? current : nextRows[0]?.id || '');
       setLoaded(true);
-      setConnecting(false);
       setError('');
-      bridge.current = null;
-    };
-    window.addEventListener('message', receive);
-    return () => window.removeEventListener('message', receive);
-  }, []);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : (ar ? 'تعذر الاتصال بخدمة العملاء.' : 'Unable to connect.'));
+    } finally {
+      if (!silent) setConnecting(false);
+    }
+  }, [ar, session?.access_token, user?.role]);
+
+  useEffect(() => {
+    if (user?.role !== 'super_admin' || !session?.access_token) return;
+    void loadConversations();
+    const timer = window.setInterval(() => void loadConversations(true), 15000);
+    return () => window.clearInterval(timer);
+  }, [loadConversations, session?.access_token, user?.role]);
+
+  const connect = () => { void loadConversations(); };
 
   const projects = useMemo(() => Array.from(new Map(rows.map(row => [row.projectId, row.projectName]))), [rows]);
   const filtered = useMemo(() => rows.filter(row =>
@@ -114,15 +113,15 @@ export function AgentConversationsPanel() {
         <button type="button" disabled={connecting} onClick={connect}
           className="inline-flex items-center gap-2 rounded-xl bg-ui-primary px-4 py-2.5 text-sm font-bold text-ui-primary-fg disabled:opacity-50">
           <RefreshCw className={`h-4 w-4 ${connecting ? 'animate-spin' : ''}`} />
-          {connecting ? (ar ? 'جارٍ الاتصال بـ AGENT...' : 'Connecting...') : loaded
+          {connecting ? (ar ? 'جارٍ تحديث المحادثات...' : 'Connecting...') : loaded
             ? (ar ? 'تحديث المحادثات' : 'Refresh conversations')
-            : (ar ? 'عرض محادثات AGENT هنا' : 'Load AGENT conversations')}
+            : (ar ? 'تحديث محادثات العملاء' : 'Refresh conversations')}
         </button>
       </div>
       {!loaded && !error && <div className="rounded-xl border border-ui-border bg-ui-page-alt p-5 text-sm leading-7 text-ui-muted">
         {ar
-          ? 'اضغط «عرض محادثات AGENT هنا». ستفتح نافذة تحقق صغيرة لحساب AGENT ثم تعود المحادثات لتظهر في هذه الصفحة نفسها. لا يتم نقل كلمات المرور أو مفاتيح API.'
-          : 'Open AGENT authentication in a small window and load conversations into this page. No credentials are transferred.'}
+          ? 'تظهر محادثات Premier تلقائيًا باستخدام صلاحية المدير العام الحالية، دون تسجيل دخول إضافي أو نافذة أخرى.'
+          : 'Conversations load automatically using the current Premier administrator session.'}
       </div>}
       {error && <div role="alert" className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">{error}</div>}
       <div className="grid min-h-[550px] gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
