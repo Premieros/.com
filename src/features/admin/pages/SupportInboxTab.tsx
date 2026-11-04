@@ -1,4 +1,5 @@
 import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { AgentConversationsPanel } from './AgentConversationsPanel';
 import { CheckCircle2, ExternalLink, Loader2, MessageSquareReply, RefreshCw, RotateCcw, Search, Send } from 'lucide-react';
 import { support, type SupportConversation, type SupportMessage } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -6,7 +7,7 @@ import { useToast } from '@/components/Toast';
 import { Button } from '@/components/Button';
 import { Card } from '@/components/PageHeader';
 
-export function SupportInboxTab() {
+function LegacySupportInboxTab() {
   const { lang } = useLanguage();
   const { show } = useToast();
   const ar = lang === 'ar';
@@ -317,6 +318,34 @@ export function SupportInboxTab() {
           </>
         )}
       </Card>
+    </div>
+  );
+}
+
+/**
+ * One customer-support screen for administrators. Native human conversations
+ * remain unchanged; the AGENT tab reads only a scoped, authenticated snapshot
+ * and does not require a database merge or expose backend credentials.
+ */
+export function SupportInboxTab() {
+  const { lang } = useLanguage();
+  const ar = lang === 'ar';
+  const [source, setSource] = useState<'agent' | 'human'>('agent');
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap gap-2" role="tablist" aria-label={ar ? 'مصدر محادثات العملاء' : 'Customer conversation source'}>
+        <button type="button" role="tab" aria-selected={source === 'agent'} onClick={() => setSource('agent')}
+          className={`rounded-xl border px-4 py-2.5 text-sm font-black ${source === 'agent'
+            ? 'border-ui-primary bg-ui-primary text-ui-primary-fg' : 'border-ui-border bg-ui-surface text-ui-text'}`}>
+          {ar ? 'محادثات الشات الجديد' : 'AGENT chat'}
+        </button>
+        <button type="button" role="tab" aria-selected={source === 'human'} onClick={() => setSource('human')}
+          className={`rounded-xl border px-4 py-2.5 text-sm font-black ${source === 'human'
+            ? 'border-ui-primary bg-ui-primary text-ui-primary-fg' : 'border-ui-border bg-ui-surface text-ui-text'}`}>
+          {ar ? 'الدعم البشري' : 'Human support'}
+        </button>
+      </div>
+      {source === 'agent' ? <AgentConversationsPanel /> : <LegacySupportInboxTab />}
     </div>
   );
 }
