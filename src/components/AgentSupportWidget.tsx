@@ -96,17 +96,17 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
   };
 
   return (
-    <div dir="rtl" className="fixed bottom-20 end-4 z-[65] font-[Cairo]">
+    <div dir="rtl" className="fixed bottom-4 start-3 z-[65] font-[Cairo] sm:bottom-5 sm:start-5">
       {open && (
         <section
           aria-label="محادثة خدمة عملاء Premier"
-          className="mb-3 flex h-[min(70dvh,540px)] w-[min(94vw,390px)] flex-col overflow-hidden rounded-2xl border border-[#dbe8ea] bg-white shadow-2xl"
+          className="mb-2 flex h-[min(57dvh,430px)] w-[min(89vw,330px)] flex-col overflow-hidden rounded-2xl border border-[#dbe8ea] bg-white shadow-xl"
         >
-          <header className="flex items-center gap-3 bg-[#0b5f76] px-4 py-3 text-white">
+          <header className="flex items-center gap-2 bg-[#0b5f76] px-3 py-2.5 text-white">
             <Headphones className="h-6 w-6" />
             <div className="flex-1">
-              <h2 className="text-sm font-black">خدمة عملاء Premier</h2>
-              <p className="text-[11px] text-cyan-100">كيف يمكننا مساعدتك؟</p>
+              <h2 className="text-base font-black">خدمة عملاء Premier</h2>
+              <p className="text-xs text-cyan-100">كيف يمكننا مساعدتك؟</p>
             </div>
             <button type="button" onClick={restart} aria-label="محادثة جديدة" className="rounded-lg p-2 hover:bg-white/15">
               <RotateCcw className="h-4 w-4" />
@@ -115,10 +115,10 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
               <X className="h-4 w-4" />
             </button>
           </header>
-          <div className="flex-1 space-y-3 overflow-y-auto bg-[#f6fafc] p-4" role="log" aria-live="polite">
+          <div className="flex-1 space-y-3 overflow-y-auto bg-[#f6fafc] p-3" role="log" aria-live="polite">
             {lines.map((line) => (
               <div key={line.id} className={`flex ${line.sender === 'visitor' ? 'justify-end' : 'justify-start'}`}>
-                <p className={`max-w-[88%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-xs leading-6 ${
+                <p className={`max-w-[88%] whitespace-pre-wrap break-words rounded-2xl px-3 py-2 text-sm leading-6 ${
                   line.sender === 'visitor' ? 'bg-[#0b758b] text-white' : 'bg-[#e9f4f7] text-[#19353f]'
                 }`}>{line.text}</p>
               </div>
@@ -142,7 +142,7 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
               </button>
             </div>
           )}
-          <form onSubmit={send} className="flex items-end gap-2 border-t border-slate-100 bg-white p-3">
+          <form onSubmit={send} className="flex items-end gap-2 border-t border-slate-100 bg-white p-2.5">
             <textarea
               value={draft}
               onChange={(event) => setDraft(event.target.value)}
@@ -150,7 +150,7 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
               maxLength={1500}
               aria-label="رسالة الدعم"
               placeholder="اكتب سؤالك هنا…"
-              className="min-h-10 min-w-0 flex-1 resize-none rounded-xl border border-[#cbdde2] bg-white px-3 py-2 text-sm text-[#19353f]"
+              className="min-h-10 min-w-0 flex-1 resize-none rounded-xl border border-[#cbdde2] bg-white px-3 py-2 text-base text-[#19353f]"
             />
             <button
               type="submit"
@@ -161,14 +161,14 @@ export function AgentSupportWidget({ onFailure, trialEnabled = false }: { onFail
               {pending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}
             </button>
           </form>
-          <p className="bg-white pb-2 text-center text-[10px] text-slate-500">لا ترسل كلمات مرور أو معلومات دفع حساسة.</p>
+          <p className="bg-white pb-2 text-center text-xs text-slate-500">لا ترسل كلمات مرور أو معلومات دفع حساسة.</p>
         </section>
       )}
       <button
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-label={open ? 'إغلاق خدمة العملاء' : 'فتح خدمة العملاء'}
-        className="flex h-14 w-14 items-center justify-center rounded-full bg-[#0b758b] text-white shadow-xl transition hover:bg-[#0b5f76]"
+        className="flex h-12 w-12 items-center justify-center rounded-full bg-[#0b758b] text-white shadow-lg transition hover:bg-[#0b5f76]"
       >
         {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
       </button>
