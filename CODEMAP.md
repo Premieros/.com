@@ -62,8 +62,8 @@ D:\pos3\project\
 │   └── features\                     # 11 وحدة × 31 صفحة (كاملة التنفيذ)
 │       ├── auth\pages\LoginPage.tsx  # تسجيل دخول PIN + كلمة مرور
 │       ├── dashboard\pages\DashboardPage.tsx   # KPIs + رسوم بيانية + تنبيهات
-│       ├── pos\pages\PosPage.tsx     # نقطة البيع (طباعة حرارية، خصم، شيفت)
-│       ├── pos\pages\FloorPlanPage.tsx  # خريطة طاولات + طلبات (realtime)
+│       ├── pos\pages\PosWorkspacePage.tsx # مساحة عمل نقطة البيع (طباعة حرارية، خصم، ورديات)
+│       ├── pos\pages\ActiveOrdersPage.tsx # خريطة الطاولات والطلبات النشطة (realtime)
 │       ├── catalog\pages\            # ProductsPage, CategoriesPage, ComponentsPage
 │       ├── inventory\pages\          # InventoryPage, WarehousesPage, TransfersPage, InventoryLedgerPage
 │       ├── manufacturing\pages\      # RawMaterialsPage, RecipesPage, ProductionOrdersPage

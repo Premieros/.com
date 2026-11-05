@@ -17,7 +17,8 @@ import {
   isSilentPrintEnabled,
 } from '../../services/localPrintAgent';
 
-const POLL_INTERVAL_MS = 700;
+const POLL_ACTIVE_INTERVAL_MS = 800;
+const POLL_IDLE_INTERVAL_MS = 3000;
 const TRANSPORT_CHECK_INTERVAL_MS = 5_000;
 
 function printRouteForStation(station: string, routes: Record<string, string>): string {
@@ -135,22 +136,29 @@ export function CloudPrintAgent() {
     const poll = async () => {
       if (cancelled) return;
       if (busy.current) {
-        timer = window.setTimeout(() => void poll(), POLL_INTERVAL_MS);
+        timer = window.setTimeout(() => void poll(), POLL_ACTIVE_INTERVAL_MS);
         return;
       }
       busy.current = true;
+      let hasActiveJobs = false;
       try {
         // Never claim durable jobs unless Electron or the legacy localhost print
         // service can actually see a Windows printer. This leaves jobs pending
         // instead of burning retry attempts while the local service is offline.
         if (!(await ensurePrintTransport())) return;
         const jobs = await claimCloudPrintJobs(branchId, agentId, 12);
-        if (jobs.length > 0) await executeClaimedBatch(jobs, agentId);
+        if (jobs.length > 0) {
+          hasActiveJobs = true;
+          await executeClaimedBatch(jobs, agentId);
+        }
       } catch (error) {
         console.warn('[cloud-print-agent] poll failed', error);
       } finally {
         busy.current = false;
-        if (!cancelled) timer = window.setTimeout(() => void poll(), POLL_INTERVAL_MS);
+        if (!cancelled) {
+          const nextInterval = hasActiveJobs ? POLL_ACTIVE_INTERVAL_MS : POLL_IDLE_INTERVAL_MS;
+          timer = window.setTimeout(() => void poll(), nextInterval);
+        }
       }
     };
 

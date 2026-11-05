@@ -89,7 +89,14 @@ function createHub(config = {}) {
     return { filename, bytes:fs.statSync(destination).size };
   }
   const send = (res, status, body) => {
-    res.writeHead(status, { 'content-type': 'application/json; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+    res.writeHead(status, {
+      'content-type': 'application/json; charset=utf-8',
+      'cache-control': 'no-store',
+      'x-content-type-options': 'nosniff',
+      'access-control-allow-origin': '*',
+      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      'access-control-allow-headers': 'Content-Type, Authorization',
+    });
     res.end(JSON.stringify(body));
   };
   const checkToken = (value) => {
@@ -98,6 +105,15 @@ function createHub(config = {}) {
     return a.length === b.length && crypto.timingSafeEqual(a, b);
   };
   const handler = async (req, res) => {
+    if (req.method === 'OPTIONS') {
+      res.writeHead(204, {
+        'access-control-allow-origin': '*',
+        'access-control-allow-methods': 'GET, POST, OPTIONS',
+        'access-control-allow-headers': 'Content-Type, Authorization',
+        'access-control-max-age': '86400',
+      });
+      return res.end();
+    }
     const pathname = new URL(req.url || '/', 'https://branch.local').pathname;
     if (pathname === '/health' && req.method === 'GET') return send(res, 200, { ok: true, service: 'premier-branch-hub', version: 1 });
     if (!checkToken(req.headers.authorization)) return send(res, 401, { error: 'UNAUTHORIZED' });

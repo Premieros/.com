@@ -634,7 +634,10 @@ export async function getAvailablePrinters(): Promise<DetectedPrinter[]> {
       });
     }
     return detected;
-  } catch {
+  } catch (error) {
+    if (typeof window !== 'undefined' && window.location?.protocol === 'https:') {
+      console.warn('[local-print-agent] Browser blocked local HTTP print agent on HTTPS (Mixed Content).', error);
+    }
     return [];
   }
 }
@@ -736,8 +739,12 @@ export async function executeSilentPrintDetailed(options: {
       ? { success: true }
       : { success: false, error: safeText(result.error) || 'PRINT_FAILED' };
   } catch (error) {
+    const isHttps = typeof window !== 'undefined' && window.location?.protocol === 'https:';
     const message = error instanceof Error ? error.message : 'LOCAL_AGENT_ERROR';
-    return { success: false, error: message || 'LOCAL_AGENT_ERROR' };
+    const errorDetail = isHttps && (message === 'Failed to fetch' || message.includes('fetch') || message.includes('NetworkError'))
+      ? 'HTTPS_MIXED_CONTENT_BLOCKED: Browser blocked local HTTP print agent. Use Electron or configure HTTPS.'
+      : (message || 'LOCAL_AGENT_ERROR');
+    return { success: false, error: errorDetail };
   }
 }
 

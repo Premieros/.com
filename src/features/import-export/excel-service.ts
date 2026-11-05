@@ -41,7 +41,10 @@ export class ExcelService {
       };
     }
 
-    const headers = (rawData[0] || []).map((h) => String(h || '').trim()).filter((h) => h !== '');
+    const DANGEROUS_KEYS = new Set(['__proto__', 'constructor', 'prototype']);
+    const headers = (rawData[0] || [])
+      .map((h) => String(h || '').trim())
+      .filter((h) => h !== '' && !DANGEROUS_KEYS.has(h));
     const dataRows = rawData.slice(1);
 
     const jsonRows: Record<string, unknown>[] = [];
@@ -51,7 +54,7 @@ export class ExcelService {
       const hasAnyValue = row.some((cell) => cell !== undefined && cell !== null && String(cell).trim() !== '');
       if (!hasAnyValue) return;
 
-      const rowObj: Record<string, unknown> = {};
+      const rowObj: Record<string, unknown> = Object.create(null);
       headers.forEach((header, colIndex) => {
         rowObj[header] = row[colIndex] ?? '';
       });
