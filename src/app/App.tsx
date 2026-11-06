@@ -8,6 +8,7 @@ import { APP_ROUTES } from '@/core/navigation/routes';
 import { WorkAuthorizationAppBoundary } from '@/features/admin/work-authorization/WorkAuthorizationAppBoundary';
 import { PageLoadProgressProvider } from '@/components/PageProgressLoader';
 import { CustomerSupportLauncher } from '@/components/CustomerSupportLauncher';
+import { PremierGuideBot } from '@/components/PremierGuideBot';
 
 const PrinterSettingsLauncher = lazy(() =>
   import('@/features/pos/components/settings/PrinterSettingsLauncher').then((module) => ({
@@ -43,6 +44,7 @@ export default function App() {
         </WorkAuthorizationAppBoundary>
         <CloudPrintAgent />
         <CustomerSupportLauncher />
+        <PremierGuideBot />
       </SessionProfileGuard>
       </PageLoadProgressProvider>
     </AppProviders>
