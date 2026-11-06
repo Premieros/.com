@@ -91,8 +91,8 @@ export function PremierGuideBot() {
   }, [location.pathname, navigate, storageKey]);
 
   const step = TIPS[stage];
-  const available = Boolean(user && user.role !== 'super_admin');
-  const canGuide = can('products.view') && can('products.create') && can('pos.view');
+  const available = Boolean(user);
+  const canGuide = user?.role === 'super_admin' || (can('products.view') && can('products.create') && can('pos.view'));
 
   useEffect(() => {
     if (!open || !available || !canGuide) { setTargetRect(null); setVisibleTarget(false); return; }
@@ -115,14 +115,18 @@ export function PremierGuideBot() {
       if (element) {
         const rect = element.getBoundingClientRect();
         const shown = rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight;
-        setTargetRect(shown ? rect : null);
+        setTargetRect(previous => {
+          if (!shown) return null;
+          if (previous && previous.x === rect.x && previous.y === rect.y && previous.width === rect.width && previous.height === rect.height) return previous;
+          return rect;
+        });
         setVisibleTarget(shown);
       } else { setTargetRect(null); setVisibleTarget(false); }
     };
     const schedule = () => { cancelAnimationFrame(frame); frame = requestAnimationFrame(update); };
     update();
     const observer = new MutationObserver(schedule);
-    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'disabled'] });
+    observer.observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['disabled'] });
     window.addEventListener('scroll', schedule, true);
     window.addEventListener('resize', schedule);
     return () => { observer.disconnect(); cancelAnimationFrame(frame); window.removeEventListener('scroll', schedule, true); window.removeEventListener('resize', schedule); };
