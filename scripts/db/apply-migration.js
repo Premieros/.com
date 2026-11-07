@@ -113,7 +113,7 @@ async function main() {
   }
 
   // Never bypass historical production repair checks. This mode is restricted
-  // to GitHub CI's ephemeral, unseeded loopback PostgreSQL test database.
+  // to GitHub CI's ephemeral loopback PostgreSQL test database.
   if (opts.ciFreshDb) {
     const host = new URL(dbUrl).hostname.toLowerCase();
     if (process.env.CI !== 'true' || !['localhost', '127.0.0.1', '[::1]'].includes(host) || opts.file || opts.dryRun || !opts.dir) {
@@ -171,20 +171,31 @@ async function main() {
       const checksum = sha256(sql);
 
       // This historic migration requires exactly nine verified production
-      // discrepancies. An empty CI schema has none: do not fabricate financial
-      // inventory rows merely to satisfy that one-off production repair.
+      // discrepancies. CI may have safe seed fixtures, but never the nine
+      // production-specific discrepancies; check that none are pending.
       // Only this known data-only repair is skipped; no schema migration is skipped.
       if (opts.ciFreshDb && name === '20261023172500_reconcile_nine_verified_raw_branch_balance_cache_rows.sql') {
         const { rows: checks } = await client.query(`
-          SELECT (SELECT count(*)::integer FROM public.organizations) AS organizations,
-                 (SELECT count(*)::integer FROM public.raw_material_inventory) AS raw_rows,
-                 (SELECT count(*)::integer FROM public.inventory_ledger) AS ledger_rows
+          WITH balances AS (
+            SELECT i.quantity AS stored,
+              (SELECT COALESCE(SUM(b.quantity),0)
+                 FROM public.raw_material_batches b
+                 WHERE b.branch_id=i.branch_id AND b.raw_material_id=i.raw_material_id) AS batch_qty,
+              (SELECT COALESCE(SUM(l.quantity),0)
+                 FROM public.inventory_ledger l
+                 WHERE l.branch_id=i.branch_id AND l.raw_material_id=i.raw_material_id) AS ledger_qty
+            FROM public.raw_material_inventory i
+          )
+          SELECT COUNT(*) FILTER (WHERE stored IS DISTINCT FROM batch_qty)::integer AS pending,
+                 COUNT(*) FILTER (WHERE stored IS DISTINCT FROM batch_qty
+                                    AND batch_qty IS DISTINCT FROM ledger_qty)::integer AS unsafe
+          FROM balances
         `);
-        if (Number(checks[0]?.organizations) !== 0 || Number(checks[0]?.raw_rows) !== 0 || Number(checks[0]?.ledger_rows) !== 0) {
-          throw new Error('CI historical data repair skip refused: test database contains business data');
+        if (Number(checks[0]?.pending) !== 0 || Number(checks[0]?.unsafe) !== 0) {
+          throw new Error('CI historical data repair skip refused: stock differences must never be ignored');
         }
         skipped.push(name);
-        console.log(`  [CI-EMPTY-DB] SKIP historical data-only repair ${name}`);
+        console.log(`  [CI-CLEAN-STOCK] SKIP production-specific data repair ${name}`);
         continue;
       }
 
