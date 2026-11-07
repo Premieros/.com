@@ -23,7 +23,7 @@ AS $function$
    AND e.priced_at<=p_at AND e.unit_cost>0
   ORDER BY e.priced_at DESC,e.id DESC LIMIT 1
  ) pe ON true;
-$function$
+$function$;
 
 REVOKE ALL ON FUNCTION private.raw_published_unit_cost_at_v2(uuid,uuid,timestamptz) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION private.raw_published_unit_cost_at_v2(uuid,uuid,timestamptz) TO service_role;
