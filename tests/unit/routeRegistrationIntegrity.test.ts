@@ -1,11 +1,12 @@
 import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { APP_ROUTES } from '@/core/navigation/routes';
 
 // Prevent a visible navigation entry from silently losing its actual screen
 // when routes are reorganized. Each canonical route must have a Route path.
 const appRouteSource = readFileSync(
-  new URL('../../src/app/routes.tsx', import.meta.url),
+  join(process.cwd(), 'src', 'app', 'routes.tsx'),
   'utf8',
 );
 
