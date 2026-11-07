@@ -6,6 +6,7 @@ import { Button } from '@/components/Button';
 import { formatCurrency } from '@/lib/format';
 import type { DiningArea, DiningTable, Order } from '@/lib/types';
 import { STATUS_STYLES } from '../../utils/orderTypes';
+import { tableDisplayStatus } from '../../utils/tableDisplayStatus';
 import { orderOperatorName } from '../../utils/operatorName';
 
 interface TablePos { table: DiningTable; left: number; top: number; width: number; height: number; }
@@ -67,8 +68,8 @@ export function TableFloorPlan({
       <div className="overflow-auto rounded-xl border border-ui-border-strong bg-ui-page-alt">
         <div className="relative" style={{ width: Math.max(maxW, 900), height: Math.max(maxH, 380) }}>
           {positions.map(({ table, left, top, width, height }) => {
-            const st = STATUS_STYLES[table.status] || STATUS_STYLES.vacant;
             const tableOrders = ordersByTable[table.id] || [];
+            const st = STATUS_STYLES[tableDisplayStatus(table.status, tableOrders.length)] || STATUS_STYLES.vacant;
             const order = tableOrders[0];
             const operatorName = order ? orderOperatorName(order) : null;
             return (
