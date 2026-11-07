@@ -93,6 +93,15 @@ describe('Architecture V2 Phase 4D component evidence', () => {
         [pricedRawId, unpricedRawId, `CI-R1-${token}`, `CI-R2-${token}`,
           materialUnitId, branchId],
       );
+      // Published raw price events (not raw_materials.default_cost) are the
+      // canonical costing source. The price-event trigger updates the current
+      // cost cache in the same rollback-only test transaction.
+      await client.query(
+        `insert into public.raw_material_price_events
+          (raw_material_id,branch_id,unit_cost,source,reference_number,priced_at)
+         values($1,$2,10,'pricing',$3,now()-interval '1 second')`,
+        [pricedRawId, branchId, `CI-COMPONENT-${token}`],
+      );
       await client.query(
         `insert into public.products(id,name,sku,cost_price,sale_price,wholesale_price,is_active,product_type,branch_id)
          values($1,'CI Manufactured Cost Evidence',$2,0,50,50,true,'manufactured',$3)`,
