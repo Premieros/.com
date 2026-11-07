@@ -55,16 +55,18 @@ function loadEnv(filePath) {
 }
 
 function parseArgs(argv) {
-  const opts = { dryRun: false, dir: null, file: null };
+  const opts = { dryRun: false, dir: null, file: null, ciFreshDb: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--dry-run') opts.dryRun = true;
+    else if (arg === '--ci-fresh-db') opts.ciFreshDb = true;
     else if (arg === '--dir') opts.dir = argv[++i];
     else if (arg === '--file') opts.file = argv[++i];
     else if (arg === '--help' || arg === '-h') {
       console.log(`Usage:
   node scripts/db/apply-migration.js [--dry-run] [--dir supabase/migrations]
-  node scripts/db/apply-migration.js [--dry-run] --file <path>`);
+  node scripts/db/apply-migration.js [--dry-run] --file <path>
+  node scripts/db/apply-migration.js --ci-fresh-db --dir supabase/migrations`);
       process.exit(0);
     }
   }
@@ -108,6 +110,15 @@ async function main() {
   if (!dbUrl) {
     console.error('ERROR: no database URL found. Add SUPABASE_DB_URL (or DATABASE_URL) to .env.');
     process.exit(1);
+  }
+
+  // Never bypass historical production repair checks. This mode is restricted
+  // to GitHub CI's ephemeral, unseeded loopback PostgreSQL test database.
+  if (opts.ciFreshDb) {
+    const host = new URL(dbUrl).hostname.toLowerCase();
+    if (process.env.CI !== 'true' || !['localhost', '127.0.0.1', '[::1]'].includes(host) || opts.file || opts.dryRun || !opts.dir) {
+      throw new Error('--ci-fresh-db is allowed only for a full migration run against local CI PostgreSQL');
+    }
   }
 
   let targets = [];
@@ -158,6 +169,24 @@ async function main() {
       const version = name.replace(/\.sql$/i, '');
       const sql = readFileSync(target, 'utf8');
       const checksum = sha256(sql);
+
+      // This historic migration requires exactly nine verified production
+      // discrepancies. An empty CI schema has none: do not fabricate financial
+      // inventory rows merely to satisfy that one-off production repair.
+      // Only this known data-only repair is skipped; no schema migration is skipped.
+      if (opts.ciFreshDb && name === '20261023172500_reconcile_nine_verified_raw_branch_balance_cache_rows.sql') {
+        const { rows: checks } = await client.query(`
+          SELECT (SELECT count(*)::integer FROM public.organizations) AS organizations,
+                 (SELECT count(*)::integer FROM public.raw_material_inventory) AS raw_rows,
+                 (SELECT count(*)::integer FROM public.inventory_ledger) AS ledger_rows
+        `);
+        if (Number(checks[0]?.organizations) !== 0 || Number(checks[0]?.raw_rows) !== 0 || Number(checks[0]?.ledger_rows) !== 0) {
+          throw new Error('CI historical data repair skip refused: test database contains business data');
+        }
+        skipped.push(name);
+        console.log(`  [CI-EMPTY-DB] SKIP historical data-only repair ${name}`);
+        continue;
+      }
 
       const existing = await client.query(
         'SELECT checksum FROM public.schema_migrations WHERE version = $1',
