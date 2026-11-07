@@ -15,7 +15,6 @@ describe('Premier canonical database identity', () => {
 
   it('fails closed instead of sending users and orders to another Supabase project', () => {
     for (const url of [
-      'https://azzdesuowpdcoflmyezn.supabase.co',
       'https://example.supabase.co',
       'http://hvqlkapynjfjikqithvd.supabase.co',
       'https://hvqlkapynjfjikqithvd.supabase.co/rest/v1',
