@@ -22,6 +22,7 @@ import type { DiningArea, DiningTable, Order, OrderType, RpcResult } from '@/lib
 import { useActiveOrders } from '../hooks/useActiveOrders';
 import { TableFloorPlan } from '../components/floor/TableFloorPlan';
 import { STATUS_STYLES } from '../utils/orderTypes';
+import { tableDisplayStatus } from '../utils/tableDisplayStatus';
 import { orderTypeLabel } from '../utils/format';
 import { filterOrdersByType, filterOrdersByStatus } from '../utils/orderFilters';
 
@@ -551,8 +552,8 @@ export function ActiveOrdersPage() {
 
       <Modal open={!!tableTarget} onClose={() => setTableTarget(null)} title={tableTarget?.name || ''} size="md">
         {tableTarget && (() => {
-          const st = STATUS_STYLES[tableTarget.status] || STATUS_STYLES.vacant;
           const tableOrders = ordersByTable[tableTarget.id] || [];
+          const st = STATUS_STYLES[tableDisplayStatus(tableTarget.status, tableOrders.length)] || STATUS_STYLES.vacant;
           const area = areas.find((a) => a.id === tableTarget.area_id);
           const isDefaultTable = Boolean(area?.is_default);
           return (
