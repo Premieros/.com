@@ -78,7 +78,7 @@ jobs:
       - name: Apply auth stub (CI only, never on real Supabase)
         run: node scripts/db/apply-migration.js --file supabase/ci/stub_auth.sql
       - name: Apply canonical migrations
-        run: node scripts/db/apply-migration.js --dir supabase/migrations
+        run: node scripts/db/apply-migration.js --ci-fresh-db --dir supabase/migrations
       - name: Verify schema
         run: node scripts/db/verify-schema.js
       - name: Isolate subscription guard for order integration fixtures
