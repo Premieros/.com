@@ -19,6 +19,10 @@ class PerPrinterQueue {
     return current;
   }
 
+  hasPending() {
+    return this.tails.size > 0;
+  }
+
   clear(printerName) {
     if (printerName) this.tails.delete(String(printerName).trim());
     else this.tails.clear();

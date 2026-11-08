@@ -1,62 +1,58 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const mockDb = vi.hoisted(() => ({
+const mocked = vi.hoisted(() => ({
   getAllStrict: vi.fn(),
-  remove: vi.fn(),
-  getAll: vi.fn(),
-  put: vi.fn(),
+  finalize: vi.fn(),
 }));
 vi.mock('@/core/repositories/LocalDatabase', () => ({
-  dbGetAllStrict: mockDb.getAllStrict,
-  dbDelete: mockDb.remove,
-  dbGetAll: mockDb.getAll,
-  dbPut: mockDb.put,
+  dbGetAllStrict: mocked.getAllStrict,
+  dbGetAll: vi.fn(),
+  dbPut: vi.fn(),
+}));
+vi.mock('@/core/offline/offlineStorage', () => ({
+  enqueueOfflineSaleWithMovements: vi.fn(),
+  finalizeConfirmedOfflineSale: mocked.finalize,
 }));
 
 import { SalesRepository } from '@/core/repositories/SalesRepository';
 
-const queueRow = {
-  id: 'client-1', client_id: 'client-1', invoice_number: 'SAME',
-  status: 'pending', retry_count: 0, created_at: '2026-10-13T00:00:00Z',
-  payload: { p_branch_id: 'branch-1', p_invoice_number: 'SAME' },
-};
-const stockMovement = {
-  id: 'movement-1', branchId: 'branch-1', productId: 'product-1',
-  referenceId: 'client-1', quantityDelta: -2, reason: 'sale', synced: false,
-  createdAt: '2026-10-13T00:00:00Z',
+const queuedSale = {
+  id: 'client-1',client_id: 'client-1',invoice_number:'INV-OFF-1',
+  status:'pending',retry_count:0,created_at:'2026-11-08T00:00:00Z',
+  payload:{p_branch_id:'branch-1',p_invoice_number:'INV-OFF-1'},
 };
 
-beforeEach(() => { vi.resetAllMocks(); });
+beforeEach(() => {
+  vi.resetAllMocks();
+  mocked.getAllStrict.mockResolvedValue([queuedSale]);
+  mocked.finalize.mockResolvedValue(undefined);
+});
 
-describe('confirmed offline sale cleanup order', () => {
-  it('cleans only local movement rows before deleting the confirmed sale', async () => {
-    const order: string[] = [];
-    mockDb.getAllStrict.mockImplementation(async (name: string) =>
-      name === 'sales_queue' ? [queueRow] : [stockMovement]);
-    mockDb.remove.mockImplementation(async (name: string, key: string) => {
-      order.push(name + ':' + key);
-    });
-    await SalesRepository.markSaleSynced('client-1', 'SAME');
-    expect(order).toEqual([
-      'local_stock_movements:movement-1',
-      'sales_queue:client-1',
-    ]);
+describe('confirmed offline sale atomic finalization', () => {
+  it('uses one branch-scoped transaction for the invoice and its movements', async () => {
+    await SalesRepository.markSaleSynced('client-1','INV-OFF-1');
+    expect(mocked.finalize).toHaveBeenCalledExactlyOnceWith(
+      'client-1','branch-1','INV-OFF-1',
+    );
   });
 
-  it('does not drop the confirmed-sale row when local cleanup cannot finish', async () => {
-    mockDb.getAllStrict.mockImplementation(async (name: string) =>
-      name === 'sales_queue' ? [queueRow] : [stockMovement]);
-    mockDb.remove.mockRejectedValue(new Error('Local write interrupted'));
-    await expect(SalesRepository.markSaleSynced('client-1', 'SAME'))
-      .rejects.toThrow('Local write interrupted');
-    expect(mockDb.remove).toHaveBeenCalledTimes(1);
-    expect(mockDb.remove).toHaveBeenCalledWith('local_stock_movements', 'movement-1');
+  it('preserves the caller error when finalization fails and never assumes success', async () => {
+    mocked.finalize.mockRejectedValue(new Error('SIMULATED_TRANSACTION_ABORT'));
+    await expect(SalesRepository.markSaleSynced('client-1','INV-OFF-1'))
+      .rejects.toThrow('SIMULATED_TRANSACTION_ABORT');
+    expect(mocked.finalize).toHaveBeenCalledTimes(1);
   });
 
-  it('rejects missing branch scope before removing anything', async () => {
-    mockDb.getAllStrict.mockResolvedValue([{ ...queueRow, payload: {} }]);
-    await expect(SalesRepository.markSaleSynced('client-1', 'SAME'))
+  it('rejects missing branch scope before any delete', async () => {
+    mocked.getAllStrict.mockResolvedValue([{...queuedSale,payload:{}}]);
+    await expect(SalesRepository.markSaleSynced('client-1','INV-OFF-1'))
       .rejects.toThrow('OFFLINE_SALE_SCOPE_REQUIRED_FOR_CLEANUP');
-    expect(mockDb.remove).not.toHaveBeenCalled();
+    expect(mocked.finalize).not.toHaveBeenCalled();
+  });
+
+  it('never attempts a delete for a missing local sale', async () => {
+    mocked.getAllStrict.mockResolvedValue([]);
+    await SalesRepository.markSaleSynced('client-1','INV-OFF-1');
+    expect(mocked.finalize).not.toHaveBeenCalled();
   });
 });

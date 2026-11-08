@@ -1,36 +1,31 @@
 // Premier Print Agent - Windows desktop shell and local thermal print bridge.
 // Every physical printer owns an independent FIFO queue and hidden print worker.
 
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, safeStorage, Menu, Tray, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { execFile } = require('child_process');
 const { PerPrinterQueue, withTimeout } = require('./printerQueue.cjs');
+const { startLocalAppServer } = require('./localAppServer.cjs');
+const { openLocalDraftJournal } = require('./localDraftJournal.cjs');
+const { createDesktopUpdateManager, policyIsApproved } = require('./desktopUpdateManager.cjs');
+const { inspectDesktopExitSafety } = require('./desktopExitSafety.cjs');
+const desktopUpdatePolicy = require('./desktop-update-policy.json');
+const desktopBuildSettings = require('./electron-builder.json');
 
-const DEFAULT_URL = 'https://premieros.github.io/.com/';
-const TRUSTED_ORIGIN = 'https://premieros.github.io';
 const DEFAULT_THERMAL_WIDTH_MM = 80;
 const PRINT_LOAD_TIMEOUT_MS = 6000;
 const PRINT_CALLBACK_TIMEOUT_MS = 12000;
 
 let mainWindow = null;
 let allowQuit = false;
+let localAppServer = null;
+let desktopTray = null;
+let updateManager = null;
 const printerQueue = new PerPrinterQueue();
 const printWorkerWindows = new Map();
 
-function resolveTargetUrl() {
-  const candidate = process.env.ELECTRON_START_URL || process.env.POS_APP_URL || DEFAULT_URL;
-  try {
-    const parsed = new URL(candidate);
-    const isTrustedProduction = parsed.origin === TRUSTED_ORIGIN && parsed.pathname.startsWith('/.com');
-    const isLocalDev = parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost';
-    if (isTrustedProduction || isLocalDev) return candidate;
-  } catch {
-    // Fall through to the pinned production URL.
-  }
-  return DEFAULT_URL;
-}
 
 function workerKey(printerName) {
   return String(printerName || '').trim().toLocaleLowerCase();
@@ -203,7 +198,16 @@ async function printOnPhysicalPrinter(printerName, options) {
   }
 }
 
-function createWindow() {
+async function createWindow() {
+  // Electron always serves the UI bundled in its own installer. No remote
+  // startup URL, web fallback, or silently substituted application version.
+  if (!localAppServer) {
+    localAppServer = await startLocalAppServer({
+      distDir: path.join(__dirname, '..', 'dist'),
+    });
+  }
+  const targetUrl = localAppServer.url;
+  const trustedOrigin = new URL(targetUrl).origin;
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -229,20 +233,18 @@ function createWindow() {
   mainWindow.webContents.on('will-navigate', (event, url) => {
     try {
       const parsed = new URL(url);
-      const target = new URL(resolveTargetUrl());
-      const sameTrustedApp = parsed.origin === target.origin && parsed.pathname.startsWith('/.com');
-      const sameLocalDev = (target.hostname === 'localhost' || target.hostname === '127.0.0.1') && parsed.origin === target.origin;
-      if (!sameTrustedApp && !sameLocalDev) event.preventDefault();
+      // Hard boundary: the privileged preload bridge belongs to this exact
+      // local origin only, not to a remote or a second local app.
+      if (parsed.origin !== trustedOrigin) event.preventDefault();
     } catch {
       event.preventDefault();
     }
   });
 
-  const targetUrl = resolveTargetUrl();
   mainWindow.loadURL(targetUrl).catch((error) => {
-    console.error('[Premier Print Agent] Failed to load remote app:', error);
-    const localIndex = path.join(__dirname, '..', 'dist', 'index.html');
-    if (fs.existsSync(localIndex) && mainWindow) void mainWindow.loadFile(localIndex);
+    console.error('[Premier Desktop] Failed to load bundled UI:', error);
+    dialog.showErrorBox('Premier OS', 'Bundled application could not be loaded. No remote fallback was used.');
+    app.quit();
   });
 
   mainWindow.on('close', (event) => {
@@ -322,6 +324,117 @@ ipcMain.handle('pos:kick-drawer', async (_event, requestedPrinterName) => {
   });
 });
 
+// Read-only OS-encryption diagnostics. This never stages, posts, retries,
+// restores or synchronizes a financial document. A local privileged UI alone
+// can inspect its own draft storage readiness.
+ipcMain.handle('desktop:get-local-draft-health', async (event) => {
+  const unavailable = (code) => ({
+    ready: false, mode: 'DRAFT_ONLY', canPost: false, canSync: false,
+    error: code,
+  });
+  if (!localAppServer || !mainWindow || event.sender !== mainWindow.webContents) {
+    return unavailable('LOCAL_DRAFT_DIAGNOSTIC_UNAUTHORIZED');
+  }
+  try {
+    const senderOrigin = new URL(event.senderFrame?.url || event.sender.getURL()).origin;
+    if (senderOrigin !== new URL(localAppServer.url).origin) {
+      return unavailable('LOCAL_DRAFT_DIAGNOSTIC_WRONG_ORIGIN');
+    }
+    if (!safeStorage.isEncryptionAvailable()) {
+      return unavailable('LOCAL_DRAFT_OS_ENCRYPTION_UNAVAILABLE');
+    }
+    // The installed Electron userData directory must remain stable across
+    // upgrades; do not move this file or guess how to migrate DPAPI secrets.
+    const filename = path.join(app.getPath('userData'), 'draft-journal-v1.sqlite');
+    const journal = openLocalDraftJournal({ filename, codec: safeStorage });
+    try {
+      const integrity = journal.verifyIntegrity();
+      return {
+        ready: true, mode: 'DRAFT_ONLY', canPost: false, canSync: false,
+        verifiedDrafts: integrity.verifiedDrafts,
+      };
+    } finally {
+      journal.close();
+    }
+  } catch (error) {
+    console.warn('[Premier Desktop] Draft journal readiness check failed:',
+      error instanceof Error ? error.message : 'unknown error');
+    return unavailable('LOCAL_DRAFT_STORAGE_UNAVAILABLE');
+  }
+});
+
+// This read-only status is available only from the bundled Premier origin.
+// Update release checks and all install decisions stay inside the main process.
+ipcMain.handle('desktop:get-update-status', async (event) => {
+  const disabled = { state:'disabled', enabled:false, autoInstallOnExit:false };
+  if (!mainWindow || event.sender !== mainWindow.webContents || !localAppServer) return disabled;
+  try {
+    const origin = new URL(event.senderFrame?.url || event.sender.getURL()).origin;
+    if (origin !== new URL(localAppServer.url).origin) return disabled;
+    return updateManager?.status() || disabled;
+  } catch {
+    return disabled;
+  }
+});
+
+function showDesktopWindow() {
+  if (!mainWindow) {
+    void createWindow().catch(reportDesktopStartupError);
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function createDesktopTray() {
+  // The X button keeps the print agent alive; "Exit Premier OS" is a real
+  // application quit and is the ONLY time a verified downloaded update can install.
+  if (desktopTray) return;
+  const iconData = 'iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAoElEQVR42mPkF9f6z0BDwIIuwK/ZSpGBH69Xo/CZqGk4NjOYqGk4NrOYqG04uiUshBQ+3B/AwMDAwCDvuAHORgbyjhvw6mcixnB0Ni41JFtALMBnCQuphiEHCSHXU80HA2oBCzXDm2Y+wJdUmWhpOMlBRMiw4ZmKhrkFyJFKTgQzMDAwMMLqZGrXCbCqkwlXXUqtepkJX4VNjUqfkdbNFgB/Di+furTO1wAAAABJRU5ErkJggg==';
+  const image = nativeImage.createFromBuffer(Buffer.from(iconData, 'base64'));
+  desktopTray = new Tray(image);
+  desktopTray.setToolTip('Premier OS');
+  desktopTray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Open Premier OS', click: showDesktopWindow },
+    { type: 'separator' },
+    { label: 'Exit Premier OS', click: () => app.quit() },
+  ]));
+  desktopTray.on('double-click', showDesktopWindow);
+}
+
+function startSignedDesktopUpdates() {
+  // The switch stays OFF in draft PRs until a reviewed Windows certificate,
+  // matching publisherName and an official signed release have been verified.
+  const publishedByPremier = Array.isArray(desktopBuildSettings.publish)
+    && desktopBuildSettings.publish.some(channel => channel.provider === 'github'
+      && channel.owner === 'Premieros' && channel.repo === '.com');
+  const builderPublisher = desktopBuildSettings.win?.publisherName;
+  const pinnedPublisher = typeof builderPublisher === 'string'
+    ? builderPublisher : Array.isArray(builderPublisher) && builderPublisher.length === 1
+      ? builderPublisher[0] : null;
+  // The source, policy and built signed installer must ALL agree. Changing a
+  // runtime environment variable can never enable installing arbitrary EXEs.
+  const approved = policyIsApproved(desktopUpdatePolicy)
+    && publishedByPremier && pinnedPublisher === desktopUpdatePolicy.publisherName;
+  const effectivePolicy = approved
+    ? desktopUpdatePolicy : { ...desktopUpdatePolicy, enabled:false };
+  let updater = null;
+  if (approved && app.isPackaged && process.platform === 'win32') {
+    updater = require('electron-updater').autoUpdater;
+  }
+  updateManager = createDesktopUpdateManager({
+    app,
+    updater,
+    policy:effectivePolicy,
+    inspectSafeExit: () => inspectDesktopExitSafety({
+      mainWindow, localAppUrl:localAppServer?.url,
+      printerQueue, app, safeStorage,
+    }),
+  });
+  updateManager.start();
+}
+
 ipcMain.handle('pos:get-system-info', async () => ({
   isElectron: true,
   platform: process.platform,
@@ -330,12 +443,21 @@ ipcMain.handle('pos:get-system-info', async () => ({
   version: app.getVersion(),
 }));
 
+function reportDesktopStartupError(error) {
+  console.error('[Premier Desktop] Local UI startup failed:', error);
+  dialog.showErrorBox(
+    'Premier OS - Local startup failed',
+    'Cannot start the locally installed interface. Verify the installation and that port 43187 is available. No online application will be substituted.',
+  );
+  app.quit();
+}
+
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (!mainWindow) createWindow();
+    if (!mainWindow) void createWindow().catch(reportDesktopStartupError);
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
@@ -343,13 +465,20 @@ if (!hasSingleInstanceLock) {
     }
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     if (process.platform === 'win32' && app.isPackaged) {
       app.setLoginItemSettings({ openAtLogin: true, path: process.execPath });
     }
-    createWindow();
+    try {
+      await createWindow();
+      createDesktopTray();
+      startSignedDesktopUpdates();
+    } catch (error) {
+      reportDesktopStartupError(error);
+      return;
+    }
     app.on('activate', () => {
-      if (!mainWindow) createWindow();
+      if (!mainWindow) void createWindow().catch(reportDesktopStartupError);
       else {
         mainWindow.show();
         mainWindow.focus();
@@ -358,9 +487,26 @@ if (!hasSingleInstanceLock) {
   });
 }
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  // An update may delay this real exit briefly to verify that nothing remains
+  // unsynced. Do not tear down the browser or printer queue before the check.
+  updateManager?.beforeQuit(event);
+  if (!event.defaultPrevented) allowQuit = true;
+});
+
+app.on('will-quit', () => {
   allowQuit = true;
+  updateManager?.stop();
   destroyAllPrintWorkers();
+  if (desktopTray) {
+    desktopTray.destroy();
+    desktopTray = null;
+  }
+  if (localAppServer) {
+    void localAppServer.close().catch((error) =>
+      console.warn('[Premier Desktop] Failed to stop local UI server:', error));
+    localAppServer = null;
+  }
 });
 
 app.on('window-all-closed', () => {});

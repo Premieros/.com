@@ -8,9 +8,9 @@ import {
   getOfflineCache,
   saveOfflineSetting,
   getOfflineSetting,
-  enqueueOfflineSale,
+  enqueueOfflineSaleWithMovements,
   getAllOfflineSales,
-  removeOfflineSale,
+  removeOfflineSaleStrict,
   type OfflineSaleQueueItem,
 } from '@/core/offline/offlineStorage';
 import type { Product, Category, Customer, DiningTable, Settings, Branch } from '@/lib/types';
@@ -166,7 +166,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       throw new Error('WAREHOUSE_REQUIRED_OFFLINE_CAPTURE');
     }
     const id = 'offline_sale_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    await enqueueOfflineSale({
+    await enqueueOfflineSaleWithMovements({
       id,
       client_id: id,
       invoice_number: invoiceNumber,
@@ -189,7 +189,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     await InventoryRepository.markSaleMovementsSynced(
       id, invoiceNumber, String(queued.payload?.p_branch_id || '').trim(),
     );
-    await removeOfflineSale(id);
+    await removeOfflineSaleStrict(id);
     await offlineSyncEngine.refreshPendingCount();
   }, []);
 

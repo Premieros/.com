@@ -22,7 +22,10 @@ async function run() {
     events.push('cashier-2-end');
     return 2;
   });
+  assert.equal(queue.hasPending(), true, 'active print queue must block update');
   assert.deepEqual(await Promise.all([first, second]), [1, 2]);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(queue.hasPending(), false, 'completed print queue may release installer gate');
   assert.deepEqual(events, ['cashier-1-start', 'cashier-1-end', 'cashier-2-start', 'cashier-2-end']);
 
   let releaseKitchen;

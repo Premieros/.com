@@ -1,0 +1,12 @@
+{
+  "enabled": false,
+  "channel": "stable",
+  "provider": {
+    "type": "github",
+    "owner": "Premieros",
+    "repo": ".com"
+  },
+  "publisherName": null,
+  "minimumBacklogCheck": true,
+  "reason": "Await signed NSIS release, pinned Windows publisher, offline-outbox migration and hardware pilot"
+}

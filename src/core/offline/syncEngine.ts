@@ -5,12 +5,11 @@
  */
 
 import { pos as posApi, supabase } from '@/api';
-import { InventoryRepository } from '@/core/repositories';
 import { getReplayPinnedWarehouse } from './warehouseBinding';
 import {
-  getAllOfflineSales,
+  getAllOfflineSalesStrict,
   updateOfflineSaleStatus,
-  removeOfflineSale,
+  finalizeConfirmedOfflineSale,
   getPendingSalesCount,
   subscribeToQueueChanges,
   type OfflineSaleQueueItem,
@@ -160,7 +159,16 @@ class OfflineSyncEngine {
       return { successCount: 0, failedCount: 0 };
     }
 
-    const items = await getAllOfflineSales();
+    let items: OfflineSaleQueueItem[];
+    try {
+      items = await getAllOfflineSalesStrict();
+    } catch {
+      // Financial records may still exist on disk. A failed DB read is NOT an
+      // empty outbox and must never be reported as a successful zero-pending sync.
+      this.lastError = 'OFFLINE_SALES_QUEUE_READ_FAILED';
+      this.emit();
+      return { successCount: 0, failedCount: 1 };
+    }
     // A row can remain persisted as `syncing` if the tab/process dies after the
     // server commit. It must be retried/reconciled on the next startup.
     const pendingItems = items.filter((i) => i.status !== 'synced');
@@ -245,12 +253,9 @@ class OfflineSyncEngine {
         // local pending movement before dropping the outbox row so local availability
         // cannot continue deducting the same sale after reconciliation.
         const invoiceNumber = String(item.payload.p_invoice_number || item.invoice_number || '').trim();
-        if (invoiceNumber) {
-          await InventoryRepository.markSaleMovementsSynced(
-            item.id, invoiceNumber, String(item.payload.p_branch_id || '').trim(),
-          );
-        }
-        await removeOfflineSale(item.id);
+        await finalizeConfirmedOfflineSale(
+          item.id, String(item.payload.p_branch_id || '').trim(), invoiceNumber,
+        );
         successCount++;
         this.syncedRecentlyCount++;
       } catch (err: unknown) {

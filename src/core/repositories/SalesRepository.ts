@@ -1,5 +1,5 @@
-import { dbGetAll, dbGetAllStrict, dbPut, dbDelete } from './LocalDatabase';
-import { InventoryRepository } from './InventoryRepository';
+import { dbGetAll, dbGetAllStrict, dbPut } from './LocalDatabase';
+import { enqueueOfflineSaleWithMovements, finalizeConfirmedOfflineSale } from '@/core/offline/offlineStorage';
 import type { OfflineSaleQueueItem } from '@/core/offline/offlineStorage';
 import type { ProcessSalePayload } from '@/features/pos/services/payment';
 
@@ -26,26 +26,9 @@ export class SalesRepository {
       created_by_user_id: originatingUserId,
     };
 
-    // 1. Put in IndexedDB sales_queue
-    await dbPut('sales_queue', queueItem);
-
-    // 2. Record local stock deduction in local movement ledger so available stock is updated immediately
-    if (Array.isArray(payload.p_items) && payload.p_items.length > 0 && payload.p_branch_id) {
-      for (const item of payload.p_items) {
-        if (item.product_id) {
-          await InventoryRepository.recordLocalMovement({
-            id: `mov_${id}_${item.product_id}_${Math.random().toString(36).slice(2, 6)}`,
-            productId: item.product_id,
-            branchId: payload.p_branch_id,
-            warehouseId: payload.p_warehouse_id,
-            quantityDelta: -Math.abs(Number(item.quantity) || 1),
-            reason: 'sale',
-            referenceId: id,
-            createdAt: now,
-          });
-        }
-      }
-    }
+    // Both the pending sale and every local stock movement are saved in ONE
+    // IndexedDB transaction; a crash cannot strand partial deductions.
+    await enqueueOfflineSaleWithMovements(queueItem);
 
     return id;
   }
@@ -85,8 +68,8 @@ export class SalesRepository {
     const queued = queue.find(s => s.id === id);
     if (!queued) return;
     const branchId = String(queued.payload.p_branch_id || '').trim();
-    // Dequeue only after scoped local cleanup has succeeded.
-    await InventoryRepository.markSaleMovementsSynced(id, invoiceNumber, branchId);
-    await dbDelete('sales_queue', id);
+    if (!branchId) throw new Error('OFFLINE_SALE_SCOPE_REQUIRED_FOR_CLEANUP');
+    // Both stock deductions and the confirmed invoice disappear atomically.
+    await finalizeConfirmedOfflineSale(id, branchId, invoiceNumber);
   }
 }

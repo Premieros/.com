@@ -15,11 +15,15 @@
     "target": [
       {
         "target": "nsis",
-        "arch": ["x64"]
+        "arch": [
+          "x64"
+        ]
       },
       {
         "target": "portable",
-        "arch": ["x64"]
+        "arch": [
+          "x64"
+        ]
       }
     ],
     "requestedExecutionLevel": "asInvoker",
@@ -32,5 +36,13 @@
     "createStartMenuShortcut": true,
     "shortcutName": "Premier Print Agent"
   },
-  "electronVersion": "38.1.0"
+  "electronVersion": "38.1.0",
+  "publish": [
+    {
+      "provider": "github",
+      "owner": "Premieros",
+      "repo": ".com",
+      "releaseType": "release"
+    }
+  ]
 }
