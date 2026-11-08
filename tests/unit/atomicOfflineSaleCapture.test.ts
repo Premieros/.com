@@ -22,6 +22,7 @@ import {
   getAllOfflineSales,
   getAllOfflineSalesStrict,
   removeOfflineSaleStrict,
+  finalizeConfirmedOfflineSale,
 } from '@/core/offline/offlineStorage';
 
 function makeDb() {
@@ -215,6 +216,57 @@ describe('atomic local financial outbox capture', () => {
     expect(harness.current!.stores.sales_queue.size).toBe(0);
     // Movement cleanup belongs to the reconciliation path, not this helper.
     expect(harness.current!.stores.local_stock_movements.size).toBe(2);
+  });
+
+  it('atomically removes the confirmed sale and its two stock deductions', async () => {
+    await enqueueOfflineSaleWithMovements(sale());
+    await finalizeConfirmedOfflineSale('cashier-device-001', 'branch-a', 'INV-OFF-001');
+    expect(harness.current!.stores.sales_queue.size).toBe(0);
+    expect(harness.current!.stores.local_stock_movements.size).toBe(0);
+  });
+
+  it('rolls back both stores when a confirmed sale cleanup fails mid-delete', async () => {
+    await enqueueOfflineSaleWithMovements(sale());
+    harness.current!.failAtWrite = 2;
+    await expect(finalizeConfirmedOfflineSale(
+      'cashier-device-001', 'branch-a', 'INV-OFF-001',
+    )).rejects.toThrow('SIMULATED_MID_TRANSACTION_WRITE_FAILURE');
+    expect(harness.current!.stores.sales_queue.size).toBe(1);
+    expect(harness.current!.stores.local_stock_movements.size).toBe(2);
+    harness.current!.failAtWrite = -1;
+    await finalizeConfirmedOfflineSale('cashier-device-001', 'branch-a', 'INV-OFF-001');
+    expect(harness.current!.stores.sales_queue.size).toBe(0);
+    expect(harness.current!.stores.local_stock_movements.size).toBe(0);
+  });
+
+  it('rejects wrong branch, invoice or warehouse before touching local financial data', async () => {
+    await enqueueOfflineSaleWithMovements(sale());
+    await expect(finalizeConfirmedOfflineSale(
+      'cashier-device-001', 'branch-b', 'INV-OFF-001',
+    )).rejects.toThrow('OFFLINE_SALE_FINALIZE_SCOPE_MISMATCH');
+    await expect(finalizeConfirmedOfflineSale(
+      'cashier-device-001', 'branch-a', 'WRONG-INVOICE',
+    )).rejects.toThrow('OFFLINE_SALE_FINALIZE_SCOPE_MISMATCH');
+    const movement = harness.current!.stores.local_stock_movements.get('mov_cashier-device-001_0')!;
+    movement.warehouseId = 'another-warehouse';
+    await expect(finalizeConfirmedOfflineSale(
+      'cashier-device-001', 'branch-a', 'INV-OFF-001',
+    )).rejects.toThrow('OFFLINE_SALE_FINALIZE_WAREHOUSE_MISMATCH');
+    expect(harness.current!.stores.sales_queue.size).toBe(1);
+    expect(harness.current!.stores.local_stock_movements.size).toBe(2);
+  });
+
+  it('does not touch another branch outstanding invoice or movement', async () => {
+    await enqueueOfflineSaleWithMovements(sale());
+    await enqueueOfflineSaleWithMovements({
+      ...sale(), id:'cashier-device-002',client_id:'cashier-device-002',
+      payload:{...sale().payload,p_branch_id:'branch-b',p_warehouse_id:'warehouse-b'},
+    });
+    await finalizeConfirmedOfflineSale('cashier-device-001','branch-a','INV-OFF-001');
+    expect(Array.from(harness.current!.stores.sales_queue.values()).map(row => row.id))
+      .toEqual(['cashier-device-002']);
+    expect(Array.from(harness.current!.stores.local_stock_movements.values())
+      .every(row => row.branchId === 'branch-b')).toBe(true);
   });
 
   it('never presents an unreadable financial outbox as an empty queue', async () => {
