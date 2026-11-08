@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Premier OS — شبكة الفرع التجريبية</title>
+  <link rel="stylesheet" href="/lan/styles.css">
+  <script src="/lan/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <header><strong>Premier OS</strong><span class="pill">وضع الشبكة المحلية التجريبي</span></header>
+    <h1>الويتر وشاشة المطبخ</h1>
+    <p class="alert">هذه شاشة تشغيل تجريبية للطلبات فقط. لا تُسجّل مبيعات أو مدفوعات، ولا تخصم مخزونًا أو تُرحّل قيودًا محاسبية.</p>
+    <form id="login-form">
+      <label for="credential">رمز الجهاز المقترن من مسؤول الفرع</label>
+      <input id="credential" type="password" autocomplete="off" required minlength="40" placeholder="أدخل رمز جهازك فقط">
+      <button type="submit">دخول الجهاز</button>
+    </form>
+    <section id="workspace" hidden>
+      <div class="topline"><span id="scope">الفرع المحلي</span><button id="disconnect" type="button">خروج</button></div>
+      <div class="status" role="status" id="connection">جارٍ الاتصال بخادم الفرع…</div>
+      <form id="order-form" hidden>
+        <h2>إرسال طلب مطبخ تجريبي</h2>
+        <label for="table">الطاولة</label><input id="table" required maxlength="64" value="Table 01">
+        <label for="station">رمز محطة المطبخ</label><input id="station" required pattern="[A-Za-z0-9_-]{3,80}" value="main">
+        <label for="product">اسم الصنف</label><input id="product" required maxlength="120" placeholder="مثال: بيتزا">
+        <label for="quantity">الكمية</label><input id="quantity" type="number" min="1" max="99" value="1" required>
+        <button type="submit">حفظ وإرسال للمطبخ</button>
+      </form>
+      <div class="topline"><h2>الطلبات المحلية</h2><button id="refresh" type="button">تحديث</button></div>
+      <div id="orders" class="orders"></div>
+    </section>
+  </main>
+</body>
+</html>
