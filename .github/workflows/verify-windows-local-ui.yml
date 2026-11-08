@@ -31,6 +31,8 @@ jobs:
         run: node --test electron/localAppServer.test.cjs
       - name: Verify encrypted local draft ledger, isolation and crash recovery
         run: node --test electron/localDraftJournal.test.cjs
+      - name: Test signed-update close gate and local financial outbox safety
+        run: node --test electron/desktopUpdateManager.test.cjs electron/desktopExitSafety.test.cjs
       - name: Install locked app dependencies
         run: npm ci
       - name: Build only local UI assets (no production upload)
