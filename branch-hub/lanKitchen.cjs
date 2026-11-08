@@ -118,6 +118,14 @@ function createLanKitchen({db,organizationId,branchId}) {
     if(!pathname.startsWith('/api/v1/lan/')) return false;
     const device=auth(req);
     if(!device) {respond(res,401,{error:'LAN_DEVICE_NOT_PAIRED'});return true;}
+    if(pathname==='/api/v1/lan/profile'&&req.method==='GET') {
+      respond(res,200,{
+        organizationId,branchId,role:device.role,
+        stationCode:device.station_code,deviceId:device.device_id,
+        operatorId:device.operator_id,localOnly:true,
+      });
+      return true;
+    }
     if(pathname==='/api/v1/lan/orders'&&req.method==='GET') {
       const rows=db.prepare('SELECT * FROM lan_kitchen_orders WHERE branch_id=? AND '+
         (device.role==='kitchen'?'station_code=?':'device_id=?')+
@@ -277,7 +285,7 @@ function createLanKitchen({db,organizationId,branchId}) {
         } catch {cleanup();res.end();}
       }
       signals.on('event',flush);signals.on('refresh',flush);
-      req.on('close',cleanup);
+      res.on('close',cleanup);
       keepalive=setInterval(()=>{if(!closed){res.write(': keepalive\n\n');flush();}},15000);
       keepalive.unref?.();
       res.write(': connected\n\n');flush();
