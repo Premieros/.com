@@ -3,17 +3,24 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 type Row = { id: string; [key: string]: unknown };
 const harness = vi.hoisted(() => ({
   current: null as null | { db: IDBDatabase; stores: Record<string, Map<string, Row>>; failAtWrite: number },
+  strictReadFailure: false,
 }));
 vi.mock('@/core/repositories/LocalDatabase', () => ({
   getLocalDb: () => {
     if (!harness.current) throw new Error('TEST_DB_UNAVAILABLE');
     return Promise.resolve(harness.current.db);
   },
+  dbGetAllStrict: (name: string) => {
+    if (name !== 'sales_queue') throw new Error('UNEXPECTED_STORE');
+    if (harness.strictReadFailure) return Promise.reject(new Error('SIMULATED_OUTBOX_READ_ERROR'));
+    return Promise.resolve(Array.from(harness.current?.stores.sales_queue.values() || []));
+  },
 }));
 
 import {
   enqueueOfflineSaleWithMovements,
   getAllOfflineSales,
+  getAllOfflineSalesStrict,
   removeOfflineSaleStrict,
 } from '@/core/offline/offlineStorage';
 
@@ -104,7 +111,7 @@ const sale = () => ({
   },
 });
 
-beforeEach(() => { harness.current = makeDb(); });
+beforeEach(() => { harness.current = makeDb(); harness.strictReadFailure = false; });
 
 describe('atomic local financial outbox capture', () => {
   it('commits one sale and ALL branch/warehouse-scoped movements as one transaction', async () => {
@@ -208,6 +215,14 @@ describe('atomic local financial outbox capture', () => {
     expect(harness.current!.stores.sales_queue.size).toBe(0);
     // Movement cleanup belongs to the reconciliation path, not this helper.
     expect(harness.current!.stores.local_stock_movements.size).toBe(2);
+  });
+
+  it('never presents an unreadable financial outbox as an empty queue', async () => {
+    await enqueueOfflineSaleWithMovements(sale());
+    expect(await getAllOfflineSalesStrict()).toHaveLength(1);
+    harness.strictReadFailure = true;
+    await expect(getAllOfflineSalesStrict()).rejects.toThrow('SIMULATED_OUTBOX_READ_ERROR');
+    expect(harness.current!.stores.sales_queue.size).toBe(1);
   });
 
   it('preserves a completed queued sale across simulated module/browser restarts', async () => {
