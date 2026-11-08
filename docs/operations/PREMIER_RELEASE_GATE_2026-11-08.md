@@ -17,10 +17,14 @@
 - Frontend PostgREST contract was checked read-only against production:
   **182/182** RPC signatures and **55/55** tables/views present. This proves
   object/signature existence, *not* authenticated/authorized button behavior.
-- Vercel deployment `premieros-sage.vercel.app` returned 404 to the
-  **currently connected Vercel account**. That account lists other projects,
-  not this site. GitHub repository homepage points at the site, but GitHub
-  homepage metadata is not proof of deployment ownership or environment values.
+- GitHub's **Vercel commit status** points to the real Vercel team
+  `premieros-3817`, project `premier.os`:
+  https://vercel.com/premieros-3817/premier.os/CxoAB3Lc98YJRVNJ6pU1MrdaFoSM
+  However the currently connected Vercel account does not have that team grant:
+  both project/deployment introspection returned **403 forbidden**. The
+  connector's team-consent action returned 404 for both team ID and slug,
+  so project configuration and production deployment ownership remain unverified.
+  A green GitHub Vercel status is **not** proof that production was promoted.
 - The connected Supabase migration history reported **707 entries**,
   latest `20261028081704_branch_hub_canonical_posting_v1`.
   The separate `public.schema_migrations` log had **449 entries** and last
@@ -75,8 +79,8 @@ compared all currently affected rows with ledger sums and source-item names:
 
 ## Mandatory release gates
 
-1. **Correct Vercel owner.** Connect the Vercel team that *actually owns*
-   `premieros-sage`; verify project ID, Git repository, production branch,
+1. **Correct Vercel owner.** Obtain an authorized Vercel grant for team
+   `premieros-3817` and project `premier.os`; verify project ID, Git repository, production branch,
    domain assignment, deployed commit SHA, and the **host** of
    `VITE_SUPABASE_URL` (not its credentials). It must resolve to
    `hvqlkapynjfjikqithvd.supabase.co`. Never display or copy API keys,
