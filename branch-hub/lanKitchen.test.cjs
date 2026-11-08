@@ -178,6 +178,20 @@ test('device revoke, cross-branch and cross-origin requests are rejected',withSe
   assert.equal((await req(port,'GET','/api/v1/lan/profile',null,chef)).status,200);
 }));
 
+test('repeated invalid device keys are throttled but valid paired staff remain operational',withServer(async({hub,port})=>{
+  const {waiter}=credentials(hub);
+  for(let i=0;i<25;i++){
+    const response=await req(port,'GET','/api/v1/lan/profile',null,'incorrect-dev-credential');
+    assert.equal(response.status,401);
+  }
+  const throttled=await req(port,'GET','/api/v1/lan/profile',null,'incorrect-dev-credential');
+  assert.equal(throttled.status,429);
+  assert.equal(throttled.data.error,'LAN_AUTH_RATE_LIMITED');
+  const valid=await req(port,'GET','/api/v1/lan/profile',null,waiter);
+  assert.equal(valid.status,200);
+  assert.equal(valid.data.role,'waiter');
+}));
+
 test('status idempotency is durable and rejects reuse for another transition',withServer(async({hub,port})=>{
   const {waiter,chef}=credentials(hub);
   const created=await req(port,'POST','/api/v1/lan/orders',order(),waiter);
