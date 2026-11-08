@@ -334,7 +334,12 @@ test('packaged Hub parent receives readiness IPC only after the local port binds
     assert.ok(message.port>0);
     assert.equal((await req(message.port,'GET','/health')).status,200);
   } finally {
+    const exited=new Promise(resolve=>{
+      if(child.exitCode!==null||child.signalCode!==null)return resolve();
+      child.once('exit',resolve);
+    });
     child.kill();
+    await Promise.race([exited,new Promise(resolve=>setTimeout(resolve,3500))]);
     fs.rmSync(dir,{recursive:true,force:true});
   }
 });
