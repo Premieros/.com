@@ -36,6 +36,8 @@ export const MENU_ITEMS: MenuItemConfig[] = [
 
   { id: 'operations-center', route: APP_ROUTES.operationsCenter, icon: 'pos', labelKey: 'orders', label: { ar: 'مركز العمليات', en: 'Operations Center' }, permission: 'dashboard.view', group: 'centers' },
   { id: 'inventory-center', route: APP_ROUTES.inventoryCenter, icon: 'inventory', labelKey: 'inventory', label: { ar: 'مركز المخزون', en: 'Inventory Center' }, permission: 'inventory.view', group: 'centers' },
+  { id: 'stock-counts', route: APP_ROUTES.stockCounts, icon: 'stockCounts', labelKey: 'inventory', label: { ar: 'الجرد والتسويات', en: 'Stock Counts & Adjustments' }, permission: 'inventory.view', group: 'centers' },
+  { id: 'opening-balances', route: APP_ROUTES.openingBalances, icon: 'openingBalances', labelKey: 'accounts', label: { ar: 'الأرصدة الافتتاحية', en: 'Opening Balances' }, permission: 'accounts.view', group: 'centers' },
   { id: 'procurement-center', route: APP_ROUTES.procurementCenter, icon: 'purchases', labelKey: 'purchases', label: { ar: 'مركز المشتريات', en: 'Procurement Center' }, permission: 'purchases.view', group: 'centers' },
   { id: 'people-center', route: APP_ROUTES.peopleCenter, icon: 'customers', labelKey: 'customers', label: { ar: 'مركز الأطراف', en: 'People Center' }, permissionsAny: ['customers.view', 'suppliers.view'], group: 'centers' },
   { id: 'finance-center', route: APP_ROUTES.financeCenter, icon: 'accounts', labelKey: 'reports', label: { ar: 'المركز المالي', en: 'Finance Center' }, permissionsAny: ['accounts.view', 'expenses.view', 'sales.view', 'shifts.view', 'reports.view', 'reports.financial', 'reports.costing'], group: 'centers' },
