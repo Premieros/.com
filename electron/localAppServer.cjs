@@ -142,9 +142,9 @@ async function startLocalAppServer({ distDir, port = DEFAULT_LOCAL_PORT } = {}) 
     throw error;
   }
 
-  const port = server.address().port;
+  const boundPort = server.address().port;
   return {
-    url: 'http://' + HOST + ':' + port + '/',
+    url: 'http://' + HOST + ':' + boundPort + '/',
     close: () => new Promise((resolve, reject) => {
       server.close((error) => error ? reject(error) : resolve());
     }),
