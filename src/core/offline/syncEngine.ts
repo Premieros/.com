@@ -5,12 +5,11 @@
  */
 
 import { pos as posApi, supabase } from '@/api';
-import { InventoryRepository } from '@/core/repositories';
 import { getReplayPinnedWarehouse } from './warehouseBinding';
 import {
   getAllOfflineSalesStrict,
   updateOfflineSaleStatus,
-  removeOfflineSaleStrict,
+  finalizeConfirmedOfflineSale,
   getPendingSalesCount,
   subscribeToQueueChanges,
   type OfflineSaleQueueItem,
@@ -254,12 +253,9 @@ class OfflineSyncEngine {
         // local pending movement before dropping the outbox row so local availability
         // cannot continue deducting the same sale after reconciliation.
         const invoiceNumber = String(item.payload.p_invoice_number || item.invoice_number || '').trim();
-        if (invoiceNumber) {
-          await InventoryRepository.markSaleMovementsSynced(
-            item.id, invoiceNumber, String(item.payload.p_branch_id || '').trim(),
-          );
-        }
-        await removeOfflineSaleStrict(item.id);
+        await finalizeConfirmedOfflineSale(
+          item.id, String(item.payload.p_branch_id || '').trim(), invoiceNumber,
+        );
         successCount++;
         this.syncedRecentlyCount++;
       } catch (err: unknown) {
