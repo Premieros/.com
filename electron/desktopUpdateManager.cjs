@@ -5,8 +5,6 @@
  * queue or attempts installing while an unacknowledged transaction may exist.
  * Automatic install is only attempted on a REAL app quit (not window hide).
  */
-const { EventEmitter } = require('node:events');
-
 const RETRY_INTERVAL_MS = 6 * 60 * 60 * 1000;
 const STARTUP_DELAY_MS = 15 * 1000;
 const EXIT_CHECK_TIMEOUT_MS = 7 * 1000;
