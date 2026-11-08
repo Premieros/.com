@@ -126,6 +126,20 @@ function createLanKitchen({db,organizationId,branchId}) {
       });
       return true;
     }
+    if(pathname==='/api/v1/lan/sync-status'&&req.method==='GET') {
+      // Only the viewer's own order events (waiter) or assigned station
+      // (kitchen) are exposed. This is NOT a cloud acknowledgement API.
+      const row=db.prepare('SELECT COUNT(*) AS count FROM lan_kitchen_events '+
+        'WHERE branch_id=? AND '+(device.role==='kitchen'?
+          'station_code=?':'creator_device_id=?')).get(
+          branchId,device.role==='kitchen'?device.station_code:device.device_id);
+      respond(res,200,{
+        pendingCloudDraftEvents:Number(row.count),
+        cloudAcknowledgementImplemented:false,
+        cloudSynced:false,mode:'LOCAL_DRAFT_ONLY',branchId,
+      });
+      return true;
+    }
     if(pathname==='/api/v1/lan/stations'&&req.method==='GET') {
       const stations=db.prepare('SELECT DISTINCT station_code FROM lan_devices '+
         "WHERE organization_id=? AND branch_id=? AND active=1 AND role='kitchen' "+
@@ -220,10 +234,17 @@ function createLanKitchen({db,organizationId,branchId}) {
           'branch_id=? AND device_id=? AND command_key=?')
           .get(branchId,device.device_id,item.commandKey);
         if(duplicate) {
-          if(duplicate.order_id!==order.id||duplicate.intended_status!==item.status) {
+          if(duplicate.order_id!==order.id||duplicate.intended_status!==item.status||
+            duplicate.result_version !== item.expectedVersion + 1) {
             respond(res,409,{error:'LAN_COMMAND_IDEMPOTENCY_CONFLICT'});return true;
           }
-          respond(res,200,{order:orderView(order),replayed:true});return true;
+          // Return both the current snapshot and the version THIS command
+          // originally committed; a later kitchen transition must not be
+          // mistaken for the result of a replayed earlier operation.
+          respond(res,200,{
+            order:orderView(order),replayed:true,
+            committedVersion:duplicate.result_version,
+          });return true;
         }
         const authorized=device.role==='kitchen' ?
           (order.status==='new'&&item.status==='cooking')||
@@ -260,7 +281,10 @@ function createLanKitchen({db,organizationId,branchId}) {
           return true;
         }
         signals.emit('event');
-        respond(res,200,{order:orderView(updated),replayed:false,eventCursor:seq});
+        respond(res,200,{
+          order:orderView(updated),replayed:false,eventCursor:seq,
+          committedVersion:updated.version,
+        });
       } catch(error) {
         respond(res,error.status||500,
           {error:error.status?error.message:'LAN_STATUS_UPDATE_FAILED'});
@@ -279,6 +303,14 @@ function createLanKitchen({db,organizationId,branchId}) {
       });
       streams.add(res);
       let cursor=after,closed=false;
+      // A backup restore can make an old phone's event cursor point beyond
+      // the durable log. Reset it rather than staying silently stale forever.
+      const latest=db.prepare('SELECT COALESCE(MAX(seq),0) AS seq '+
+        'FROM lan_kitchen_events WHERE branch_id=? AND '+
+        (device.role==='kitchen'?'station_code=?':'creator_device_id=?'))
+        .get(branchId,device.role==='kitchen'?device.station_code:device.device_id);
+      const cursorReset=after>latest.seq;
+      if(cursorReset) cursor=0;
       let keepalive;
       function cleanup() {
         if(closed)return;closed=true;
@@ -306,7 +338,9 @@ function createLanKitchen({db,organizationId,branchId}) {
       res.on('close',cleanup);
       keepalive=setInterval(()=>{if(!closed){res.write(': keepalive\n\n');flush();}},15000);
       keepalive.unref?.();
-      res.write(': connected\n\n');flush();
+      res.write(': connected\n\n');
+      if(cursorReset) res.write('event: reset-cursor\ndata: {}\n\n');
+      flush();
       return true;
     }
     respond(res,404,{error:'LAN_API_NOT_FOUND'});return true;
