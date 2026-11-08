@@ -7,6 +7,7 @@ const fs = require('fs');
 const os = require('os');
 const { execFile } = require('child_process');
 const { PerPrinterQueue, withTimeout } = require('./printerQueue.cjs');
+const { registerLocalEngineIPC } = require('./localEngine/ipcBridge.cjs');
 
 const DEFAULT_URL = 'https://premieros.github.io/.com/';
 const TRUSTED_ORIGIN = 'https://premieros.github.io';
@@ -321,6 +322,8 @@ ipcMain.handle('pos:kick-drawer', async (_event, requestedPrinterName) => {
     );
   });
 });
+
+registerLocalEngineIPC(ipcMain, app);
 
 ipcMain.handle('pos:get-system-info', async () => ({
   isElectron: true,
