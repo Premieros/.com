@@ -204,3 +204,22 @@ test('untrusted hosts and LAN without TLS remain blocked, including master maint
   assert.equal(isLoopbackAddress('::ffff:192.168.1.8'),false);
   assert.equal(isLoopbackAddress('127.0.0.1'),true);
 });
+
+test('Windows desktop keeps LAN disabled until explicit TLS hostname and certificate configuration',()=>{
+  const {resolveLanDeployment}=require('./lanDeploymentConfig.cjs');
+  const cert=path.resolve(os.tmpdir(),'premier-local-test-cert.pem');
+  const key=path.resolve(os.tmpdir(),'premier-local-test-key.pem');
+  assert.equal(resolveLanDeployment({}).enabled,false);
+  assert.equal(resolveLanDeployment({lanEnabled:false,lanHostname:'bad'}).host,'127.0.0.1');
+  assert.throws(()=>resolveLanDeployment({lanEnabled:true}),/LAN_TRUSTED_HOSTNAME_REQUIRED/);
+  assert.throws(()=>resolveLanDeployment({lanEnabled:true,lanHostname:'evil.com'}),
+    /LAN_TRUSTED_TLS_FILES_REQUIRED/);
+  assert.throws(()=>resolveLanDeployment({lanEnabled:true,lanHostname:'0.0.0.0',
+    tlsCert:cert,tlsKey:key}),/LAN_TRUSTED_HOSTNAME_REQUIRED/);
+  assert.throws(()=>resolveLanDeployment({lanEnabled:true,lanHostname:'premier-branch.local',
+    tlsCert:cert,tlsKey:key,lanPort:80},()=>true),/LAN_PORT_INVALID/);
+  const allowed=resolveLanDeployment({lanEnabled:true,lanHostname:'premier-branch.local',
+    tlsCert:cert,tlsKey:key,lanPort:3847},()=>true);
+  assert.equal(allowed.host,'0.0.0.0');
+  assert.equal(allowed.url,'https://premier-branch.local:3847/lan');
+});
