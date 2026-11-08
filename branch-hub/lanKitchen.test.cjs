@@ -301,6 +301,44 @@ test('untrusted hosts and LAN without TLS remain blocked, including master maint
   assert.equal(isLoopbackAddress('127.0.0.1'),true);
 });
 
+test('packaged Hub parent receives readiness IPC only after the local port binds',async()=>{
+  const {fork}=require('node:child_process');
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'premier-hub-ipc-'));
+  const child=fork(path.join(__dirname,'server.cjs'),[],{
+    execPath:process.execPath,
+    env:{
+      ...process.env,BRANCH_HUB_HOST:'127.0.0.1',BRANCH_HUB_PORT:'0',
+      BRANCH_HUB_BRANCH_ID:'branch_001',BRANCH_HUB_ORGANIZATION_ID:'org_001',
+      BRANCH_HUB_TOKEN:MASTER,BRANCH_HUB_DATA_DIR:dir,
+    },
+    stdio:['ignore','ignore','ignore','ipc'],
+  });
+  try {
+    const message=await new Promise((resolve,reject)=>{
+      const timeout=setTimeout(()=>reject(Error('LAN_IPC_READY_TIMEOUT')),6000);
+      child.once('exit',code=>{
+        clearTimeout(timeout);
+        reject(Error('LAN_SERVICE_EXITED_BEFORE_READY_'+code));
+      });
+      child.once('message',data=>{
+        clearTimeout(timeout);
+        resolve(data);
+      });
+      child.once('error',error=>{
+        clearTimeout(timeout);
+        reject(error);
+      });
+    });
+    assert.equal(message.type,'premier-hub-ready');
+    assert.equal(message.host,'127.0.0.1');
+    assert.ok(message.port>0);
+    assert.equal((await req(message.port,'GET','/health')).status,200);
+  } finally {
+    child.kill();
+    fs.rmSync(dir,{recursive:true,force:true});
+  }
+});
+
 test('Windows desktop keeps LAN disabled until explicit TLS hostname and certificate configuration',()=>{
   const {resolveLanDeployment}=require('./lanDeploymentConfig.cjs');
   const cert=path.resolve(os.tmpdir(),'premier-local-test-cert.pem');
