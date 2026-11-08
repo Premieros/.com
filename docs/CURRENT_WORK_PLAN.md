@@ -1,4 +1,6 @@
-# CURRENT WORK PLAN — Premieros/.com — SOURCE OF TRUTH
+# CURRENT WORK PLAN — Premieros/.com — HISTORICAL WORK PLAN
+
+> **Current work state / سجل العمل الحي:** اقرأ أولًا [PREMIER_MASTER_WORK_LOG.md](./PREMIER_MASTER_WORK_LOG.md). هذا الملف يحتفظ بخطة وأدلة تاريخية ولا ينبغي اعتبار عباراته القديمة دليلًا على الحالة الحالية. الحالة الآنية تُتحقّق دائمًا من GitHub HEAD وCI والمصادر، وتُحدَّث في سجل العمل المرجعي. لا تعتمد على ذاكرة المحادثة لتقرير حالة التنفيذ.
 
 ## Canonical project
 
