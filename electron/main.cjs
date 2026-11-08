@@ -1,36 +1,24 @@
 // Premier Print Agent - Windows desktop shell and local thermal print bridge.
 // Every physical printer owns an independent FIFO queue and hidden print worker.
 
-const { app, BrowserWindow, ipcMain, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { execFile } = require('child_process');
 const { PerPrinterQueue, withTimeout } = require('./printerQueue.cjs');
+const { startLocalAppServer } = require('./localAppServer.cjs');
 
-const DEFAULT_URL = 'https://premieros.github.io/.com/';
-const TRUSTED_ORIGIN = 'https://premieros.github.io';
 const DEFAULT_THERMAL_WIDTH_MM = 80;
 const PRINT_LOAD_TIMEOUT_MS = 6000;
 const PRINT_CALLBACK_TIMEOUT_MS = 12000;
 
 let mainWindow = null;
 let allowQuit = false;
+let localAppServer = null;
 const printerQueue = new PerPrinterQueue();
 const printWorkerWindows = new Map();
 
-function resolveTargetUrl() {
-  const candidate = process.env.ELECTRON_START_URL || process.env.POS_APP_URL || DEFAULT_URL;
-  try {
-    const parsed = new URL(candidate);
-    const isTrustedProduction = parsed.origin === TRUSTED_ORIGIN && parsed.pathname.startsWith('/.com');
-    const isLocalDev = parsed.hostname === '127.0.0.1' || parsed.hostname === 'localhost';
-    if (isTrustedProduction || isLocalDev) return candidate;
-  } catch {
-    // Fall through to the pinned production URL.
-  }
-  return DEFAULT_URL;
-}
 
 function workerKey(printerName) {
   return String(printerName || '').trim().toLocaleLowerCase();
@@ -203,7 +191,16 @@ async function printOnPhysicalPrinter(printerName, options) {
   }
 }
 
-function createWindow() {
+async function createWindow() {
+  // Electron always serves the UI bundled in its own installer. No remote
+  // startup URL, web fallback, or silently substituted application version.
+  if (!localAppServer) {
+    localAppServer = await startLocalAppServer({
+      distDir: path.join(__dirname, '..', 'dist'),
+    });
+  }
+  const targetUrl = localAppServer.url;
+  const trustedOrigin = new URL(targetUrl).origin;
   mainWindow = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -229,20 +226,18 @@ function createWindow() {
   mainWindow.webContents.on('will-navigate', (event, url) => {
     try {
       const parsed = new URL(url);
-      const target = new URL(resolveTargetUrl());
-      const sameTrustedApp = parsed.origin === target.origin && parsed.pathname.startsWith('/.com');
-      const sameLocalDev = (target.hostname === 'localhost' || target.hostname === '127.0.0.1') && parsed.origin === target.origin;
-      if (!sameTrustedApp && !sameLocalDev) event.preventDefault();
+      // Hard boundary: the privileged preload bridge belongs to this exact
+      // local origin only, not to a remote or a second local app.
+      if (parsed.origin !== trustedOrigin) event.preventDefault();
     } catch {
       event.preventDefault();
     }
   });
 
-  const targetUrl = resolveTargetUrl();
   mainWindow.loadURL(targetUrl).catch((error) => {
-    console.error('[Premier Print Agent] Failed to load remote app:', error);
-    const localIndex = path.join(__dirname, '..', 'dist', 'index.html');
-    if (fs.existsSync(localIndex) && mainWindow) void mainWindow.loadFile(localIndex);
+    console.error('[Premier Desktop] Failed to load bundled UI:', error);
+    dialog.showErrorBox('Premier OS', 'Bundled application could not be loaded. No remote fallback was used.');
+    app.quit();
   });
 
   mainWindow.on('close', (event) => {
@@ -330,12 +325,21 @@ ipcMain.handle('pos:get-system-info', async () => ({
   version: app.getVersion(),
 }));
 
+function reportDesktopStartupError(error) {
+  console.error('[Premier Desktop] Local UI startup failed:', error);
+  dialog.showErrorBox(
+    'Premier OS - Local startup failed',
+    'Cannot start the locally installed interface. Verify the installation and that port 43187 is available. No online application will be substituted.',
+  );
+  app.quit();
+}
+
 const hasSingleInstanceLock = app.requestSingleInstanceLock();
 if (!hasSingleInstanceLock) {
   app.quit();
 } else {
   app.on('second-instance', () => {
-    if (!mainWindow) createWindow();
+    if (!mainWindow) void createWindow().catch(reportDesktopStartupError);
     if (mainWindow) {
       if (mainWindow.isMinimized()) mainWindow.restore();
       mainWindow.show();
@@ -343,13 +347,18 @@ if (!hasSingleInstanceLock) {
     }
   });
 
-  app.whenReady().then(() => {
+  app.whenReady().then(async () => {
     if (process.platform === 'win32' && app.isPackaged) {
       app.setLoginItemSettings({ openAtLogin: true, path: process.execPath });
     }
-    createWindow();
+    try {
+      await createWindow();
+    } catch (error) {
+      reportDesktopStartupError(error);
+      return;
+    }
     app.on('activate', () => {
-      if (!mainWindow) createWindow();
+      if (!mainWindow) void createWindow().catch(reportDesktopStartupError);
       else {
         mainWindow.show();
         mainWindow.focus();
@@ -361,6 +370,11 @@ if (!hasSingleInstanceLock) {
 app.on('before-quit', () => {
   allowQuit = true;
   destroyAllPrintWorkers();
+  if (localAppServer) {
+    void localAppServer.close().catch((error) =>
+      console.warn('[Premier Desktop] Failed to stop local UI server:', error));
+    localAppServer = null;
+  }
 });
 
 app.on('window-all-closed', () => {});
