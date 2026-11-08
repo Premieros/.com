@@ -36,8 +36,8 @@
 | Issue | Quantity | Evidence / safety |
 | --- | ---: | --- |
 | Canonical inventory mismatches | 10 | 9 raw material (7 Cleopatra, 2 Smouha), 1 semi-finished (ASD) |
-| Raw stored-versus-batch mismatch | 1.35 absolute units across raw cases | The other 8 raw cases match batches but differ from movement sums; updating stored stock is not a remedy |
-| Raw movement absolute deltas | 96.925 units summed across 9 cases | Historical movement lineage must be reconciled first |
+| Raw stored-versus-batch mismatch | 1.35 absolute units across raw cases | The other 8 raw cases match batches but disagree with latest ledger after_qty snapshots; do not update stored stock |
+| Raw latest-ledger-snapshot absolute deltas | 96.925 units summed across 9 cases | Historical movement lineage must be reconciled first |
 | Semi-finished movement delta | 7 units | Stored -14, batches -7, movements -7; establish source-of-truth before adjustment |
 | Tables vacant with effective open orders | 7 | All Cleopatra; frontend now shows occupied based on effective order, but stored state is not silently changed |
 | Tables occupied without effective open order | 1 | Cleopatra; needs order lifecycle review |
@@ -48,6 +48,30 @@ Use `scripts/audit/premier-production-triage-readonly.sql` to reproduce
 the branch/category summary; use existing
 `scripts/audit/critical-integrity.sql` and
 `scripts/audit/erp-cross-domain-readonly.sql` for broader invariants.
+
+## Inventory lineage follow-up (read-only, 2026-11-08)
+
+**Important design constraint:** `docs/architecture/PHASE3B_CANONICAL_INVENTORY_BALANCE_PROJECTION.md`
+says the latest `inventory_ledger.after_qty` was deliberately used as the
+raw-material reconciliation baseline because historical opening/import flows
+can reset the stock baseline. **Do not globally switch the canonical view to
+`sum(inventory_ledger.quantity)` merely to clear nine warnings.**
+
+The read-only `scripts/audit/premier-inventory-source-lineage-readonly.sql`
+compared all currently affected rows with ledger sums and source-item names:
+
+- 533/533 current raw-material balances equal signed ledger totals and batch sums;
+  nine still disagree with the **latest event's `after_qty` snapshot**.
+  Classification: `LATEST_SNAPSHOT_DISAGREES_WITH_CONSISTENT_SUMS`.
+- All 15 semi-finished unit batch totals equal signed unit entries; the one
+  flagged ASD item has batch/entry quantity -7 and open debt 7, while the
+  current projection shows -14. Classification:
+  `POSSIBLE_DEBT_DOUBLE_SUBTRACTION_IN_PROJECTION`. This is a hypothesis
+  requiring comparison with the negative-stock writer; do not auto-change debt.
+- Neither evidence class authorizes rewriting source inventory, event history,
+  posted accounting, or replacing the established canonical baseline.
+  The correct next step is a **narrow, reviewed classification or writer fix**
+  with a scenario test for historical opening balances and negative batch debt.
 
 ## Mandatory release gates
 
