@@ -100,6 +100,14 @@ test('waiter order is stored durably and kitchen status becomes visible without 
   assert.equal(created.data.order.localOnly,true);
   assert.equal(created.data.order.cloudSynced,false);
   assert.equal(created.data.order.status,'new');
+  const pendingStart=await req(port,'GET','/api/v1/lan/sync-status',null,waiter);
+  assert.equal(pendingStart.status,200);
+  assert.equal(pendingStart.data.pendingCloudDraftEvents,1);
+  assert.equal(pendingStart.data.cloudAcknowledgementImplemented,false);
+  assert.equal(pendingStart.data.cloudSynced,false);
+  assert.equal(pendingStart.data.mode,'LOCAL_DRAFT_ONLY');
+  assert.equal((await req(port,'GET','/api/v1/lan/sync-status',null,bar))
+    .data.pendingCloudDraftEvents,0);
   const id=created.data.order.id;
   const retry=await req(port,'POST','/api/v1/lan/orders',order(),waiter);
   assert.equal(retry.status,200);
@@ -128,6 +136,8 @@ test('waiter order is stored durably and kitchen status becomes visible without 
     {status:'ready',expectedVersion:2,commandKey:'status_00000002'},chef);
   assert.equal(ready.status,200);
   assert.equal(ready.data.order.status,'ready');
+  assert.equal((await req(port,'GET','/api/v1/lan/sync-status',null,chef))
+    .data.pendingCloudDraftEvents,3);
 
   const afterRestart=await restart();
   assert.ok(afterRestart);
@@ -142,6 +152,8 @@ test('waiter order is stored durably and kitchen status becomes visible without 
   assert.equal(afterRestart.db.prepare('SELECT count(*) n FROM lan_kitchen_orders').get().n,1);
   assert.equal(afterRestart.db.prepare('SELECT count(*) n FROM lan_kitchen_events').get().n,4);
   assert.equal(afterRestart.db.prepare('SELECT count(*) n FROM lan_kitchen_commands').get().n,3);
+  assert.equal((await req(port,'GET','/api/v1/lan/sync-status',null,waiter))
+    .data.pendingCloudDraftEvents,4);
   assert.equal(afterRestart.revokeLanDevice('chef_tablet_001'),true);
   const replayAfterRevoke=await req(port,'POST','/api/v1/lan/orders',order(),waiter);
   assert.equal(replayAfterRevoke.status,200);
@@ -175,9 +187,21 @@ test('status idempotency is durable and rejects reuse for another transition',wi
   const retry=await req(port,'POST',endpoint,command,chef);
   assert.equal(retry.status,200);
   assert.equal(retry.data.replayed,true);
+  assert.equal(retry.data.committedVersion,2);
+  assert.equal((await req(port,'POST',endpoint,
+    {...command,expectedVersion:2},chef)).status,409);
   assert.equal((await req(port,'POST',endpoint,
     {...command,status:'ready'},chef)).status,409);
-  assert.equal(hub.db.prepare('SELECT count(*) n FROM lan_kitchen_events').get().n,2);
+  const newer=await req(port,'POST',endpoint,
+    {status:'ready',expectedVersion:2,commandKey:'cook_action_002'},chef);
+  assert.equal(newer.status,200);
+  const lateRetry=await req(port,'POST',endpoint,command,chef);
+  assert.equal(lateRetry.status,200);
+  assert.equal(lateRetry.data.replayed,true);
+  assert.equal(lateRetry.data.committedVersion,2);
+  assert.equal(lateRetry.data.order.status,'ready');
+  assert.equal(lateRetry.data.order.version,3);
+  assert.equal(hub.db.prepare('SELECT count(*) n FROM lan_kitchen_events').get().n,3);
 }));
 
 test('SSE replays only station-allowed durable events with monotonically increasing IDs',withServer(async({hub,port})=>{
@@ -206,6 +230,23 @@ test('SSE replays only station-allowed durable events with monotonically increas
   assert.ok(val.includes(': connected'));
   assert.doesNotMatch(val,/event: order-created/);
   await br.cancel();
+
+  const pastEnd=await fetch('http://127.0.0.1:'+port+'/api/v1/lan/events?after=9999',{
+    headers:{authorization:'Bearer '+chef},signal:AbortSignal.timeout(3500),
+  });
+  assert.equal(pastEnd.status,200);
+  const resetReader=pastEnd.body.getReader();
+  let resetPayload='';
+  for(let i=0;i<4;i++){
+    const frame=await resetReader.read();
+    if(frame.done)break;
+    resetPayload+=Buffer.from(frame.value).toString('utf8');
+    if(resetPayload.includes('event: reset-cursor')&&
+       resetPayload.includes('event: order-created'))break;
+  }
+  assert.match(resetPayload,/event: reset-cursor/);
+  assert.match(resetPayload,/event: order-created/);
+  await resetReader.cancel();
 }));
 
 test('untrusted hosts and LAN without TLS remain blocked, including master maintenance API',()=>{
