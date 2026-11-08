@@ -29,6 +29,8 @@ jobs:
           cache: npm
       - name: Local UI HTTP security and restart-origin contract
         run: node --test electron/localAppServer.test.cjs
+      - name: Verify encrypted local draft ledger, isolation and crash recovery
+        run: node --test electron/localDraftJournal.test.cjs
       - name: Install locked app dependencies
         run: npm ci
       - name: Build only local UI assets (no production upload)
