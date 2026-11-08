@@ -10,7 +10,7 @@ import { getReplayPinnedWarehouse } from './warehouseBinding';
 import {
   getAllOfflineSales,
   updateOfflineSaleStatus,
-  removeOfflineSale,
+  removeOfflineSaleStrict,
   getPendingSalesCount,
   subscribeToQueueChanges,
   type OfflineSaleQueueItem,
@@ -250,7 +250,7 @@ class OfflineSyncEngine {
             item.id, invoiceNumber, String(item.payload.p_branch_id || '').trim(),
           );
         }
-        await removeOfflineSale(item.id);
+        await removeOfflineSaleStrict(item.id);
         successCount++;
         this.syncedRecentlyCount++;
       } catch (err: unknown) {
