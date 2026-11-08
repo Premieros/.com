@@ -126,6 +126,15 @@ function createLanKitchen({db,organizationId,branchId}) {
       });
       return true;
     }
+    if(pathname==='/api/v1/lan/stations'&&req.method==='GET') {
+      const stations=db.prepare('SELECT DISTINCT station_code FROM lan_devices '+
+        "WHERE organization_id=? AND branch_id=? AND active=1 AND role='kitchen' "+
+        'ORDER BY station_code').all(organizationId,branchId).map(row=>row.station_code);
+      respond(res,200,{stations:device.role==='kitchen'?
+        stations.filter(code=>code===device.station_code):stations,
+        localOnly:true});
+      return true;
+    }
     if(pathname==='/api/v1/lan/orders'&&req.method==='GET') {
       const rows=db.prepare('SELECT * FROM lan_kitchen_orders WHERE branch_id=? AND '+
         (device.role==='kitchen'?'station_code=?':'device_id=?')+
@@ -149,6 +158,15 @@ function createLanKitchen({db,organizationId,branchId}) {
             line.name.trim().length>0&&line.name.length<=120&&
             Number.isInteger(line.quantity)&&line.quantity>=1&&line.quantity<=99)) {
           respond(res,400,{error:'LAN_INVALID_KITCHEN_DRAFT'});return true;
+        }
+        // Refuse an orphan kitchen ticket with no currently paired station.
+        const station=db.prepare('SELECT 1 FROM lan_devices WHERE '+
+          "organization_id=? AND branch_id=? AND role='kitchen' AND "+
+          'station_code=? AND active=1 LIMIT 1')
+          .get(organizationId,branchId,item.stationCode);
+        if (!station) {
+          respond(res,409,{error:'LAN_KITCHEN_STATION_NOT_AVAILABLE'});
+          return true;
         }
         const items=item.items.map(line=>({name:line.name.trim(),quantity:line.quantity}));
         const payloadHash=hash(JSON.stringify({
