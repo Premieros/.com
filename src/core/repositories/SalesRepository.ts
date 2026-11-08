@@ -1,6 +1,5 @@
-import { dbGetAll, dbGetAllStrict, dbPut, dbDelete } from './LocalDatabase';
-import { InventoryRepository } from './InventoryRepository';
-import { enqueueOfflineSaleWithMovements } from '@/core/offline/offlineStorage';
+import { dbGetAll, dbGetAllStrict, dbPut } from './LocalDatabase';
+import { enqueueOfflineSaleWithMovements, finalizeConfirmedOfflineSale } from '@/core/offline/offlineStorage';
 import type { OfflineSaleQueueItem } from '@/core/offline/offlineStorage';
 import type { ProcessSalePayload } from '@/features/pos/services/payment';
 
@@ -69,8 +68,8 @@ export class SalesRepository {
     const queued = queue.find(s => s.id === id);
     if (!queued) return;
     const branchId = String(queued.payload.p_branch_id || '').trim();
-    // Dequeue only after scoped local cleanup has succeeded.
-    await InventoryRepository.markSaleMovementsSynced(id, invoiceNumber, branchId);
-    await dbDelete('sales_queue', id);
+    if (!branchId) throw new Error('OFFLINE_SALE_SCOPE_REQUIRED_FOR_CLEANUP');
+    // Both stock deductions and the confirmed invoice disappear atomically.
+    await finalizeConfirmedOfflineSale(id, branchId, invoiceNumber);
   }
 }
