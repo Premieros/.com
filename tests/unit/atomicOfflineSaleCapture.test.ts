@@ -149,8 +149,34 @@ describe('atomic local financial outbox capture', () => {
     const previous = Array.from(harness.current!.stores.sales_queue.values());
     await expect(enqueueOfflineSaleWithMovements({
       ...sale(), invoice_number: 'DIFFERENT-INVOICE',
-    })).rejects.toThrow('DUPLICATE_LOCAL_SALE_ID');
+    })).rejects.toThrow('OFFLINE_SALE_DUPLICATE_LOCAL_CAPTURE');
     expect(Array.from(harness.current!.stores.sales_queue.values())).toEqual(previous);
+    expect(harness.current!.stores.local_stock_movements.size).toBe(2);
+  });
+
+  it('rejects duplicate offline invoices or operation keys even with different local IDs', async () => {
+    await enqueueOfflineSaleWithMovements({
+      ...sale(),
+      payload: { ...sale().payload, p_client_operation_key: 'checkout:one' },
+    });
+    await expect(enqueueOfflineSaleWithMovements({
+      ...sale(), id: 'cashier-device-002', client_id: 'cashier-device-002',
+      invoice_number: 'INV-OFF-002',
+      payload: {
+        ...sale().payload,
+        p_invoice_number: 'INV-OFF-002',
+        p_client_operation_key: 'checkout:one',
+      },
+    })).rejects.toThrow('OFFLINE_SALE_DUPLICATE_LOCAL_CAPTURE');
+
+    await expect(enqueueOfflineSaleWithMovements({
+      ...sale(), id: 'cashier-device-003', client_id: 'cashier-device-003',
+      payload: {
+        ...sale().payload, p_client_operation_key: 'checkout:other',
+      },
+    })).rejects.toThrow('OFFLINE_SALE_DUPLICATE_LOCAL_CAPTURE');
+
+    expect(harness.current!.stores.sales_queue.size).toBe(1);
     expect(harness.current!.stores.local_stock_movements.size).toBe(2);
   });
 
