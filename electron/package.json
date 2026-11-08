@@ -5,10 +5,13 @@
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
-    "build:win": "electron-builder --projectDir .. --config electron/electron-builder.json --win"
+    "build:win": "electron-builder --projectDir .. --config electron/electron-builder.json --win --publish never"
   },
   "devDependencies": {
     "electron": "^38.1.0",
     "electron-builder": "^26.0.12"
+  },
+  "dependencies": {
+    "electron-updater": "6.6.2"
   }
 }
