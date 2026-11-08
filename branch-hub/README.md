@@ -12,6 +12,106 @@ Set BRANCH_HUB_ORGANIZATION_ID (organization identifier), BRANCH_HUB_BRANCH_ID (
 
 Set BRANCH_HUB_HOST=0.0.0.0, BRANCH_HUB_TLS_CERT, BRANCH_HUB_TLS_KEY, and BRANCH_HUB_TOKEN. LAN bind is rejected without TLS. Install a certificate trusted by tablets/phones. Configure Windows firewall for branch subnet only. Device pairing, per-device credentials, revocation, persistent authenticated sessions, and a certificate provisioning UX are NOT YET implemented; the shared token is for controlled developer testing only. Do not expose the server to the internet.
 
+## Premier Local Network — waiter ↔ kitchen pilot (unreleased)
+
+This branch adds a **separate local kitchen-draft workflow** to the existing
+Branch Hub SQLite database. It is deliberately NOT a live POS order, stock
+consumption, payment, accounting posting or Supabase reconciliation. The
+existing cloud KDS screen and POS still use their current RPCs.
+
+- HTTPS /lan renders an Arabic phone/tablet screen with **zero CDN scripts**.
+  The static web UI accepts a device-specific credential manually; never pass
+  credentials in URLs, shared QR codes, query strings or repository files.
+  The backend requires a paired **per-device** secret for all local kitchen APIs.
+- Waiter may create a durable kitchen-only draft with station, table, quantities,
+  unique operation key. Kitchen tablets are restricted to one provisioned
+  station, may move new→cooking→ready. Originating waiter may mark ready→served.
+  Both operations use SQLite transactions; retries are deduplicated and version
+  conflicts rejected.
+- A branch-scoped Server-Sent Events stream includes cursor IDs so a
+  disconnected tablet can replay changes after reconnecting. Every request and
+  live push rechecks device revocation. Only the authorized station or
+  originating waiter receives each event.
+- Branch Hub's existing master token only accesses *legacy maintenance APIs
+  from loopback*. The new waiter/KDS endpoints DO NOT accept the shared master
+  credential. Wildcard CORS was removed; forged Host/Origin requests are
+  rejected. LAN binding requires a configured TLS certificate and explicit
+  trusted hostname/IP. Do not expose the service via router port forwarding.
+- The Windows Branch Hub desktop stays on loopback **by default**. In a
+  controlled lab, an administrator may set `lanEnabled: true`, `lanHostname`,
+  `lanPort`, and absolute `tlsCert`/`tlsKey` paths in the existing userData
+  `branch-config.json`. Its window then shows the exact HTTPS `/lan` URL.
+  A missing hostname/certificate fails closed; no firewall rule is installed.
+  Do not enable remote listening on a customer network without cert
+  provisioning, authenticated enrollment UX and complete security review.
+- Branch Hub's local SQLite is still plaintext on disk; portable encrypted
+  backups, secure device enrollment, operator PINs, comprehensive rate limiting,
+  lockout policy, signed enrollment and cloud-side rights revocation are NOT complete.
+  Basic invalid-device-token throttling is implemented as a bounded per-address
+  in-memory safeguard; it is not a replacement for authenticated enrollment.
+
+### Offline receipts, reconnect and recovery semantics
+
+- `GET /api/v1/lan/sync-status` reports a **device-scoped** count of durable
+  kitchen events and explicit `cloudAcknowledgementImplemented:false`.
+  These events are **not** uploaded to Supabase by the pilot. The screen must
+  never label them as remotely reconciled transactions.
+- On a lost HTTP response, repeat order creation or status updates with the
+  **same idempotency key**. For status commands, the response includes
+  `committedVersion` so retrying a previous transition cannot accidentally
+  report the later current kitchen state as the result of that command.
+- If the tablet reconnects with an SSE cursor ahead of the recovered database
+  (for example after restoring an older snapshot), the stream emits a
+  `reset-cursor` event and replays available station-authorized events.
+- The desktop's local LAN address is shown as active only after its child
+  service reports that it **bound the configured port**. The status does not
+  prove that a phone trusts the TLS certificate or that the Wi-Fi firewall
+  allows the connection.
+- A development backup can restore kitchen tickets, status history, device
+  revocations and event cursors. **It is not encrypted or portable for
+  customers**. Stop the branch service before restoring; never restore two
+  active copies of the same branch DB into the same LAN.
+- Revoked credentials receive a visible re-enrollment prompt instead of
+  being retried indefinitely, and repeated invalid tokens are throttled.
+  Real employee session/permission integration and certificate enrollment
+  remain release blockers.
+
+### Controlled development-only test
+
+Prerequisites: Node >=22.13, a trusted test PC and a test-only organization
+and branch identity. No customer orders or production secrets.
+
+Set BRANCH_HUB_ORGANIZATION_ID, BRANCH_HUB_BRANCH_ID, and a unique random
+BRANCH_HUB_TOKEN (32+ characters) on the administrator's machine. Stop the
+Hub first, then run from the repository root:
+
+    node branch-hub/provision-device.cjs pair waiter_phone_001 waiter_001 waiter
+    node branch-hub/provision-device.cjs pair kitchen_tablet_001 chef_001 kitchen hot
+
+Each command prints its **one-time device credential** locally. Treat it as a
+secret and manually enter it in the HTTPS /lan page; never share the master
+token with a phone. Set BRANCH_HUB_DATA_DIR consistently for both the admin
+CLI and the actual Hub (do not point to production). Revoke with:
+
+    node branch-hub/provision-device.cjs revoke waiter_phone_001
+
+For LAN access, configure BRANCH_HUB_HOST=0.0.0.0,
+BRANCH_HUB_LAN_HOSTNAME=<locally resolvable host or branch IP>,
+BRANCH_HUB_TLS_CERT and BRANCH_HUB_TLS_KEY with a certificate trusted on the
+phones. Restrict Windows firewall to the branch subnet. Access
+https://<BRANCH_HUB_LAN_HOSTNAME>:3847/lan from the same LAN. The test
+device IDs, names and station codes above are illustrative and must match
+enrollment. Access to the full Premier cloud app via this URL is NOT implied.
+
+### Test contract
+
+    node --test branch-hub/server.test.cjs branch-hub/lanKitchen.test.cjs
+
+Tests use loopback and an isolated temporary SQLite DB. They must pass
+without access to Supabase or any external network. A green unit test does
+NOT authorize live rollout; see docs/PREMIER_MASTER_WORK_LOG.md for the
+production readiness gates.
+
 ## Roadmap / production acceptance gates
 
 1. Package Windows installer/service with SQLite backups, encryption at rest, migration/versioning, startup recovery and printer worker.

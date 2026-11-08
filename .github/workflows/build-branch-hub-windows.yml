@@ -13,8 +13,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22.16.0'
+      - name: Validate local waiter browser scripts and enrollment CLI
+        run: |
+          node --check branch-hub/staff-ui.js
+          node --check branch-hub/lanKitchen.cjs
+          node --check branch-hub/provision-device.cjs
+          node --check branch-hub/lanDeploymentConfig.cjs
+          node --check branch-hub/desktop.cjs
       - name: Unit tests
-        run: node --test branch-hub/server.test.cjs
+        run: node --test branch-hub/server.test.cjs branch-hub/lanKitchen.test.cjs
       - name: Install packager
         working-directory: branch-hub
         run: npm install --no-audit --no-fund
