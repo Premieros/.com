@@ -8,7 +8,7 @@ import {
   getOfflineCache,
   saveOfflineSetting,
   getOfflineSetting,
-  enqueueOfflineSale,
+  enqueueOfflineSaleWithMovements,
   getAllOfflineSales,
   removeOfflineSale,
   type OfflineSaleQueueItem,
@@ -166,7 +166,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
       throw new Error('WAREHOUSE_REQUIRED_OFFLINE_CAPTURE');
     }
     const id = 'offline_sale_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8);
-    await enqueueOfflineSale({
+    await enqueueOfflineSaleWithMovements({
       id,
       client_id: id,
       invoice_number: invoiceNumber,
