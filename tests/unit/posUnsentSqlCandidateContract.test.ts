@@ -33,4 +33,14 @@ describe('Premier POS server guard candidate safety contract', () => {
     expect(sql).not.toContain('SET row_security = off');
     expect(sql).not.toContain('GRANT EXECUTE');
   });
+  it('includes a guarded rollback to the original function signatures', () => {
+    const rollback = fs.readFileSync(path.join(process.cwd(),
+      'scripts/db/candidates/pos_unsent_settlement_print_rollback_NOT_FOR_PRODUCTION.sql'), 'utf8');
+    expect(rollback).toContain('NOT FOR PRODUCTION');
+    expect(rollback).toContain('PREMIER_SETTLEMENT_ROLLBACK_DRIFT');
+    expect(rollback).toContain('PREMIER_PRINT_ROLLBACK_DRIFT');
+    expect(rollback).toContain('7bd3f7ac00ec8fd217bf27be451c1a73');
+    expect(rollback).toContain('79d0a8973a55b7e85ea6655c3df53f90');
+    expect(rollback.match(/PREMIER_ORDER_FULL_SEND_REQUIRED_20261108/g)?.length).toBe(2);
+  });
 });
