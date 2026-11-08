@@ -133,7 +133,23 @@ function getSharedChannel(branchId: string, debounceMs: number): SharedChannel {
       { event: '*', schema: 'public', table: 'order_kitchen_sends', filter: `branch_id=eq.${branchId}` },
       (payload) => trigger(toEvent('order_kitchen_sends', payload)),
     )
-    .subscribe();
+    .subscribe((status) => {
+      // Realtime does not replay events missed during a disconnect.
+      // Trigger the existing debounced branch snapshot only once per
+      // successful rejoin, without replaying any writes or adding polling.
+      if (status === 'SUBSCRIBED' && !(typeof document !== 'undefined' && document.hidden)) {
+        for (const listener of entry.listeners) entry.pendingListeners.add(listener.onEvent);
+        if (entry.pendingListeners.size > 0) {
+          if (entry.timer) clearTimeout(entry.timer);
+          entry.timer = setTimeout(() => {
+            entry.timer = null;
+            const pending = [...entry.pendingListeners];
+            entry.pendingListeners.clear();
+            pending.forEach((callback) => callback());
+          }, entry.debounceMs);
+        }
+      }
+    });
 
   sharedChannels.set(branchId, entry);
   return entry;

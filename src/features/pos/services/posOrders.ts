@@ -100,6 +100,10 @@ export async function fetchOrderForWorkspace(orderId: string): Promise<{ order: 
   if (orderError) throw orderError;
   const order = (o as Order | null) || null;
   if (!order) return { order: null, items: [], products: [], table: null };
+  // Authorization and hydration are separate reads. An order can close
+  // between them: never restore a terminal order to the cashier workspace.
+  if (order.status === 'completed') throw new Error('ORDER_CLOSED');
+  if (order.status === 'cancelled') throw new Error('ORDER_CANCELLED');
 
   const { data: items, error: itemsError } = await supabase.from('order_items').select('*').eq('order_id', orderId);
   if (itemsError) throw itemsError;

@@ -1,0 +1,63 @@
+name: Premier POS recovery guards
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'src/features/pos/**'
+      - 'tests/unit/posRecoveryGuards.test.ts'
+      - 'tests/unit/posUnsentCheckoutGuard.test.ts'
+      - 'tests/unit/posUnsentSqlCandidateContract.test.ts'
+      - 'scripts/db/candidates/pos_unsent_settlement_print_NOT_FOR_PRODUCTION.sql'
+      - 'scripts/db/candidates/pos_unsent_settlement_print_rollback_NOT_FOR_PRODUCTION.sql'
+      - 'tests/integration/posUnsentPredicate.test.ts'
+      - 'tests/components/pos-customer-receipt-print-contract.test.ts'
+      - '.github/workflows/premier-pos-recovery.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SUPABASE_PROJECT_REF: hvqlkapynjfjikqithvd
+  VITE_SUPABASE_URL: https://hvqlkapynjfjikqithvd.supabase.co
+  VITE_SUPABASE_ANON_KEY: dummy_anon_key_for_ci_build
+
+jobs:
+  pos-recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      SUPABASE_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --no-audit --no-fund
+      - name: Verify canonical Premier project identity
+        run: |
+          node scripts/db/verify-database-identity.js
+          node scripts/db/verify-project-references.js
+      - name: Typecheck application and tests
+        run: npm run typecheck:all
+      - name: Verify POS recovery, unsent guard and existing print contract
+        run: npx vitest run tests/unit/posRecoveryGuards.test.ts tests/unit/posUnsentCheckoutGuard.test.ts tests/unit/posUnsentSqlCandidateContract.test.ts tests/components/pos-customer-receipt-print-contract.test.ts
+      - name: Verify unsent-line SQL predicate against synthetic local PostgreSQL values
+        run: npx vitest run -c vitest.integration.config.ts tests/integration/posUnsentPredicate.test.ts
+      - name: Build Premier app
+        run: npm run build

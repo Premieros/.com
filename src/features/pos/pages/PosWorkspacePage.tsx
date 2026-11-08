@@ -24,6 +24,7 @@ import { useActiveOrders } from '../hooks/useActiveOrders';
 import { usePosPermissions } from '../hooks/usePosPermissions';
 import { usePosKeyboard } from '../hooks/usePosKeyboard';
 import { cartLineKey, orderItemLineKey } from '../utils/cart';
+import { needsKitchenDispatchBeforeSettlement } from '../utils/unsentCheckoutGuard';
 import { InventoryRepository } from '@/core/repositories/InventoryRepository';
 import { OrderStartWizard, type StartStep, type StartOrderOptions } from '../components/start/OrderStartWizard';
 import { ProductBrowser } from '../components/catalog/ProductBrowser';
@@ -295,8 +296,22 @@ export function PosWorkspacePage() {
     });
   }, [pos.cart, kitchenSendsByOrder, orderItemsForActive]);
 
+  // A cashier-side guard provides immediate feedback. The corresponding
+  // transaction-locked server guard is still required before production use.
+  const blockUnsentOpenOrder = useCallback((): boolean => {
+    if (!needsKitchenDispatchBeforeSettlement(pos.activeOrderId, hasUnsentItems)) return false;
+    show(
+      isAr
+        ? 'أرسل جميع الأصناف للمطبخ أو احذف غير المرسل قبل الدفع أو طباعة الحساب.'
+        : 'Send all items to the kitchen or remove unsent items before payment or printing.',
+      'error',
+    );
+    return true;
+  }, [pos.activeOrderId, hasUnsentItems, isAr, show]);
+
   const handlePay = useCallback(() => {
     if (!perms.canPay || !shiftChecked || pos.cart.length === 0) return;
+    if (blockUnsentOpenOrder()) return;
     if (posSurface.customerRequired && !pos.customerId) {
       setCustomerModalOpen(true);
       show(
@@ -315,7 +330,7 @@ export function PosWorkspacePage() {
     pos.setPaidAmount(pos.total);
     pos.setCheckoutOpen(true);
     setMobileOrderOpen(true);
-  }, [perms.canPay, shiftChecked, pos, guardPos, products.length, activeShift?.id, posSurface, show, isAr]);
+  }, [perms.canPay, shiftChecked, pos, guardPos, products.length, activeShift?.id, posSurface, show, isAr, blockUnsentOpenOrder]);
 
   // Keyboard Shortcuts Hook
   usePosKeyboard({
@@ -748,7 +763,7 @@ export function PosWorkspacePage() {
       canComplete={perms.canPay && !!effectiveBranch}
       canEditOrder={perms.canEditOrder}
       canDirectDiscount={perms.canDiscount}
-      onComplete={() => { if (perms.canPay) void pos.completeSale(); }}
+      onComplete={() => { if (perms.canPay && !blockUnsentOpenOrder()) void pos.completeSale(); }}
       onBack={() => { pos.setCheckoutOpen(false); setMobileOrderOpen(true); }}
       currency={pos.effCurrency}
       cart={pos.cart}
@@ -795,7 +810,7 @@ export function PosWorkspacePage() {
       onSetItemDiscount={pos.setItemDiscount}
       onHold={() => void pos.holdOrder()}
       onSendKitchen={() => void pos.sendToKitchen()}
-      onPrint={() => void pos.printReceipt()}
+      onPrint={() => { if (!blockUnsentOpenOrder()) void pos.printReceipt(); }}
       onPay={handlePay}
       onAddItem={() => barcodeRef.current?.focus()}
       onConfigureItem={(item) => setConfigItem(item)}
@@ -977,7 +992,7 @@ export function PosWorkspacePage() {
             onOpenCustomer={() => setCustomerModalOpen(true)}
             onHoldOrder={() => void pos.holdOrder()}
             onSendKitchen={() => void pos.sendToKitchen()}
-            onPrint={() => void pos.printReceipt()}
+            onPrint={() => { if (!blockUnsentOpenOrder()) void pos.printReceipt(); }}
             onPay={handlePay}
           />
           ) : (
@@ -1368,7 +1383,7 @@ export function PosWorkspacePage() {
             {perms.canPrint && (
               <button
                 data-testid="pos-receipt-print"
-                onClick={() => void pos.printReceipt()}
+                onClick={() => { if (!blockUnsentOpenOrder()) void pos.printReceipt(); }}
                 className="w-full inline-flex items-center justify-center gap-2 py-3 rounded-xl bg-ui-primary hover:bg-ui-primary-hover text-ui-primary-fg font-bold transition-colors"
               >
                 <Printer className="w-5 h-5" /> {t('printReceipt')}
