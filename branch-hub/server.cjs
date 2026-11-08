@@ -271,6 +271,17 @@ function createHub(config = {}) {
 }
 if (require.main === module) {
   const hub = createHub();
-  hub.listen().then(addr => console.log('Premier Branch Hub listening on', addr.address, addr.port));
+  hub.listen().then(addr => {
+    // The packaged Electron parent must NOT claim the LAN link is ready
+    // before Node has actually bound the port and loaded its TLS identity.
+    if (typeof process.send === 'function') {
+      process.send({type:'premier-hub-ready',port:addr.port,
+        host:addr.address,mode:addr.family});
+    }
+    console.log('Premier Branch Hub listening on', addr.address, addr.port);
+  }).catch(error => {
+    console.error('Premier Branch Hub refused startup:',error?.message||'unknown');
+    process.exitCode=1;
+  });
 }
 module.exports = { createHub };
