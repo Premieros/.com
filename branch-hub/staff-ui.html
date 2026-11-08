@@ -23,7 +23,7 @@
       <form id="order-form" hidden>
         <h2>إرسال طلب مطبخ تجريبي</h2>
         <label for="table">الطاولة</label><input id="table" required maxlength="64" value="Table 01">
-        <label for="station">رمز محطة المطبخ</label><input id="station" required pattern="[A-Za-z0-9_-]{3,80}" value="main">
+        <label for="station">محطة المطبخ المقترنة</label><input id="station" list="stations" required pattern="[A-Za-z0-9_-]{3,80}"><datalist id="stations"></datalist>
         <label for="product">اسم الصنف</label><input id="product" required maxlength="120" placeholder="مثال: بيتزا">
         <label for="quantity">الكمية</label><input id="quantity" type="number" min="1" max="99" value="1" required>
         <button type="submit">حفظ وإرسال للمطبخ</button>
