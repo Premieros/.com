@@ -65,17 +65,7 @@ export interface FixedThermalTemplate {
   footerLines?: string[];
 }
 
-declare global {
-  interface Window {
-    electronAPI?: {
-      isElectron: boolean;
-      getPrinters: () => Promise<Array<{ name: string; displayName?: string; isDefault?: boolean; status?: number }>>;
-      printSilent: (options: { html?: string; text?: string; printerName: string; copies?: number; paperWidthMm?: number }) => Promise<{ success: boolean; error?: string }>;
-      kickDrawer: (printerName?: string) => Promise<{ success: boolean; error?: string }>;
-      getSystemInfo: () => Promise<{ isElectron: boolean; platform: string; hostname: string }>;
-    };
-  }
-}
+// Global electronAPI is typed in src/types/electron.d.ts
 
 function safeText(value: unknown): string {
   return Array.from(String(value ?? ''))

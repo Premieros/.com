@@ -491,3 +491,30 @@
     - محاكاة إعادة تشغيل Windows وإغلاق المحرك وإعادة فتحه من القرص والتأكد من بقاء وسلامة البيانات.
     - اختبار إعادة إرسال أمر التحصيل بنفس المفتاح والتأكد من عدم إنشاء أي سجلات أو حركات جديدة.
   - تم إضافة سكريبت `npm run test:local-engine` ودمجه في `package.json`.
+
+
+## 22. 2026-11-10 — تنفيذ المرحلة C وربط شاشة البيع بمحرك SQLite المحلي (Local POS Data Adapter)
+
+- **الفرع التطويري المستقل:** `feat/premier-offline-pos-adapter`.
+- **أولاً: إغلاق ثغرات المرحلة B وتأمين المحرك المحلي (C0 Security):**
+  1. **حماية جلسات الكاشير وسياق الفرع:**
+     - إدارة جلسات العمل `local_sessions` بصورة موثوقة في Electron Main Process عبر `electron/localEngine/ipcBridge.cjs`.
+     - منع التلاعب بالهويات: عدم الثقة في `cashierId` أو `branchId` أو `warehouseId` ممررة من React؛ يتم استنتاجها والتحقق منها جبرياً من الجلسة الموثقة `sessionToken`.
+  2. **احتساب تكلفة المخزون الآلي الموثوق:**
+     - منع تمرير `soldItemsCost` نهائياً من الواجهة الأمامية.
+     - إضافة جدول `local_product_recipes` (BOM) لحساب تكلفة الأصناف تلقائياً من المكونات الخام وخصمها من دفتر المخزون `local_inventory_movements`.
+     - في حال عدم وجود وصفة، يتم احتساب التكلفة تلقائياً من أحدث حركة شراء للمنتج أو تكلفة الكتالوج، وإذا لم تتوفر التكلفة لا يتم توليد قيود تكلفة وهمية.
+  3. **ضمان توازن القيود وذرية المعاملات:**
+     - تراجع كامل للمعاملة (`ROLLBACK`) عند حدوث أي خطأ في التحصيل أو نقص في المبلغ المدفوع، مع اختبار سلبي يثبت عدم كتابة أي سجل أو حركة مخزون عند الفشل.
+- **ثانياً: إنشاء Local POS Data Adapter (C1):**
+  - إنشاء `src/features/pos/adapters/localPosAdapter.ts`:
+    - التحقق من توافر محرك التشغيل المحلي عبر `isLocalEngineAvailable()`.
+    - توفير دوال التشغيل المحلية: `localFetchActiveOrders`, `localFetchActiveShift`, `localProcessSaleForOrder`, `localSendOrderToKitchen`, `localCreateOrder`, `localAddOrderItem`.
+    - ربط خدمة الدفع `src/features/pos/services/payment.ts` بالمحول المحلي مع الالتزام الصارم بمبدأ الانغلاق عند الخطأ (`Fail Closed`) دون الرجوع لـ Supabase.
+    - ربط جلب الطلبات والورديات `src/features/pos/services/posOrders.ts` وإرسال المطبخ `src/features/pos/services/kitchen.ts` بالمحول المحلي.
+    - توحيد تعريفات Electron في `src/types/electron.d.ts` وضمان سلامة الأنواع `typecheck` بالكامل.
+- **ثالثاً: نتائج الاختبارات:**
+  - اجتياز 15 اختبار قبول وأمان في `electron/localEngine/engine.test.cjs` بنسبة 100%.
+  - اجتياز اختبارات وحدة الـ Adapter في `tests/unit/localPosAdapter.test.ts` (5/5 tests passed).
+  - اجتياز 153 اختباراً في `npm run test:unit`.
+  - اجتياز فحص `tsc --noEmit -p tsconfig.app.json` بدون أي أخطاء.

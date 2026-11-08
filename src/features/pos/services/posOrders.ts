@@ -1,6 +1,7 @@
 import { supabase, pos as posApi } from '@/api';
 import type { Branch, Customer, DiningTable, Order, OrderItem, Product } from '@/lib/types';
 import type { OrderKitchenSend, PosRealtimeData } from '../types';
+import { isLocalEngineAvailable, localFetchActiveOrders, localFetchActiveShift } from '../adapters/localPosAdapter';
 
 export const EMPTY_POS_REALTIME: PosRealtimeData = {
   orders: [],
@@ -33,6 +34,9 @@ export type MyActiveTableOrderResolution = {
 };
 
 export async function fetchActiveOrders(branchId: string): Promise<PosRealtimeData> {
+  if (isLocalEngineAvailable()) {
+    return localFetchActiveOrders(branchId);
+  }
   const [tRes, oRes, operatorRes] = await Promise.all([
     supabase.from('dining_tables').select('*').eq('branch_id', branchId).eq('is_active', true).order('name'),
     supabase.from('orders')
@@ -141,6 +145,9 @@ export async function fetchCustomers(branchId: string): Promise<Customer[]> {
 }
 
 export async function fetchActiveShift(branchId: string): Promise<{ id: string; expected: number; opened_at: string; opening_amount: number } | null> {
+  if (isLocalEngineAvailable()) {
+    return localFetchActiveShift(branchId);
+  }
   const { data } = await posApi.getActiveShift({ p_branch_id: branchId });
   const res = data as unknown as { success?: boolean; open?: boolean; shift?: { id: string; expected: number; opened_at: string; opening_amount: number } } | null;
   return res?.open ? (res.shift ?? null) : null;

@@ -55,9 +55,116 @@ class PremierLocalEngine {
     }
   }
 
+  // =========================================================================
+  // AUTHENTICATION & SESSION GUARDS (C0 Security)
+  // =========================================================================
+
   /**
-   * Seed baseline branch, roles, users, and warehouse for testing or initial branch initialization.
+   * Create an authenticated session for a user in a branch.
    */
+  createSession({ userId, branchId }) {
+    if (!userId || !branchId) {
+      throw new Error('AUTH_SESSION_PARAMETERS_MISSING');
+    }
+
+    const user = this.db.prepare(
+      `SELECT u.id, u.username, u.full_name, u.role, u.branch_id, u.is_active, r.permissions
+       FROM local_users u
+       JOIN local_roles r ON r.name = u.role
+       WHERE u.id = ? AND u.branch_id = ?`
+    ).get(userId, branchId);
+
+    if (!user) {
+      throw new Error('USER_NOT_FOUND_IN_BRANCH');
+    }
+    if (!user.is_active) {
+      throw new Error('USER_INACTIVE');
+    }
+
+    const permissions = JSON.parse(user.permissions || '[]');
+    const token = crypto.randomBytes(32).toString('hex');
+
+    // Check if cashier has an open shift in this branch
+    const shift = this.db.prepare(
+      `SELECT id FROM local_shifts WHERE cashier_id = ? AND branch_id = ? AND status = 'open'`
+    ).get(userId, branchId);
+
+    const shiftId = shift ? shift.id : null;
+
+    this.db.prepare(
+      `INSERT INTO local_sessions (token, user_id, branch_id, role, shift_id)
+       VALUES (?, ?, ?, ?, ?)`
+    ).run(token, userId, branchId, user.role, shiftId);
+
+    return {
+      token,
+      userId: user.id,
+      username: user.username,
+      fullName: user.full_name,
+      role: user.role,
+      branchId: user.branch_id,
+      permissions,
+      shiftId,
+    };
+  }
+
+  /**
+   * Validate session token and return authoritative user context.
+   */
+  verifySession(token) {
+    if (!token) {
+      throw new Error('SESSION_TOKEN_REQUIRED');
+    }
+
+    const session = this.db.prepare(
+      `SELECT s.token, s.user_id, s.branch_id, s.role, s.shift_id, s.created_at,
+              u.username, u.full_name, u.is_active, r.permissions
+       FROM local_sessions s
+       JOIN local_users u ON u.id = s.user_id
+       JOIN local_roles r ON r.name = s.role
+       WHERE s.token = ?`
+    ).get(token);
+
+    if (!session || !session.is_active) {
+      throw new Error('INVALID_OR_EXPIRED_SESSION');
+    }
+
+    // Refresh active shift ID dynamically
+    const currentShift = this.db.prepare(
+      `SELECT id FROM local_shifts WHERE cashier_id = ? AND branch_id = ? AND status = 'open'`
+    ).get(session.user_id, session.branch_id);
+
+    const shiftId = currentShift ? currentShift.id : null;
+
+    return {
+      token: session.token,
+      userId: session.user_id,
+      username: session.username,
+      fullName: session.full_name,
+      role: session.role,
+      branchId: session.branch_id,
+      permissions: JSON.parse(session.permissions || '[]'),
+      shiftId,
+    };
+  }
+
+  /**
+   * Check if a session has permission.
+   */
+  requirePermission(session, permission) {
+    if (!session || !Array.isArray(session.permissions)) {
+      throw new Error('UNAUTHORIZED: No session provided');
+    }
+    const hasPerm = session.permissions.includes('all') || session.permissions.includes(permission);
+    if (!hasPerm) {
+      throw new Error(`FORBIDDEN: Missing permission [${permission}]`);
+    }
+  }
+
+  // =========================================================================
+  // SEEDING & CATALOG
+  // =========================================================================
+
   seedInitialData({
     branchId = crypto.randomUUID(),
     branchName = 'Main Branch',
@@ -73,7 +180,7 @@ class PremierLocalEngine {
         `INSERT OR IGNORE INTO local_roles (name, permissions, description) VALUES (?, ?, ?)`
       );
       insertRole.run('admin', JSON.stringify(['all']), 'Full Local Administrator');
-      insertRole.run('cashier', JSON.stringify(['pos:order', 'pos:settle', 'pos:shift']), 'POS Cashier');
+      insertRole.run('cashier', JSON.stringify(['pos:order', 'pos:settle', 'pos:shift', 'inventory:view']), 'POS Cashier');
       insertRole.run('kitchen', JSON.stringify(['kds:view', 'kds:status']), 'Kitchen Staff');
 
       // 2. Branch
@@ -98,21 +205,86 @@ class PremierLocalEngine {
   }
 
   /**
+   * Seed or sync a product into the local catalog.
+   */
+  upsertProduct({
+    id = crypto.randomUUID(),
+    branchId,
+    categoryId = null,
+    categoryName = null,
+    name,
+    sku = null,
+    barcode = null,
+    price,
+    cost = 0.0,
+    stationCode = 'kitchen',
+    isAvailable = 1,
+  }) {
+    this.db.prepare(
+      `INSERT INTO local_products (id, branch_id, category_id, category_name, name, sku, barcode, price, cost, station_code, is_available)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(id) DO UPDATE SET
+         name = excluded.name,
+         price = excluded.price,
+         cost = excluded.cost,
+         station_code = excluded.station_code,
+         is_available = excluded.is_available`
+    ).run(id, branchId, categoryId, categoryName, name, sku, barcode, price, cost, stationCode, isAvailable);
+
+    return this.db.prepare(`SELECT * FROM local_products WHERE id = ?`).get(id);
+  }
+
+  /**
+   * Set recipe ingredients for a finished product.
+   */
+  setProductRecipe({ productId, ingredients = [] }) {
+    return this.transaction(() => {
+      this.db.prepare(`DELETE FROM local_product_recipes WHERE product_id = ?`).run(productId);
+
+      const stmt = this.db.prepare(
+        `INSERT INTO local_product_recipes (id, product_id, ingredient_item_id, quantity_required, unit_of_measure)
+         VALUES (?, ?, ?, ?, ?)`
+      );
+
+      for (const ing of ingredients) {
+        stmt.run(crypto.randomUUID(), productId, ing.ingredientItemId, ing.quantityRequired, ing.unitOfMeasure || 'unit');
+      }
+
+      return this.db.prepare(`SELECT * FROM local_product_recipes WHERE product_id = ?`).all(productId);
+    });
+  }
+
+  /**
+   * Get products available for POS menu.
+   */
+  getProducts({ branchId }) {
+    return this.db.prepare(
+      `SELECT * FROM local_products WHERE branch_id = ? AND is_available = 1 ORDER BY name ASC`
+    ).all(branchId);
+  }
+
+  /**
+   * Get floor tables and active order occupancy.
+   */
+  getTables({ branchId }) {
+    return this.db.prepare(
+      `SELECT * FROM local_tables WHERE branch_id = ? ORDER BY table_number ASC`
+    ).all(branchId);
+  }
+
+  // =========================================================================
+  // OPERATIONAL METHODS (POS & KDS)
+  // =========================================================================
+
+  /**
    * Open a cashier shift.
    */
-  openShift({ branchId, cashierId, openingFloat = 0.0 }) {
-    if (!branchId || !cashierId) {
-      throw new Error('BRANCH_OR_CASHIER_MISSING');
-    }
+  openShift({ sessionToken, openingFloat = 0.0 }) {
+    const session = this.verifySession(sessionToken);
+    this.requirePermission(session, 'pos:shift');
 
-    // Verify cashier exists and is active
-    const user = this.db.prepare(
-      `SELECT id, is_active, branch_id FROM local_users WHERE id = ?`
-    ).get(cashierId);
-
-    if (!user || !user.is_active || user.branch_id !== branchId) {
-      throw new Error('INVALID_CASHIER');
-    }
+    const branchId = session.branchId;
+    const cashierId = session.userId;
 
     // Check for open shift for this cashier
     const existingShift = this.db.prepare(
@@ -134,6 +306,9 @@ class PremierLocalEngine {
       `INSERT INTO local_shifts (id, branch_id, cashier_id, status, opening_float, opened_at)
        VALUES (?, ?, ?, 'open', ?, ?)`
     ).run(shiftId, branchId, cashierId, openingFloat, openedAt);
+
+    // Update active session with shift ID
+    this.db.prepare(`UPDATE local_sessions SET shift_id = ? WHERE token = ?`).run(shiftId, sessionToken);
 
     const shift = this.db.prepare(`SELECT * FROM local_shifts WHERE id = ?`).get(shiftId);
     return { success: true, shift };
@@ -158,9 +333,16 @@ class PremierLocalEngine {
   /**
    * Create a new order (dining table or takeaway).
    */
-  createOrder({ branchId, tableId = null, shiftId, createdBy, guestCount = 1 }) {
-    if (!branchId || !createdBy || !shiftId) {
-      throw new Error('ORDER_CREATION_PARAMETERS_MISSING');
+  createOrder({ sessionToken, tableId = null, guestCount = 1 }) {
+    const session = this.verifySession(sessionToken);
+    this.requirePermission(session, 'pos:order');
+
+    const branchId = session.branchId;
+    const createdBy = session.userId;
+    const shiftId = session.shiftId;
+
+    if (!shiftId) {
+      throw new Error('NO_ACTIVE_SHIFT: Cashier must open a shift before creating orders');
     }
 
     return this.transaction(() => {
@@ -206,7 +388,10 @@ class PremierLocalEngine {
   /**
    * Add an item to an active order.
    */
-  addOrderItem({ orderId, productId, productName, quantity, unitPrice, stationCode = 'kitchen', notes = null }) {
+  addOrderItem({ sessionToken, orderId, productId, productName, quantity, unitPrice, stationCode = 'kitchen', notes = null }) {
+    const session = this.verifySession(sessionToken);
+    this.requirePermission(session, 'pos:order');
+
     if (!orderId || !productId || !productName) {
       throw new Error('MISSING_ORDER_ITEM_DATA');
     }
@@ -218,9 +403,12 @@ class PremierLocalEngine {
     }
 
     return this.transaction(() => {
-      const order = this.db.prepare(`SELECT id, status FROM local_orders WHERE id = ?`).get(orderId);
+      const order = this.db.prepare(`SELECT id, branch_id, status FROM local_orders WHERE id = ?`).get(orderId);
       if (!order) {
         throw new Error('ORDER_NOT_FOUND');
+      }
+      if (order.branch_id !== session.branchId) {
+        throw new Error('FORBIDDEN_BRANCH_MISMATCH: Order belongs to different branch');
       }
       if (order.status === 'completed' || order.status === 'cancelled') {
         throw new Error(`ORDER_CLOSED: Cannot add item to ${order.status} order`);
@@ -240,7 +428,7 @@ class PremierLocalEngine {
       ).get(orderId);
 
       const subtotal = totals.subtotal || 0.0;
-      const totalAmount = subtotal; // can apply discount/tax rules if needed
+      const totalAmount = subtotal;
 
       this.db.prepare(
         `UPDATE local_orders SET subtotal = ?, total_amount = ?, updated_at = datetime('now') WHERE id = ?`
@@ -256,15 +444,19 @@ class PremierLocalEngine {
   /**
    * Send pending unsent items of an order to the Kitchen (KDS).
    */
-  sendOrderToKitchen({ orderId, sentBy }) {
-    if (!orderId || !sentBy) {
-      throw new Error('MISSING_SEND_PARAMETERS');
-    }
+  sendOrderToKitchen({ sessionToken, orderId }) {
+    const session = this.verifySession(sessionToken);
+    this.requirePermission(session, 'pos:order');
+
+    const sentBy = session.userId;
 
     return this.transaction(() => {
-      const order = this.db.prepare(`SELECT id, status, branch_id FROM local_orders WHERE id = ?`).get(orderId);
+      const order = this.db.prepare(`SELECT id, branch_id, status FROM local_orders WHERE id = ?`).get(orderId);
       if (!order) {
         throw new Error('ORDER_NOT_FOUND');
+      }
+      if (order.branch_id !== session.branchId) {
+        throw new Error('FORBIDDEN_BRANCH_MISMATCH');
       }
       if (order.status === 'completed' || order.status === 'cancelled') {
         throw new Error(`ORDER_CLOSED: Cannot send items for ${order.status} order`);
@@ -355,26 +547,75 @@ class PremierLocalEngine {
   }
 
   /**
-   * Settle an order, record the sale, collect payment, deduct stock,
-   * generate double-entry journal, and write outbox for cloud sync.
-   * Fully idempotent using idempotencyKey.
+   * Fetch latest unit cost for an item from inventory movements or products catalog.
+   */
+  getAuthoritativeUnitCost(branchId, warehouseId, itemId) {
+    // 1. Try latest purchase movement
+    const movement = this.db.prepare(
+      `SELECT unit_cost FROM local_inventory_movements
+       WHERE branch_id = ? AND warehouse_id = ? AND item_id = ? AND delta > 0
+       ORDER BY created_at DESC LIMIT 1`
+    ).get(branchId, warehouseId, itemId);
+
+    if (movement && movement.unit_cost > 0) {
+      return movement.unit_cost;
+    }
+
+    // 2. Try catalog cost
+    const product = this.db.prepare(
+      `SELECT cost FROM local_products WHERE id = ? AND branch_id = ?`
+    ).get(itemId, branchId);
+
+    if (product && product.cost > 0) {
+      return product.cost;
+    }
+
+    return 0.0;
+  }
+
+  /**
+   * Settle an order authoritatively:
+   * 1. Validates authenticated session and cashier permissions.
+   * 2. Idempotency replay check.
+   * 3. Validates order completion and table release.
+   * 4. Enforces kitchen dispatch policy (ORDER_NOT_FULLY_SENT).
+   * 5. Computes authoritative stock cost internally (NEVER trusts frontend soldItemsCost).
+   * 6. Deducts inventory (recipes or products) in ACID transaction.
+   * 7. Generates balanced double-entry accounting lines.
+   * 8. Records outbox entry for cloud synchronization.
    */
   settleOrder({
+    sessionToken,
     orderId,
-    branchId,
-    shiftId,
-    cashierId,
     warehouseId,
     paymentMethod = 'cash',
     amount,
     idempotencyKey,
-    soldItemsCost = 0.0,
   }) {
-    if (!orderId || !branchId || !cashierId || !idempotencyKey) {
+    // 1. Authoritative Session Check
+    const session = this.verifySession(sessionToken);
+    this.requirePermission(session, 'pos:settle');
+
+    const branchId = session.branchId;
+    const cashierId = session.userId;
+    const shiftId = session.shiftId;
+
+    if (!orderId || !warehouseId || !idempotencyKey) {
       throw new Error('SETTLEMENT_PARAMETERS_MISSING');
     }
+    if (!shiftId) {
+      throw new Error('NO_ACTIVE_SHIFT: Cannot settle order without an open cashier shift');
+    }
 
-    // 1. Check idempotency key first (outside transaction lock)
+    // Verify warehouse belongs to this branch
+    const warehouse = this.db.prepare(
+      `SELECT id, is_active FROM local_warehouses WHERE id = ? AND branch_id = ?`
+    ).get(warehouseId, branchId);
+    if (!warehouse || !warehouse.is_active) {
+      throw new Error('INVALID_WAREHOUSE: Warehouse does not exist or is inactive in this branch');
+    }
+
+    // 2. Check idempotency key first (outside transaction lock)
     const existingRecord = this.db.prepare(
       `SELECT response_payload FROM local_idempotency_keys WHERE key = ?`
     ).get(idempotencyKey);
@@ -387,7 +628,7 @@ class PremierLocalEngine {
       };
     }
 
-    // 2. Perform ACID atomic settlement
+    // 3. Perform ACID atomic settlement
     return this.transaction(() => {
       // Re-check idempotency under transaction
       const doubleCheck = this.db.prepare(
@@ -404,6 +645,9 @@ class PremierLocalEngine {
       const order = this.db.prepare(`SELECT * FROM local_orders WHERE id = ?`).get(orderId);
       if (!order) {
         throw new Error('ORDER_NOT_FOUND');
+      }
+      if (order.branch_id !== branchId) {
+        throw new Error('FORBIDDEN_BRANCH_MISMATCH');
       }
       if (order.status === 'completed') {
         throw new Error('ORDER_ALREADY_COMPLETED');
@@ -440,7 +684,7 @@ class PremierLocalEngine {
         orderId,
         invoiceNumber,
         branchId,
-        shiftId || order.shift_id,
+        shiftId,
         cashierId,
         order.subtotal,
         order.discount_amount,
@@ -468,39 +712,58 @@ class PremierLocalEngine {
         ).run(order.table_id);
       }
 
-      // Deduct Inventory Movements for each order item
+      // Authoritative Cost & Inventory Deduction
       const orderItems = this.db.prepare(
         `SELECT id, product_id, product_name, quantity, unit_price, total_price FROM local_order_items WHERE order_id = ?`
       ).all(orderId);
 
+      let totalCalculatedCost = 0.0;
       const inventoryMovements = [];
+
       for (const item of orderItems) {
-        const movementId = crypto.randomUUID();
-        const delta = -item.quantity;
-        // Cost estimation per unit
-        const unitCost = (soldItemsCost > 0 && order.total_amount > 0)
-          ? ((soldItemsCost / order.total_amount) * item.unit_price)
-          : 0.0;
-        const totalCost = unitCost * item.quantity;
+        // Check if item has raw material recipe BOM
+        const recipeIngredients = this.db.prepare(
+          `SELECT ingredient_item_id, quantity_required FROM local_product_recipes WHERE product_id = ?`
+        ).all(item.product_id);
 
-        this.db.prepare(
-          `INSERT INTO local_inventory_movements (id, branch_id, warehouse_id, item_type, item_id, delta, unit_cost, total_cost, entry_type, reference_id, created_at)
-           VALUES (?, ?, ?, 'product', ?, ?, ?, ?, 'sale', ?, ?)`
-        ).run(movementId, branchId, warehouseId, item.product_id, delta, unitCost, totalCost, saleId, now);
+        if (recipeIngredients.length > 0) {
+          // Deduct ingredients according to recipe
+          for (const ing of recipeIngredients) {
+            const ingQty = ing.quantity_required * item.quantity;
+            const ingUnitCost = this.getAuthoritativeUnitCost(branchId, warehouseId, ing.ingredient_item_id);
+            const ingTotalCost = ingUnitCost * ingQty;
+            totalCalculatedCost += ingTotalCost;
 
-        inventoryMovements.push({ movementId, itemId: item.product_id, delta });
+            const movementId = crypto.randomUUID();
+            this.db.prepare(
+              `INSERT INTO local_inventory_movements (id, branch_id, warehouse_id, item_type, item_id, delta, unit_cost, total_cost, entry_type, reference_id, created_at)
+               VALUES (?, ?, ?, 'raw_material', ?, ?, ?, ?, 'sale', ?, ?)`
+            ).run(movementId, branchId, warehouseId, ing.ingredient_item_id, -ingQty, ingUnitCost, ingTotalCost, saleId, now);
+
+            inventoryMovements.push({ movementId, itemId: ing.ingredient_item_id, delta: -ingQty });
+          }
+        } else {
+          // Direct product deduction
+          const unitCost = this.getAuthoritativeUnitCost(branchId, warehouseId, item.product_id);
+          const itemCost = unitCost * item.quantity;
+          totalCalculatedCost += itemCost;
+
+          const movementId = crypto.randomUUID();
+          this.db.prepare(
+            `INSERT INTO local_inventory_movements (id, branch_id, warehouse_id, item_type, item_id, delta, unit_cost, total_cost, entry_type, reference_id, created_at)
+             VALUES (?, ?, ?, 'product', ?, ?, ?, ?, 'sale', ?, ?)`
+          ).run(movementId, branchId, warehouseId, item.product_id, -item.quantity, unitCost, itemCost, saleId, now);
+
+          inventoryMovements.push({ movementId, itemId: item.product_id, delta: -item.quantity });
+        }
       }
 
-      // Generate Balanced Double-Entry Journal
+      // Generate Strictly Balanced Double-Entry Journal
       const journalEntryId = crypto.randomUUID();
       const entryNumber = `JE-${Date.now().toString().slice(-6)}-${Math.floor(100 + Math.random() * 900)}`;
 
-      // Debits: Cash/Receivables = total_amount.
-      // If soldItemsCost > 0: Debit COGS = soldItemsCost
-      // Credits: Sales Revenue = total_amount.
-      // If soldItemsCost > 0: Credit Food Inventory = soldItemsCost
-      const totalDebit = order.total_amount + (soldItemsCost > 0 ? soldItemsCost : 0.0);
-      const totalCredit = order.total_amount + (soldItemsCost > 0 ? soldItemsCost : 0.0);
+      const totalDebit = order.total_amount + (totalCalculatedCost > 0 ? totalCalculatedCost : 0.0);
+      const totalCredit = order.total_amount + (totalCalculatedCost > 0 ? totalCalculatedCost : 0.0);
 
       this.db.prepare(
         `INSERT INTO local_journal_entries (id, branch_id, entry_number, entry_date, reference_type, reference_id, description, total_debit, total_credit, is_balanced, created_at)
@@ -517,7 +780,7 @@ class PremierLocalEngine {
         now
       );
 
-      // Debit Cash (or Bank/Card)
+      // Line 1: Debit Cash / Card
       const cashAccountId = paymentMethod === 'cash' ? '1010' : '1020';
       const cashAccountName = paymentMethod === 'cash' ? 'Cash on Hand (POS Drawer)' : 'Card Payment Clearing';
       this.db.prepare(
@@ -525,25 +788,23 @@ class PremierLocalEngine {
          VALUES (?, ?, ?, ?, ?, 0.0)`
       ).run(crypto.randomUUID(), journalEntryId, cashAccountId, cashAccountName, order.total_amount);
 
-      // Credit Revenue
+      // Line 2: Credit Sales Revenue
       this.db.prepare(
         `INSERT INTO local_journal_lines (id, journal_entry_id, account_code, account_name, debit, credit)
          VALUES (?, ?, '4010', 'Restaurant Sales Revenue', 0.0, ?)`
       ).run(crypto.randomUUID(), journalEntryId, order.total_amount);
 
-      // Cost of Goods Sold & Inventory Ledger (if cost available)
-      if (soldItemsCost > 0) {
-        // Debit COGS
+      // Lines 3 & 4: Cost of Goods Sold & Inventory Asset (Only if authoritative cost > 0)
+      if (totalCalculatedCost > 0) {
         this.db.prepare(
           `INSERT INTO local_journal_lines (id, journal_entry_id, account_code, account_name, debit, credit)
            VALUES (?, ?, '5010', 'Cost of Goods Sold (Food Cost)', ?, 0.0)`
-        ).run(crypto.randomUUID(), journalEntryId, soldItemsCost);
+        ).run(crypto.randomUUID(), journalEntryId, totalCalculatedCost);
 
-        // Credit Inventory Asset
         this.db.prepare(
           `INSERT INTO local_journal_lines (id, journal_entry_id, account_code, account_name, debit, credit)
            VALUES (?, ?, '1210', 'Food & Beverage Inventory', 0.0, ?)`
-        ).run(crypto.randomUUID(), journalEntryId, soldItemsCost);
+        ).run(crypto.randomUUID(), journalEntryId, totalCalculatedCost);
       }
 
       // Add to Cloud Outbox for durable sync
@@ -561,6 +822,7 @@ class PremierLocalEngine {
           invoiceNumber,
           totalAmount: order.total_amount,
           paymentMethod,
+          totalCost: totalCalculatedCost,
           itemsCount: orderItems.length,
         }),
         now
@@ -575,6 +837,7 @@ class PremierLocalEngine {
         paymentMethod,
         journalEntryId,
         entryNumber,
+        calculatedCost: totalCalculatedCost,
         movementsCount: inventoryMovements.length,
       };
 
@@ -657,6 +920,39 @@ class PremierLocalEngine {
       cashCollected: salesStats.cash_collected,
       cardCollected: salesStats.card_collected,
       expectedCashInDrawer: shift.opening_float + salesStats.cash_collected,
+    };
+  }
+
+  /**
+   * Get active orders formatted for the POS workspace.
+   */
+  getPosWorkspaceData({ branchId }) {
+    const tables = this.db.prepare(`SELECT * FROM local_tables WHERE branch_id = ?`).all(branchId);
+    const orders = this.db.prepare(
+      `SELECT * FROM local_orders WHERE branch_id = ? AND status IN ('open', 'sent_to_kitchen')`
+    ).all(branchId);
+
+    const watchedOrderIds = orders.map((o) => o.id);
+    let orderItems = [];
+    let kitchenSends = [];
+
+    if (watchedOrderIds.length > 0) {
+      const placeholders = watchedOrderIds.map(() => '?').join(',');
+      orderItems = this.db.prepare(
+        `SELECT * FROM local_order_items WHERE order_id IN (${placeholders})`
+      ).all(...watchedOrderIds);
+
+      kitchenSends = this.db.prepare(
+        `SELECT * FROM local_kitchen_sends WHERE order_id IN (${placeholders})`
+      ).all(...watchedOrderIds);
+    }
+
+    return {
+      orders,
+      tables,
+      orderItems,
+      kitchenSends,
+      watchedOrderIds,
     };
   }
 }
