@@ -249,6 +249,49 @@ test('SSE replays only station-allowed durable events with monotonically increas
   await resetReader.cancel();
 }));
 
+test('verified backup restores local kitchen orders, stage history and device revocations',async()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'premier-kds-backup-'));
+  const config={host:'127.0.0.1',port:0,branchId:'branch_001',
+    organizationId:'org_001',token:MASTER,dataDir:dir};
+  let hub=createHub(config);
+  try {
+    let address=await hub.listen();
+    const keys=credentials(hub);
+    const created=await req(address.port,'POST','/api/v1/lan/orders',order(),keys.waiter);
+    assert.equal(created.status,201);
+    const advance=await req(address.port,'POST',
+      '/api/v1/lan/orders/'+created.data.order.id+'/status',
+      {status:'cooking',expectedVersion:1,commandKey:'cooking_backup_001'},keys.chef);
+    assert.equal(advance.status,200);
+    assert.equal(hub.revokeLanDevice('bar_tablet_001'),true);
+    const snapshot=hub.createLocalBackup();
+    const file=path.join(dir,'backups',snapshot.filename);
+    assert.ok(snapshot.bytes>0);
+    const {DatabaseSync}=require('node:sqlite');
+    const backup=new DatabaseSync(file,{readOnly:true});
+    try {
+      assert.equal(backup.prepare('PRAGMA quick_check').get().quick_check,'ok');
+      assert.equal(backup.prepare('SELECT count(*) n FROM lan_kitchen_orders').get().n,1);
+      assert.equal(backup.prepare('SELECT count(*) n FROM lan_kitchen_events').get().n,2);
+      assert.equal(backup.prepare('SELECT count(*) n FROM lan_kitchen_commands').get().n,1);
+      assert.equal(backup.prepare("SELECT active FROM lan_devices WHERE device_id='bar_tablet_001'").get().active,0);
+    } finally {backup.close();}
+    await hub.close();hub=null;
+    // Disaster-recovery drill: the original service is stopped before restore.
+    fs.copyFileSync(file,path.join(dir,'branch-hub.sqlite'));
+    hub=createHub(config);
+    address=await hub.listen();
+    assert.equal((await req(address.port,'GET','/api/v1/lan/orders',null,keys.waiter))
+      .data.orders[0].status,'cooking');
+    assert.equal((await req(address.port,'GET','/api/v1/lan/sync-status',null,keys.waiter))
+      .data.pendingCloudDraftEvents,2);
+    assert.equal((await req(address.port,'GET','/api/v1/lan/orders',null,keys.bar)).status,401);
+  } finally {
+    if(hub)await hub.close();
+    fs.rmSync(dir,{recursive:true,force:true});
+  }
+});
+
 test('untrusted hosts and LAN without TLS remain blocked, including master maintenance API',()=>{
   assert.throws(()=>createHub({host:'0.0.0.0',branchId:'branch_001',
     organizationId:'org_001',token:MASTER}),/LAN_REQUIRES_TLS_CERTIFICATE/);
