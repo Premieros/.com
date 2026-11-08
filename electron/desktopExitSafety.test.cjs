@@ -15,8 +15,8 @@ function mockCodec() {
     encryptString(text) {
       const iv=randomBytes(12);
       const cipher=createCipheriv('aes-256-gcm',key,iv);
-      return Buffer.concat([iv,cipher.getAuthTag(),
-        cipher.update(text,'utf8'),cipher.final()]);
+      const ciphertext=Buffer.concat([cipher.update(text,'utf8'),cipher.final()]);
+      return Buffer.concat([iv,cipher.getAuthTag(),ciphertext]);
     },
     decryptString(blob) {
       const iv=blob.subarray(0,12);
