@@ -6,6 +6,7 @@ const http = require('node:http');
 const https = require('node:https');
 const crypto = require('node:crypto');
 const { DatabaseSync } = require('node:sqlite');
+const { createLanKitchen, isLoopbackAddress } = require('./lanKitchen.cjs');
 
 function createHub(config = {}) {
   const host = config.host || process.env.BRANCH_HUB_HOST || '127.0.0.1';
@@ -24,6 +25,14 @@ function createHub(config = {}) {
     throw Error('LAN_REQUIRES_TLS_CERTIFICATE');
   }
   if (Boolean(keyFile) !== Boolean(certFile)) throw Error('TLS_KEY_AND_CERT_REQUIRED');
+  // LAN browsers must access the exact trusted DNS/IP configured by the owner.
+  // Reject DNS rebinding and Host-header spoofing even on private Wi-Fi.
+  const onLoopback = host === '127.0.0.1' || host === '::1';
+  const lanHostname = config.lanHostname || process.env.BRANCH_HUB_LAN_HOSTNAME;
+  if (!onLoopback &&
+    (typeof lanHostname !== 'string' || !/^[a-zA-Z0-9.-]{3,253}$/.test(lanHostname))) {
+    throw Error('LAN_TRUSTED_HOSTNAME_REQUIRED');
+  }
   const dir = config.dataDir || process.env.BRANCH_HUB_DATA_DIR ||
     path.join(process.env.APPDATA || path.join(os.homedir(), '.premieros'), 'PremierOS', 'BranchHub', branchId);
   fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
@@ -67,6 +76,7 @@ function createHub(config = {}) {
     status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending','acknowledged')),
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );`);
+  const lanKitchen = createLanKitchen({ db, organizationId, branchId });
   // SQLite VACUUM INTO creates a consistent snapshot even while WAL is enabled.
   // Backups stay on the server, never returned by the HTTP API.
   function createLocalBackup() {
@@ -93,9 +103,8 @@ function createHub(config = {}) {
       'content-type': 'application/json; charset=utf-8',
       'cache-control': 'no-store',
       'x-content-type-options': 'nosniff',
-      'access-control-allow-origin': '*',
-      'access-control-allow-methods': 'GET, POST, OPTIONS',
-      'access-control-allow-headers': 'Content-Type, Authorization',
+      'x-frame-options': 'DENY',
+      'referrer-policy': 'no-referrer',
     });
     res.end(JSON.stringify(body));
   };
@@ -105,17 +114,63 @@ function createHub(config = {}) {
     return a.length === b.length && crypto.timingSafeEqual(a, b);
   };
   const handler = async (req, res) => {
+    const boundPort = server.address()?.port ?? port;
+    const expectedHostname = onLoopback ? host : lanHostname;
+    const hostHeader = expectedHostname + ':' + boundPort;
+    if (req.headers.host !== hostHeader)
+      return send(res, 403, { error: 'LAN_INVALID_HOST_HEADER' });
+    const origin = req.headers.origin;
+    const protocol = keyFile && certFile ? 'https:' : 'http:';
+    if (origin) {
+      let sameOrigin = false;
+      try {
+        const parsed = new URL(origin);
+        sameOrigin = parsed.protocol === protocol && parsed.host === hostHeader;
+      } catch { /* not a usable origin */ }
+      if (!sameOrigin) return send(res, 403, { error: 'LAN_CROSS_ORIGIN_DENIED' });
+    }
     if (req.method === 'OPTIONS') {
+      // Do not enable wildcard CORS or cross-site token-backed LAN writes.
+      if (!origin) return send(res, 403, { error: 'LAN_CORS_ORIGIN_REQUIRED' });
       res.writeHead(204, {
-        'access-control-allow-origin': '*',
-        'access-control-allow-methods': 'GET, POST, OPTIONS',
+        'access-control-allow-origin': origin,
+        'vary': 'Origin',
+        'access-control-allow-methods': 'GET, POST',
         'access-control-allow-headers': 'Content-Type, Authorization',
-        'access-control-max-age': '86400',
+        'access-control-max-age': '600',
       });
       return res.end();
     }
     const pathname = new URL(req.url || '/', 'https://branch.local').pathname;
-    if (pathname === '/health' && req.method === 'GET') return send(res, 200, { ok: true, service: 'premier-branch-hub', version: 1 });
+    if (pathname === '/health' && req.method === 'GET')
+      return send(res, 200, { ok: true, service: 'premier-branch-hub', version: 1 });
+
+    if (req.method === 'GET' &&
+      (pathname === '/lan' || pathname === '/lan/app.js' || pathname === '/lan/styles.css')) {
+      const assets = {
+        '/lan': ['staff-ui.html', 'text/html; charset=utf-8'],
+        '/lan/app.js': ['staff-ui.js', 'text/javascript; charset=utf-8'],
+        '/lan/styles.css': ['staff-ui.css', 'text/css; charset=utf-8'],
+      };
+      const [file, mime] = assets[pathname];
+      return res.writeHead(200, {
+        'content-type':mime,
+        'cache-control':'no-store',
+        'x-content-type-options':'nosniff',
+        'x-frame-options':'DENY',
+        'referrer-policy':'no-referrer',
+        'content-security-policy':"default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src 'self'; form-action 'none'; base-uri 'none'; frame-ancestors 'none'",
+      }).end(fs.readFileSync(path.join(__dirname, file)));
+    }
+    if (pathname.startsWith('/api/v1/lan/')) {
+      try { await lanKitchen.handle(req,res,pathname); }
+      catch { send(res,500,{ error:'LAN_INTERNAL_ERROR' }); }
+      return;
+    }
+    // The old master maintenance token and draft receipt/job APIs must never
+    // be remotely reachable from a phone on the branch LAN.
+    if (!onLoopback || !isLoopbackAddress(req.socket.remoteAddress))
+      return send(res, 403, { error: 'LAN_MAINTENANCE_LOOPBACK_ONLY' });
     if (!checkToken(req.headers.authorization)) return send(res, 401, { error: 'UNAUTHORIZED' });
     if (pathname === '/api/v1/receipts' && req.method === 'GET') {
       const receipts = db.prepare('SELECT id,device_id,total_minor,currency,created_at FROM local_receipts WHERE branch_id=? ORDER BY created_at DESC LIMIT 100').all(branchId);
@@ -205,8 +260,14 @@ function createHub(config = {}) {
   const server = keyFile && certFile
     ? https.createServer({ key: fs.readFileSync(keyFile), cert: fs.readFileSync(certFile) }, handler)
     : http.createServer(handler);
-  return { server, db, createLocalBackup, listen: () => new Promise(resolve => server.listen(port, host, () => resolve(server.address()))),
-    close: () => new Promise(resolve => server.close(() => { db.close(); resolve(); })) };
+  return { server, db, createLocalBackup,
+    provisionLanDevice: lanKitchen.provisionDevice,
+    revokeLanDevice: lanKitchen.revokeDevice,
+    listen: () => new Promise(resolve => server.listen(port, host, () => resolve(server.address()))),
+    close: () => new Promise(resolve => {
+      lanKitchen.closeStreams();
+      server.close(() => { db.close(); resolve(); });
+    }) };
 }
 if (require.main === module) {
   const hub = createHub();
