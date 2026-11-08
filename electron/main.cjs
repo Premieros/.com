@@ -12,6 +12,7 @@ const { openLocalDraftJournal } = require('./localDraftJournal.cjs');
 const { createDesktopUpdateManager, policyIsApproved } = require('./desktopUpdateManager.cjs');
 const { inspectDesktopExitSafety } = require('./desktopExitSafety.cjs');
 const desktopUpdatePolicy = require('./desktop-update-policy.json');
+const desktopBuildSettings = require('./electron-builder.json');
 
 const DEFAULT_THERMAL_WIDTH_MM = 80;
 const PRINT_LOAD_TIMEOUT_MS = 6000;
@@ -405,15 +406,27 @@ function createDesktopTray() {
 function startSignedDesktopUpdates() {
   // The switch stays OFF in draft PRs until a reviewed Windows certificate,
   // matching publisherName and an official signed release have been verified.
+  const publishedByPremier = Array.isArray(desktopBuildSettings.publish)
+    && desktopBuildSettings.publish.some(channel => channel.provider === 'github'
+      && channel.owner === 'Premieros' && channel.repo === '.com');
+  const builderPublisher = desktopBuildSettings.win?.publisherName;
+  const pinnedPublisher = typeof builderPublisher === 'string'
+    ? builderPublisher : Array.isArray(builderPublisher) && builderPublisher.length === 1
+      ? builderPublisher[0] : null;
+  // The source, policy and built signed installer must ALL agree. Changing a
+  // runtime environment variable can never enable installing arbitrary EXEs.
+  const approved = policyIsApproved(desktopUpdatePolicy)
+    && publishedByPremier && pinnedPublisher === desktopUpdatePolicy.publisherName;
+  const effectivePolicy = approved
+    ? desktopUpdatePolicy : { ...desktopUpdatePolicy, enabled:false };
   let updater = null;
-  if (policyIsApproved(desktopUpdatePolicy) &&
-      app.isPackaged && process.platform === 'win32') {
+  if (approved && app.isPackaged && process.platform === 'win32') {
     updater = require('electron-updater').autoUpdater;
   }
   updateManager = createDesktopUpdateManager({
     app,
     updater,
-    policy:desktopUpdatePolicy,
+    policy:effectivePolicy,
     inspectSafeExit: () => inspectDesktopExitSafety({
       mainWindow, localAppUrl:localAppServer?.url,
       printerQueue, app, safeStorage,
