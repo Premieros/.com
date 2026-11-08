@@ -10,7 +10,7 @@ import {
   getOfflineSetting,
   enqueueOfflineSaleWithMovements,
   getAllOfflineSales,
-  removeOfflineSale,
+  removeOfflineSaleStrict,
   type OfflineSaleQueueItem,
 } from '@/core/offline/offlineStorage';
 import type { Product, Category, Customer, DiningTable, Settings, Branch } from '@/lib/types';
@@ -189,7 +189,7 @@ export function OfflineProvider({ children }: { children: React.ReactNode }) {
     await InventoryRepository.markSaleMovementsSynced(
       id, invoiceNumber, String(queued.payload?.p_branch_id || '').trim(),
     );
-    await removeOfflineSale(id);
+    await removeOfflineSaleStrict(id);
     await offlineSyncEngine.refreshPendingCount();
   }, []);
 
