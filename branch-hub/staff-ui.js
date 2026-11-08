@@ -107,6 +107,10 @@
           signal:signal.signal,
           cache:'no-store',
         });
+        if(response.status===401) {
+          disconnect('صلاحية هذا الجهاز ملغاة أو منتهية. اطلب من مسؤول الفرع إعادة إقرانه.');
+          return;
+        }
         if(!response.ok||!response.body) throw Error('EVENT_STREAM_UNAVAILABLE');
         const reader=response.body.getReader();
         const decoder=new TextDecoder();
@@ -126,8 +130,8 @@
               continue;
             }
             if(frame.includes('event: revoked')) {
-              report('تم إلغاء صلاحية الجهاز. أعد الإقران مع مسؤول الفرع.');
-              disconnect();return;
+              disconnect('تم إلغاء صلاحية الجهاز. اطلب من مسؤول الفرع إعادة الإقران.');
+              return;
             }
             if(seq) await refresh();
           }
@@ -140,7 +144,10 @@
       await new Promise(resolve=>setTimeout(resolve,1500));
     }
   }
-  function disconnect() {
+  function disconnect(reason='') {
+    const notice=$('login-status');
+    notice.hidden=!reason;
+    notice.textContent=reason;
     secret='';
     signal?.abort();
     signal=null;
@@ -151,6 +158,7 @@
   }
   login.addEventListener('submit',async (e)=>{
     e.preventDefault();
+    $('login-status').hidden=true;
     secret=$('credential').value.trim();
     try {
       await refresh();
