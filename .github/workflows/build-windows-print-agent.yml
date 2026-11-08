@@ -34,8 +34,8 @@ jobs:
 
       - name: Verify encrypted local SQLite draft journal on Windows Node 22
         run: node --test electron/localDraftJournal.test.cjs
-      - name: Test Windows signed updater safety and tray exit behavior
-        run: node --test electron/desktopUpdateManager.test.cjs electron/desktopExitSafety.test.cjs
+      - name: Test Windows signed updater and isolated UI release staging
+        run: node --test electron/desktopUpdateManager.test.cjs electron/desktopExitSafety.test.cjs electron/uiReleaseStore.test.cjs
       - name: Install web dependencies including Windows native optionals
         run: |
           npm install --include=optional --no-audit --no-fund
