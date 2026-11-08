@@ -12,7 +12,8 @@
     "staff-ui.html",
     "staff-ui.css",
     "staff-ui.js",
-    "provision-device.cjs"
+    "provision-device.cjs",
+    "lanDeploymentConfig.cjs"
   ],
   "asar": true,
   "win": {
