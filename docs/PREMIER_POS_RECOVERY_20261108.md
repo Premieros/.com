@@ -3,7 +3,7 @@
 Status: **DRAFT / partial P0 frontend repair only**.
 
 Repository: `Premieros/.com`. Production database: `hvqlkapynjfjikqithvd`.
-Source comparison: `Premieros/johna-s` PR #550 (read-only reference).
+Source comparison: Johna’s POS PR #550 (read-only reference; no foreign project credentials or database connections embedded).
 
 ## Purpose
 Prevent a closed or cancelled restaurant order from being rehydrated into a live cashier workspace after authorization; refresh the current branch's live order snapshot after a Realtime subscription or reconnection, because Realtime does not replay missed messages.
