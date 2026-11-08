@@ -1,0 +1,15 @@
+:root{font:16px "Segoe UI",Tahoma,Arial,sans-serif;color:#172a45;background:#f4f7fc}
+*{box-sizing:border-box}body{margin:0}main{width:min(900px,96vw);margin:25px auto;padding:20px;background:#fff;border:1px solid #dbe4ee;border-radius:18px;box-shadow:0 8px 25px #14203a12}
+header,.topline{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+header strong{font-size:22px;color:#16346d}.pill{font-size:13px;border-radius:24px;background:#e8f0ff;color:#19427b;padding:6px 12px}
+h1{font-size:22px}h2{font-size:19px}.alert{line-height:1.8;border:1px solid #e6b954;background:#fff8e7;padding:12px;border-radius:12px}
+form{display:grid;gap:10px;margin:20px 0;max-width:480px}label{font-weight:600}
+input{width:100%;border-radius:10px;padding:12px 14px;border:1px solid #b5c5dd;background:#fff;font:inherit}
+button{font:inherit;border:0;border-radius:10px;background:#214985;color:#fff;padding:11px 16px;cursor:pointer;min-height:42px}
+button:hover{background:#16376d}button:disabled{opacity:.5;cursor:not-allowed}
+button.secondary{background:#277451}button.warn{background:#a24d15}
+.status{border-radius:10px;background:#e9eef6;padding:12px;margin:12px 0;white-space:pre-line}
+.orders{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.ticket{padding:15px;border:1px solid #c4d4e7;border-radius:13px;background:#f9fbff;overflow-wrap:anywhere}
+.ticket h3{font-size:18px;margin:0 0 8px}.ticket p{margin:7px 0}.ticket button{width:100%;margin-top:8px}
+[hidden]{display:none!important}
