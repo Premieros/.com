@@ -39,14 +39,14 @@
 
 | Issue | Quantity | Evidence / safety |
 | --- | ---: | --- |
-| Canonical inventory mismatches | 10 | 9 raw material (7 Cleopatra, 2 Smouha), 1 semi-finished (ASD) |
-| Raw stored-versus-batch mismatch | 1.35 absolute units across raw cases | The other 8 raw cases match batches but disagree with latest ledger after_qty snapshots; do not update stored stock |
+| Canonical inventory mismatches | 10 | 9 raw material across two branches, 1 semi-finished in a third branch |
+| Debt-adjusted raw batch diagnostic delta | 1.35 absolute units across raw cases | All 533 current raw balances match the signed batch sums; this diagnostic subtracts open FIFO debt, not a stored-vs-batch discrepancy. Do not alter stock to zero this metric |
 | Raw latest-ledger-snapshot absolute deltas | 96.925 units summed across 9 cases | Historical movement lineage must be reconciled first |
-| Semi-finished movement delta | 7 units | Stored -14, batches -7, movements -7; establish source-of-truth before adjustment |
-| Tables vacant with effective open orders | 7 | All Cleopatra; frontend now shows occupied based on effective order, but stored state is not silently changed |
-| Tables occupied without effective open order | 1 | Cleopatra; needs order lifecycle review |
-| Kitchen send / pending inventory event mismatch | 1 | Cleopatra; no automatic extra deduction or reversal |
-| Print jobs older than 10 minutes | 22 | 9 ASD kitchen/main, 4 Cleopatra kitchen/kit, 9 Cleopatra receipts/cashier; all pending, 0 attempts and never claimed. Some date back to 2026-09-30 |
+| Semi-finished movement delta | 7 units | Projection -14, signed batches -7, signed unit entries -7, open debt 7; potential double subtraction, not a stored stock reading |
+| Tables vacant with effective open orders | 7 | One affected branch; frontend now shows occupied based on effective order, but stored state is not silently changed |
+| Tables occupied without effective open order | 1 | Affected branch needs order lifecycle review |
+| Kitchen send / pending inventory event mismatch | 1 | Affected branch; no automatic extra deduction or reversal |
+| Print jobs older than 10 minutes | 22 | Across two branches (13 kitchen, 9 receipt); all pending, 0 attempts and never claimed. Some date back to 2026-09-30 |
 
 Use `scripts/audit/premier-production-triage-readonly.sql` to reproduce
 the branch/category summary; use existing
@@ -68,14 +68,19 @@ compared all currently affected rows with ledger sums and source-item names:
   nine still disagree with the **latest event's `after_qty` snapshot**.
   Classification: `LATEST_SNAPSHOT_DISAGREES_WITH_CONSISTENT_SUMS`.
 - All 15 semi-finished unit batch totals equal signed unit entries; the one
-  flagged ASD item has batch/entry quantity -7 and open debt 7, while the
+  flagged item has batch/entry quantity -7 and open debt 7, while the
   current projection shows -14. Classification:
   `POSSIBLE_DEBT_DOUBLE_SUBTRACTION_IN_PROJECTION`. This is a hypothesis
   requiring comparison with the negative-stock writer; do not auto-change debt.
 - Neither evidence class authorizes rewriting source inventory, event history,
   posted accounting, or replacing the established canonical baseline.
-  The correct next step is a **narrow, reviewed classification or writer fix**
-  with a scenario test for historical opening balances and negative batch debt.
+  The PR now contains a **guarded read-model migration candidate**
+  `20261108072500_canonical_balance_snapshot_and_signed_debt_projection.sql`
+  plus rollback-only integration regressions. It preserves latest ledger
+  `after_qty` semantics, but uses insertion-ID ordering for backdated openings;
+  it excludes open debt from signed negative batches only when movement entries
+  corroborate that the debt is already represented. Validate this change
+  on staging before any production application.
 
 ## Mandatory release gates
 
