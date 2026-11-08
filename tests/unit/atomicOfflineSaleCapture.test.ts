@@ -14,6 +14,7 @@ vi.mock('@/core/repositories/LocalDatabase', () => ({
 import {
   enqueueOfflineSaleWithMovements,
   getAllOfflineSales,
+  removeOfflineSaleStrict,
 } from '@/core/offline/offlineStorage';
 
 function makeDb() {
@@ -50,6 +51,12 @@ function makeDb() {
                 if (writes === result.failAtWrite) throw new Error('SIMULATED_MID_TRANSACTION_WRITE_FAILURE');
                 if (target.has(value.id)) throw new Error('DUPLICATE_LOCAL_SALE_ID');
                 target.set(value.id, value);
+              },
+              delete(key: string) {
+                if (mode !== 'readwrite') throw new Error('READONLY');
+                writes++;
+                if (writes === result.failAtWrite) throw new Error('SIMULATED_MID_TRANSACTION_WRITE_FAILURE');
+                target.delete(key);
               },
               getAll() {
                 const req = {
@@ -162,6 +169,19 @@ describe('atomic local financial outbox capture', () => {
     }
     expect(harness.current!.stores.sales_queue.size).toBe(0);
     expect(harness.current!.stores.local_stock_movements.size).toBe(0);
+  });
+
+  it('does not claim dequeue success until the local delete transaction commits', async () => {
+    await enqueueOfflineSaleWithMovements(sale());
+    harness.current!.failAtWrite = 1;
+    await expect(removeOfflineSaleStrict('cashier-device-001'))
+      .rejects.toThrow('SIMULATED_MID_TRANSACTION_WRITE_FAILURE');
+    expect(harness.current!.stores.sales_queue.size).toBe(1);
+    harness.current!.failAtWrite = -1;
+    await removeOfflineSaleStrict('cashier-device-001');
+    expect(harness.current!.stores.sales_queue.size).toBe(0);
+    // Movement cleanup belongs to the reconciliation path, not this helper.
+    expect(harness.current!.stores.local_stock_movements.size).toBe(2);
   });
 
   it('preserves a completed queued sale across simulated module/browser restarts', async () => {
