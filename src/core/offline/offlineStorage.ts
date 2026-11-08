@@ -1,4 +1,4 @@
-import { getLocalDb } from '@/core/repositories/LocalDatabase';
+import { getLocalDb, dbGetAllStrict } from '@/core/repositories/LocalDatabase';
 import type { LocalStockMovement } from '@/core/repositories/types';
 
 /**
@@ -291,6 +291,14 @@ export async function getAllOfflineSales(): Promise<OfflineSaleQueueItem[]> {
   } catch {
     return [];
   }
+}
+
+/**
+ * Financial synchronization must not mistake an IndexedDB read failure for
+ * an empty outbox. UI convenience reads retain their legacy tolerant behavior.
+ */
+export async function getAllOfflineSalesStrict(): Promise<OfflineSaleQueueItem[]> {
+  return dbGetAllStrict<OfflineSaleQueueItem>('sales_queue');
 }
 
 export async function updateOfflineSaleStatus(
