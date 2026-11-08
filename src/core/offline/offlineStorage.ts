@@ -207,16 +207,41 @@ export async function enqueueOfflineSaleWithMovements(
     tx.oncomplete = () => resolve();
     tx.onerror = () => reject(tx.error || new Error('OFFLINE_SALE_ATOMIC_CAPTURE_FAILED'));
     tx.onabort = () => reject(tx.error || new Error('OFFLINE_SALE_ATOMIC_CAPTURE_ABORTED'));
-    try {
-      // add() (not put()) refuses a duplicate local sale ID, instead of
-      // replacing an earlier pending financial document.
-      tx.objectStore('sales_queue').add(queueItem);
-      const store = tx.objectStore('local_stock_movements');
-      for (const movement of movements) store.add(movement);
-    } catch (error) {
+    // A write transaction serializes concurrent captures from multiple tabs.
+    // Check both the invoice and client operation key INSIDE the transaction:
+    // different random local IDs must not queue the same offline payment twice.
+    const queueStore = tx.objectStore('sales_queue');
+    const scan = queueStore.getAll();
+    scan.onsuccess = () => {
+      const prior = (scan.result || []) as OfflineSaleQueueItem[];
+      const operationKey = String(queueItem.payload.p_client_operation_key || '');
+      const alreadyCaptured = prior.some((row) =>
+        row.id === queueItem.id || (
+          row.payload?.p_branch_id === branchId && (
+            String(row.payload?.p_client_operation_key || '') === operationKey ||
+            String(row.payload?.p_invoice_number || row.invoice_number || '') === invoice
+          )
+        ),
+      );
+      if (alreadyCaptured) {
+        reject(new Error('OFFLINE_SALE_DUPLICATE_LOCAL_CAPTURE'));
+        tx.abort();
+        return;
+      }
+      try {
+        // add(), not put(), also fails closed on a same-ID collision.
+        queueStore.add(queueItem);
+        const movementStore = tx.objectStore('local_stock_movements');
+        for (const movement of movements) movementStore.add(movement);
+      } catch (error) {
+        try { tx.abort(); } catch { /* transaction may already be inactive */ }
+        reject(error);
+      }
+    };
+    scan.onerror = () => {
+      reject(scan.error || new Error('OFFLINE_SALE_ATOMIC_SCAN_FAILED'));
       try { tx.abort(); } catch { /* transaction may already be inactive */ }
-      reject(error);
-    }
+    };
   });
   notifyQueueListeners();
 }
