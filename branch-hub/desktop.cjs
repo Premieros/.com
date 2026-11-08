@@ -6,6 +6,7 @@ const path = require('node:path');
 const { resolveLanDeployment } = require('./lanDeploymentConfig.cjs');
 let worker;
 let stopping=false;
+let statusWindow=null;
 function configPath() { return path.join(app.getPath('userData'), 'branch-config.json'); }
 function loadConfig() {
  const file=configPath();
@@ -17,16 +18,20 @@ function loadConfig() {
  return c;
 }
 function createWindow(status) {
- const win=new BrowserWindow({width:940,height:650,minWidth:650,minHeight:450,
-  webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}});
+ const isNew=!statusWindow||statusWindow.isDestroyed();
+ const win=isNew ? new BrowserWindow({width:940,height:650,minWidth:650,minHeight:450,
+  webPreferences:{nodeIntegration:false,contextIsolation:true,sandbox:true}}) : statusWindow;
+ statusWindow=win;
  const markup=`<!doctype html><html lang="ar" dir="rtl"><meta charset="utf-8"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'"><title>PremierOS Branch Hub</title><style>
  body{font-family:Segoe UI,Tahoma,Arial;background:#0b1730;color:#eaf1ff;margin:0;display:grid;place-items:center;min-height:100vh}
  main{max-width:650px;padding:45px;background:#132341;border:1px solid #38537d;border-radius:25px;box-shadow:0 25px 60px #0005}
  h1{font-size:32px}p{line-height:2;color:#bed0e9}.pill{color:#90ddff}
  </style><main><div class="pill">PREMIER OS • LOCAL BRANCH</div><h1>PremierOS Branch Hub</h1><p>${status}</p><p>هذه نسخة تأسيسية لإدارة خادم الفرع المحلي. لا تستخدمها حتى الآن لمعالجة المبيعات أو المدفوعات الفعلية.</p></main></html>`;
  win.loadURL('data:text/html;charset=UTF-8,'+encodeURIComponent(markup));
- win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
- win.webContents.on('will-navigate',event=>event.preventDefault());
+ if(isNew){
+  win.webContents.setWindowOpenHandler(()=>({action:'deny'}));
+  win.webContents.on('will-navigate',event=>event.preventDefault());
+ }
 }
 app.whenReady().then(()=>{
  try {
@@ -41,11 +46,23 @@ app.whenReady().then(()=>{
    BRANCH_HUB_TOKEN:c.token,BRANCH_HUB_DATA_DIR:path.join(app.getPath('userData'),'branch-data')};
   worker=fork(path.join(__dirname,'server.cjs'),[],{execPath:process.execPath,env,stdio:'ignore'});
   worker.on('error',()=>dialog.showErrorBox('PremierOS','تعذر بدء خادم الفرع المحلي'));
-  worker.on('exit',(code)=>{
-    if(!stopping) dialog.showErrorBox('PremierOS',
-      'توقف خادم الفرع المحلي أو تعذر تفعيل شهادة HTTPS (code: '+String(code)+'). تحقق من الإعدادات.');
+  worker.on('message',(message)=>{
+    if(message?.type!=='premier-hub-ready')return;
+    if(message.port!==lan.port){
+      createWindow('عنوان خادم الفرع لا يطابق الإعدادات، تم منع عرض رابط LAN.');
+      return;
+    }
+    createWindow(lan.enabled ?
+      'يعمل خادم الفرع التجريبي الآن: '+lan.url+' . تحقق من شهادة HTTPS على الهاتف. لا تستخدم مدفوعات حقيقية.' :
+      'يعمل خادم الفرع المحلي على الجهاز فقط. رابط الهاتف غير مفعّل حتى إعداد TLS وإقران الأجهزة.');
   });
-  createWindow(lan.enabled ? 'تمت تهيئة رابط شبكة الفرع التجريبي: '+lan.url+' . يجب التحقق من عمل HTTPS قبل استخدامه. لا تستخدم عمليات مالية حقيقية.' : 'خادم الفرع المحلي مهيأ على الجهاز فقط. اتصال الشبكة المحلية يحتاج شهادة TLS وإقران الأجهزة أولًا.');
+  worker.on('exit',(code)=>{
+    if(!stopping){
+      createWindow('خادم الفرع المحلي متوقف. لا يمكن استقبال طلبات جديدة. رمز الخروج: '+String(code));
+      dialog.showErrorBox('PremierOS','توقف خادم الفرع المحلي أو فشل تفعيل HTTPS.');
+    }
+  });
+  createWindow('جارٍ بدء خدمة الفرع والتحقق من ارتباط المنفذ المحلي. لا يعتبر رابط الهاتف جاهزًا قبل تأكيد بدء الخادم.');
  } catch { createWindow('إعداد ربط الفرع غير صالح؛ تم منع تشغيل الخادم لحماية بيانات الفرع.'); }
 });
 app.on('before-quit',()=>{ stopping=true; if(worker && !worker.killed)worker.kill(); });
