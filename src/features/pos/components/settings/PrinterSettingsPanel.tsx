@@ -22,6 +22,7 @@ import {
   type DetectedPrinter,
   type PrinterRouteConfig,
 } from '../../services/localPrintAgent';
+import { summarizePrintQueueHealth } from '../../utils/printQueueHealth';
 import {
   getCloudPrintAgentBranchId,
   isCloudPrintAgentEnabled,
@@ -185,6 +186,8 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
     }
     return counts;
   }, [queueJobs]);
+
+  const queueHealth = useMemo(() => summarizePrintQueueHealth(queueJobs), [queueJobs]);
 
   const visibleQueueJobs = useMemo(() => queueJobs.filter((job) => {
     if (queueFilter === 'all') return true;
@@ -405,6 +408,17 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
             {isAr ? 'الكل' : 'All'} ({queueJobs.length})
           </button>
         </div>
+
+        {!queueError && queueHealth.staleJobs > 0 ? (
+          <div role="status" className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              {isAr
+                ? `تنبيه: ${queueHealth.staleJobs} أمر طباعة أقدم من 10 دقائق، منها ${queueHealth.unclaimedPendingJobs} أمرًا معلقًا لم يبدأ أي وكيل طباعتها. افحص خدمة الطباعة على كمبيوتر الفرع ومسارات الطابعات وحالة الطلبات قبل تشغيل الوكيل؛ لا تُعِد طباعة أو حذف الأوامر القديمة تلقائيًا.`
+                : `Warning: ${queueHealth.staleJobs} print jobs are older than 10 minutes; ${queueHealth.unclaimedPendingJobs} pending jobs were never claimed by an agent. Check the branch PC print service, printer routes and source orders before starting the agent; do not bulk replay or delete old jobs.`}
+            </span>
+          </div>
+        ) : null}
 
         {queueError ? (
           <div className="mt-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
