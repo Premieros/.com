@@ -135,6 +135,41 @@ Required offline operational families:
   synced sales, stale opening balance, negative inventory, different physical
   counts) requiring operator review rather than silent quantity updates.
 
+## Phase 2D — signed Windows updates on real Exit (implementation in draft)
+
+The Windows app retains its locally bundled web interface, so a new feature or
+new screen appears only as part of a **new versioned Windows installer**, not
+from silently swapping in an unrelated website.
+
+- The app's signed NSIS update client is implemented in
+  `electron/desktopUpdateManager.cjs`. When explicitly authorized for release,
+  it checks only the pinned official `Premieros/.com` GitHub Releases stable
+  channel, downloads in the background when connected and defers installation
+  until a **real app exit**. No restart during cashier transactions.
+- Closing the window with **X** continues to **hide it in the system tray** so
+  the print agent stays available. The Windows tray menu now offers **Exit
+  Premier OS**: this action genuinely closes the app and, when safe, installs
+  an already downloaded and verified update.
+- The installer safety gate reads all four authoritative local IndexedDB
+  stores and rejects installation if there is any pending sale, unacknowledged
+  hold order, outbox operation, unsynced stock movement, ongoing printer job
+  or encrypted SQLite draft. Missing/unreadable stores or mismatched origin
+  also block installation. Updates never clear or replay local data.
+- If installation is unsafe, the app **quits normally without installing the
+  update**. The verified update is deferred until the next safe exit.
+- **The committed release policy is disabled by default**:
+  `electron/desktop-update-policy.json` has `enabled=false`, with no signed
+  publisher. No Windows client is currently opted into unsigned updates.
+- Before authorizing real automatic updates, issue an Authenticode-signed
+  NSIS installer, set and pin its verified `win.publisherName`, verify
+  electron-updater's signature checks, create a reviewed stable GitHub Release
+  with verified `latest.yml` and its checksums, implement tested rollback and
+  old-origin IndexedDB migration, and run a pilot on real Windows printers.
+- The separate portable EXE is **not self-updating**. Never push a remote
+  JavaScript hot-reload as an unreviewed replacement for the bundled UI.
+- The PR Windows packaging command uses `--publish never` so pull-request
+  CI cannot accidentally publish a customer update.
+
 ## Mandatory readiness gates before calling Windows "fully local"
 
 - Fully packaged installer builds on Windows, installs, starts and restarts on
