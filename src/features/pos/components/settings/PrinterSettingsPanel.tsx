@@ -22,8 +22,10 @@ import {
   type DetectedPrinter,
   type PrinterRouteConfig,
 } from '../../services/localPrintAgent';
+import { summarizePrintQueueHealth } from '../../utils/printQueueHealth';
 import {
   getCloudPrintAgentBranchId,
+  getCloudPrintQueueHealthCounts,
   isCloudPrintAgentEnabled,
   listCloudPrintQueue,
   saveCloudPrintAgentConfig,
@@ -112,6 +114,8 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
   const [queueJobs, setQueueJobs] = useState<CloudPrintQueueRow[]>([]);
   const [queueLoading, setQueueLoading] = useState(false);
   const [queueError, setQueueError] = useState<string | null>(null);
+  const [queueHealthCounts, setQueueHealthCounts] = useState<{ branchId: string; staleJobs: number; unclaimedPendingJobs: number } | null>(null);
+  const [queueHealthUnavailable, setQueueHealthUnavailable] = useState(false);
   const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'active' | 'submitted' | 'failed'>('pending');
 
   useEffect(() => {
@@ -175,6 +179,35 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
     return () => window.clearInterval(timer);
   }, [canManagePrinters, loadPrintQueue, selectedBranchId]);
 
+  // Full-queue counts use only two read-only HEAD requests per minute. The
+  // visible queue deliberately remains capped at 150 recent jobs, but old
+  // pending slips must not vanish from the operational warning.
+  useEffect(() => {
+    if (!canManagePrinters || !selectedBranchId) {
+      setQueueHealthCounts(null);
+      setQueueHealthUnavailable(false);
+      return;
+    }
+    let mounted = true;
+    const checkHealth = async () => {
+      try {
+        const counts = await getCloudPrintQueueHealthCounts(selectedBranchId);
+        if (mounted) {
+          setQueueHealthCounts({ branchId: selectedBranchId, ...counts });
+          setQueueHealthUnavailable(false);
+        }
+      } catch {
+        if (mounted) {
+          setQueueHealthCounts(null);
+          setQueueHealthUnavailable(true);
+        }
+      }
+    };
+    void checkHealth();
+    const timer = window.setInterval(() => void checkHealth(), 60_000);
+    return () => { mounted = false; window.clearInterval(timer); };
+  }, [canManagePrinters, selectedBranchId]);
+
   const queueCounts = useMemo(() => {
     const counts = { pending: 0, active: 0, submitted: 0, failed: 0 };
     for (const job of queueJobs) {
@@ -185,6 +218,16 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
     }
     return counts;
   }, [queueJobs]);
+
+  const queueHealth = useMemo(() => {
+    const sample = summarizePrintQueueHealth(queueJobs);
+    if (queueHealthCounts?.branchId !== selectedBranchId) return sample;
+    return {
+      ...sample,
+      staleJobs: queueHealthCounts.staleJobs,
+      unclaimedPendingJobs: queueHealthCounts.unclaimedPendingJobs,
+    };
+  }, [queueJobs, queueHealthCounts, selectedBranchId]);
 
   const visibleQueueJobs = useMemo(() => queueJobs.filter((job) => {
     if (queueFilter === 'all') return true;
@@ -405,6 +448,26 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
             {isAr ? 'الكل' : 'All'} ({queueJobs.length})
           </button>
         </div>
+
+        {!queueError && queueHealth.staleJobs > 0 ? (
+          <div role="status" className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>
+              {isAr
+                ? `تنبيه: ${queueHealth.staleJobs} أمر طباعة أقدم من 10 دقائق، منها ${queueHealth.unclaimedPendingJobs} أمرًا معلقًا لم يبدأ أي وكيل طباعتها. افحص خدمة الطباعة على كمبيوتر الفرع ومسارات الطابعات وحالة الطلبات قبل تشغيل الوكيل؛ لا تُعِد طباعة أو حذف الأوامر القديمة تلقائيًا.`
+                : `Warning: ${queueHealth.staleJobs} print jobs are older than 10 minutes; ${queueHealth.unclaimedPendingJobs} pending jobs were never claimed by an agent. Check the branch PC print service, printer routes and source orders before starting the agent; do not bulk replay or delete old jobs.`}
+            </span>
+          </div>
+        ) : null}
+
+        {!queueError && queueHealthUnavailable ? (
+          <div role="status" className="mt-4 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 p-3 text-xs font-semibold text-amber-900">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{isAr
+              ? 'تعذر التحقق من العدد الكامل لأوامر الطباعة المتأخرة؛ الأعداد الظاهرة مأخوذة من أحدث 150 أمرًا فقط. راجع الطابعات قبل إعادة تشغيل أي أمر قديم.'
+              : 'Full stale-print count unavailable; shown numbers cover only the 150 most recent jobs. Check printers before replaying any old job.'}</span>
+          </div>
+        ) : null}
 
         {queueError ? (
           <div className="mt-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">

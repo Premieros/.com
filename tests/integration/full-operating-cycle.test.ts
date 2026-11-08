@@ -185,6 +185,26 @@ describe('full ERP/POS operating cycle', () => {
       expect(sale1?.success).toBe(true);
       expect(Number(sale1?.cogs)).toBe(8);
 
+      // Manufactured inventory has a receipt batch valued at 4/unit.
+      // The sale's stock ledger and movement journal must preserve that
+      // actual batch valuation, not its stale catalog cost_price of zero.
+      const saleCostLines = await client.query<{
+        stock_ledger_cogs: string;
+        transaction_cogs: string;
+      }>(`
+        SELECT
+          (SELECT COALESCE(-SUM(l.total_cost),0)::text
+             FROM public.inventory_ledger l
+             WHERE l.reference_type='sale' AND l.reference_id=$1::uuid
+               AND l.product_id=$2 AND l.branch_id=$3) AS stock_ledger_cogs,
+          (SELECT COALESCE(-SUM(st.quantity * st.unit_cost),0)::text
+             FROM public.stock_transactions st
+             WHERE st.reference_type='sale' AND st.reference_id=$1::uuid
+               AND st.product_id=$2 AND st.branch_id=$3) AS transaction_cogs
+      `, [String(sale1?.sale_id), productId, branchId]);
+      expect(Number(saleCostLines.rows[0].stock_ledger_cogs)).toBe(8);
+      expect(Number(saleCostLines.rows[0].transaction_cogs)).toBe(8);
+
       // 4) Offline-style sale and retry/reconciliation: must never duplicate.
       const offlineInvoice = `INV-OFF-${token}`;
       const offlineSale = await json(

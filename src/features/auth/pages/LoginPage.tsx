@@ -85,7 +85,7 @@ export function LoginPage() {
   const activeSlide = slides[slideIndex];
 
   useEffect(() => {
-    if (slideshowPaused || (typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+    if (slideshowPaused || (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
     const timer = window.setInterval(() => {
       setSlideIndex((value) => (value + 1) % slides.length);
     }, 6500);

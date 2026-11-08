@@ -48,7 +48,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:16
+        image: postgres:17
         env:
           POSTGRES_PASSWORD: postgres
           POSTGRES_USER: postgres
@@ -78,7 +78,7 @@ jobs:
       - name: Apply auth stub (CI only, never on real Supabase)
         run: node scripts/db/apply-migration.js --file supabase/ci/stub_auth.sql
       - name: Apply canonical migrations
-        run: node scripts/db/apply-migration.js --dir supabase/migrations
+        run: node scripts/db/apply-migration.js --ci-fresh-db --dir supabase/migrations
       - name: Verify schema
         run: node scripts/db/verify-schema.js
       - name: Isolate subscription guard for order integration fixtures

@@ -177,6 +177,46 @@ export async function listCloudPrintQueue(branchId: string, limit = 100): Promis
   return (Array.isArray(data) ? data : []) as CloudPrintQueueRow[];
 }
 
+export interface CloudPrintQueueHealthCounts {
+  staleJobs: number;
+  unclaimedPendingJobs: number;
+}
+
+/**
+ * Counts the entire branch-scoped queue, not just the most recent 150 rows
+ * displayed by PrinterSettingsPanel. Queries are read-only and RLS-scoped.
+ * Never claim, retry, print, discard, or change historical jobs here.
+ */
+export async function getCloudPrintQueueHealthCounts(
+  branchId: string,
+  staleAfterMinutes = 10,
+): Promise<CloudPrintQueueHealthCounts> {
+  const scopedBranchId = safeText(branchId);
+  if (!scopedBranchId) return { staleJobs: 0, unclaimedPendingJobs: 0 };
+  const cutoff = new Date(Date.now() - Math.max(1, staleAfterMinutes) * 60_000).toISOString();
+
+  const [stale, unclaimed] = await Promise.all([
+    supabase.from('cloud_print_jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('branch_id', scopedBranchId)
+      .in('status', ['pending', 'claimed', 'printing'])
+      .lt('created_at', cutoff),
+    supabase.from('cloud_print_jobs')
+      .select('id', { count: 'exact', head: true })
+      .eq('branch_id', scopedBranchId)
+      .eq('status', 'pending')
+      .eq('attempts', 0)
+      .is('claimed_at', null)
+      .lt('created_at', cutoff),
+  ]);
+  if (stale.error) throw stale.error;
+  if (unclaimed.error) throw unclaimed.error;
+  if (!Number.isInteger(stale.count) || !Number.isInteger(unclaimed.count)) {
+    throw new Error('CLOUD_PRINT_QUEUE_HEALTH_COUNT_UNAVAILABLE');
+  }
+  return { staleJobs: stale.count!, unclaimedPendingJobs: unclaimed.count! };
+}
+
 export async function claimCloudPrintJobs(branchId: string, agentId: string, limit = 12): Promise<CloudPrintJob[]> {
   const { data, error } = await supabase.rpc('claim_cloud_print_jobs', { p_branch_id: branchId, p_agent_id: agentId, p_limit: limit });
   if (error) throw error;
