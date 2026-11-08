@@ -29,6 +29,31 @@ confirm server receipts, and execute a reviewed one-time outbox migration that
 cannot duplicate financial documents. Do not overwrite existing live sales or
 open orders. This is a **mandatory release gate**, not an optional cleanup.
 
+## Phase 2A — incremental safe local capture (draft, test-only)
+
+The currently existing IndexedDB offline-sale outbox is being hardened while
+the independent device-native transaction database is designed:
+
+- Payment checkout, OfflineProvider and SalesRepository now use **one IndexedDB
+  readwrite transaction across sales_queue and local_stock_movements**.
+  A failed write rolls back the sale and all associated deductions together.
+- The same transaction checks previously queued branch invoices and client
+  operation keys to refuse duplicate offline financial captures; `add` does
+  not overwrite a duplicate local sale ID.
+- Incomplete branch, warehouse, operator, item or quantity scopes are rejected
+  before any transaction starts. No warehouse is filled in at reconnect.
+- The sync worker uses strict financial outbox reads (a corrupt/unreadable DB is
+  NOT interpreted as zero pending) and waits for deletion to commit before
+  claiming a successful local dequeue.
+- Regression tests simulate mid-write aborts, duplicate invoices, repeated
+  attempts, local restart, invalid scope, unreadable storage and failed delete.
+
+**This does not add authoritative offline purchase, accounting, production or
+stock posting** and does not upgrade to an embedded encrypted database yet.
+IndexedDB is origin/profile scoped and not a replacement for a tested,
+device-native crash recovery, backup and restore layer. Existing hosted-origin
+sales remain subject to the migration gate from Phase 1.
+
 ## Phase 2 — local transaction engine (not yet delivered)
 
 Implement an embedded, durable transaction store owned by one per-device
@@ -89,6 +114,4 @@ Required offline operational families:
 - Existing PR #132 remains a separate production remediation gate; merging
   this local-shell PR alone does not apply its database migrations.
 
-Status on 2026-11-08: **Phase 1 code submitted for CI; phases 2 and 3 not yet
-implemented.** No live DB writes, paid Supabase branches, PR merges or
-production promotions were performed by these changes.
+Status on 2026-11-08: **Phase 1 local shell and Phase 2A atomic IndexedDB capture are submitted for CI.** The independent native transaction engine, full ERP offline posting, hosted-origin migration and Phase 3 cloud reconciliation are not yet delivered. No live DB writes, paid Supabase branches, PR merges or production promotions were performed by these changes.
