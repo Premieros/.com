@@ -77,7 +77,9 @@
       }
       orders.appendChild(ticket);
     }
-    report('الشبكة المحلية متصلة. التغييرات محفوظة محليًا وليست فواتير مالية.');
+    if(role==='waiter'&&$('order-form').hidden)
+      report('متصل بالخادم، لكن لا توجد محطة مطبخ مقترنة. اطلب من المسؤول ربط جهاز المطبخ.');
+    else report('الشبكة المحلية متصلة. التغييرات محفوظة محليًا وليست فواتير مالية.');
   }
   async function events() {
     while(secret&&signal&&!signal.signal.aborted) {
