@@ -36,6 +36,25 @@ function createLanKitchen({db,organizationId,branchId}) {
   const signals=new EventEmitter();
   signals.setMaxListeners(200);
   const streams=new Set();
+  // Bounded LAN auth-failure throttle. Only invalid credentials count;
+  // a legitimate paired tablet on the same NAT/IP remains permitted.
+  const failedAuthByAddress=new Map();
+  function deniedAuth(req) {
+    const address=req.socket.remoteAddress||'unknown';
+    const now=Date.now();
+    if(failedAuthByAddress.size>1024) {
+      for(const [key,record] of failedAuthByAddress) {
+        if(record.expires<=now) failedAuthByAddress.delete(key);
+      }
+      if(failedAuthByAddress.size>1024)
+        failedAuthByAddress.delete(failedAuthByAddress.keys().next().value);
+    }
+    let record=failedAuthByAddress.get(address);
+    if(!record||record.expires<=now) record={count:0,expires:now+60_000};
+    record.count+=1;
+    failedAuthByAddress.set(address,record);
+    return record.count>25 ? 429 : 401;
+  }
   db.exec([
     'PRAGMA synchronous=FULL',
     'CREATE TABLE IF NOT EXISTS lan_devices (device_id TEXT PRIMARY KEY,'+
@@ -117,7 +136,11 @@ function createLanKitchen({db,organizationId,branchId}) {
   async function handle(req,res,pathname) {
     if(!pathname.startsWith('/api/v1/lan/')) return false;
     const device=auth(req);
-    if(!device) {respond(res,401,{error:'LAN_DEVICE_NOT_PAIRED'});return true;}
+    if(!device) {
+      const code=deniedAuth(req);
+      respond(res,code,{error:code===429?'LAN_AUTH_RATE_LIMITED':'LAN_DEVICE_NOT_PAIRED'});
+      return true;
+    }
     if(pathname==='/api/v1/lan/profile'&&req.method==='GET') {
       respond(res,200,{
         organizationId,branchId,role:device.role,
