@@ -29,6 +29,9 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Test Windows bundled UI server without Electron downloads
+        run: node --test electron/localAppServer.test.cjs
+
       - name: Install web dependencies including Windows native optionals
         run: |
           npm install --include=optional --no-audit --no-fund
@@ -36,6 +39,9 @@ jobs:
 
       - name: Build web app
         run: npm run build
+
+      - name: Smoke test packaged Premier UI on loopback
+        run: node electron/localBundledSmoke.cjs
 
       - name: Install Print Agent dependencies
         working-directory: electron
