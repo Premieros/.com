@@ -20,8 +20,9 @@ function withServer(fn) {
         get hub(){return hub;},
         get port(){return address.port;},
         restart:async()=>{
+          const currentPort=address.port;
           await hub.close();
-          hub=createHub(config);
+          hub=createHub({...config,port:currentPort});
           address=await hub.listen();
           return hub;
         },
