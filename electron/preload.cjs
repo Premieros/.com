@@ -6,4 +6,5 @@ contextBridge.exposeInMainWorld('electronAPI', Object.freeze({
   printSilent: (options) => ipcRenderer.invoke('pos:print-silent', options),
   kickDrawer: (printerName) => ipcRenderer.invoke('pos:kick-drawer', printerName),
   getSystemInfo: () => ipcRenderer.invoke('pos:get-system-info'),
+  getLocalDraftHealth: () => ipcRenderer.invoke('desktop:get-local-draft-health'),
 }));
