@@ -19,7 +19,7 @@ describe('Premier POS server guard candidate safety contract', () => {
   });
 
   it('guards both settlement and print against missing or partially sent lines', () => {
-    expect(sql.match(/PREMIER_ORDER_FULL_SEND_REQUIRED_20261108/g)?.length).toBe(3);
+    expect(sql.match(/PREMIER_ORDER_FULL_SEND_REQUIRED_20261108/g)?.length).toBe(4);
     expect(sql.match(/ORDER_NOT_FULLY_SENT/g)?.length).toBe(2);
     expect(sql.match(/COALESCE\(s\.sent_quantity, 0\) \+ 0\.000001/g)?.length).toBe(2);
     expect(sql.match(/s\.order_id = oi\.order_id/g)?.length).toBe(2);
