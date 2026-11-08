@@ -1,5 +1,6 @@
 import { getLocalDb, dbGetAllStrict } from '@/core/repositories/LocalDatabase';
 import type { LocalStockMovement } from '@/core/repositories/types';
+import { saleMovementIdsForCleanup } from '@/core/repositories/stockProjection';
 
 /**
  * Premier POS IndexedDB Offline Storage & Local Sync Engine
@@ -367,6 +368,96 @@ export async function removeOfflineSaleStrict(id: string): Promise<void> {
     } catch (error) {
       try { tx.abort(); } catch { /* no active transaction */ }
       reject(error);
+    }
+  });
+  notifyQueueListeners();
+}
+
+/**
+ * After an authoritative *server* commit, delete this invoice and only its
+ * local inventory deductions in ONE IndexedDB transaction. A power cut or
+ * quota error must retain BOTH records so idempotent replay is safe.
+ * This function never contacts the server or prints an old ticket.
+ */
+export async function finalizeConfirmedOfflineSale(
+  saleId: string,
+  branchId: string,
+  invoiceNumber: string,
+): Promise<void> {
+  const id = typeof saleId === 'string' ? saleId.trim() : '';
+  const branch = typeof branchId === 'string' ? branchId.trim() : '';
+  const invoice = typeof invoiceNumber === 'string' ? invoiceNumber.trim() : '';
+  if (!id || !branch || !invoice) {
+    throw new Error('OFFLINE_SALE_SCOPE_REQUIRED_FOR_FINALIZE');
+  }
+  const db = await openOfflineDb();
+  await new Promise<void>((resolve, reject) => {
+    let tx: IDBTransaction;
+    try {
+      tx = db.transaction(['sales_queue', 'local_stock_movements'], 'readwrite');
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('OFFLINE_SALE_FINALIZE_FAILED'));
+    tx.onabort = () => reject(tx.error || new Error('OFFLINE_SALE_FINALIZE_ABORTED'));
+
+    const queueStore = tx.objectStore('sales_queue');
+    const movementStore = tx.objectStore('local_stock_movements');
+    let queueRows: OfflineSaleQueueItem[] | null = null;
+    let movements: LocalStockMovement[] | null = null;
+
+    const abortWith = (error: unknown) => {
+      reject(error);
+      try { tx.abort(); } catch { /* already aborted */ }
+    };
+    const completeReads = () => {
+      if (!queueRows || !movements) return;
+      try {
+        const sale = queueRows.find(row => row.id === id);
+        if (!sale) throw new Error('OFFLINE_SALE_NOT_FOUND_FOR_FINALIZE');
+        const capturedBranch = String(sale.payload?.p_branch_id || '').trim();
+        const capturedInvoice = String(
+          sale.payload?.p_invoice_number || sale.invoice_number || '',
+        ).trim();
+        if (capturedBranch !== branch || capturedInvoice !== invoice) {
+          throw new Error('OFFLINE_SALE_FINALIZE_SCOPE_MISMATCH');
+        }
+        const warehouse = String(sale.payload?.p_warehouse_id || '').trim();
+        const ids = saleMovementIdsForCleanup(
+          movements, queueRows, id, invoice, branch,
+        );
+        // Do not remove a movement from another warehouse accidentally, even
+        // when a historical invoice number was reused inside this branch.
+        const toRemove = new Set(ids);
+        if (warehouse && movements.some(m => toRemove.has(m.id)
+          && m.warehouseId && m.warehouseId !== warehouse)) {
+          throw new Error('OFFLINE_SALE_FINALIZE_WAREHOUSE_MISMATCH');
+        }
+        for (const movementId of ids) movementStore.delete(movementId);
+        queueStore.delete(id);
+      } catch (error) {
+        abortWith(error);
+      }
+    };
+    try {
+      const queued = queueStore.getAll();
+      const localMovements = movementStore.getAll();
+      queued.onsuccess = () => {
+        queueRows = (queued.result as OfflineSaleQueueItem[]) || [];
+        completeReads();
+      };
+      localMovements.onsuccess = () => {
+        movements = (localMovements.result as LocalStockMovement[]) || [];
+        completeReads();
+      };
+      queued.onerror = () =>
+        abortWith(queued.error || new Error('OFFLINE_SALE_FINALIZE_READ_FAILED'));
+      localMovements.onerror = () =>
+        abortWith(localMovements.error || new Error('OFFLINE_SALE_FINALIZE_READ_FAILED'));
+    } catch (error) {
+      abortWith(error);
     }
   });
   notifyQueueListeners();
