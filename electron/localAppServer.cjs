@@ -2,7 +2,7 @@
 
 /**
  * Read-only static host for the exact UI bundled inside the Windows installer.
- * Binds exclusively to 127.0.0.1 on a random port. No proxy, DB, API, or
+ * Binds exclusively to 127.0.0.1 on a stable port. No proxy, DB, API, or
  * internet fallback is provided here. Financial offline operations remain
  * separately gated until the local transaction/sync engine is implemented.
  */
@@ -12,6 +12,9 @@ const path = require('node:path');
 const { promises: files } = fs;
 
 const HOST = '127.0.0.1';
+// Stable origin is essential: a new random port would hide IndexedDB and
+// queued offline sales on every application restart.
+const DEFAULT_LOCAL_PORT = 43187;
 const MIME = Object.freeze({
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -85,7 +88,7 @@ async function resolveStaticFile(root, pathname, acceptHtml) {
   return { status: 404 };
 }
 
-async function startLocalAppServer({ distDir } = {}) {
+async function startLocalAppServer({ distDir, port = DEFAULT_LOCAL_PORT } = {}) {
   if (typeof distDir !== 'string' || !distDir.trim()) {
     throw new Error('PREMIER_LOCAL_UI_BUILD_REQUIRED: dist directory not provided');
   }
@@ -129,7 +132,7 @@ async function startLocalAppServer({ distDir } = {}) {
   try {
     await new Promise((resolve, reject) => {
       server.once('error', reject);
-      server.listen(0, HOST, () => {
+      server.listen(port, HOST, () => {
         server.removeListener('error', reject);
         resolve();
       });
@@ -148,4 +151,4 @@ async function startLocalAppServer({ distDir } = {}) {
   };
 }
 
-module.exports = { startLocalAppServer };
+module.exports = { DEFAULT_LOCAL_PORT, startLocalAppServer };
