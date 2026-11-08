@@ -89,6 +89,12 @@ test('mobile UI is served locally without external scripts and APIs require pair
 
 test('waiter order is stored durably and kitchen status becomes visible without WAN',withServer(async({hub,port,restart})=>{
   const {waiter,chef,bar}=credentials(hub);
+  const choices=await req(port,'GET','/api/v1/lan/stations',null,waiter);
+  assert.equal(choices.status,200);
+  assert.deepEqual(choices.data.stations,['cold','hot']);
+  assert.deepEqual((await req(port,'GET','/api/v1/lan/stations',null,chef)).data.stations,['hot']);
+  assert.equal((await req(port,'POST','/api/v1/lan/orders',
+    order({stationCode:'missing_station'}),waiter)).status,409);
   const created=await req(port,'POST','/api/v1/lan/orders',order(),waiter);
   assert.equal(created.status,201);
   assert.equal(created.data.order.localOnly,true);
