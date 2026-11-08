@@ -43,3 +43,19 @@ test('original migration remains byte-identical and keeps its canonical checksum
   assert.equal(createHash('sha256').update(readFileSync(pathname, 'utf8')).digest('hex'),
     createHash('sha256').update(historical).digest('hex'));
 });
+
+
+test('one-off production inventory reconciliation is replaced only with empty-CI preflight', () => {
+  const filename = '20261023172500_reconcile_nine_verified_raw_branch_balance_cache_rows.sql';
+  const file = join(process.cwd(), 'supabase', 'migrations', filename);
+  const original = readFileSync(file, 'utf8');
+  const replay = normalizeHistoricalMigrationForCi(file, original);
+  assert.notEqual(replay, original);
+  assert.match(replay, /CI_RECONCILIATION_NOT_EMPTY/);
+  assert.match(replay, /raw_material_inventory/);
+  assert.match(replay, /raw_material_batches/);
+  assert.match(replay, /inventory_ledger/);
+  assert.doesNotMatch(replay, /UPDATE public\.raw_material_inventory/);
+  assert.throws(() => normalizeHistoricalMigrationForCi(file, original + '\n'),
+    /CI_RECONCILIATION_CONTENT_DRIFT/);
+});
