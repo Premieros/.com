@@ -1,5 +1,6 @@
 import { dbGetAll, dbGetAllStrict, dbPut, dbDelete } from './LocalDatabase';
 import { InventoryRepository } from './InventoryRepository';
+import { enqueueOfflineSaleWithMovements } from '@/core/offline/offlineStorage';
 import type { OfflineSaleQueueItem } from '@/core/offline/offlineStorage';
 import type { ProcessSalePayload } from '@/features/pos/services/payment';
 
@@ -26,26 +27,9 @@ export class SalesRepository {
       created_by_user_id: originatingUserId,
     };
 
-    // 1. Put in IndexedDB sales_queue
-    await dbPut('sales_queue', queueItem);
-
-    // 2. Record local stock deduction in local movement ledger so available stock is updated immediately
-    if (Array.isArray(payload.p_items) && payload.p_items.length > 0 && payload.p_branch_id) {
-      for (const item of payload.p_items) {
-        if (item.product_id) {
-          await InventoryRepository.recordLocalMovement({
-            id: `mov_${id}_${item.product_id}_${Math.random().toString(36).slice(2, 6)}`,
-            productId: item.product_id,
-            branchId: payload.p_branch_id,
-            warehouseId: payload.p_warehouse_id,
-            quantityDelta: -Math.abs(Number(item.quantity) || 1),
-            reason: 'sale',
-            referenceId: id,
-            createdAt: now,
-          });
-        }
-      }
-    }
+    // Both the pending sale and every local stock movement are saved in ONE
+    // IndexedDB transaction; a crash cannot strand partial deductions.
+    await enqueueOfflineSaleWithMovements(queueItem);
 
     return id;
   }
