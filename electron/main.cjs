@@ -1,7 +1,7 @@
 // Premier Print Agent - Windows desktop shell and local thermal print bridge.
 // Every physical printer owns an independent FIFO queue and hidden print worker.
 
-const { app, BrowserWindow, ipcMain, shell, dialog, safeStorage } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, safeStorage, Menu, Tray, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
@@ -9,6 +9,9 @@ const { execFile } = require('child_process');
 const { PerPrinterQueue, withTimeout } = require('./printerQueue.cjs');
 const { startLocalAppServer } = require('./localAppServer.cjs');
 const { openLocalDraftJournal } = require('./localDraftJournal.cjs');
+const { createDesktopUpdateManager, policyIsApproved } = require('./desktopUpdateManager.cjs');
+const { inspectDesktopExitSafety } = require('./desktopExitSafety.cjs');
+const desktopUpdatePolicy = require('./desktop-update-policy.json');
 
 const DEFAULT_THERMAL_WIDTH_MM = 80;
 const PRINT_LOAD_TIMEOUT_MS = 6000;
@@ -17,6 +20,8 @@ const PRINT_CALLBACK_TIMEOUT_MS = 12000;
 let mainWindow = null;
 let allowQuit = false;
 let localAppServer = null;
+let desktopTray = null;
+let updateManager = null;
 const printerQueue = new PerPrinterQueue();
 const printWorkerWindows = new Map();
 
@@ -357,6 +362,66 @@ ipcMain.handle('desktop:get-local-draft-health', async (event) => {
   }
 });
 
+// This read-only status is available only from the bundled Premier origin.
+// Update release checks and all install decisions stay inside the main process.
+ipcMain.handle('desktop:get-update-status', async (event) => {
+  const disabled = { state:'disabled', enabled:false, autoInstallOnExit:false };
+  if (!mainWindow || event.sender !== mainWindow.webContents || !localAppServer) return disabled;
+  try {
+    const origin = new URL(event.senderFrame?.url || event.sender.getURL()).origin;
+    if (origin !== new URL(localAppServer.url).origin) return disabled;
+    return updateManager?.status() || disabled;
+  } catch {
+    return disabled;
+  }
+});
+
+function showDesktopWindow() {
+  if (!mainWindow) {
+    void createWindow().catch(reportDesktopStartupError);
+    return;
+  }
+  if (mainWindow.isMinimized()) mainWindow.restore();
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function createDesktopTray() {
+  // The X button keeps the print agent alive; "Exit Premier OS" is a real
+  // application quit and is the ONLY time a verified downloaded update can install.
+  if (desktopTray) return;
+  const iconData = 'iVBORw0KGgoAAAANSUhEUgAAABgAAAAYCAYAAADgdz34AAAAoElEQVR42mPkF9f6z0BDwIIuwK/ZSpGBH69Xo/CZqGk4NjOYqGk4NrOYqG04uiUshBQ+3B/AwMDAwCDvuAHORgbyjhvw6mcixnB0Ni41JFtALMBnCQuphiEHCSHXU80HA2oBCzXDm2Y+wJdUmWhpOMlBRMiw4ZmKhrkFyJFKTgQzMDAwMMLqZGrXCbCqkwlXXUqtepkJX4VNjUqfkdbNFgB/Di+furTO1wAAAABJRU5ErkJggg==';
+  const image = nativeImage.createFromBuffer(Buffer.from(iconData, 'base64'));
+  desktopTray = new Tray(image);
+  desktopTray.setToolTip('Premier OS');
+  desktopTray.setContextMenu(Menu.buildFromTemplate([
+    { label: 'Open Premier OS', click: showDesktopWindow },
+    { type: 'separator' },
+    { label: 'Exit Premier OS', click: () => app.quit() },
+  ]));
+  desktopTray.on('double-click', showDesktopWindow);
+}
+
+function startSignedDesktopUpdates() {
+  // The switch stays OFF in draft PRs until a reviewed Windows certificate,
+  // matching publisherName and an official signed release have been verified.
+  let updater = null;
+  if (policyIsApproved(desktopUpdatePolicy) &&
+      app.isPackaged && process.platform === 'win32') {
+    updater = require('electron-updater').autoUpdater;
+  }
+  updateManager = createDesktopUpdateManager({
+    app,
+    updater,
+    policy:desktopUpdatePolicy,
+    inspectSafeExit: () => inspectDesktopExitSafety({
+      mainWindow, localAppUrl:localAppServer?.url,
+      printerQueue, app, safeStorage,
+    }),
+  });
+  updateManager.start();
+}
+
 ipcMain.handle('pos:get-system-info', async () => ({
   isElectron: true,
   platform: process.platform,
@@ -393,6 +458,8 @@ if (!hasSingleInstanceLock) {
     }
     try {
       await createWindow();
+      createDesktopTray();
+      startSignedDesktopUpdates();
     } catch (error) {
       reportDesktopStartupError(error);
       return;
@@ -407,9 +474,21 @@ if (!hasSingleInstanceLock) {
   });
 }
 
-app.on('before-quit', () => {
+app.on('before-quit', (event) => {
+  // An update may delay this real exit briefly to verify that nothing remains
+  // unsynced. Do not tear down the browser or printer queue before the check.
+  updateManager?.beforeQuit(event);
+  if (!event.defaultPrevented) allowQuit = true;
+});
+
+app.on('will-quit', () => {
   allowQuit = true;
+  updateManager?.stop();
   destroyAllPrintWorkers();
+  if (desktopTray) {
+    desktopTray.destroy();
+    desktopTray = null;
+  }
   if (localAppServer) {
     void localAppServer.close().catch((error) =>
       console.warn('[Premier Desktop] Failed to stop local UI server:', error));
