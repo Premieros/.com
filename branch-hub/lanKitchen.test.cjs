@@ -398,12 +398,12 @@ test('SSE replay drains more than 100 persisted authorized events without a new 
   const reader=response.body.getReader();
   let payload='';
   try {
-    while(!payload.includes('id: 251\\n')) {
+    while(!payload.includes('id: 251\n')) {
       const frame=await reader.read();
       assert.equal(frame.done,false,'event stream stopped before backlog was replayed');
       payload+=Buffer.from(frame.value).toString('utf8');
     }
-    const ids=[...payload.matchAll(/^id: (\\d+)$/gm)].map(m=>Number(m[1]));
+    const ids=[...payload.matchAll(/^id: (\d+)$/gm)].map(m=>Number(m[1]));
     assert.equal(ids.length,251);
     assert.equal(ids[0],1);
     assert.equal(ids.at(-1),251);
