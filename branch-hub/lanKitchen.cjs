@@ -334,26 +334,44 @@ function createLanKitchen({db,organizationId,branchId}) {
         .get(branchId,device.role==='kitchen'?device.station_code:device.device_id);
       const cursorReset=after>latest.seq;
       if(cursorReset) cursor=0;
-      let keepalive;
+      let keepalive,blocked=false;
+      function onDrain() {
+        blocked=false;
+        flush();
+      }
       function cleanup() {
         if(closed)return;closed=true;
         signals.off('event',flush);signals.off('refresh',flush);
+        res.off('drain',onDrain);
         clearInterval(keepalive);streams.delete(res);
       }
       function flush() {
-        if(closed||res.destroyed)return;
+        if(closed||res.destroyed||blocked)return;
         if(!auth(req)) {
-          res.write('event: revoked\ndata: {}\n\n');cleanup();res.end();return;
+          res.write('event: revoked\\ndata: {}\\n\\n');cleanup();res.end();return;
         }
         try {
-          const rows=db.prepare('SELECT * FROM lan_kitchen_events '+
-            'WHERE branch_id=? AND seq>? AND '+
-            (device.role==='kitchen'?'station_code=?':'creator_device_id=?')+
-            ' ORDER BY seq LIMIT 100').all(
-            branchId,cursor,device.role==='kitchen'?device.station_code:device.device_id);
-          for(const evt of rows) {
-            res.write('id: '+evt.seq+'\nevent: '+evt.event_type+
-              '\ndata: '+evt.data_json+'\n\n');cursor=evt.seq;
+          // Drain the entire authorized replay backlog. A single 100-row
+          // query strands older events until some unrelated new event arrives.
+          // Stop at stream backpressure and resume on drain instead of
+          // buffering an unbounded backlog in the server's response socket.
+          while(!closed&&!blocked) {
+            const rows=db.prepare('SELECT * FROM lan_kitchen_events '+
+              'WHERE branch_id=? AND seq>? AND '+
+              (device.role==='kitchen'?'station_code=?':'creator_device_id=?')+
+              ' ORDER BY seq LIMIT 100').all(
+              branchId,cursor,device.role==='kitchen'?device.station_code:device.device_id);
+            for(const evt of rows) {
+              const writable=res.write('id: '+evt.seq+'\\nevent: '+evt.event_type+
+                '\\ndata: '+evt.data_json+'\\n\\n');
+              cursor=evt.seq;
+              if(!writable) {
+                blocked=true;
+                res.once('drain',onDrain);
+                return;
+              }
+            }
+            if(rows.length<100)break;
           }
         } catch {cleanup();res.end();}
       }
