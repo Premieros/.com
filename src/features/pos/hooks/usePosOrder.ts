@@ -428,13 +428,9 @@ export function usePosOrder(input: UsePosOrderInput) {
     }
 
     const preview = await loadSettlementPreview(false);
-    if (!preview) {
-      if (settlementReceipt) {
-        const html = await buildReceiptHtml(settlementReceipt, input.effSettings, lang, isAr);
-        openPrintWindow(html, APPROVED_FIXED_THERMAL_WIDTH_MM);
-      }
-      return;
-    }
+    // An open order must never fall back to a receipt from an earlier
+    // completed sale when its current authoritative preview is unavailable.
+    if (!preview) return;
 
     const receipt = buildSettlementReceipt(preview, base.activeOrderNumber || `ORDER-${Date.now()}`, 0);
     receipt.isOpenOrder = true;
