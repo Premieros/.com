@@ -1,5 +1,5 @@
 import { pos as posApi, supabase, type SplitTenderInput } from '@/api';
-import { enqueueOfflineSale, type OfflineSaleQueueItem } from '@/core/offline/offlineStorage';
+import { enqueueOfflineSaleWithMovements, type OfflineSaleQueueItem } from '@/core/offline/offlineStorage';
 import { SettingsRepository, InventoryRepository } from '@/core/repositories';
 import { saveVerifiedSaleWarehouse } from '@/core/offline/warehouseBinding';
 import type { RpcResult, OrderType } from '@/lib/types';
@@ -147,25 +147,9 @@ async function queueOfflineSale(p: ProcessSalePayload): Promise<string> {
       p_client_operation_key: operationKey,
     } as unknown as Record<string, unknown>,
   };
-  await enqueueOfflineSale(queuedSale);
-
-  // Record local stock movements in the authoritative local ledger
-  if (Array.isArray(p.p_items)) {
-    for (const item of p.p_items) {
-      if (item.product_id) {
-        await InventoryRepository.recordLocalMovement({
-          id: `mov_${createOfflineToken()}`,
-          productId: item.product_id,
-          branchId: p.p_branch_id,
-          warehouseId: p.p_warehouse_id,
-          quantityDelta: -Number(item.quantity || 0),
-          reason: 'sale',
-          referenceId: id,
-          createdAt: new Date().toISOString(),
-        });
-      }
-    }
-  }
+  // Commit the outbox AND every warehouse-scoped deduction together.
+  // No partial sale confirmation if the app crashes while writing.
+  await enqueueOfflineSaleWithMovements(queuedSale);
 
   return id;
 }
