@@ -1,4 +1,5 @@
 import { getLocalDb } from '@/core/repositories/LocalDatabase';
+import type { LocalStockMovement } from '@/core/repositories/types';
 
 /**
  * Premier POS IndexedDB Offline Storage & Local Sync Engine
@@ -133,6 +134,91 @@ export async function enqueueOfflineSale(sale: Omit<OfflineSaleQueueItem, 'statu
     tx.onerror = () => rej(tx.error);
     tx.onabort = () => rej(tx.error || new Error('Offline sale queue transaction aborted'));
   });
+}
+
+/**
+ * A sale and ALL of its offline inventory deductions are one IndexedDB
+ * readwrite transaction. Never report a financial offline capture as saved
+ * until both object stores have committed. Legacy queue rows are NOT replayed
+ * or migrated by this helper.
+ */
+export async function enqueueOfflineSaleWithMovements(
+  sale: Omit<OfflineSaleQueueItem, 'status' | 'retry_count'>,
+): Promise<void> {
+  const branchId = typeof sale.payload?.p_branch_id === 'string'
+    ? sale.payload.p_branch_id.trim() : '';
+  const warehouseId = typeof sale.payload?.p_warehouse_id === 'string'
+    ? sale.payload.p_warehouse_id.trim() : '';
+  const operatorId = typeof sale.created_by_user_id === 'string'
+    ? sale.created_by_user_id.trim() : '';
+  const invoice = typeof sale.invoice_number === 'string' ? sale.invoice_number.trim() : '';
+  const rawItems = sale.payload?.p_items;
+  if (!sale.id?.trim() || !sale.client_id?.trim() || !invoice || !operatorId ||
+      !branchId || !warehouseId || !Array.isArray(rawItems) ||
+      rawItems.length === 0 || rawItems.length > 1000) {
+    throw new Error('OFFLINE_SALE_ATOMIC_CAPTURE_SCOPE_INVALID');
+  }
+
+  const movements: LocalStockMovement[] = rawItems.map((line: unknown, index: number) => {
+    if (!line || typeof line !== 'object') {
+      throw new Error('OFFLINE_SALE_ATOMIC_CAPTURE_ITEM_INVALID');
+    }
+    const item = line as { product_id?: unknown; quantity?: unknown };
+    const productId = typeof item.product_id === 'string' ? item.product_id.trim() : '';
+    const quantity = Number(item.quantity);
+    if (!productId || !Number.isFinite(quantity) || quantity <= 0) {
+      throw new Error('OFFLINE_SALE_ATOMIC_CAPTURE_ITEM_INVALID');
+    }
+    return {
+      id: `mov_${sale.id}_${index}`,
+      productId,
+      branchId,
+      warehouseId,
+      quantityDelta: -quantity,
+      reason: 'sale',
+      referenceId: sale.id,
+      createdAt: sale.created_at,
+      synced: false,
+    };
+  });
+
+  const db = await openOfflineDb();
+  const queueItem: OfflineSaleQueueItem = {
+    ...sale,
+    created_by_user_id: operatorId,
+    status: 'pending',
+    retry_count: 0,
+    payload: {
+      ...sale.payload,
+      p_branch_id: branchId,
+      p_warehouse_id: warehouseId,
+      p_client_operation_key: String(sale.payload.p_client_operation_key || sale.id),
+    },
+  };
+
+  await new Promise<void>((resolve, reject) => {
+    let tx: IDBTransaction;
+    try {
+      tx = db.transaction(['sales_queue', 'local_stock_movements'], 'readwrite');
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('OFFLINE_SALE_ATOMIC_CAPTURE_FAILED'));
+    tx.onabort = () => reject(tx.error || new Error('OFFLINE_SALE_ATOMIC_CAPTURE_ABORTED'));
+    try {
+      // add() (not put()) refuses a duplicate local sale ID, instead of
+      // replacing an earlier pending financial document.
+      tx.objectStore('sales_queue').add(queueItem);
+      const store = tx.objectStore('local_stock_movements');
+      for (const movement of movements) store.add(movement);
+    } catch (error) {
+      try { tx.abort(); } catch { /* transaction may already be inactive */ }
+      reject(error);
+    }
+  });
+  notifyQueueListeners();
 }
 
 export async function getPendingSalesCount(): Promise<number> {
