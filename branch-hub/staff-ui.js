@@ -34,6 +34,20 @@
     $('scope').textContent=role==='waiter'?'الويتر — الطلبات المسجلة محليًا':
       'المطبخ — محطة '+station;
     $('order-form').hidden=role!=='waiter';
+    if(role==='waiter') {
+      const stations=(await api('/api/v1/lan/stations')).stations;
+      const names=$('stations');
+      names.replaceChildren();
+      for(const code of stations){
+        const option=document.createElement('option');
+        option.value=code;
+        names.appendChild(option);
+      }
+      if(!stations.includes($('station').value)) $('station').value=stations[0]||'';
+      $('order-form').hidden=stations.length===0;
+      if(stations.length===0)
+        report('لا توجد محطة مطبخ مقترنة حاليًا. اطلب من مسؤول الفرع ربط جهاز المطبخ.');
+    }
     orders.replaceChildren();
     if (!payload.orders.length) orders.appendChild(make('p','لا توجد طلبات محلية حاليًا'));
     for (const item of payload.orders) {
