@@ -5,6 +5,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { resolveLanDeployment } = require('./lanDeploymentConfig.cjs');
 let worker;
+let stopping=false;
 function configPath() { return path.join(app.getPath('userData'), 'branch-config.json'); }
 function loadConfig() {
  const file=configPath();
@@ -40,8 +41,12 @@ app.whenReady().then(()=>{
    BRANCH_HUB_TOKEN:c.token,BRANCH_HUB_DATA_DIR:path.join(app.getPath('userData'),'branch-data')};
   worker=fork(path.join(__dirname,'server.cjs'),[],{execPath:process.execPath,env,stdio:'ignore'});
   worker.on('error',()=>dialog.showErrorBox('PremierOS','تعذر بدء خادم الفرع المحلي'));
-  createWindow(lan.enabled ? 'تم تفعيل وضع شبكة الفرع التجريبي. افتح '+lan.url+' من هاتف مقترن عبر Wi-Fi. لا تستخدم عمليات مالية حقيقية.' : 'خادم الفرع المحلي يعمل على الجهاز فقط. اتصال الشبكة المحلية يحتاج شهادة TLS وإقران الأجهزة أولًا.');
+  worker.on('exit',(code)=>{
+    if(!stopping) dialog.showErrorBox('PremierOS',
+      'توقف خادم الفرع المحلي أو تعذر تفعيل شهادة HTTPS (code: '+String(code)+'). تحقق من الإعدادات.');
+  });
+  createWindow(lan.enabled ? 'تمت تهيئة رابط شبكة الفرع التجريبي: '+lan.url+' . يجب التحقق من عمل HTTPS قبل استخدامه. لا تستخدم عمليات مالية حقيقية.' : 'خادم الفرع المحلي مهيأ على الجهاز فقط. اتصال الشبكة المحلية يحتاج شهادة TLS وإقران الأجهزة أولًا.');
  } catch { createWindow('إعداد ربط الفرع غير صالح؛ تم منع تشغيل الخادم لحماية بيانات الفرع.'); }
 });
-app.on('before-quit',()=>{ if(worker && !worker.killed)worker.kill(); });
+app.on('before-quit',()=>{ stopping=true; if(worker && !worker.killed)worker.kill(); });
 app.on('window-all-closed',()=>app.quit());
