@@ -376,3 +376,45 @@ test('Windows desktop keeps LAN disabled until explicit TLS hostname and certifi
   assert.equal(allowed.host,'0.0.0.0');
   assert.equal(allowed.url,'https://premier-branch.local:3847/lan');
 });
+
+test('SSE replay drains more than 100 persisted authorized events without a new write',withServer(async({hub,port})=>{
+  const {waiter,chef,bar}=credentials(hub);
+  const created=await req(port,'POST','/api/v1/lan/orders',order(),waiter);
+  assert.equal(created.status,201);
+  const id=created.data.order.id;
+  // Insert a durable historical event backlog directly. No live notification
+  // follows: the reconnecting kitchen must catch up without a fresh order.
+  const insert=hub.db.prepare('INSERT INTO lan_kitchen_events'+
+    '(branch_id,station_code,creator_device_id,order_id,event_type,data_json)'+
+    ' VALUES(?,?,?,?,?,?)');
+  for(let i=0;i<250;i++){
+    insert.run('branch_001','hot','waiter_phone_001',id,'status-changed',
+      JSON.stringify({orderId:id,status:'new',sequence:i,localOnly:true}));
+  }
+  const response=await fetch('http://127.0.0.1:'+port+'/api/v1/lan/events?after=0',{
+    headers:{authorization:'Bearer '+chef},signal:AbortSignal.timeout(7000),
+  });
+  assert.equal(response.status,200);
+  const reader=response.body.getReader();
+  let payload='';
+  try {
+    while(!payload.includes('id: 251\\n')) {
+      const frame=await reader.read();
+      assert.equal(frame.done,false,'event stream stopped before backlog was replayed');
+      payload+=Buffer.from(frame.value).toString('utf8');
+    }
+    const ids=[...payload.matchAll(/^id: (\\d+)$/gm)].map(m=>Number(m[1]));
+    assert.equal(ids.length,251);
+    assert.equal(ids[0],1);
+    assert.equal(ids.at(-1),251);
+    assert.deepEqual(ids,Array.from({length:251},(_,i)=>i+1));
+  } finally {await reader.cancel();}
+  const isolated=await fetch('http://127.0.0.1:'+port+'/api/v1/lan/events?after=0',{
+    headers:{authorization:'Bearer '+bar},signal:AbortSignal.timeout(3000),
+  });
+  const otherReader=isolated.body.getReader();
+  try {
+    const first=await otherReader.read();
+    assert.equal(Buffer.from(first.value).toString('utf8').includes('id: 1'),false);
+  } finally {await otherReader.cancel();}
+}));
