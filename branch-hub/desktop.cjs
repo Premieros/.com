@@ -3,6 +3,7 @@ const { app, BrowserWindow, dialog } = require('electron');
 const { fork } = require('node:child_process');
 const fs = require('node:fs');
 const path = require('node:path');
+const { resolveLanDeployment } = require('./lanDeploymentConfig.cjs');
 let worker;
 function configPath() { return path.join(app.getPath('userData'), 'branch-config.json'); }
 function loadConfig() {
@@ -30,12 +31,16 @@ app.whenReady().then(()=>{
  try {
   const c=loadConfig();
   if (!c) {createWindow('لم يتم ربط الجهاز بفرع بعد. يتطلب التشغيل إعداد ربط فرع آمن؛ لم يتم تنفيذ التسجيل المركزي أو التوقيع بعد.');return;}
-  const env={...process.env,ELECTRON_RUN_AS_NODE:'1',BRANCH_HUB_HOST:'127.0.0.1',
+  const lan=resolveLanDeployment(c);
+  const env={...process.env,ELECTRON_RUN_AS_NODE:'1',
+   BRANCH_HUB_HOST:lan.host,BRANCH_HUB_PORT:String(lan.port),
+   BRANCH_HUB_LAN_HOSTNAME:lan.hostname||'',
+   BRANCH_HUB_TLS_CERT:lan.tlsCert||'',BRANCH_HUB_TLS_KEY:lan.tlsKey||'',
    BRANCH_HUB_BRANCH_ID:c.branchId,BRANCH_HUB_ORGANIZATION_ID:c.organizationId,
    BRANCH_HUB_TOKEN:c.token,BRANCH_HUB_DATA_DIR:path.join(app.getPath('userData'),'branch-data')};
   worker=fork(path.join(__dirname,'server.cjs'),[],{execPath:process.execPath,env,stdio:'ignore'});
   worker.on('error',()=>dialog.showErrorBox('PremierOS','تعذر بدء خادم الفرع المحلي'));
-  createWindow('خادم الفرع المحلي يعمل على الجهاز فقط. اتصال الشبكة المحلية يحتاج شهادة TLS وإقران الأجهزة أولًا.');
+  createWindow(lan.enabled ? 'تم تفعيل وضع شبكة الفرع التجريبي. افتح '+lan.url+' من هاتف مقترن عبر Wi-Fi. لا تستخدم عمليات مالية حقيقية.' : 'خادم الفرع المحلي يعمل على الجهاز فقط. اتصال الشبكة المحلية يحتاج شهادة TLS وإقران الأجهزة أولًا.');
  } catch { createWindow('إعداد ربط الفرع غير صالح؛ تم منع تشغيل الخادم لحماية بيانات الفرع.'); }
 });
 app.on('before-quit',()=>{ if(worker && !worker.killed)worker.kill(); });
