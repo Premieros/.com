@@ -45,8 +45,36 @@ existing cloud KDS screen and POS still use their current RPCs.
   Do not enable remote listening on a customer network without cert
   provisioning, authenticated enrollment UX and complete security review.
 - Branch Hub's local SQLite is still plaintext on disk; portable encrypted
-  backups, secure device enrollment, operator PINs, rate limiting, lockout,
-  signed enrollment and cloud-side rights revocation are NOT complete.
+  backups, secure device enrollment, operator PINs, comprehensive rate limiting,
+  lockout policy, signed enrollment and cloud-side rights revocation are NOT complete.
+  Basic invalid-device-token throttling is implemented as a bounded per-address
+  in-memory safeguard; it is not a replacement for authenticated enrollment.
+
+### Offline receipts, reconnect and recovery semantics
+
+- `GET /api/v1/lan/sync-status` reports a **device-scoped** count of durable
+  kitchen events and explicit `cloudAcknowledgementImplemented:false`.
+  These events are **not** uploaded to Supabase by the pilot. The screen must
+  never label them as remotely reconciled transactions.
+- On a lost HTTP response, repeat order creation or status updates with the
+  **same idempotency key**. For status commands, the response includes
+  `committedVersion` so retrying a previous transition cannot accidentally
+  report the later current kitchen state as the result of that command.
+- If the tablet reconnects with an SSE cursor ahead of the recovered database
+  (for example after restoring an older snapshot), the stream emits a
+  `reset-cursor` event and replays available station-authorized events.
+- The desktop's local LAN address is shown as active only after its child
+  service reports that it **bound the configured port**. The status does not
+  prove that a phone trusts the TLS certificate or that the Wi-Fi firewall
+  allows the connection.
+- A development backup can restore kitchen tickets, status history, device
+  revocations and event cursors. **It is not encrypted or portable for
+  customers**. Stop the branch service before restoring; never restore two
+  active copies of the same branch DB into the same LAN.
+- Revoked credentials receive a visible re-enrollment prompt instead of
+  being retried indefinitely, and repeated invalid tokens are throttled.
+  Real employee session/permission integration and certificate enrollment
+  remain release blockers.
 
 ### Controlled development-only test
 
