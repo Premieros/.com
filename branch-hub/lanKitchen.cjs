@@ -159,15 +159,6 @@ function createLanKitchen({db,organizationId,branchId}) {
             Number.isInteger(line.quantity)&&line.quantity>=1&&line.quantity<=99)) {
           respond(res,400,{error:'LAN_INVALID_KITCHEN_DRAFT'});return true;
         }
-        // Refuse an orphan kitchen ticket with no currently paired station.
-        const station=db.prepare('SELECT 1 FROM lan_devices WHERE '+
-          "organization_id=? AND branch_id=? AND role='kitchen' AND "+
-          'station_code=? AND active=1 LIMIT 1')
-          .get(organizationId,branchId,item.stationCode);
-        if (!station) {
-          respond(res,409,{error:'LAN_KITCHEN_STATION_NOT_AVAILABLE'});
-          return true;
-        }
         const items=item.items.map(line=>({name:line.name.trim(),quantity:line.quantity}));
         const payloadHash=hash(JSON.stringify({
           stationCode:item.stationCode,tableCode:item.tableCode,items,
@@ -180,6 +171,15 @@ function createLanKitchen({db,organizationId,branchId}) {
             respond(res,409,{error:'LAN_ORDER_IDEMPOTENCY_CONFLICT'});return true;
           }
           respond(res,200,{order:orderView(existing),replayed:true});return true;
+        }
+        // Refuse an orphan kitchen ticket with no currently paired station.
+        const station=db.prepare('SELECT 1 FROM lan_devices WHERE '+
+          "organization_id=? AND branch_id=? AND role='kitchen' AND "+
+          'station_code=? AND active=1 LIMIT 1')
+          .get(organizationId,branchId,item.stationCode);
+        if (!station) {
+          respond(res,409,{error:'LAN_KITCHEN_STATION_NOT_AVAILABLE'});
+          return true;
         }
         let row,seq;
         db.exec('BEGIN IMMEDIATE');
