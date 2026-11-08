@@ -5,6 +5,7 @@
   const orders = $('orders'), status = $('connection');
   let secret = '', role = '', station = '', lastEvent = 0, signal = null;
   let uncertainSubmission = null;
+  const uncertainStatusCommands = new Map();
   const labels={new:'جديد',cooking:'قيد التحضير',ready:'جاهز',served:'تم التقديم'};
   function report(message) { status.textContent = message; }
   async function api(path, options = {}) {
@@ -28,7 +29,13 @@
   }
   async function refresh() {
     if(!secret)return;
-    const payload=await api('/api/v1/lan/orders');
+    const [payload,syncStatus]=await Promise.all([
+      api('/api/v1/lan/orders'),
+      api('/api/v1/lan/sync-status'),
+    ]);
+    $('cloud-status').textContent = 'أحداث مطبخ محفوظة محليًا: '+
+      syncStatus.pendingCloudDraftEvents+
+      ' | المزامنة السحابية غير مفعّلة. ليست مبيعات أو مدفوعات معتمدة.';
     role=payload.role;
     station=payload.stationCode||'';
     $('scope').textContent=role==='waiter'?'الويتر — الطلبات المسجلة محليًا':
@@ -64,14 +71,25 @@
         const btn=make('button',text,'secondary');
         btn.addEventListener('click',async()=>{
           btn.disabled=true;
+          const operationId=item.id+':'+item.version+':'+next;
+          // A network timeout does not prove failure. Reuse the exact key
+          // for the same command, even if another tablet subsequently changed
+          // the order status.
+          if(!uncertainStatusCommands.has(operationId))
+            uncertainStatusCommands.set(operationId,'status-'+crypto.randomUUID());
           try {
             await api('/api/v1/lan/orders/'+encodeURIComponent(item.id)+'/status',{
               method:'POST',
               body:JSON.stringify({status:next,expectedVersion:item.version,
-                commandKey:'status-'+crypto.randomUUID()}),
+                commandKey:uncertainStatusCommands.get(operationId)}),
             });
+            uncertainStatusCommands.delete(operationId);
             await refresh();
-          } catch(error) {report('تعذر التحديث: '+error.message);btn.disabled=false;}
+          } catch(error) {
+            report('حالة الطلب غير مؤكدة: '+error.message+
+              ' — أعد المحاولة بنفس الطلب أو اضغط تحديث.');
+            btn.disabled=false;
+          }
         });
         ticket.appendChild(btn);
       }
@@ -102,6 +120,11 @@
             const frame=pending.slice(0,sep);pending=pending.slice(sep+2);
             const seq=/^id: (\d+)$/m.exec(frame);
             if(seq) lastEvent=Math.max(lastEvent,Number(seq[1]));
+            if(frame.includes('event: reset-cursor')) {
+              lastEvent=0;
+              await refresh();
+              continue;
+            }
             if(frame.includes('event: revoked')) {
               report('تم إلغاء صلاحية الجهاز. أعد الإقران مع مسؤول الفرع.');
               disconnect();return;
@@ -122,6 +145,7 @@
     signal?.abort();
     signal=null;
     lastEvent=0;role='';station='';uncertainSubmission=null;
+    uncertainStatusCommands.clear();
     $('credential').value='';
     orders.replaceChildren();workspace.hidden=true;login.hidden=false;
   }
