@@ -54,6 +54,46 @@ IndexedDB is origin/profile scoped and not a replacement for a tested,
 device-native crash recovery, backup and restore layer. Existing hosted-origin
 sales remain subject to the migration gate from Phase 1.
 
+## Phase 2B — native encrypted document-draft journal (implemented in draft PR)
+
+The Electron Node 22 main process now has a separate SQLite/WAL/FULL durability
+foundation at electron/localDraftJournal.cjs. It is intentionally **draft-only**
+and is NOT the current authoritative sale queue:
+
+- SQLite draft rows survive application process restarts; all payload bytes are
+  encrypted with an injected OS-protected codec. Windows integration uses
+  Electron safeStorage, fails closed without OS encryption, and stores no
+  plaintext fallback.
+- Scoped organization/branch/operator/device identity and branch-unique
+  invoice/idempotency fingerprints reject conflicting duplicate drafts.
+- Domain draft kinds exist for sale, return, held order, kitchen ticket,
+  purchase receipt, stock movement, manufacture, expense and accounting
+  journal draft. The only allowed states are LOCAL_PENDING and NEEDS_REVIEW.
+  Neither means posted or confirmed.
+- A read-only Electron preload call getLocalDraftHealth verifies local storage
+  integrity and reports mode DRAFT_ONLY, canPost=false, canSync=false.
+  No general document-write or raw SQL IPC capability is exposed to the UI.
+- Node 22 Linux/Windows regression checks exercise encrypted storage,
+  duplicates, rollback, restart, corrupt ciphertext, and cross-branch access.
+- OS-protected encryption may tie backups to the Windows user profile.
+  **Do not export SQLite files and assume they can be decrypted on another PC**;
+  a separately reviewed portable encrypted backup and key-recovery protocol
+  is still mandatory before branch deployment.
+- The existing V5 IndexedDB outbox remains the source of offline sales and
+  is **not automatically copied or replayed into SQLite**. Migration and
+  unification require a separate one-time receipt-by-receipt reconciliation.
+
+## Phase 2C — atomic confirmed-sale cleanup (implemented in draft PR)
+
+When the canonical Supabase sale RPC confirms a sale, the sync worker now
+deletes the queued invoice and scoped local stock movements **in one IndexedDB
+readwrite transaction**. A failed transaction retains both stores for
+idempotent reconciliation after restart. It checks the captured branch,
+invoice and warehouse and refuses cross-scope deletion.
+Unit regressions cover partial delete failures, wrong warehouse, another
+branch and repeated attempts. A manually discarded unsynced document does
+not constitute confirmed posting.
+
 ## Phase 2 — local transaction engine (not yet delivered)
 
 Implement an embedded, durable transaction store owned by one per-device
