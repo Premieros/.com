@@ -4,6 +4,7 @@
   const login = $('login-form'), workspace = $('workspace');
   const orders = $('orders'), status = $('connection');
   let secret = '', role = '', station = '', lastEvent = 0, signal = null;
+  let uncertainSubmission = null;
   const labels={new:'جديد',cooking:'قيد التحضير',ready:'جاهز',served:'تم التقديم'};
   function report(message) { status.textContent = message; }
   async function api(path, options = {}) {
@@ -104,7 +105,7 @@
     secret='';
     signal?.abort();
     signal=null;
-    lastEvent=0;role='';station='';
+    lastEvent=0;role='';station='';uncertainSubmission=null;
     $('credential').value='';
     orders.replaceChildren();workspace.hidden=true;login.hidden=false;
   }
@@ -124,22 +125,28 @@
     const button=$('order-form').querySelector('button');
     button.disabled=true;
     try {
-      const body={
-        organizationId:null,branchId:null,
+      const draft={
         stationCode:$('station').value.trim(),
         tableCode:$('table').value.trim(),
         items:[{name:$('product').value.trim(),quantity:Number($('quantity').value)}],
-        idempotencyKey:'order-'+crypto.randomUUID(),
       };
-      // Branch identity is provided from the paired device's local Hub,
-      // not from a cloud environment variable or browser-supplied tenant.
+      const fingerprint=JSON.stringify(draft);
+      if (uncertainSubmission && uncertainSubmission.fingerprint!==fingerprint)
+        throw Error('هناك عملية حفظ غير مؤكدة. أعد إرسال نفس الطلب قبل تغييره، حتى لا يتكرر.');
+      if (!uncertainSubmission)
+        uncertainSubmission={fingerprint,key:'order-'+crypto.randomUUID()};
+      // A network timeout is NOT proof of failure; retry with the same
+      // operation key instead of silently creating a second kitchen ticket.
       const profile=await api('/api/v1/lan/profile');
-      body.organizationId=profile.organizationId;
-      body.branchId=profile.branchId;
+      const body={
+        organizationId:profile.organizationId,branchId:profile.branchId,
+        ...draft,idempotencyKey:uncertainSubmission.key,
+      };
       await api('/api/v1/lan/orders',{method:'POST',body:JSON.stringify(body)});
+      uncertainSubmission=null;
       $('product').value='';
       await refresh();
-    } catch(error){report('تعذر حفظ الطلب: '+error.message);}
+    } catch(error){report('الحفظ غير مؤكد: '+error.message+' — حاول بنفس بيانات الطلب.');}
     finally{button.disabled=false;}
   });
 })();
