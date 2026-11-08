@@ -1595,6 +1595,7 @@
     "canonical_item_catalog",
     "categories",
     "chart_of_accounts",
+    "cloud_print_jobs",
     "customers",
     "dining_areas",
     "dining_tables",
