@@ -32,6 +32,8 @@ jobs:
         run: if [ -f package-lock.json ]; then npm ci; else npm install; fi
       - name: Validate bundled Windows UI local server
         run: node --test electron/localAppServer.test.cjs
+      - name: Verify encrypted offline Windows draft journal
+        run: node --test electron/localDraftJournal.test.cjs
       - name: Verify locked Supabase project identity
         run: node scripts/db/verify-database-identity.js
       - name: Verify repository project references
