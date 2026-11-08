@@ -142,6 +142,12 @@ test('waiter order is stored durably and kitchen status becomes visible without 
   assert.equal(afterRestart.db.prepare('SELECT count(*) n FROM lan_kitchen_orders').get().n,1);
   assert.equal(afterRestart.db.prepare('SELECT count(*) n FROM lan_kitchen_events').get().n,4);
   assert.equal(afterRestart.db.prepare('SELECT count(*) n FROM lan_kitchen_commands').get().n,3);
+  assert.equal(afterRestart.revokeLanDevice('chef_tablet_001'),true);
+  const replayAfterRevoke=await req(port,'POST','/api/v1/lan/orders',order(),waiter);
+  assert.equal(replayAfterRevoke.status,200);
+  assert.equal(replayAfterRevoke.data.replayed,true);
+  assert.equal((await req(port,'POST','/api/v1/lan/orders',
+    order({idempotencyKey:'fresh-order-after-revoke'}),waiter)).status,409);
 }));
 
 test('device revoke, cross-branch and cross-origin requests are rejected',withServer(async({hub,port})=>{
