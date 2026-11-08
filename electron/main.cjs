@@ -1,13 +1,14 @@
 // Premier Print Agent - Windows desktop shell and local thermal print bridge.
 // Every physical printer owns an independent FIFO queue and hidden print worker.
 
-const { app, BrowserWindow, ipcMain, shell, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, shell, dialog, safeStorage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
 const { execFile } = require('child_process');
 const { PerPrinterQueue, withTimeout } = require('./printerQueue.cjs');
 const { startLocalAppServer } = require('./localAppServer.cjs');
+const { openLocalDraftJournal } = require('./localDraftJournal.cjs');
 
 const DEFAULT_THERMAL_WIDTH_MM = 80;
 const PRINT_LOAD_TIMEOUT_MS = 6000;
@@ -315,6 +316,45 @@ ipcMain.handle('pos:kick-drawer', async (_event, requestedPrinterName) => {
       },
     );
   });
+});
+
+// Read-only OS-encryption diagnostics. This never stages, posts, retries,
+// restores or synchronizes a financial document. A local privileged UI alone
+// can inspect its own draft storage readiness.
+ipcMain.handle('desktop:get-local-draft-health', async (event) => {
+  const unavailable = (code) => ({
+    ready: false, mode: 'DRAFT_ONLY', canPost: false, canSync: false,
+    error: code,
+  });
+  if (!localAppServer || !mainWindow || event.sender !== mainWindow.webContents) {
+    return unavailable('LOCAL_DRAFT_DIAGNOSTIC_UNAUTHORIZED');
+  }
+  try {
+    const senderOrigin = new URL(event.senderFrame?.url || event.sender.getURL()).origin;
+    if (senderOrigin !== new URL(localAppServer.url).origin) {
+      return unavailable('LOCAL_DRAFT_DIAGNOSTIC_WRONG_ORIGIN');
+    }
+    if (!safeStorage.isEncryptionAvailable()) {
+      return unavailable('LOCAL_DRAFT_OS_ENCRYPTION_UNAVAILABLE');
+    }
+    // The installed Electron userData directory must remain stable across
+    // upgrades; do not move this file or guess how to migrate DPAPI secrets.
+    const filename = path.join(app.getPath('userData'), 'draft-journal-v1.sqlite');
+    const journal = openLocalDraftJournal({ filename, codec: safeStorage });
+    try {
+      const integrity = journal.verifyIntegrity();
+      return {
+        ready: true, mode: 'DRAFT_ONLY', canPost: false, canSync: false,
+        verifiedDrafts: integrity.verifiedDrafts,
+      };
+    } finally {
+      journal.close();
+    }
+  } catch (error) {
+    console.warn('[Premier Desktop] Draft journal readiness check failed:',
+      error instanceof Error ? error.message : 'unknown error');
+    return unavailable('LOCAL_DRAFT_STORAGE_UNAVAILABLE');
+  }
 });
 
 ipcMain.handle('pos:get-system-info', async () => ({
