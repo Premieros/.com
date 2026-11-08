@@ -1,0 +1,48 @@
+name: Verify Windows Bundled UI (No Cloud Transactions)
+
+on:
+  pull_request:
+    branches: [main, master]
+    paths:
+      - 'electron/**'
+      - 'tests/e2e/windows-local-shell.spec.ts'
+      - '.github/workflows/verify-windows-local-ui.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  SUPABASE_PROJECT_REF: hvqlkapynjfjikqithvd
+  VITE_SUPABASE_URL: https://hvqlkapynjfjikqithvd.supabase.co
+  VITE_SUPABASE_ANON_KEY: dummy_anon_key_for_ci_build
+
+jobs:
+  bundled-interface:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Local UI HTTP security and restart-origin contract
+        run: node --test electron/localAppServer.test.cjs
+      - name: Install locked app dependencies
+        run: npm ci
+      - name: Build only local UI assets (no production upload)
+        run: npm run build
+      - name: Verify real bundled UI and deep links
+        run: node electron/localBundledSmoke.cjs
+      - name: Install Chromium for isolated login-shell check
+        run: npx playwright install --with-deps chromium
+      - name: Simulate no external network in browser
+        run: npx playwright test tests/e2e/windows-local-shell.spec.ts --project=chromium
+      - name: Store browser report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-desktop-ui-browser-report
+          path: playwright-report/
+          retention-days: 5
