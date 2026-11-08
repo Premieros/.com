@@ -309,6 +309,36 @@ export async function removeOfflineSale(id: string): Promise<void> {
   }
 }
 
+/**
+ * Strict financial dequeue: callers awaiting server-committed sales must
+ * know whether the IndexedDB delete transaction actually committed.
+ * The legacy convenience remover intentionally remains unchanged for now.
+ */
+export async function removeOfflineSaleStrict(id: string): Promise<void> {
+  const saleId = typeof id === 'string' ? id.trim() : '';
+  if (!saleId) throw new Error('OFFLINE_SALE_ID_REQUIRED_FOR_DEQUEUE');
+  const db = await openOfflineDb();
+  await new Promise<void>((resolve, reject) => {
+    let tx: IDBTransaction;
+    try {
+      tx = db.transaction('sales_queue', 'readwrite');
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error('OFFLINE_SALE_DEQUEUE_FAILED'));
+    tx.onabort = () => reject(tx.error || new Error('OFFLINE_SALE_DEQUEUE_ABORTED'));
+    try {
+      tx.objectStore('sales_queue').delete(saleId);
+    } catch (error) {
+      try { tx.abort(); } catch { /* no active transaction */ }
+      reject(error);
+    }
+  });
+  notifyQueueListeners();
+}
+
 // ── Queue Change Event Listeners ─────────────────────────────────
 
 type QueueListener = (pendingCount: number) => void;
