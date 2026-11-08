@@ -24,6 +24,7 @@ import { useActiveOrders } from '../hooks/useActiveOrders';
 import { usePosPermissions } from '../hooks/usePosPermissions';
 import { usePosKeyboard } from '../hooks/usePosKeyboard';
 import { cartLineKey, orderItemLineKey } from '../utils/cart';
+import { needsKitchenDispatchBeforeSettlement } from '../utils/unsentCheckoutGuard';
 import { InventoryRepository } from '@/core/repositories/InventoryRepository';
 import { OrderStartWizard, type StartStep, type StartOrderOptions } from '../components/start/OrderStartWizard';
 import { ProductBrowser } from '../components/catalog/ProductBrowser';
@@ -298,7 +299,7 @@ export function PosWorkspacePage() {
   // A cashier-side guard provides immediate feedback. The corresponding
   // transaction-locked server guard is still required before production use.
   const blockUnsentOpenOrder = useCallback((): boolean => {
-    if (!pos.activeOrderId || !hasUnsentItems) return false;
+    if (!needsKitchenDispatchBeforeSettlement(pos.activeOrderId, hasUnsentItems)) return false;
     show(
       isAr
         ? 'أرسل جميع الأصناف للمطبخ أو احذف غير المرسل قبل الدفع أو طباعة الحساب.'
