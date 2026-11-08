@@ -5,12 +5,14 @@ const mockDb = vi.hoisted(() => ({
   remove: vi.fn(),
   getAll: vi.fn(),
   put: vi.fn(),
+  openDb: vi.fn(),
 }));
 vi.mock('@/core/repositories/LocalDatabase', () => ({
   dbGetAllStrict: mockDb.getAllStrict,
   dbDelete: mockDb.remove,
   dbGetAll: mockDb.getAll,
   dbPut: mockDb.put,
+  getLocalDb: mockDb.openDb,
 }));
 
 import { SalesRepository } from '@/core/repositories/SalesRepository';
