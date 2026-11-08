@@ -36,7 +36,7 @@ function withServer(fn) {
 function req(port,method,pathname,payload,credential,headers={}) {
   return new Promise((resolve,reject)=>{
     const request=http.request({
-      hostname:'127.0.0.1',port,path:pathname,method,
+      hostname:'127.0.0.1',port,path:pathname,method,agent:false,
       headers:{
         ...(credential?{authorization:'Bearer '+credential}:{}),
         ...(payload?{'content-type':'application/json'}:{}),
