@@ -37,7 +37,11 @@ existing cloud KDS screen and POS still use their current RPCs.
   credential. Wildcard CORS was removed; forged Host/Origin requests are
   rejected. LAN binding requires a configured TLS certificate and explicit
   trusted hostname/IP. Do not expose the service via router port forwarding.
-- Existing desktop Branch Hub still starts on loopback by default, not LAN.
+- The Windows Branch Hub desktop stays on loopback **by default**. In a
+  controlled lab, an administrator may set `lanEnabled: true`, `lanHostname`,
+  `lanPort`, and absolute `tlsCert`/`tlsKey` paths in the existing userData
+  `branch-config.json`. Its window then shows the exact HTTPS `/lan` URL.
+  A missing hostname/certificate fails closed; no firewall rule is installed.
   Do not enable remote listening on a customer network without cert
   provisioning, authenticated enrollment UX and complete security review.
 - Branch Hub's local SQLite is still plaintext on disk; portable encrypted
