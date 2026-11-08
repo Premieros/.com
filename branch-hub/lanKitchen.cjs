@@ -348,7 +348,7 @@ function createLanKitchen({db,organizationId,branchId}) {
       function flush() {
         if(closed||res.destroyed||blocked)return;
         if(!auth(req)) {
-          res.write('event: revoked\\ndata: {}\\n\\n');cleanup();res.end();return;
+          res.write('event: revoked\ndata: {}\n\n');cleanup();res.end();return;
         }
         try {
           // Drain the entire authorized replay backlog. A single 100-row
@@ -362,8 +362,8 @@ function createLanKitchen({db,organizationId,branchId}) {
               ' ORDER BY seq LIMIT 100').all(
               branchId,cursor,device.role==='kitchen'?device.station_code:device.device_id);
             for(const evt of rows) {
-              const writable=res.write('id: '+evt.seq+'\\nevent: '+evt.event_type+
-                '\\ndata: '+evt.data_json+'\\n\\n');
+              const writable=res.write('id: '+evt.seq+'\nevent: '+evt.event_type+
+                '\ndata: '+evt.data_json+'\n\n');
               cursor=evt.seq;
               if(!writable) {
                 blocked=true;
