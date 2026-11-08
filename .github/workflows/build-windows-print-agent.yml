@@ -32,6 +32,8 @@ jobs:
       - name: Test Windows bundled UI server without Electron downloads
         run: node --test electron/localAppServer.test.cjs
 
+      - name: Verify encrypted local SQLite draft journal on Windows Node 22
+        run: node --test electron/localDraftJournal.test.cjs
       - name: Install web dependencies including Windows native optionals
         run: |
           npm install --include=optional --no-audit --no-fund
