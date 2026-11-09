@@ -61,12 +61,15 @@ CREATE POLICY legacy_expenses_select ON public.expenses FOR SELECT TO authentica
 CREATE POLICY legacy_purchases_select ON public.purchases FOR SELECT TO authenticated USING (true);
 CREATE POLICY legacy_purchase_items_select ON public.purchase_items FOR SELECT TO authenticated USING (true);
 CREATE POLICY legacy_stock_counts_select ON public.stock_counts FOR SELECT TO authenticated USING (true);
+CREATE POLICY auth_stock_counts_insert ON public.stock_counts FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY auth_stock_counts_update ON public.stock_counts FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY legacy_sale_items_select ON public.sale_items FOR SELECT TO authenticated USING (true);
 CREATE POLICY legacy_sales_select ON public.sales FOR SELECT TO authenticated USING (true);
 CREATE POLICY legacy_pul_select ON public.product_unit_links FOR SELECT TO authenticated USING (true);
 
 GRANT USAGE ON SCHEMA private TO authenticated;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated;
+GRANT INSERT,UPDATE ON public.stock_counts TO authenticated;
 
 INSERT INTO public.branches VALUES
  ('00000000-0000-0000-0000-000000000001'),
