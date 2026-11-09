@@ -173,12 +173,14 @@ export async function enqueueOfflineSaleIdempotent(
     const tx = db.transaction('sales_queue', 'readwrite');
     const store = tx.objectStore('sales_queue');
     let decision: { id: string; inserted: boolean } | null = null;
+    let conflict = false;
     const req = store.getAll();
     req.onsuccess = () => {
       const matches = (req.result as OfflineSaleQueueItem[]).filter(row =>
         String(row.payload?.p_client_operation_key || '').trim() === key,
       );
       if (matches.length > 1) {
+        conflict = true;
         tx.abort();
         return;
       }
@@ -187,6 +189,7 @@ export async function enqueueOfflineSaleIdempotent(
         if (existing.created_by_user_id !== owner
           || existing.payload.p_branch_id !== branchId
           || offlineSaleFingerprint(existing.payload) !== offlineSaleFingerprint(sale.payload)) {
+          conflict = true;
           tx.abort();
           return;
         }
@@ -205,12 +208,9 @@ export async function enqueueOfflineSaleIdempotent(
       resolve(decision);
     };
     tx.onerror = () => reject(tx.error || new Error('OFFLINE_SALE_QUEUE_WRITE_FAILED'));
-    tx.onabort = () => {
-      reject(req.readyState === 'done' && (req.result as OfflineSaleQueueItem[] | undefined)?.some(row =>
-        String(row.payload?.p_client_operation_key || '').trim() === key)
-        ? new Error('OFFLINE_SALE_OPERATION_KEY_CONFLICT')
-        : tx.error || new Error('OFFLINE_SALE_QUEUE_ABORTED'));
-    };
+    tx.onabort = () => reject(conflict
+      ? new Error('OFFLINE_SALE_OPERATION_KEY_CONFLICT')
+      : tx.error || new Error('OFFLINE_SALE_QUEUE_ABORTED'));
   });
 }
 
