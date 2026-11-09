@@ -81,6 +81,8 @@ jobs:
         run: node --test scripts/db/ci-migration-compat.test.mjs
       - name: Apply canonical migrations to disposable CI PostgreSQL
         run: node scripts/db/apply-migration.js --dir supabase/migrations --ci-replay
+      - name: Stage batch-accurate ready-product COGS on isolated CI database only
+        run: node scripts/db/apply-migration.js --file scripts/db/candidates/premier_ready_product_batch_cogs_NOT_FOR_PRODUCTION.sql
       - name: Verify schema
         run: node scripts/db/verify-schema.js
       - name: Isolate subscription guard for order integration fixtures
