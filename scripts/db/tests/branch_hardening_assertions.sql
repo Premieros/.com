@@ -74,6 +74,7 @@ END $negative_fks$;
 SET ROLE authenticated;
 SET app.allowed_branch = '00000000-0000-0000-0000-000000000001';
 SET app.test_admin = 'no';
+SET app.test_permissions = 'sales.view,expenses.view,purchases.view,inventory.view';
 
 DO $rls_negative$
 DECLARE
@@ -94,6 +95,22 @@ BEGIN
   SELECT count(*) INTO n FROM public.product_unit_links;
   IF n<>1 THEN RAISE EXCEPTION 'PRODUCT_UNIT_LINKS_BRANCH_BYPASS: %',n; END IF;
 END $rls_negative$;
+-- A branch-approved but unprivileged employee cannot read finance/stock
+-- just because their branch or the row's creation date matches.
+SET app.test_permissions = '';
+DO $unprivileged$
+BEGIN
+  IF (SELECT count(*) FROM public.sales) <> 0
+     OR (SELECT count(*) FROM public.sale_items) <> 0
+     OR (SELECT count(*) FROM public.expenses) <> 0
+     OR (SELECT count(*) FROM public.purchases) <> 0
+     OR (SELECT count(*) FROM public.purchase_items) <> 0
+     OR (SELECT count(*) FROM public.stock_counts) <> 0 THEN
+    RAISE EXCEPTION 'UNPRIVILEGED_BRANCH_USER_CAN_READ_PROTECTED_ROWS';
+  END IF;
+END $unprivileged$;
+SET app.test_permissions = 'sales.view,expenses.view,purchases.view,inventory.view';
+
 -- Legitimate branch B user can read its own *recent* information.
 SET app.allowed_branch = '00000000-0000-0000-0000-000000000002';
 DO $legitimate_branch$
