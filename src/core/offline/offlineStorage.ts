@@ -1,4 +1,5 @@
 import { getLocalDb } from '@/core/repositories/LocalDatabase';
+import { decideOfflineSaleInsert } from './offlineSaleIdempotency';
 
 /**
  * Premier POS IndexedDB Offline Storage & Local Sync Engine
@@ -132,6 +133,57 @@ export async function enqueueOfflineSale(sale: Omit<OfflineSaleQueueItem, 'statu
     };
     tx.onerror = () => rej(tx.error);
     tx.onabort = () => rej(tx.error || new Error('Offline sale queue transaction aborted'));
+  });
+}
+
+
+/**
+ * Atomically insert (or retrieve) one offline sale per financial operation key.
+ * IndexedDB readwrite transactions on the same store serialize across tabs,
+ * including concurrent requests. No change to the existing DB version/indexes.
+ *
+ * Invoice numbers can be freshly generated on a retry; they do not change
+ * the business payload identity. Everything else must match exactly.
+ */
+export async function enqueueOfflineSaleIdempotent(
+  sale: Omit<OfflineSaleQueueItem, 'status' | 'retry_count'>,
+): Promise<{ id: string; inserted: boolean }> {
+  const key = String(sale.payload.p_client_operation_key || '').trim();
+  const branchId = String(sale.payload.p_branch_id || '').trim();
+  const owner = String(sale.created_by_user_id || '').trim();
+  if (!key || !branchId || !owner) {
+    throw new Error('OFFLINE_SALE_IDEMPOTENCY_SCOPE_REQUIRED');
+  }
+  const db = await openOfflineDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('sales_queue', 'readwrite');
+    const store = tx.objectStore('sales_queue');
+    let decision: { id: string; inserted: boolean } | null = null;
+    let conflict = false;
+    const req = store.getAll();
+    req.onsuccess = () => {
+      try {
+        decision = decideOfflineSaleInsert(req.result as OfflineSaleQueueItem[], sale);
+        if (decision.inserted) {
+          store.add({ ...sale, status: 'pending', retry_count: 0 } satisfies OfflineSaleQueueItem);
+        }
+      } catch (error) {
+        conflict = error instanceof Error && error.message === 'OFFLINE_SALE_OPERATION_KEY_CONFLICT';
+        tx.abort();
+      }
+    };
+    tx.oncomplete = () => {
+      if (!decision) {
+        reject(new Error('OFFLINE_SALE_IDEMPOTENCY_UNRESOLVED'));
+        return;
+      }
+      if (decision.inserted) notifyQueueListeners();
+      resolve(decision);
+    };
+    tx.onerror = () => reject(tx.error || new Error('OFFLINE_SALE_QUEUE_WRITE_FAILED'));
+    tx.onabort = () => reject(conflict
+      ? new Error('OFFLINE_SALE_OPERATION_KEY_CONFLICT')
+      : tx.error || new Error('OFFLINE_SALE_QUEUE_ABORTED'));
   });
 }
 

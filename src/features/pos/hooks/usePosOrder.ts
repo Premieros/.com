@@ -43,6 +43,9 @@ export function usePosOrder(input: UsePosOrderInput) {
   const perms = usePosPermissions();
   const [offlineCompleting, setOfflineCompleting] = useState(false);
   const settlementLockRef = useRef(false);
+  // Reuse the same financial operation key on an unresolved offline retry.
+  // Never mint a fresh key merely because a local IndexedDB response was lost.
+  const pendingOfflineOperationKeyRef = useRef<string | null>(null);
   const pendingLinkedCheckoutRef = useRef<{ orderId: string; branchId: string; payload: ProcessSalePayload; preview: OrderSettlementPreview } | null>(null);
   const [settlementPreview, setSettlementPreview] = useState<OrderSettlementPreview | null>(null);
   const [settlementReceipt, setSettlementReceipt] = useState<ReceiptData | null>(null);
@@ -270,8 +273,11 @@ export function usePosOrder(input: UsePosOrderInput) {
           return false;
         }
         const invoiceNumber = await nextInvoiceNumber();
+        const operationKey = pendingOfflineOperationKeyRef.current || createSaleOperationKey();
+        pendingOfflineOperationKeyRef.current = operationKey;
         const paidAmountToUse = base.paymentMethod === 'credit' ? 0 : base.paidAmount || base.total;
         const { result, error } = await processSaleForOrder({
+          p_client_operation_key: operationKey,
           p_invoice_number: invoiceNumber,
           p_branch_id: input.branchId,
           p_shift_id: input.activeShift.id,
@@ -299,6 +305,7 @@ export function usePosOrder(input: UsePosOrderInput) {
           return false;
         }
 
+        pendingOfflineOperationKeyRef.current = null;
         base.resetWorkspace();
         show(
           isAr
