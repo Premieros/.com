@@ -4,6 +4,7 @@ test('browser preloads all lazy route assets and reloads shell without internet'
   const errors: string[] = [];
   page.on('pageerror', (error) => errors.push(error.message));
   page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
+  page.on('requestfailed', (request) => errors.push(`REQUEST_FAILED ${request.url()} ${request.failure()?.errorText || ''}`));
   await page.route('https://hvqlkapynjfjikqithvd.supabase.co/**', (route) => route.abort('failed'));
   await page.goto('/');
   await page.waitForFunction(() => navigator.serviceWorker?.controller != null, { timeout: 30_000 });
