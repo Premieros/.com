@@ -23,7 +23,7 @@ Now:
 
 ## Next gates (separate work)
 
-1. Add a disposable Postgres fixture containing two branches, two warehouses, different product batch and catalog costs, sales and returns. Reconcile quantities, historical sale COGS, ledger and posted journals.
+1. **Added first disposable Postgres fixture:** one branch/product/warehouse with actual batch cost different from catalog cost, consumed sale quantity, ledger/stock-transaction and current valuation assertions in `tests/integration/premier-batch-cogs-vs-current-valuation.test.ts`. A *separate* two-branch/two-warehouse, returns and posted journal integration scenario is still required before certifying full accounting reconciliation.
 2. Review `get_stock_valuation` server-side authorization for direct RPC callers, including permission scope and cross-organization branch access. **UI filtering is not a replacement for RLS/RPC authorization.** No SECURITY DEFINER function replaced in this change.
 3. Add an explicit **historical/as-of inventory valuation** only with an authoritative as-of contract and snapshot policy; never reinterpret the present-value report as a historical close.
 4. Fiscal period close/export must use frozen source journal evidence, not live mutable product prices.
