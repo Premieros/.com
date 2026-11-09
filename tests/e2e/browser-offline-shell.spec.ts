@@ -1,6 +1,9 @@
 import { expect, test } from '@playwright/test';
 
 test('browser preloads all lazy route assets and reloads shell without internet', async ({ page, context }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (error) => errors.push(error.message));
+  page.on('console', (message) => { if (message.type() === 'error') errors.push(message.text()); });
   await page.route('https://hvqlkapynjfjikqithvd.supabase.co/**', (route) => route.abort('failed'));
   await page.goto('/');
   await page.waitForFunction(() => navigator.serviceWorker?.controller != null, { timeout: 30_000 });
@@ -20,7 +23,8 @@ test('browser preloads all lazy route assets and reloads shell without internet'
   await context.setOffline(true);
   try {
     await page.goto('/nonexistent-offline-route', { waitUntil: 'domcontentloaded' });
-    await expect(page.locator('#root')).not.toBeEmpty();
+    await page.waitForTimeout(1500);
+    expect(await page.locator('#root').innerHTML(), `Offline page errors: ${errors.join(' | ')}`).not.toBe('');
     await expect(page.getByText('Something went wrong')).toHaveCount(0);
   } finally {
     await context.setOffline(false);
