@@ -100,7 +100,12 @@ self.addEventListener('fetch', (event) => {
 
   if (isStaticAsset) {
     event.respondWith(
-      caches.match(request).then((cachedResponse) => {
+      caches.open(CACHE_NAME).then(async (cache) => {
+        // Vite assets are immutable build files. Browsers send different
+        // Accept/Vary request headers for module scripts, preload and CSS.
+        // Match the same-origin asset by its exact pathname regardless of
+        // those headers; never use this for API/auth/business data.
+        const cachedResponse = await cache.match(url.pathname, { ignoreVary: true });
         const fetchPromise = fetch(request)
           .then((networkResponse) => {
             if (networkResponse.ok) {
