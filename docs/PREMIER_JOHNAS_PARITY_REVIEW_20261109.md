@@ -9,6 +9,7 @@ This review compares **behavioral invariants**; the Johna's raw-material costing
 1. **Atomic stock count** (Johna's #570 and later count fixes as inspiration): Premier's last installed writer uses `private.apply_unified_raw_movement_v1` for raw reductions, `private.remove_product_stock_non_fifo_v1` for product reductions, and journal posting. Four error-return paths inside the multi-item loop could commit earlier changes. New guarded migration converts **only post-write failures** into controlled exceptions that trigger PL/pgSQL subtransaction rollback while retaining the prior public JSON error code. The outer preflight failures still return without writing. No FIFO-to-last-price conversion or historical repricing was introduced.
 2. **Kitchen screen reads are read-only** (Johna's #580/#583 as inspiration): remove the automatic `complete_stale_kitchen_orders` mutation from every KDS refresh. Overdue cards remain visible with a warning; only a permissioned explicit status button changes the order. Reject repeat clicks on the same order while a status write is in flight. Historical completed entries remain accessible.
 3. **Dashboard timeout containment** (Johna's #604 as inspiration): distinguish an absent RPC (PGRST202, legacy fallback permitted) from permission errors, timeouts and malformed responses (no raw-sales query storm, retain last-known data with visible retry error).
+4. **POS read failure containment** (Johna's #604/#550 as inspiration): all branch-scoped floor-plan reads must succeed before replacing the visible restaurant snapshot. The existing Premier `usePosRealtime` hook already retains the last successful snapshot on thrown errors; `fetchActiveOrders` now propagates errors from tables, active orders, operator names, order lines and send receipts instead of silently returning empty arrays.
 
 ## Required pre-production verification
 
@@ -18,6 +19,7 @@ This review compares **behavioral invariants**; the Johna's raw-material costing
 - Verify installed `apply_stock_count(uuid)` body matches the guarded Premier baseline. On drift, migration must stop rather than overwrite new business logic.
 - Test KDS against the installed `get_kitchen_queue` and explicit `set_kitchen_status` functions with two terminals, overlapping realtime refreshes, overdue cards, station-scoped users and new send after prior served work.
 - Verify dashboard on timeout, missing RPC, partial multi-branch read and permission denial; no raw-sales fanout after non-compatibility failures.
+- Verify active POS order/table reads preserve the last good scoped snapshot under timeout and RLS failures (including kitchen sends), and do not expose stale data after switching branches.
 
 ## Still not proven equivalent — separate, scoped work required
 
