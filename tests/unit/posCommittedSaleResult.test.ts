@@ -116,6 +116,21 @@ describe('POS confirmed and queued sales survive local projection errors', () =>
     expect(mocks.processSaleIdempotent).not.toHaveBeenCalled();
   });
 
+  it('keeps an offline capture when both stock cache and its warning fail', async () => {
+    vi.stubGlobal('navigator', { onLine: false });
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => {
+      throw new Error('console unavailable');
+    });
+    try {
+      const { result, error } = await processSaleForOrder(payload);
+      expect(error).toBeNull();
+      expect(result?.pending_sync).toBe(true);
+      expect(mocks.enqueueOfflineSale).toHaveBeenCalledTimes(1);
+    } finally {
+      warning.mockRestore();
+    }
+  });
+
   it('does not generate a local confirmation when the server rejects the sale', async () => {
     mocks.processSaleIdempotent.mockResolvedValue({
       data: { success: false, error: 'ORDER_NOT_FULLY_SENT' },
