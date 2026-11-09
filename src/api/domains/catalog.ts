@@ -152,9 +152,6 @@ export const catalog = {
     return rpc<ProductLiveCostRow[]>('get_product_live_costs', p);
   },
   getKitchenOrderContext(p: { p_order_ids: string[]; p_branch_id: string }): ApiResult<KitchenOrderContextRow[]> { return rpc('get_kitchen_order_context', p); },
-  completeStaleKitchenOrders(p: { p_branch_id: string }): ApiResult<{ success?: boolean; error?: string; completed_count?: number; threshold_minutes?: number }> {
-    return rpc('complete_stale_kitchen_orders', p);
-  },
   getKitchenCompletedHistory(p: {
     p_branch_id: string;
     p_from_ts: string;
