@@ -115,7 +115,16 @@ async function loadSingle(args: {
     p_timezone: args.timezone || 'Africa/Cairo',
   });
 
-  if (result.error || !result.data || typeof result.data !== 'object') return null;
+  if (result.error) {
+    // Only an absent RPC is eligible for the legacy bounded-read fallback.
+    // Timeouts, permission failures and transport errors must NOT fan out
+    // into thousands of raw sale-item requests.
+    if (result.error.code === 'PGRST202') return null;
+    throw result.error;
+  }
+  if (!result.data || typeof result.data !== 'object') {
+    throw new Error('DASHBOARD_SNAPSHOT_INVALID');
+  }
   return parseSnapshot(result.data as RawSnapshot);
 }
 
