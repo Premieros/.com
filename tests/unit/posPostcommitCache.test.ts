@@ -19,7 +19,7 @@ describe('POS postcommit local stock projection', () => {
     await cacheConfirmedSaleMovements({ ...base, record });
     expect(record).toHaveBeenCalledTimes(4);
     expect(record.mock.calls[0][0]).toEqual(expect.objectContaining({
-      id: 'confirmed-sale:sale-123:0', warehouseId: 'warehouse-1',
+      id: 'confirmed-sale:branch-1:sale-123:0', warehouseId: 'warehouse-1',
       quantityDelta: -2, synced: true,
     }));
     expect(record.mock.calls[2][0].id).toBe(record.mock.calls[0][0].id);
@@ -49,6 +49,6 @@ describe('POS postcommit local stock projection', () => {
   it('uses a stable invoice identity when server omits a sale id', async () => {
     const record = vi.fn().mockResolvedValue(undefined);
     await cacheConfirmedSaleMovements({ ...base, saleId: null, record });
-    expect(record.mock.calls[0][0].id).toBe('confirmed-sale:INV-2026-1:0');
+    expect(record.mock.calls[0][0].id).toBe('confirmed-sale:branch-1:INV-2026-1:0');
   });
 });
