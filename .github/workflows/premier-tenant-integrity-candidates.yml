@@ -5,6 +5,7 @@ on:
     paths:
       - 'scripts/db/candidates/premier_branch_*.sql'
       - 'scripts/db/tests/branch_hardening_*.sql'
+      - 'scripts/db/candidates/premier_stock_counts_write_rls_NOT_FOR_PRODUCTION.sql'
       - '.github/workflows/premier-tenant-integrity-candidates.yml'
   workflow_dispatch:
 
