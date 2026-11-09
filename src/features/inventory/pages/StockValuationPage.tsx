@@ -1,8 +1,9 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
-import { useToast } from '@/components/Toast';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranches } from '@/hooks/useBranches';
+import { requireStockValuationRows } from '../services/requireStockValuationRows';
 import { DesignSurface, DesignPageHeader, DesignSearch, DesignPanel } from '@/components/design';
 import { DataTable, type Column } from '@/components/DataTable';
 import { Button } from '@/components/Button';
@@ -14,41 +15,76 @@ import type { StockValuationRow, Warehouse } from '@/lib/types';
 export function StockValuationPage() {
   const { t, lang } = useLanguage();
   const isAr = lang === 'ar';
-  const { show } = useToast();
   const branchFilter = useBranchFilter();
+  const { branches } = useBranches();
 
   const [rows, setRows] = useState<StockValuationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [branchId, setBranchId] = useState(branchFilter || '');
   const [warehouseId, setWarehouseId] = useState('');
-  const [branches, setBranches] = useState<{ id: string; name: string }[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
+  const [loadedScopeKey, setLoadedScopeKey] = useState('');
 
-  const load = useCallback(async () => {
+  useEffect(() => {
+    setWarehouseId('');
+    setWarehouses([]);
+    setRows([]);
+    setLoadedScopeKey('');
+    setError(null);
+  }, [branchFilter]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const key = `${branchFilter || ''}|${warehouseId}`;
     setLoading(true);
     setError(null);
-    const [br, wh] = await Promise.all([
-      supabase.from('branches').select('id, name').eq('is_active', true).order('name'),
-      supabase.from('warehouses').select('*').eq('is_active', true).order('name'),
-    ]);
-    if (br.error) { setError(br.error.message); setLoading(false); show(br.error.message, 'error'); return; }
-    const b = (br.data as { id: string; name: string }[] | null) || [];
-    setBranches(b);
-    setWarehouses((wh.data as Warehouse[]) || []);
-    let effBranch = branchId;
-    if (!effBranch && b.length === 1) { effBranch = b[0].id; setBranchId(effBranch); }
+    setRows([]);
+    setLoadedScopeKey('');
+    const load = async () => {
+      if (!branchFilter) {
+        if (!cancelled) {
+          setError(isAr ? 'اختر فرعًا متاحًا لعرض تقييم المخزون.' : 'Select an accessible branch to view valuation.');
+          setLoading(false);
+        }
+        return;
+      }
+      try {
+        const wh = await supabase.from('warehouses').select('*')
+          .eq('branch_id', branchFilter).eq('is_active', true).order('name');
+        if (wh.error || !Array.isArray(wh.data)) throw wh.error || new Error('WAREHOUSES_UNAVAILABLE');
+        const allowed = wh.data as Warehouse[];
+        if (warehouseId && !allowed.some((w) => w.id === warehouseId)) throw new Error('WAREHOUSE_SCOPE_CHANGED');
+        const result = await supabase.rpc('get_stock_valuation', {
+          p_branch_id: branchFilter, p_warehouse_id: warehouseId || null,
+        });
+        if (result.error) throw result.error;
+        const validated = requireStockValuationRows(
+          result.data as StockValuationRow[] | null, branchFilter, warehouseId || null,
+        );
+        if (cancelled) return;
+        setWarehouses(allowed);
+        setRows(validated);
+        setLoadedScopeKey(key);
+      } catch {
+        if (cancelled) return;
+        setRows([]);
+        setLoadedScopeKey('');
+        setError(isAr
+          ? 'تعذر تحميل تقييم المخزون الكامل. لن تُعرض أو تُصدَّر قيم قديمة. أعد المحاولة.'
+          : 'Complete valuation unavailable. Stale values are hidden and cannot be exported. Retry.');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    };
+    void load();
+    return () => { cancelled = true; };
+  }, [branchFilter, warehouseId, isAr]);
 
-    const { data, error: valuationError } = await supabase.rpc('get_stock_valuation', { p_branch_id: effBranch || null, p_warehouse_id: warehouseId || null });
-    if (valuationError) { setError(valuationError.message); setLoading(false); return; }
-    setRows((data || []) as StockValuationRow[]);
-    setLoading(false);
-  }, [branchId, warehouseId, show, t]);
+  const scopedRows = !loading && !error && loadedScopeKey === `${branchFilter || ''}|${warehouseId}`
+    ? rows : [];
 
-  useEffect(() => { load(); }, [load]);
-
-  const filtered = rows.map((r) => ({
+  const filtered = scopedRows.map((r) => ({
     ...r,
     id: `${r.product_id}-${r.warehouse_id}`,
   })).filter((r) => {
@@ -59,9 +95,7 @@ export function StockValuationPage() {
       || (r.warehouse_name || '').toLowerCase().includes(q);
   });
 
-  const visibleBranches = branchFilter ? branches.filter((b) => b.id === branchFilter) : branches;
-
-  const summary = Object.values(rows.reduce<Record<string, { branch_id: string; branch_name: string; total_quantity: number; total_value: number }>>((acc, r) => {
+  const summary = Object.values(scopedRows.reduce<Record<string, { branch_id: string; branch_name: string; total_quantity: number; total_value: number }>>((acc, r) => {
     const id = r.branch_id;
     const item = acc[id] ?? (acc[id] = { branch_id: id, branch_name: branches.find(b => b.id === id)?.name || '', total_quantity: 0, total_value: 0 });
     item.total_quantity += Number(r.quantity);
@@ -69,10 +103,11 @@ export function StockValuationPage() {
     return acc;
   }, {}));
 
-  const grandTotal = rows.reduce((s, r) => s + Number(r.total_value), 0);
-  const grandQty = rows.reduce((s, r) => s + Number(r.quantity), 0);
+  const grandTotal = scopedRows.reduce((s, r) => s + Number(r.total_value), 0);
+  const grandQty = scopedRows.reduce((s, r) => s + Number(r.quantity), 0);
 
   const handleExport = () => {
+    if (loading || error || !branchFilter || !loadedScopeKey) return;
     exportToExcel(filtered.map((r) => ({
       Product: r.product_name, Barcode: r.barcode || '', SKU: r.sku || '',
       Warehouse: r.warehouse_name || '', Branch: r.branch_id, Quantity: r.quantity,
@@ -102,10 +137,11 @@ export function StockValuationPage() {
 
   return (
     <DesignSurface testId="stock-valuation-page">
-      <DesignPageHeader title={t('stockValuation')} subtitle={isAr ? 'تقييم المخزون (بالكلفة) حسب المنتج والمستودع' : 'Inventory valuation (at cost) by product and warehouse'} actions={
-        <Button variant="outline" size="sm" onClick={handleExport}>{t('exportExcel')}</Button>
+      <DesignPageHeader title={t('stockValuation')} subtitle={isAr ? 'تقييم المخزون بالتكلفة الحالية للعرض، وليس تكلفة قيود البيع التاريخية' : 'Current display cost — not historical sale COGS or journal valuation'} actions={
+        <Button variant="outline" size="sm" disabled={loading || !!error || !branchFilter || !loadedScopeKey} onClick={handleExport}>{t('exportExcel')}</Button>
       } />
 
+      {error && <div role="alert" data-testid="valuation-error" className="mb-3 rounded-xl border border-ui-danger/30 bg-ui-danger-soft p-3 text-sm text-ui-danger">{error}</div>}
       <DesignPanel testId="valuation-summary-panel">
         <div className="grid sm:grid-cols-2 gap-3">
           <div className="rounded-ui-lg border border-ui-border bg-ui-page p-4">
@@ -136,13 +172,10 @@ export function StockValuationPage() {
       <DesignPanel testId="valuation-search-panel">
         <div className="flex flex-col sm:flex-row gap-3">
           <DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={t('search')} testId="valuation-search" />
-          <Select value={branchId} onChange={(e) => { setBranchId(e.target.value); setWarehouseId(''); }} className="sm:w-44">
-            <option value="">{t('allBranches')}</option>
-            {visibleBranches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
-          </Select>
+          <span className="text-sm text-ui-muted">{branches.find((b) => b.id === branchFilter)?.name || (isAr ? 'الفرع النشط' : 'Active branch')}</span>
           <Select value={warehouseId} onChange={(e) => setWarehouseId(e.target.value)} className="sm:w-44">
             <option value="">{t('all')} - {t('warehouses')}</option>
-            {warehouses.filter((w) => !branchId || w.branch_id === branchId).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
+            {warehouses.filter((w) => w.branch_id === branchFilter).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </Select>
         </div>
       </DesignPanel>
