@@ -37,7 +37,7 @@ export async function cacheConfirmedSaleMovements(input: {
     if (!item.product_id) continue;
     try {
       await input.record({
-        id: `confirmed-sale:${identity}:${index}`,
+        id: `confirmed-sale:${input.branchId}:${identity}:${index}`,
         productId: item.product_id,
         branchId: input.branchId,
         warehouseId: input.warehouseId,
