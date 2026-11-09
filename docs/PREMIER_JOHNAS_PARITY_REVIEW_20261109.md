@@ -1,6 +1,6 @@
 # Premier operational parity review — 2026-11-09
 
-**Write target:** `Premieros/.com` only. **Read-only reference:** `Premieros/johna-s`. No Johna's commits, database changes, migrations or deployments were performed.
+**Write target:** `Premieros/.com` only. **Read-only reference:** Johna’s reference repository (read only). No Johna's commits, database changes, migrations or deployments were performed.
 
 This review compares **behavioral invariants**; the Johna's raw-material costing model and permission policies cannot be copied into Premier without changing its inventory ledger, published-price history, accounting snapshots and organization/branch authority.
 
