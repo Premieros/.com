@@ -22,6 +22,11 @@ CREATE TABLE public.product_unit_links(id uuid PRIMARY KEY, product_id uuid NOT 
 -- RLS helpers model the branch/history contract, not production credentials.
 CREATE FUNCTION public.is_platform_admin() RETURNS boolean LANGUAGE sql STABLE
  AS $$ SELECT current_setting('app.test_admin',true)='yes' $$;
+CREATE FUNCTION public.can_permission(p_permission text) RETURNS boolean LANGUAGE sql STABLE AS
+$permission$
+ SELECT public.is_platform_admin()
+ OR p_permission=ANY(string_to_array(coalesce(current_setting('app.test_permissions',true),''),','))
+$permission$;
 CREATE FUNCTION public.user_may_access_branch(p_branch_id uuid)
  RETURNS boolean LANGUAGE sql STABLE AS $$
  SELECT public.is_platform_admin()
