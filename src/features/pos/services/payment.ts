@@ -172,7 +172,8 @@ async function queueOfflineSale(p: ProcessSalePayload): Promise<string> {
       } catch {
         // The pending sale remains the source of truth; report only a cache
         // projection warning and let stockProjection reconcile missing lines.
-        console.warn('POS_OFFLINE_SALE_MOVEMENT_PROJECTION_FAILED');
+        try { console.warn('POS_OFFLINE_SALE_MOVEMENT_PROJECTION_FAILED'); }
+        catch { /* Diagnostics must never invalidate an already queued sale. */ }
       }
     }
   }
