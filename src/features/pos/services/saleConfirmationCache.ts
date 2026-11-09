@@ -53,6 +53,9 @@ export async function cacheConfirmedSaleMovements(input: {
       failedCount++;
     }
   }
-  if (failedCount) input.onFailure?.(failedCount);
+  if (failedCount) {
+    try { input.onFailure?.(failedCount); }
+    catch { /* Diagnostics must not change an already committed sale result. */ }
+  }
   return { failedCount };
 }
