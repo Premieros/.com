@@ -1,5 +1,5 @@
 import { pos as posApi, supabase, type SplitTenderInput } from '@/api';
-import { enqueueOfflineSale, type OfflineSaleQueueItem } from '@/core/offline/offlineStorage';
+import { enqueueOfflineSaleIdempotent, type OfflineSaleQueueItem } from '@/core/offline/offlineStorage';
 import { SettingsRepository, InventoryRepository } from '@/core/repositories';
 import { saveVerifiedSaleWarehouse } from '@/core/offline/warehouseBinding';
 import type { RpcResult, OrderType } from '@/lib/types';
@@ -148,7 +148,9 @@ async function queueOfflineSale(p: ProcessSalePayload): Promise<string> {
       p_client_operation_key: operationKey,
     } as unknown as Record<string, unknown>,
   };
-  await enqueueOfflineSale(queuedSale);
+  const persisted = await enqueueOfflineSaleIdempotent(queuedSale);
+  // Same operation key already exists: never re-enqueue or re-project stock.
+  if (!persisted.inserted) return persisted.id;
 
   // The outbox transaction is already durable at this point.
   // Stock projection is separately best-effort: stockProjection.ts subtracts
