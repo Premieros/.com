@@ -1,0 +1,48 @@
+name: Premier tenant relationship and RLS candidate tests
+
+on:
+  pull_request:
+    paths:
+      - 'scripts/db/candidates/premier_branch_*.sql'
+      - 'scripts/db/tests/branch_hardening_*.sql'
+      - '.github/workflows/premier-tenant-integrity-candidates.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  isolated-tenant-security:
+    name: Isolated PostgreSQL tenant boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      PGHOST: 127.0.0.1
+      PGPORT: 5432
+      PGUSER: postgres
+      PGPASSWORD: postgres
+      PGDATABASE: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ensure local PostgreSQL client
+        run: command -v psql || (sudo apt-get update && sudo apt-get install -y postgresql-client)
+      - name: Create synthetic branch and permission fixtures
+        run: psql -v ON_ERROR_STOP=1 -f scripts/db/tests/branch_hardening_fixture.sql
+      - name: Apply candidate tenant FKs and restrictive RLS to disposable PostgreSQL
+        run: psql -v ON_ERROR_STOP=1 -f scripts/db/candidates/premier_branch_fk_rls_hardening_NOT_FOR_PRODUCTION.sql
+      - name: Assert cross-branch FK violations and authenticated history isolation
+        run: psql -v ON_ERROR_STOP=1 -f scripts/db/tests/branch_hardening_assertions.sql
