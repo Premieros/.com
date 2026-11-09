@@ -21,3 +21,10 @@ Date: 2026-11-09. Status: DRAFT only. No production writes, migrations, RLS chan
 - CI: .github/workflows/premier-tenant-integrity-candidates.yml. The candidate is never a canonical migration and runs only in a disposable postgres:16 service.
 - Remaining: realistic full-schema clone and actual Premier roles (owner, superadmin, cashier, inventory manager, branch grants), legitimate workflows, security-definer RPCs, negative tests, and explicit production approval.
 - Review account and product-unit links and journal-entry lines separately. Organization-scoped treasury accounts MUST remain usable.
+
+## Permission-aware RLS follow-up
+- Checked actual Premier role permission JSON. The relevant keys are sales.view, expenses.view, purchases.view, and inventory.view / inventory.count.*. Some active roles legitimately have none of these while holding pos.view. Branch access alone MUST NOT authorize financial/stock history queries.
+- Candidate now requires both authorized branch/history and matching financial view permission for expenses, sales, sale_items, purchases and purchase_items. Stock-count reads require authorized branch AND inventory viewing/counting permission. Admin override is retained.
+- Added synthetic authenticated role negative test for a branch member with NO financial/stock-view grants; positive tests retain authorized branch A, branch B and platform-admin access. **Isolated CI test run 42579067835 PASSED on commit 1197f300**.
+- The synthetic history helper denies older rows for testing; the real production financial_row_visible helper uses configurable recent-days/historical sampling, which the candidate preserves without changing helper definitions.
+- This does not establish effective access of every actual Premier user; SQL SECURITY DEFINER RPC routes, role exceptions, RLS SQL execution contexts, and UI workflows require an anonymized real-schema test prior to release.
