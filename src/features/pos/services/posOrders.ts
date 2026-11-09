@@ -44,6 +44,13 @@ export async function fetchActiveOrders(branchId: string): Promise<PosRealtimeDa
     // The RPC exposes only a branch-scoped display label for active POS orders.
     supabase.rpc('get_pos_order_operator_labels', { p_branch_id: branchId }),
   ]);
+  // Never turn a timeout or permission failure into an apparently empty floor
+  // plan: usePosRealtime keeps its last good branch-scoped snapshot on errors.
+  // In particular, a failed order read must not erase open checks or table labels.
+  if (tRes.error) throw tRes.error;
+  if (oRes.error) throw oRes.error;
+  if (operatorRes.error) throw operatorRes.error;
+
   const tables = (tRes.data as DiningTable[]) || [];
   const operatorLabels = (operatorRes.data as PosOrderOperatorLabel[] | null) || [];
   const operatorByOrder = new Map(operatorLabels.map((row) => [row.order_id, row]));
@@ -68,6 +75,8 @@ export async function fetchActiveOrders(branchId: string): Promise<PosRealtimeDa
       supabase.from('order_items').select('*').in('order_id', ids),
       supabase.from('order_kitchen_sends').select('*').in('order_id', ids),
     ]);
+    if (iRes.error) throw iRes.error;
+    if (kRes.error) throw kRes.error;
     orderItems = (iRes.data as OrderItem[]) || [];
     kitchenSends = (kRes.data as OrderKitchenSend[]) || [];
 

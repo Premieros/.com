@@ -61,6 +61,8 @@ export function KitchenDisplayPage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [orderContext, setOrderContext] = useState<Record<string, { table_name: string | null; operator_name: string | null }>>({});
   const prevCountRef = useRef(0);
+  const statusWritesRef = useRef(new Set<string>());
+  const [pendingStatusWrites, setPendingStatusWrites] = useState<ReadonlySet<string>>(new Set());
 
   const loadStations = useCallback(async () => {
     if (!branchFilter || !canViewKds) {
@@ -90,12 +92,9 @@ export function KitchenDisplayPage() {
         setLoadError(userFacingErrorMessage(!canViewKds ? 'POS_KDS_VIEW_REQUIRED' : 'BRANCH_REQUIRED', ar ? 'ar' : 'en'));
         return;
       }
-      const { data: completeResult, error: completeError } = await catalog.completeStaleKitchenOrders({
-        p_branch_id: branchFilter,
-      });
-      if (completeError) throw completeError;
-      if (completeResult?.success === false) throw new Error(completeResult.error || 'KDS_AUTO_COMPLETE_FAILED');
-
+      // Display refresh is READ-ONLY: elapsed time must never silently mark
+      // a real order as served/completed or alter its inventory/payment state.
+      // Authorized staff can still use the explicit status controls below.
       const { data, error } = await supabase.rpc('get_kitchen_queue', {
         p_station: station || null,
         p_branch_id: branchFilter,
@@ -171,14 +170,20 @@ export function KitchenDisplayPage() {
       setLoadError(userFacingErrorMessage('POS_KDS_UPDATE_REQUIRED', ar ? 'ar' : 'en'));
       return;
     }
+    // Prevent duplicate clicks while a status mutation is pending. A read
+    // refresh (realtime or timer) cannot change the server's kitchen state.
+    if (statusWritesRef.current.has(orderId)) return;
+    statusWritesRef.current.add(orderId);
+    setPendingStatusWrites(new Set(statusWritesRef.current));
     try {
       await catalog.setKitchenStatus(orderId, status);
       setLoadError('');
       void load();
     } catch (error) {
-      // Keep the last known KDS cards visible, but never make a failed action
-      // look successful or silent.
       setLoadError(userFacingErrorMessage(error, ar ? 'ar' : 'en'));
+    } finally {
+      statusWritesRef.current.delete(orderId);
+      setPendingStatusWrites(new Set(statusWritesRef.current));
     }
   };
 
@@ -226,8 +231,8 @@ export function KitchenDisplayPage() {
         {view === 'active' && (
           <p className="text-xs font-medium text-ui-muted">
             {ar
-              ? 'أي طلب يبقى في المطبخ 40 دقيقة ينتقل تلقائيًا إلى مكتمل.'
-              : 'Any kitchen order remaining for 40 minutes is automatically moved to Completed.'}
+              ? 'تظل الطلبات غير المكتملة ظاهرة حتى يتم تحديث حالتها بواسطة مستخدم مخوّل. يتم تمييز الطلبات المتأخرة فقط.'
+              : 'Unfinished orders remain visible until an authorized operator updates their status. Overdue orders are highlighted only.'}
           </p>
         )}
 
@@ -260,7 +265,7 @@ export function KitchenDisplayPage() {
             <div key={`${item.order_id}-${item.station}`} className={`rounded-2xl border bg-ui-surface p-3 sm:p-4 shadow-ui-sm transition-all ${item.kitchen_status === 'cooking' ? 'border-ui-warning/40 ring-1 ring-ui-warning' : item.kitchen_status === 'ready' ? 'border-ui-success/40 ring-1 ring-ui-success' : 'border-ui-border'}`}>
               <div className="flex items-center justify-between gap-2 mb-2">
                 <span className="font-bold text-ui-text text-base sm:text-lg">#{item.order_number}</span>
-                <div className="flex items-center gap-1.5">{statusBadge(item.kitchen_status, ar)}<span className={`text-xs sm:text-sm ${elapsedColor(item.elapsed_seconds)}`}>{formatElapsed(item.elapsed_seconds)}</span></div>
+                <div className="flex items-center gap-1.5">{statusBadge(item.kitchen_status, ar)}<span className={`text-xs sm:text-sm ${elapsedColor(item.elapsed_seconds)}`}>{formatElapsed(item.elapsed_seconds)}</span>{item.elapsed_seconds >= 2400 && <span data-testid="kds-overdue" className="rounded-full bg-ui-warning-soft px-2 py-0.5 text-[11px] font-bold text-ui-warning">{ar ? 'متأخر' : 'Overdue'}</span>}</div>
               </div>
               <div className="flex items-center gap-2 mb-3 text-xs sm:text-sm text-ui-muted flex-wrap">
                 <span className="rounded bg-ui-primary-soft px-2 py-0.5 text-ui-primary font-semibold">{stationName(item.station)}</span>
@@ -296,9 +301,9 @@ export function KitchenDisplayPage() {
               {item.notes && <div className="text-xs text-ui-muted italic border-t border-ui-border pt-2 mb-3 break-words">{item.notes}</div>}
 
               {canUpdateKds && <div className="flex gap-2 border-t border-ui-border pt-3">
-                {item.kitchen_status === 'sent' && <button onClick={() => void handleKitchenStatus(item.order_id, 'cooking')} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-ui-warning text-white py-2.5 px-3 text-sm font-bold active:scale-95 transition-all min-h-11"><ChefHat className="h-5 w-5" /> {ar ? 'بدء التحضير' : 'Start Cooking'}</button>}
-                {item.kitchen_status === 'cooking' && <button onClick={() => void handleKitchenStatus(item.order_id, 'ready')} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-ui-success text-white py-2.5 px-3 text-sm font-bold active:scale-95 transition-all min-h-11"><CheckCircle2 className="h-5 w-5" /> {ar ? 'جاهز للتقديم' : 'Mark Ready'}</button>}
-                {item.kitchen_status === 'ready' && <button onClick={() => void handleKitchenStatus(item.order_id, 'served')} className="flex-1 flex items-center justify-center gap-2 rounded-xl bg-ui-info text-white py-2.5 px-3 text-sm font-bold active:scale-95 transition-all min-h-11"><UtensilsCrossed className="h-5 w-5" /> {ar ? 'مكتمل' : 'Completed'}</button>}
+                {item.kitchen_status === 'sent' && <button disabled={pendingStatusWrites.has(item.order_id)} onClick={() => void handleKitchenStatus(item.order_id, 'cooking')} className="flex-1 flex items-center justify-center gap-2 rounded-xl disabled:opacity-50 bg-ui-warning text-white py-2.5 px-3 text-sm font-bold active:scale-95 transition-all min-h-11"><ChefHat className="h-5 w-5" /> {ar ? 'بدء التحضير' : 'Start Cooking'}</button>}
+                {item.kitchen_status === 'cooking' && <button disabled={pendingStatusWrites.has(item.order_id)} onClick={() => void handleKitchenStatus(item.order_id, 'ready')} className="flex-1 flex items-center justify-center gap-2 rounded-xl disabled:opacity-50 bg-ui-success text-white py-2.5 px-3 text-sm font-bold active:scale-95 transition-all min-h-11"><CheckCircle2 className="h-5 w-5" /> {ar ? 'جاهز للتقديم' : 'Mark Ready'}</button>}
+                {item.kitchen_status === 'ready' && <button disabled={pendingStatusWrites.has(item.order_id)} onClick={() => void handleKitchenStatus(item.order_id, 'served')} className="flex-1 flex items-center justify-center gap-2 rounded-xl disabled:opacity-50 bg-ui-info text-white py-2.5 px-3 text-sm font-bold active:scale-95 transition-all min-h-11"><UtensilsCrossed className="h-5 w-5" /> {ar ? 'مكتمل' : 'Completed'}</button>}
               </div>}
             </div>
             );

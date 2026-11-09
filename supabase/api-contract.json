@@ -129,12 +129,6 @@
       ]
     },
     {
-      "name": "complete_stale_kitchen_orders",
-      "params": [
-        "branch_id"
-      ]
-    },
-    {
       "name": "create_bank_reconciliation",
       "params": [
         "branch_id",
