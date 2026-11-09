@@ -94,5 +94,29 @@ BEGIN
   SELECT count(*) INTO n FROM public.product_unit_links;
   IF n<>1 THEN RAISE EXCEPTION 'PRODUCT_UNIT_LINKS_BRANCH_BYPASS: %',n; END IF;
 END $rls_negative$;
+-- Legitimate branch B user can read its own *recent* information.
+SET app.allowed_branch = '00000000-0000-0000-0000-000000000002';
+DO $legitimate_branch$
+BEGIN
+  IF (SELECT count(*) FROM public.sales) <> 1
+     OR (SELECT count(*) FROM public.purchases) <> 1
+     OR (SELECT count(*) FROM public.stock_counts) <> 1
+     OR (SELECT count(*) FROM public.product_unit_links) <> 1 THEN
+    RAISE EXCEPTION 'LEGITIMATE_BRANCH_B_READ_BROKEN';
+  END IF;
+END $legitimate_branch$;
+
+-- Platform admin must retain visibility across both branches/history.
+SET app.test_admin = 'yes';
+DO $legitimate_admin$
+BEGIN
+  IF (SELECT count(*) FROM public.sales) <> 3
+     OR (SELECT count(*) FROM public.purchases) <> 3
+     OR (SELECT count(*) FROM public.expenses) <> 3
+     OR (SELECT count(*) FROM public.stock_counts) <> 2
+     OR (SELECT count(*) FROM public.product_unit_links) <> 2 THEN
+    RAISE EXCEPTION 'LEGITIMATE_ADMIN_READ_BROKEN';
+  END IF;
+END $legitimate_admin$;
 RESET ROLE;
-SELECT 'TENANT_FK_AND_RLS_ISOLATED_NEGATIVE_TESTS_PASSED' AS result;
+SELECT 'TENANT_FK_RLS_NEGATIVE_AND_AUTHORIZED_POSITIVE_TESTS_PASSED' AS result;
