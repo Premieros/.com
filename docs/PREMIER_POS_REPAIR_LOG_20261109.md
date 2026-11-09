@@ -37,3 +37,13 @@ Run repository identity checks, lint, `typecheck:all`, tests for both POS and ca
 2. Isolated database simulation for WEBPOS-02, including concurrent kitchen send/settle and print queue; explicit approval before production migration.
 3. Decide partial-settlement policy for WEBPOS-03.
 4. Add durable offline sale idempotency keyed by originating client-operation key, in a separate isolated proposal after storage transaction review.
+
+## 2026-11-09 independent review of PR #141
+
+**Reviewed against main and exact PR source:**
+- Online normal and manual-payment routes call the best-effort helper **only after** server-confirmed success. Server rejection and ambiguous network failure stay errors; no offline fallback is added to online payment.
+- `dbPut` in `LocalDatabase.ts` commits its transaction before resolving and uses the movement `id` as the IndexedDB object key; stable confirmed-sale ids can overwrite an earlier projected replay rather than appending random duplicates.
+- Offline `enqueueOfflineSale` waits for its `sales_queue` transaction to complete before recording derived `local_stock_movements`; `stockProjection.ts` computes unrecorded queued-sale deductions per branch, reference and product. This justifies treating *post-enqueue projection* errors as warnings, but **does not** guarantee no duplicate sales if the caller starts a new separate operation with a different key.
+- A residual failure path was fixed: if `console.warn` itself throws after successful offline queue persistence, payment completion must still remain pending/successful. Added targeted test.
+- The shared source of truth for confirmed online sales remains Supabase; failure to write an IndexedDB projection may leave local history temporarily stale. A durable repair/reconciliation notification for missing projections is not implemented here.
+- **No approval to merge** until post-review HEAD unit/typecheck/build results are checked. Existing `Verify main` database-migration bootstrap failure is unrelated to this PR and must not be misreported as success.
