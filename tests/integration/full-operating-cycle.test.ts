@@ -160,6 +160,18 @@ describe('full ERP/POS operating cycle', () => {
       );
       expect(completeProduction?.success, JSON.stringify(completeProduction)).toBe(true);
       expect(Number(completeProduction?.total_cost)).toBe(20);
+      // Actual manufactured batch: 20 raw cost / 5 finished units = 4.
+      // The sale must consume this batch cost, not products.cost_price=0.
+      const producedBatch = await client.query<{ unit_cost: string; quantity: string }>(
+        `select unit_cost::text,quantity::text
+         from public.inventory_batches
+         where product_id=$1 and branch_id=$2 and warehouse_id=$3
+           and batch_number=$4 and quantity>0`,
+        [productId, branchId, warehouseId, `PB-${token}`],
+      );
+      expect(producedBatch.rows).toHaveLength(1);
+      expect(Number(producedBatch.rows[0].unit_cost)).toBe(4);
+      expect(Number(producedBatch.rows[0].quantity)).toBe(5);
 
       const postProduction = await client.query<{ raw_qty: string; product_qty: string }>(
         `select
@@ -184,6 +196,17 @@ describe('full ERP/POS operating cycle', () => {
       );
       expect(sale1?.success).toBe(true);
       expect(Number(sale1?.cogs)).toBe(8);
+      // Inventory ledger, RPC COGS and the production batch must agree.
+      const saleCostLedger = await client.query<{ ledger_cost: string; quantity: string }>(
+        `select coalesce(sum(total_cost),0)::text as ledger_cost,
+                coalesce(sum(quantity),0)::text as quantity
+         from public.inventory_ledger
+         where branch_id=$1 and product_id=$2
+           and reference_number=$3 and entry_type='sale'`,
+        [branchId, productId, sale1Invoice],
+      );
+      expect(Number(saleCostLedger.rows[0].quantity)).toBe(-2);
+      expect(Number(saleCostLedger.rows[0].ledger_cost)).toBe(-8);
 
       // 4) Offline-style sale and retry/reconciliation: must never duplicate.
       const offlineInvoice = `INV-OFF-${token}`;
