@@ -1,4 +1,5 @@
 import { getLocalDb } from '@/core/repositories/LocalDatabase';
+import { decideOfflineSaleInsert } from './offlineSaleIdempotency';
 
 /**
  * Premier POS IndexedDB Offline Storage & Local Sync Engine
@@ -144,21 +145,6 @@ export async function enqueueOfflineSale(sale: Omit<OfflineSaleQueueItem, 'statu
  * Invoice numbers can be freshly generated on a retry; they do not change
  * the business payload identity. Everything else must match exactly.
  */
-function offlineSaleFingerprint(payload: Record<string, unknown>): string {
-  const { p_invoice_number: _invoice, ...financialPayload } = payload;
-  void _invoice;
-  const stable = (value: unknown): unknown => {
-    if (Array.isArray(value)) return value.map(stable);
-    if (value && typeof value === 'object') {
-      return Object.fromEntries(Object.entries(value as Record<string, unknown>)
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([key, child]) => [key, stable(child)]));
-    }
-    return value;
-  };
-  return JSON.stringify(stable(financialPayload));
-}
-
 export async function enqueueOfflineSaleIdempotent(
   sale: Omit<OfflineSaleQueueItem, 'status' | 'retry_count'>,
 ): Promise<{ id: string; inserted: boolean }> {
@@ -176,27 +162,14 @@ export async function enqueueOfflineSaleIdempotent(
     let conflict = false;
     const req = store.getAll();
     req.onsuccess = () => {
-      const matches = (req.result as OfflineSaleQueueItem[]).filter(row =>
-        String(row.payload?.p_client_operation_key || '').trim() === key,
-      );
-      if (matches.length > 1) {
-        conflict = true;
-        tx.abort();
-        return;
-      }
-      const existing = matches[0];
-      if (existing) {
-        if (existing.created_by_user_id !== owner
-          || existing.payload.p_branch_id !== branchId
-          || offlineSaleFingerprint(existing.payload) !== offlineSaleFingerprint(sale.payload)) {
-          conflict = true;
-          tx.abort();
-          return;
+      try {
+        decision = decideOfflineSaleInsert(req.result as OfflineSaleQueueItem[], sale);
+        if (decision.inserted) {
+          store.add({ ...sale, status: 'pending', retry_count: 0 } satisfies OfflineSaleQueueItem);
         }
-        decision = { id: existing.id, inserted: false };
-      } else {
-        decision = { id: sale.id, inserted: true };
-        store.add({ ...sale, status: 'pending', retry_count: 0 } satisfies OfflineSaleQueueItem);
+      } catch (error) {
+        conflict = error instanceof Error && error.message === 'OFFLINE_SALE_OPERATION_KEY_CONFLICT';
+        tx.abort();
       }
     };
     tx.oncomplete = () => {
