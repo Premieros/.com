@@ -1,14 +1,11 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   ArrowLeft,
   ArrowRight,
   Loader2,
   LockKeyhole,
-  ChevronLeft,
-  ChevronRight,
   ShieldCheck,
-  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
@@ -18,6 +15,7 @@ import { Logo } from '@/components/Logo';
 import { useToast } from '@/components/Toast';
 import { DesignSurface } from '@/components/design/DesignSurface';
 import { APP_ROUTES } from '@/core/navigation/routes';
+import { AntigravityLoginHero } from '@/features/auth/components/AntigravityLoginHero';
 
 export function LoginPage() {
   const { signIn, signInWithUsername } = useAuth();
@@ -30,8 +28,6 @@ export function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [slideIndex, setSlideIndex] = useState(0);
-  const [slideshowPaused, setSlideshowPaused] = useState(false);
 
   const isAr = lang === 'ar';
 
@@ -71,34 +67,6 @@ export function LoginPage() {
       }
     };
   }, []);
-
-  // Each visual has an explicit product capability and an accessible description.
-  const slides = useMemo(() => [
-    { image: '/auth/hq/pos.webp', titleAr: 'نقطة بيع سريعة ومرنة', titleEn: 'Fast, flexible point of sale', textAr: 'طلبات ومبيعات ومدفوعات من واجهة واحدة', textEn: 'Orders, sales and payments in one workspace' },
-    { image: '/auth/hq/tables.webp', titleAr: 'إدارة الطاولات والطلبات', titleEn: 'Tables & order management', textAr: 'تابع الصالة، الطاولات، وحالة كل طلب', textEn: 'Keep track of tables, dining areas and orders' },
-    { image: '/auth/hq/kitchen.webp', titleAr: 'المطبخ والإنتاج', titleEn: 'Kitchen & production', textAr: 'نظّم تحضير الطلبات والوصفات والمكونات', textEn: 'Coordinate kitchen orders, recipes and ingredients' },
-    { image: '/auth/hq/dashboard.webp', titleAr: 'لوحات تحكم وتقارير', titleEn: 'Dashboards & reports', textAr: 'راقب الأداء والمبيعات والتكاليف في مكان واحد', textEn: 'See performance, sales and costing in one place' },
-    { image: '/auth/creative/dashboard.webp', titleAr: 'المخزون والمشتريات', titleEn: 'Inventory & purchasing', textAr: 'تابع حركة المخزون والخامات والتوريد', textEn: 'Track stock, raw materials and purchases' },
-    { image: '/auth/exact/login-art-4.webp', titleAr: 'المحاسبة والفروع', titleEn: 'Accounting & branches', textAr: 'إدارة مالية وصلاحيات وفروع متعددة', textEn: 'Financial workflows, permissions and multiple branches' },
-  ], []);
-
-  const activeSlide = slides[slideIndex];
-
-  useEffect(() => {
-    if (slideshowPaused || (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
-    const timer = window.setInterval(() => {
-      setSlideIndex((value) => (value + 1) % slides.length);
-    }, 6500);
-
-    return () => window.clearInterval(timer);
-  }, [slides.length, slideshowPaused]);
-
-  useEffect(() => {
-    const nextSlide = slides[(slideIndex + 1) % slides.length];
-    const preload = new Image();
-    preload.src = nextSlide.image;
-  }, [slideIndex, slides]);
-
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -140,23 +108,6 @@ export function LoginPage() {
   return (
     <DesignSurface testId="login-surface" className="h-[100dvh] overflow-hidden !space-y-0">
       <style>{`
-        @keyframes login-scene-zoom-out {
-          0% {
-            transform: scale(1.025);
-            opacity: 0;
-          }
-          10% {
-            opacity: 1;
-          }
-          92% {
-            opacity: 1;
-          }
-          100% {
-            transform: scale(1);
-            opacity: 0;
-          }
-        }
-
         @media (max-height: 760px) and (min-width: 1024px) {
           .login-panel-shell {
             transform: scale(0.9);
@@ -172,52 +123,9 @@ export function LoginPage() {
           }
         }
 
-        @media (prefers-reduced-motion: reduce) {
-          [style*='login-scene-zoom-out'] {
-            animation: none !important;
-            transform: scale(1) !important;
-            opacity: 1 !important;
-          }
-        }
       `}</style>
       <div className="h-[100dvh] overflow-hidden bg-white text-slate-950 lg:grid lg:grid-cols-[60%_40%] xl:grid-cols-[62%_38%]" dir="ltr">
-        <section className="group relative hidden h-full min-h-0 overflow-hidden bg-[#07172e] lg:block" onMouseEnter={() => setSlideshowPaused(true)} onMouseLeave={() => setSlideshowPaused(false)} onFocusCapture={() => setSlideshowPaused(true)} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSlideshowPaused(false); }}>
-          <img
-            key={activeSlide.image}
-            src={activeSlide.image}
-            alt={isAr ? activeSlide.titleAr : activeSlide.titleEn}
-            loading="eager"
-            decoding="async"
-            fetchPriority="high"
-            draggable={false}
-            className="absolute inset-0 h-full w-full object-cover object-center will-change-transform"
-            style={{ animation: 'login-scene-zoom-out 6500ms ease-out both' }}
-          />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#06152b]/65 via-transparent to-[#06152b]/95" />
-          <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-9 pt-9 text-white xl:px-14" dir={isAr ? "rtl" : "ltr"}>
-            <div className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black tracking-wider backdrop-blur-xl"><Sparkles className="h-4 w-4 text-sky-300" /> PREMIER OS</div>
-            <span className="rounded-full border border-white/20 bg-slate-950/25 px-3 py-2 text-xs font-semibold backdrop-blur-xl">{isAr ? "منصة متكاملة لإدارة أعمالك" : "Your connected business workspace"}</span>
-          </div>
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-9 pb-9 pt-28 text-white xl:px-14" dir={isAr ? 'rtl' : 'ltr'}>
-            <div className="max-w-2xl">
-              <p className="mb-3 text-xs font-black tracking-widest text-sky-300">{String(slideIndex + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")} · {isAr ? "اكتشف الإمكانيات" : "EXPLORE THE PLATFORM"}</p>
-              <h2 className="max-w-xl text-3xl font-black leading-tight drop-shadow-lg xl:text-5xl">{isAr ? activeSlide.titleAr : activeSlide.titleEn}</h2>
-              <p className="mt-3 max-w-xl text-base font-medium leading-relaxed text-slate-100 xl:text-lg">{isAr ? activeSlide.textAr : activeSlide.textEn}</p>
-            </div>
-            <div className="pointer-events-auto mt-7 flex items-center justify-between gap-3"><div className="flex items-center gap-2" role="tablist" aria-label={isAr ? 'إمكانيات النظام' : 'System capabilities'}>
-              {slides.map((slide, index) => (
-                <button key={slide.image} type="button" role="tab" aria-selected={slideIndex === index}
-                  aria-label={isAr ? slide.titleAr : slide.titleEn}
-                  onClick={() => setSlideIndex(index)}
-                  className={`h-2.5 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${slideIndex === index ? 'w-9 bg-sky-400' : 'w-2.5 bg-white/60 hover:bg-white'}`}
-                />
-              ))}
-              </div><div className="flex gap-2" dir="ltr">
-                <button type="button" aria-label={isAr ? "الشريحة السابقة" : "Previous slide"} onClick={() => setSlideIndex((i) => (i - 1 + slides.length) % slides.length)} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/10 backdrop-blur-md transition hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"><ChevronLeft className="h-5 w-5" /></button>
-                <button type="button" aria-label={isAr ? "الشريحة التالية" : "Next slide"} onClick={() => setSlideIndex((i) => (i + 1) % slides.length)} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/10 backdrop-blur-md transition hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"><ChevronRight className="h-5 w-5" /></button>
-              </div></div>
-          </div>
-        </section>
+        <AntigravityLoginHero isAr={isAr} />
 
         <section
           className="relative flex h-full min-h-0 items-center justify-center overflow-y-auto bg-gradient-to-b from-white via-white to-slate-50 px-6 py-4 sm:px-10 lg:border-s lg:border-slate-100 lg:px-9 xl:px-12"
