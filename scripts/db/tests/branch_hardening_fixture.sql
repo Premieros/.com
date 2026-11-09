@@ -7,7 +7,8 @@ CREATE TABLE public.products(id uuid PRIMARY KEY, branch_id uuid NOT NULL);
 CREATE TABLE public.orders(id uuid PRIMARY KEY, branch_id uuid NOT NULL, inventory_warehouse_id uuid);
 CREATE TABLE public.sales(id uuid PRIMARY KEY, branch_id uuid NOT NULL, warehouse_id uuid, created_at timestamptz NOT NULL);
 CREATE TABLE public.inventory(id uuid PRIMARY KEY,branch_id uuid NOT NULL,warehouse_id uuid NOT NULL,product_id uuid NOT NULL);
-CREATE TABLE public.purchases(id uuid PRIMARY KEY,branch_id uuid,warehouse_id uuid);
+CREATE TABLE public.purchases(id uuid PRIMARY KEY,branch_id uuid,warehouse_id uuid,created_at timestamptz NOT NULL);
+CREATE TABLE public.purchase_items(id uuid PRIMARY KEY,purchase_id uuid NOT NULL);
 CREATE TABLE public.stock_counts(id uuid PRIMARY KEY,branch_id uuid NOT NULL,warehouse_id uuid NOT NULL);
 CREATE TABLE public.recipes(id uuid PRIMARY KEY,branch_id uuid NOT NULL,product_id uuid NOT NULL);
 CREATE TABLE public.sale_payments(id uuid PRIMARY KEY,sale_id uuid NOT NULL,branch_id uuid NOT NULL);
@@ -32,12 +33,19 @@ CREATE FUNCTION private.financial_row_visible(p_row_id uuid,p_branch_id uuid,p_c
 CREATE FUNCTION private.sale_read_visible(p_sale_id uuid,p_branch_id uuid,p_created_at timestamptz)
  RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
  SELECT private.financial_row_visible(p_sale_id,p_branch_id,p_created_at) $$;
+CREATE FUNCTION private.purchase_read_visible_by_id(p_purchase_id uuid)
+ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $
+ SELECT coalesce((SELECT private.financial_row_visible(p.id,p.branch_id,p.created_at)
+                  FROM public.purchases p WHERE p.id=p_purchase_id),false) $;
 CREATE FUNCTION private.sale_read_visible_by_id(p_sale_id uuid)
  RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
  SELECT coalesce((SELECT private.sale_read_visible(s.id,s.branch_id,s.created_at)
                   FROM public.sales s WHERE s.id=p_sale_id),false) $$;
 
 ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.purchases ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.purchase_items ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stock_counts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sale_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_unit_links ENABLE ROW LEVEL SECURITY;
@@ -45,6 +53,9 @@ ALTER TABLE public.product_unit_links ENABLE ROW LEVEL SECURITY;
 -- Intentionally permissive legacy policies: candidate RESTRICTIVE gates
 -- MUST close the historical visibility / branch privilege OR-bypass.
 CREATE POLICY legacy_expenses_select ON public.expenses FOR SELECT TO authenticated USING (true);
+CREATE POLICY legacy_purchases_select ON public.purchases FOR SELECT TO authenticated USING (true);
+CREATE POLICY legacy_purchase_items_select ON public.purchase_items FOR SELECT TO authenticated USING (true);
+CREATE POLICY legacy_stock_counts_select ON public.stock_counts FOR SELECT TO authenticated USING (true);
 CREATE POLICY legacy_sale_items_select ON public.sale_items FOR SELECT TO authenticated USING (true);
 CREATE POLICY legacy_sales_select ON public.sales FOR SELECT TO authenticated USING (true);
 CREATE POLICY legacy_pul_select ON public.product_unit_links FOR SELECT TO authenticated USING (true);
@@ -85,3 +96,16 @@ INSERT INTO public.inventory_units VALUES
 INSERT INTO public.product_unit_links VALUES
  ('00000000-0000-0000-0000-000000000091','00000000-0000-0000-0000-000000000021','00000000-0000-0000-0000-000000000081'),
  ('00000000-0000-0000-0000-000000000092','00000000-0000-0000-0000-000000000022','00000000-0000-0000-0000-000000000082');
+
+-- Add representative recent/old/other-branch history for purchase and stock-count RLS.
+INSERT INTO public.purchases VALUES
+ ('00000000-0000-0000-0000-000000000121','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000011',now()),
+ ('00000000-0000-0000-0000-000000000122','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000011',now()-interval '60 days'),
+ ('00000000-0000-0000-0000-000000000123','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000012',now());
+INSERT INTO public.purchase_items VALUES
+ ('00000000-0000-0000-0000-000000000131','00000000-0000-0000-0000-000000000121'),
+ ('00000000-0000-0000-0000-000000000132','00000000-0000-0000-0000-000000000122'),
+ ('00000000-0000-0000-0000-000000000133','00000000-0000-0000-0000-000000000123');
+INSERT INTO public.stock_counts VALUES
+ ('00000000-0000-0000-0000-000000000141','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000011'),
+ ('00000000-0000-0000-0000-000000000142','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000012');
