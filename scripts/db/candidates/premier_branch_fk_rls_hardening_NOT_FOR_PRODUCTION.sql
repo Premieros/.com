@@ -79,28 +79,33 @@ ALTER TABLE public.order_kitchen_sends
 -- financial-history visibility filters on these tables.
 CREATE POLICY premier_expenses_financial_select_gate
   ON public.expenses AS RESTRICTIVE FOR SELECT TO authenticated
-  USING (public.is_platform_admin() OR private.financial_row_visible(id,branch_id,created_at));
+  USING (public.is_platform_admin() OR (public.can_permission('expenses.view') AND private.financial_row_visible(id,branch_id,created_at)));
 CREATE POLICY premier_sale_items_financial_select_gate
   ON public.sale_items AS RESTRICTIVE FOR SELECT TO authenticated
-  USING (public.is_platform_admin() OR private.sale_read_visible_by_id(sale_id));
+  USING (public.is_platform_admin() OR (public.can_permission('sales.view') AND private.sale_read_visible_by_id(sale_id)));
 CREATE POLICY premier_sales_financial_select_gate
   ON public.sales AS RESTRICTIVE FOR SELECT TO authenticated
-  USING (public.is_platform_admin() OR private.sale_read_visible(id,branch_id,created_at));
+  USING (public.is_platform_admin() OR (public.can_permission('sales.view') AND private.sale_read_visible(id,branch_id,created_at)));
 
 -- Existing stock_counts SELECT policy is USING (true), which exposes
 -- counts across branches to authenticated roles with table SELECT privilege.
 -- A restrictive AND guard closes the leak without disabling authorized reads.
 CREATE POLICY premier_stock_counts_branch_select_gate
   ON public.stock_counts AS RESTRICTIVE FOR SELECT TO authenticated
-  USING (public.user_may_access_branch(branch_id));
+  USING (public.user_may_access_branch(branch_id)
+    AND (public.is_platform_admin() OR public.can_permission('inventory.view')
+      OR public.can_permission('inventory.count.create')
+      OR public.can_permission('inventory.count.approve')
+      OR public.can_permission('inventory.count.apply')
+      OR public.can_permission('inventory.count.reject')));
 
 -- Purchase history has the same OR-bypass pattern as sales and expenses.
 CREATE POLICY premier_purchases_financial_select_gate
   ON public.purchases AS RESTRICTIVE FOR SELECT TO authenticated
-  USING (public.is_platform_admin() OR private.financial_row_visible(id,branch_id,created_at));
+  USING (public.is_platform_admin() OR (public.can_permission('purchases.view') AND private.financial_row_visible(id,branch_id,created_at)));
 CREATE POLICY premier_purchase_items_financial_select_gate
   ON public.purchase_items AS RESTRICTIVE FOR SELECT TO authenticated
-  USING (public.is_platform_admin() OR private.purchase_read_visible_by_id(purchase_id));
+  USING (public.is_platform_admin() OR (public.can_permission('purchases.view') AND private.purchase_read_visible_by_id(purchase_id)));
 
 -- Cross-branch access must use explicit branch permission, not merely
 -- one primary branch stored in the users profile.
