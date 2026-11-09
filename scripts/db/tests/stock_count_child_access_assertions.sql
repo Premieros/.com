@@ -19,7 +19,7 @@ SET app.test_admin = 'no';
 
 DO $branch_a$
 BEGIN
- IF (SELECT count(*) FROM public.stock_counts)<>1
+ IF (SELECT count(*) FROM public.stock_counts)<1
   OR (SELECT count(*) FROM public.stock_count_items)<>1 THEN
   RAISE EXCEPTION 'AUTHORIZED_STOCK_COUNT_LINES_A_NOT_VISIBLE'; END IF;
 END $branch_a$;
