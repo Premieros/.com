@@ -16,7 +16,7 @@ export function requireStockValuationRows(
       throw new Error('STOCK_VALUATION_SCOPE_MISMATCH');
     }
     if (![row.quantity, row.unit_cost, row.total_value].every((value) =>
-      value !== null && value !== undefined && value !== '' && Number.isFinite(Number(value))
+      value !== null && value !== undefined && Number.isFinite(Number(value))
     )) {
       throw new Error('STOCK_VALUATION_INVALID_AMOUNT');
     }
