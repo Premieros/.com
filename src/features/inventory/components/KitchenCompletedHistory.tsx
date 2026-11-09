@@ -40,7 +40,7 @@ export function KitchenCompletedHistory({ branchId, station, ar }: { branchId: s
   return (
     <div data-testid="kds-completed-history" className="space-y-3">
       <p className="text-sm text-ui-muted">
-        {ar ? 'الطلبات المكتملة تلقائيًا بعد 40 دقيقة أو المكتملة يدويًا.' : 'Orders completed automatically after 40 minutes or completed manually.'}
+        {ar ? 'الطلبات التي اكتملت حالتها بالفعل. يحتفظ السجل أيضًا بعمليات الإكمال التلقائي السابقة إن وجدت.' : 'Orders with a completed kitchen status. Historical auto-completions may also appear.'}
       </p>
 
       <div className="flex flex-wrap items-end gap-2">
