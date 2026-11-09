@@ -4,7 +4,8 @@
  * transaction semantics for all API and Supabase communication.
  */
 
-const CACHE_NAME = 'premier-app-shell-v1';
+const CACHE_NAME = 'premier-app-shell-v2-dev'; // __PREMIER_BUILD_CACHE__
+const BUILD_ASSETS = []; // __PREMIER_BUILD_ASSETS__
 
 // Static assets to pre-cache on install
 const PRECACHE_ASSETS = [
@@ -13,6 +14,7 @@ const PRECACHE_ASSETS = [
   '/favicon.svg',
   '/app-icon.svg',
   '/manifest.webmanifest',
+  ...BUILD_ASSETS,
 ];
 
 self.addEventListener('install', (event) => {
@@ -31,7 +33,7 @@ self.addEventListener('activate', (event) => {
       .then((cacheNames) =>
         Promise.all(
           cacheNames.map((name) => {
-            if (name !== CACHE_NAME) {
+            if (name.startsWith('premier-app-shell-') && name !== CACHE_NAME) {
               return caches.delete(name);
             }
             return null;
@@ -45,6 +47,9 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
+
+  // Do not intercept other origins (including cloud API, CDN, analytics).
+  if (url.origin !== self.location.origin) return;
 
   // 1. Only intercept GET requests
   if (request.method !== 'GET') {
@@ -61,7 +66,8 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 3. Navigation requests (HTML document): Network-first with cache fallback
+  // 3. Navigation requests (HTML document): Network-first with cache fallback.
+  // SPA routes load their lazy modules from the versioned BUILD_ASSETS precache.
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request)
@@ -94,7 +100,12 @@ self.addEventListener('fetch', (event) => {
 
   if (isStaticAsset) {
     event.respondWith(
-      caches.match(request).then((cachedResponse) => {
+      caches.open(CACHE_NAME).then(async (cache) => {
+        // Vite assets are immutable build files. Browsers send different
+        // Accept/Vary request headers for module scripts, preload and CSS.
+        // Match the same-origin asset by its exact pathname regardless of
+        // those headers; never use this for API/auth/business data.
+        const cachedResponse = await cache.match(url.pathname, { ignoreVary: true });
         const fetchPromise = fetch(request)
           .then((networkResponse) => {
             if (networkResponse.ok) {
