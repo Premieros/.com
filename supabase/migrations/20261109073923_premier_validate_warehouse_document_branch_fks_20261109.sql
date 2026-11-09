@@ -1,0 +1,4 @@
+-- MIRRORED VERBATIM from already-applied Premier production migration history.
+-- Version: 20261109073923; name: premier_validate_warehouse_document_branch_fks_20261109
+-- DO NOT manually rerun on production. A fresh database replays sequentially.
+BEGIN; SET LOCAL lock_timeout='2s'; SET LOCAL statement_timeout='25s'; ALTER TABLE public.orders VALIDATE CONSTRAINT premier_orders_warehouse_branch_fk; ALTER TABLE public.sales VALIDATE CONSTRAINT premier_sales_warehouse_branch_fk; ALTER TABLE public.purchases VALIDATE CONSTRAINT premier_purchases_warehouse_branch_fk; ALTER TABLE public.stock_counts VALIDATE CONSTRAINT premier_stock_counts_warehouse_branch_fk; ALTER TABLE public.recipes VALIDATE CONSTRAINT premier_recipes_product_branch_fk; COMMIT;
