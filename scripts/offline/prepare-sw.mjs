@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readdir, readFile, writeFile, stat } from 'node:fs/promises';
-import { join, relative, sep } from 'node:path';
+import { join, relative, sep, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export const MARKER = 'const BUILD_ASSETS = []; // __PREMIER_BUILD_ASSETS__';
 export const CACHE_MARKER = "const CACHE_NAME = 'premier-app-shell-v2-dev'; // __PREMIER_BUILD_CACHE__";
@@ -51,6 +52,6 @@ export async function prepareOfflineWorker(distDir = 'dist') {
   console.log(`Premier offline shell: precache ${assets.length} built route JS/CSS assets`);
 }
 
-if (process.argv[1] && import.meta.url === new URL('file://' + process.argv[1]).href) {
+if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {
   await prepareOfflineWorker(process.argv[2] || 'dist');
 }
