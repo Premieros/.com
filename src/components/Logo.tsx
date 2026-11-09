@@ -1,10 +1,5 @@
 import { type ReactNode } from 'react';
 
-const BLUE = '#2563EB';
-const BLUE_DARK = '#1D4ED8';
-const GOLD = '#F6C344';
-const WHITE = '#FFFFFF';
-
 export type LogoTone = 'navy' | 'white' | 'mono' | 'auto';
 export type LogoVariant = 'mark' | 'horizontal' | 'vertical';
 
@@ -17,28 +12,13 @@ interface LogoProps {
   className?: string;
 }
 
-function Mark({ tone, size }: { tone: LogoTone; size: number }) {
-  const primary = tone === 'white' ? WHITE : BLUE;
-  const accent = tone === 'white' ? WHITE : GOLD;
-
+/** Official Premier geometric P, recreated as resolution-independent vector artwork. */
+export function PremierMark({ size = 36, tone = 'navy' }: { size?: number; tone?: LogoTone }) {
+  const ink = tone === 'white' ? '#F7F5F1' : tone === 'mono' ? 'currentColor' : '#1C1230';
   return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 32 32"
-      fill="none"
-      xmlns="http://www.w3.org/2000/svg"
-      aria-hidden="true"
-    >
-      <path
-        d="M8 5.5A3.5 3.5 0 0 1 11.5 2H16c7.18 0 12 4.38 12 10.75 0 5.87-4.05 10.02-10.35 10.63L14 23.7V27a3 3 0 0 1-6 0V5.5Z"
-        fill={primary}
-      />
-      <path
-        d="M14 7.4h2.2c3.4 0 5.8 2.02 5.8 5.2 0 3.1-2.18 5-5.45 5.25L14 18.05V7.4Z"
-        fill={tone === 'white' ? BLUE_DARK : WHITE}
-      />
-      <path d="M20.2 7.2 23 5.35l1.25 3.05-2.95 1.35-1.1-2.55Z" fill={accent} />
+    <svg width={size} height={size} viewBox="0 0 100 100" fill="none" aria-hidden="true" xmlns="http://www.w3.org/2000/svg">
+      <path fill={ink} fillRule="evenodd" d="M20 69V27C20 11.54 32.54 0 48 0H65C80.46 0 93 12.54 93 28V36C93 51.46 80.46 64 65 64H50C44.48 64 40 68.48 40 74V79C40 84.52 35.52 89 30 89C24.48 89 20 84.52 20 79V69ZM40 27V59C43.89 50.46 52.5 45 62 45H65C69.97 45 74 40.97 74 36V28C74 23.03 69.97 19 65 19H48C43.58 19 40 22.58 40 27Z"/>
+      <circle cx="84" cy="77" r="9" fill="#8054F6" />
     </svg>
   );
 }
@@ -51,50 +31,30 @@ export function Logo({
   tagline = 'Business Management Platform',
   className = '',
 }: LogoProps) {
-  const textCls =
-    tone === 'white'
-      ? 'text-white'
-      : 'text-blue-600';
-
-  const mark = <Mark tone={tone} size={size} />;
-
+  const mark = <PremierMark size={size} tone={tone} />;
   const textBlock = (
-    <div className="flex flex-col" dir="ltr">
-      <span
-        className={`font-extrabold tracking-tight leading-none ${textCls}`}
-        style={{ fontSize: Math.round(size * 0.42) }}
-      >
-        Premier
+    <div className="flex min-w-0 flex-col" dir="ltr">
+      <span className="whitespace-nowrap font-light leading-none tracking-tight" style={{
+        fontSize: Math.round(size * 0.50),
+        color: tone === 'white' ? '#F7F5F1' : tone === 'mono' ? 'currentColor' : '#1C1230',
+        fontFamily: 'Inter, sans-serif',
+      }}>
+        premier<span style={{ color: '#8054F6' }}>.</span>os
       </span>
       {showTagline && (
-        <span
-          className={tone === 'white' ? 'mt-1 uppercase tracking-[0.14em] text-blue-100 leading-none' : 'mt-1 uppercase tracking-[0.14em] text-ui-subtle leading-none'}
-          style={{ fontSize: Math.max(8, Math.round(size * 0.125)) }}
-        >
+        <span className={tone === 'white' ? 'mt-1 uppercase tracking-wider text-violet-200' : 'mt-1 uppercase tracking-wider text-ui-subtle'} style={{ fontSize: Math.max(8, Math.round(size * 0.125)) }}>
           {tagline}
         </span>
       )}
     </div>
   );
-
   let content: ReactNode;
   if (variant === 'mark') {
     content = <div className={className}>{mark}</div>;
   } else if (variant === 'horizontal') {
-    content = (
-      <div className={`flex items-center gap-3 ${className}`} dir="ltr">
-        {mark}
-        {textBlock}
-      </div>
-    );
+    content = <div className={'flex items-center gap-3 ' + className} dir="ltr">{mark}{textBlock}</div>;
   } else {
-    content = (
-      <div className={`flex flex-col items-center gap-2 ${className}`} dir="ltr">
-        {mark}
-        {textBlock}
-      </div>
-    );
+    content = <div className={'flex flex-col items-center gap-2 ' + className} dir="ltr">{mark}{textBlock}</div>;
   }
-
   return <>{content}</>;
 }
