@@ -44,5 +44,7 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f scripts/db/tests/branch_hardening_fixture.sql
       - name: Apply candidate tenant FKs and restrictive RLS to disposable PostgreSQL
         run: psql -v ON_ERROR_STOP=1 -f scripts/db/candidates/premier_branch_fk_rls_hardening_NOT_FOR_PRODUCTION.sql
+      - name: Apply stock-count write hardening candidate in isolated PostgreSQL
+        run: psql -v ON_ERROR_STOP=1 -f scripts/db/candidates/premier_stock_counts_write_rls_NOT_FOR_PRODUCTION.sql
       - name: Assert cross-branch FK violations and authenticated history isolation
         run: psql -v ON_ERROR_STOP=1 -f scripts/db/tests/branch_hardening_assertions.sql
