@@ -64,7 +64,7 @@ describe('bounded-pool tenant onboarding and branch access smoke', () => {
         poolConnections: 12,
         p50Ms: sorted[Math.floor(sorted.length * 0.5)],
         p95Ms: sorted[Math.floor(sorted.length * 0.95)],
-        maxMs: sorted.at(-1),
+        maxMs: sorted[sorted.length - 1],
       });
     } finally {
       await pool.end();
