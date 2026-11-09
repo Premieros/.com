@@ -7,7 +7,7 @@ const mocks = vi.hoisted(() => ({
   recordLocalMovement: vi.fn(),
   getBranchSettings: vi.fn(),
   getGlobalSettings: vi.fn(),
-  enqueueOfflineSale: vi.fn(),
+  enqueueOfflineSaleIdempotent: vi.fn(),
   getSession: vi.fn(),
 }));
 
@@ -27,7 +27,7 @@ vi.mock('@/core/repositories', () => ({
     recordLocalMovement: mocks.recordLocalMovement,
   },
 }));
-vi.mock('@/core/offline/offlineStorage', () => ({ enqueueOfflineSale: mocks.enqueueOfflineSale }));
+vi.mock('@/core/offline/offlineStorage', () => ({ enqueueOfflineSaleIdempotent: mocks.enqueueOfflineSaleIdempotentIdempotent }));
 vi.mock('@/core/offline/warehouseBinding', () => ({ saveVerifiedSaleWarehouse: vi.fn() }));
 
 import {
@@ -70,7 +70,7 @@ describe('POS confirmed and queued sales survive local projection errors', () =>
     mocks.getBranchSettings.mockResolvedValue({ allow_negative_stock: true });
     mocks.getGlobalSettings.mockResolvedValue({ allow_negative_stock: true });
     mocks.recordLocalMovement.mockRejectedValue(new Error('IndexedDB unavailable'));
-    mocks.enqueueOfflineSale.mockResolvedValue(undefined);
+    mocks.enqueueOfflineSaleIdempotentIdempotent.mockImplementation(async (sale: { id: string }) => ({ id: sale.id, inserted: true }));
     mocks.getSession.mockResolvedValue({ data: { session: { user: { id: 'cashier-1' } } }, error: null });
   });
 
@@ -111,7 +111,7 @@ describe('POS confirmed and queued sales survive local projection errors', () =>
     expect(result?.success).toBe(true);
     expect(result?.offline).toBe(true);
     expect(result?.pending_sync).toBe(true);
-    expect(mocks.enqueueOfflineSale).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueueOfflineSaleIdempotent).toHaveBeenCalledTimes(1);
     expect(mocks.recordLocalMovement).toHaveBeenCalledTimes(1);
     expect(mocks.processSaleIdempotent).not.toHaveBeenCalled();
   });
@@ -125,10 +125,31 @@ describe('POS confirmed and queued sales survive local projection errors', () =>
       const { result, error } = await processSaleForOrder(payload);
       expect(error).toBeNull();
       expect(result?.pending_sync).toBe(true);
-      expect(mocks.enqueueOfflineSale).toHaveBeenCalledTimes(1);
+      expect(mocks.enqueueOfflineSaleIdempotent).toHaveBeenCalledTimes(1);
     } finally {
       warning.mockRestore();
     }
+  });
+
+  it('replay with the same operation key does not reproject queued stock', async () => {
+    vi.stubGlobal('navigator', { onLine: false });
+    mocks.recordLocalMovement.mockResolvedValue(undefined);
+    mocks.enqueueOfflineSaleIdempotent
+      .mockResolvedValueOnce({ id: 'existing-capture', inserted: false });
+    const { result, error } = await processSaleForOrder(payload);
+    expect(error).toBeNull();
+    expect(result?.sale_id).toBe('existing-capture');
+    expect(result?.pending_sync).toBe(true);
+    expect(mocks.recordLocalMovement).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when an operation key is reused with different financial data', async () => {
+    vi.stubGlobal('navigator', { onLine: false });
+    mocks.enqueueOfflineSaleIdempotent.mockRejectedValueOnce(new Error('OFFLINE_SALE_OPERATION_KEY_CONFLICT'));
+    const { result, error } = await processSaleForOrder(payload);
+    expect(result).toBeNull();
+    expect(error).toBe('OFFLINE_SALE_OPERATION_KEY_CONFLICT');
+    expect(mocks.recordLocalMovement).not.toHaveBeenCalled();
   });
 
   it('does not generate a local confirmation when the server rejects the sale', async () => {
