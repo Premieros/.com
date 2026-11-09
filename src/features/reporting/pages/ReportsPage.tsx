@@ -17,6 +17,7 @@ import { useColumnPreferences } from '../useColumnPreferences';
 import { ColumnPicker } from '../ColumnPicker';
 import { useCustomReports } from '../useCustomReports';
 import { getReportExcelProfile } from '../reportExcelProfiles';
+import { requireFinancialReport } from '../services/requireFinancialReport';
 import type { SavedReportConfig } from '../useCustomReports';
 import { CustomReportBar } from '../CustomReportBar';
 import { ReportFilterBar } from '../ReportFilterBar';
@@ -70,6 +71,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
   const [, setChartData] = useState<{ name: string; value: number }[]>([]);
   const [summary, setSummary] = useState({ total: 0, count: 0 });
   const [loading, setLoading] = useState(false);
+  const [reportError, setReportError] = useState(false);
   const [filters, setFilters] = useState<ReportFilters>({});
   const [filtersDirty, setFiltersDirty] = useState(false);
   const [queryVersion, setQueryVersion] = useState(0);
@@ -243,6 +245,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
 
   async function loadReport() {
     setLoading(true);
+    setReportError(false);
     try {
       const allowed = history.clampRange(from, to);
       if (allowed.from !== from) setFrom(allowed.from);
@@ -323,8 +326,8 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       } else if (reportType === 'profit') {
         const targetBranches = reportBranches;
         const results = await Promise.all(targetBranches.map(async (branch) => {
-          const { data: statement } = await reporting.getIncomeStatement({ p_branch_id: branch.id, p_from_date: from, p_to_date: to });
-          return { branch, statement };
+          const result = await reporting.getIncomeStatement({ p_branch_id: branch.id, p_from_date: from, p_to_date: to });
+          return { branch, statement: requireFinancialReport(result, 'income', branch.id) };
         }));
         const rows = results.map(({ branch, statement }) => withBranch(branch.id, {
           [lang === 'ar' ? 'الفترة' : 'Period']: `${from} - ${to}`,
@@ -417,8 +420,10 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
         let paymentSummaryTotal = 0;
         let paymentInvoiceCount = 0;
         const methodRows = results.flatMap((result, index) => {
-          const raw = (result.data as Record<string, unknown> | null) || {};
-          if (result.error || raw.success === false || !Array.isArray(raw.rows)) return [];
+          const raw = requireFinancialReport(result, 'sales_by_payment', targetBranchIds[index]);
+          if (!Array.isArray(raw.rows) || !raw.summary || typeof raw.summary !== 'object') {
+            throw new Error('FINANCIAL_REPORT_INCOMPLETE:sales_by_payment:' + targetBranchIds[index] + ':INVALID_PAYLOAD');
+          }
           const summaryRow = (raw.summary as Record<string, unknown> | null) || {};
           paymentSummaryTotal += Number(summaryRow.sales_total || 0);
           paymentInvoiceCount += Number(summaryRow.invoice_count || 0);
@@ -793,14 +798,15 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
         let totalNetSales = 0;
         let mismatchCount = 0;
         results.forEach((result, index) => {
-          const raw = (result.data as Record<string, unknown> | null) || {};
-          if (result.error || raw.success === false) return;
           const branchId = targetBranchIds[index];
-          const summaryRow = (raw.summary as Record<string, unknown> | null) || {};
+          const raw = requireFinancialReport(result, 'financial_reconciliation', branchId);
+          if (!Array.isArray(raw.rows) || !raw.summary || typeof raw.summary !== 'object') {
+            throw new Error('FINANCIAL_REPORT_INCOMPLETE:financial_reconciliation:' + branchId + ':INVALID_PAYLOAD');
+          }
+          const summaryRow = raw.summary as Record<string, unknown>;
           totalNetSales += Number(summaryRow.net_sales || 0);
           mismatchCount += Number(summaryRow.mismatch_count || 0);
-          if (!Array.isArray(raw.rows)) return;
-          raw.rows.forEach((item) => {
+          (raw.rows as unknown[]).forEach((item) => {
             const row = item as Record<string, unknown>;
             const status = String(row.reconciliation_status || 'matched');
             reconciliationRows.push(withBranch(branchId, {
@@ -1074,6 +1080,12 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
         setChartData(rows.slice(0, 10).map((row) => ({ name: String(row[lang === 'ar' ? 'المنتج' : 'Product']), value: Number(row[lang === 'ar' ? 'التكلفة الإجمالية' : 'Total Cost']) })));
         setSummary({ total: rows.reduce((sum, row) => sum + Number(row[lang === 'ar' ? 'التكلفة الإجمالية' : 'Total Cost'] || 0), 0), count: rows.length });
       }
+    } catch {
+      // Never expose prior-branch data or misleading partial financial totals.
+      setData([]);
+      setChartData([]);
+      setSummary({ total: 0, count: 0 });
+      setReportError(true);
     } finally {
       setLoading(false);
     }
@@ -1261,9 +1273,9 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
             lang={lang}
             hiddenCount={hiddenCount}
           />
-          {can('reports.export') && <Button variant="outline" size="sm" onClick={handleExportExcel}><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}
-          {can('reports.export') && <Button variant="outline" size="sm" onClick={handleExportCSV}><FileDown className="w-4 h-4" /> {t('exportCsv')}</Button>}
-          {can('reports.print') && <Button variant="outline" size="sm" onClick={handlePrint}><Printer className="w-4 h-4" /> {t('print')}</Button>}
+          {can('reports.export') && <Button variant="outline" size="sm" disabled={loading || reportError} onClick={handleExportExcel}><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}
+          {can('reports.export') && <Button variant="outline" size="sm" disabled={loading || reportError} onClick={handleExportCSV}><FileDown className="w-4 h-4" /> {t('exportCsv')}</Button>}
+          {can('reports.print') && <Button variant="outline" size="sm" disabled={loading || reportError} onClick={handlePrint}><Printer className="w-4 h-4" /> {t('print')}</Button>}
         </div>
       } />
 
@@ -1272,6 +1284,12 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
           {lang === 'ar'
             ? 'نطاق العرض محدود حسب الصلاحية: آخر 7 أيام تظهر كاملة، وما قبلها يخضع لسياسة العرض التاريخي. الإجماليات والتصدير تشمل فقط البيانات المسموح لك برؤيتها.'
             : 'Visibility is permission-limited: the last 7 days are complete, while older history follows the historical visibility policy. Totals and exports include only data you are allowed to see.'}
+        </div>
+      )}
+
+      {reportError && !loading && (
+        <div role="alert" data-testid="reports-incomplete-error" className="mb-3 rounded-xl border border-ui-danger/30 bg-ui-danger-soft px-4 py-3 text-sm text-ui-danger">
+          {lang === 'ar' ? 'تعذر تحميل التقرير بالكامل لجميع الفروع المحددة. تم إخفاء البيانات الناقصة وإيقاف التصدير. حاول تشغيل التقرير مرة أخرى.' : 'The report could not be loaded completely for all selected branches. Incomplete data is hidden and export is disabled. Please run the report again.'}
         </div>
       )}
 
