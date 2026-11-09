@@ -176,6 +176,6 @@ BEGIN
     'after_qty',v_running
   );
 END;
-$function$
+$function$;
 
 COMMIT;
