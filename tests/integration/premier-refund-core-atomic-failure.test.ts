@@ -57,7 +57,7 @@ const local = !!url && /(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url)
       await client.query(`
         create or replace function public._restore_refund_hybrid_inventory(
           p_sale_item_id uuid,p_sale_id uuid,p_product_id uuid,p_refund_qty numeric,
-          p_branch_id uuid,p_warehouse_id uuid,p_reference_number text
+          p_branch_id uuid,p_warehouse_id uuid,p_reference_number text default null::text
         ) returns jsonb
         language plpgsql security definer set search_path to 'public','pg_temp'
         as $fn$
