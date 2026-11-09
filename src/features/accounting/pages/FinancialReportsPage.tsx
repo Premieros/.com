@@ -16,6 +16,7 @@ import { useBranches } from '@/hooks/useBranches';
 import { useSettings } from '@/context/SettingsContext';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { businessMetricLabel } from '@/lib/businessMetrics';
+import { requireFinancialReport } from '@/features/reporting/services/requireFinancialReport';
 import type {
   TrialBalanceRow, GeneralLedgerRow, TrialBalanceSummary,
   IncomeStatementResult, BalanceSheetResult, ArAgingRow, ApAgingRow,
@@ -58,6 +59,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
   const [from, setFrom] = useState(() => history.clampRange(searchParams.get('from') || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10), searchParams.get('to') || todayISO()).from);
   const [to, setTo] = useState(() => history.clampRange(searchParams.get('from'), searchParams.get('to') || todayISO()).to);
   const [loading, setLoading] = useState(false);
+  const [reportError, setReportError] = useState(false);
   const { effectiveSettings } = useSettings();
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
   const [accountId, setAccountId] = useState('');
@@ -201,6 +203,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
     }
 
     setLoading(true);
+    setReportError(false);
     try {
       const allowed = history.clampRange(from, to);
       if (allowed.from !== from) setFrom(allowed.from);
@@ -209,11 +212,12 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
       const safeTo = allowed.to;
       if (view === 'trial_balance') {
         const results = await Promise.all(summaryBranchIds.map(async (branchId) => {
-          const { data } = await api.reporting.getTrialBalance({
+          const result = await api.reporting.getTrialBalance({
             p_branch_id: branchId,
             p_to_date: safeTo,
           });
-          return ((data as TrialBalanceRow[]) || []).map((row) => ({
+          const data = requireFinancialReport(result, 'trial_balance', branchId);
+          return (data as TrialBalanceRow[]).map((row) => ({
             ...row,
             branch_id: branchId,
             branch_name: branchName(branchId),
@@ -237,25 +241,25 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
           balanced: totalDebit === totalCredit,
         });
       } else if (view === 'ledger') {
-        const { data } = await api.reporting.getGeneralLedger( {
+        const result = await api.reporting.getGeneralLedger( {
           p_branch_id: effectiveBranchFilter,
           p_account_id: accountId || null,
           p_from_date: safeFrom,
           p_to_date: safeTo,
         });
-        setGl((data as GeneralLedgerRow[]) || []);
+        setGl(requireFinancialReport(result, 'ledger', effectiveBranchFilter || '') as GeneralLedgerRow[]);
       } else if (view === 'treasury_statement') {
         if (!treasuryId) { setTreasuryStmt(null); return; }
-        const { data } = await api.reporting.getTreasuryAccountStatement({
+        const result = await api.reporting.getTreasuryAccountStatement({
           p_branch_id: effectiveBranchFilter,
           p_treasury_account_id: treasuryId,
           p_from_date: safeFrom,
           p_to_date: safeTo,
         });
-        setTreasuryStmt((data as TreasuryStatementResult) || null);
+        setTreasuryStmt(requireFinancialReport(result, 'treasury_statement', effectiveBranchFilter || '') as TreasuryStatementResult);
       } else if (view === 'inventory_movement') {
         if (!inventoryItemId) { setInventoryStmt(null); return; }
-        const { data } = await api.reporting.getInventoryItemStatement({
+        const result = await api.reporting.getInventoryItemStatement({
           p_branch_id: effectiveBranchFilter,
           p_item_type: inventoryItemType,
           p_item_id: inventoryItemId,
@@ -263,12 +267,12 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
           p_from_date: safeFrom || null,
           p_to_date: safeTo || null,
         });
-        setInventoryStmt((data as InventoryItemStatementResult) || null);
+        setInventoryStmt(requireFinancialReport(result, 'inventory_movement', effectiveBranchFilter || '') as InventoryItemStatementResult);
       } else if (view === 'income') {
         const results = await Promise.all(summaryBranchIds.map((branchId) =>
           api.reporting.getIncomeStatement({ p_branch_id: branchId, p_from_date: safeFrom, p_to_date: safeTo })
         ));
-        const rows = results.map((result) => result.data as IncomeStatementResult | null).filter(Boolean) as IncomeStatementResult[];
+        const rows = results.map((result, index) => requireFinancialReport(result, 'income', summaryBranchIds[index]));
         setIncome(rows.reduce<IncomeStatementResult>((acc, row) => ({
           revenue: acc.revenue + Number(row.revenue || 0),
           discount: acc.discount + Number(row.discount || 0),
@@ -282,7 +286,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
         const results = await Promise.all(summaryBranchIds.map((branchId) =>
           api.reporting.getBalanceSheet({ p_branch_id: branchId, p_as_of: safeTo })
         ));
-        const rows = results.map((result) => result.data as BalanceSheetResult | null).filter(Boolean) as BalanceSheetResult[];
+        const rows = results.map((result, index) => requireFinancialReport(result, 'balance_sheet', summaryBranchIds[index]));
         setSheet(rows.reduce<BalanceSheetResult>((acc, row) => ({
           assets: acc.assets + Number(row.assets || 0),
           liabilities: acc.liabilities + Number(row.liabilities || 0),
@@ -294,21 +298,21 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
         }), { assets: 0, liabilities: 0, capital: 0, retained: 0, net_income: 0, equity: 0, balanced: true }));
       } else if (view === 'ar_aging') {
         const results = await Promise.all(summaryBranchIds.map(async (branchId) => {
-          const { data } = await api.reporting.getArAging({ p_branch_id: branchId, p_as_of: safeTo });
-          return ((data as ArAgingRow[]) || []).map((row) => ({ ...row, branch_id: branchId, branch_name: branchName(branchId) }));
+          const result = await api.reporting.getArAging({ p_branch_id: branchId, p_as_of: safeTo });
+          return requireFinancialReport(result, 'ar_aging', branchId).map((row) => ({ ...row, branch_id: branchId, branch_name: branchName(branchId) }));
         }));
         setArAging(results.flat());
       } else if (view === 'ap_aging') {
         const results = await Promise.all(summaryBranchIds.map(async (branchId) => {
-          const { data } = await api.reporting.getApAging({ p_branch_id: branchId, p_as_of: safeTo });
-          return ((data as ApAgingRow[]) || []).map((row) => ({ ...row, branch_id: branchId, branch_name: branchName(branchId) }));
+          const result = await api.reporting.getApAging({ p_branch_id: branchId, p_as_of: safeTo });
+          return requireFinancialReport(result, 'ap_aging', branchId).map((row) => ({ ...row, branch_id: branchId, branch_name: branchName(branchId) }));
         }));
         setApAging(results.flat());
       } else if (view === 'aging_summary') {
         const results = await Promise.all(summaryBranchIds.map((branchId) =>
           api.reporting.getAgingSummary({ p_branch_id: branchId, p_as_of: safeTo })
         ));
-        const rows = results.map((result) => result.data as AgingSummaryResult | null).filter(Boolean) as AgingSummaryResult[];
+        const rows = results.map((result, index) => requireFinancialReport(result, 'aging_summary', summaryBranchIds[index]));
         setAgingSummary(rows.reduce<AgingSummaryResult>((acc, row) => ({
           as_of: safeTo,
           ar_open: acc.ar_open + Number(row.ar_open || 0),
@@ -328,20 +332,22 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
         }), { as_of: safeTo, ar_open: 0, ap_open: 0, ar: { '0_30': 0, '31_60': 0, '61_90': 0, '90_plus': 0 }, ap: { '0_30': 0, '31_60': 0, '61_90': 0, '90_plus': 0 } }));
       } else if (view === 'cash_flow') {
         const results = await Promise.all(summaryBranchIds.map(async (branchId) => {
-          const { data } = await api.reporting.getCashFlow({ p_branch_id: branchId, p_from_date: safeFrom, p_to_date: safeTo });
-          return ((data as CashFlowRow[]) || []).map((row) => ({ ...row, branch_id: branchId, branch_name: branchName(branchId) }));
+          const result = await api.reporting.getCashFlow({ p_branch_id: branchId, p_from_date: safeFrom, p_to_date: safeTo });
+          return requireFinancialReport(result, 'cash_flow', branchId).map((row) => ({ ...row, branch_id: branchId, branch_name: branchName(branchId) }));
         }));
         setCashFlow(results.flat());
       } else if (view === 'party_statement') {
-        const { data } = await api.reporting.getPartyStatement( {
+        const result = await api.reporting.getPartyStatement( {
           p_branch_id: effectiveBranchFilter,
           p_side: partySide,
           p_party_id: partyId || null,
           p_from_date: safeFrom || null,
           p_to_date: safeTo || null,
         });
-        setPartyStmt((data as PartyStatementResult) || null);
+        setPartyStmt(requireFinancialReport(result, 'party_statement', effectiveBranchFilter || '') as PartyStatementResult);
       }
+    } catch {
+      setReportError(true);
     } finally {
       setLoading(false);
     }
@@ -561,7 +567,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
 
   return (
     <DesignSurface testId="financial-reports-page">
-      <DesignPageHeader title={t('financialReports')} actions={<Button variant="outline" size="sm" onClick={exportData}><Download className="w-4 h-4" /> {t('exportExcel')}</Button>} />
+      <DesignPageHeader title={t('financialReports')} actions={<Button variant="outline" size="sm" disabled={loading || reportError || !effectiveBranchFilter} onClick={exportData}><Download className="w-4 h-4" /> {t('exportExcel')}</Button>} />
 
       {!history.unlimited && (
         <div className="mb-3 rounded-xl border border-ui-warning/30 bg-ui-warning-soft px-4 py-3 text-sm text-ui-warning">
@@ -638,9 +644,12 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
         </div>
       </DesignPanel>
 
+      {reportError && !loading && (
+        <DesignPanel testId="financial-reports-error"><div role="alert" className="rounded-xl border border-ui-danger/30 bg-ui-danger-soft p-4 text-ui-danger text-sm">{isAr ? 'تعذر تحميل جميع بيانات التقرير للفروع المحددة. لن تُعرض أو تُصدَّر أرقام مالية ناقصة. أعد المحاولة.' : 'Could not load the financial report for every selected branch. Incomplete totals are hidden and cannot be exported. Please retry.'}</div></DesignPanel>
+      )}
       {loading ? (
         <DesignPanel testId="financial-reports-loading"><div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" /></div></DesignPanel>
-      ) : !effectiveBranchFilter ? (
+      ) : reportError ? null : !effectiveBranchFilter ? (
         <DesignPanel testId="financial-reports-placeholder"><div className="text-center py-12 text-ui-subtle text-sm">{t('filterByBranch')}</div></DesignPanel>
       ) : view === 'trial_balance' ? (
         <Card className="p-4">
