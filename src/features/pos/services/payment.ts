@@ -428,7 +428,7 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
         items: p.p_items || [],
         branchId: p.p_branch_id,
         warehouseId: p.p_warehouse_id,
-        saleId: (result as { sale_id?: string }).sale_id,
+        saleId: (data as { sale_id?: string }).sale_id,
         invoiceNumber: p.p_invoice_number,
         record: (movement) => InventoryRepository.recordLocalMovement(movement),
         onFailure: (count) => console.warn('POS_CONFIRMED_SALE_CACHE_WRITE_FAILED', { count }),
