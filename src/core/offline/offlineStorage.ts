@@ -135,6 +135,85 @@ export async function enqueueOfflineSale(sale: Omit<OfflineSaleQueueItem, 'statu
   });
 }
 
+
+/**
+ * Atomically insert (or retrieve) one offline sale per financial operation key.
+ * IndexedDB readwrite transactions on the same store serialize across tabs,
+ * including concurrent requests. No change to the existing DB version/indexes.
+ *
+ * Invoice numbers can be freshly generated on a retry; they do not change
+ * the business payload identity. Everything else must match exactly.
+ */
+function offlineSaleFingerprint(payload: Record<string, unknown>): string {
+  const { p_invoice_number: _invoice, ...financialPayload } = payload;
+  void _invoice;
+  const stable = (value: unknown): unknown => {
+    if (Array.isArray(value)) return value.map(stable);
+    if (value && typeof value === 'object') {
+      return Object.fromEntries(Object.entries(value as Record<string, unknown>)
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([key, child]) => [key, stable(child)]));
+    }
+    return value;
+  };
+  return JSON.stringify(stable(financialPayload));
+}
+
+export async function enqueueOfflineSaleIdempotent(
+  sale: Omit<OfflineSaleQueueItem, 'status' | 'retry_count'>,
+): Promise<{ id: string; inserted: boolean }> {
+  const key = String(sale.payload.p_client_operation_key || '').trim();
+  const branchId = String(sale.payload.p_branch_id || '').trim();
+  const owner = String(sale.created_by_user_id || '').trim();
+  if (!key || !branchId || !owner) {
+    throw new Error('OFFLINE_SALE_IDEMPOTENCY_SCOPE_REQUIRED');
+  }
+  const db = await openOfflineDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('sales_queue', 'readwrite');
+    const store = tx.objectStore('sales_queue');
+    let decision: { id: string; inserted: boolean } | null = null;
+    const req = store.getAll();
+    req.onsuccess = () => {
+      const matches = (req.result as OfflineSaleQueueItem[]).filter(row =>
+        String(row.payload?.p_client_operation_key || '').trim() === key,
+      );
+      if (matches.length > 1) {
+        tx.abort();
+        return;
+      }
+      const existing = matches[0];
+      if (existing) {
+        if (existing.created_by_user_id !== owner
+          || existing.payload.p_branch_id !== branchId
+          || offlineSaleFingerprint(existing.payload) !== offlineSaleFingerprint(sale.payload)) {
+          tx.abort();
+          return;
+        }
+        decision = { id: existing.id, inserted: false };
+      } else {
+        decision = { id: sale.id, inserted: true };
+        store.add({ ...sale, status: 'pending', retry_count: 0 } satisfies OfflineSaleQueueItem);
+      }
+    };
+    tx.oncomplete = () => {
+      if (!decision) {
+        reject(new Error('OFFLINE_SALE_IDEMPOTENCY_UNRESOLVED'));
+        return;
+      }
+      if (decision.inserted) notifyQueueListeners();
+      resolve(decision);
+    };
+    tx.onerror = () => reject(tx.error || new Error('OFFLINE_SALE_QUEUE_WRITE_FAILED'));
+    tx.onabort = () => {
+      reject(req.readyState === 'done' && (req.result as OfflineSaleQueueItem[] | undefined)?.some(row =>
+        String(row.payload?.p_client_operation_key || '').trim() === key)
+        ? new Error('OFFLINE_SALE_OPERATION_KEY_CONFLICT')
+        : tx.error || new Error('OFFLINE_SALE_QUEUE_ABORTED'));
+    };
+  });
+}
+
 export async function getPendingSalesCount(): Promise<number> {
   try {
     const db = await openOfflineDb();
