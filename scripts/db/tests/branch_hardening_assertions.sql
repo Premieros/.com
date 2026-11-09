@@ -135,5 +135,48 @@ BEGIN
     RAISE EXCEPTION 'LEGITIMATE_ADMIN_READ_BROKEN';
   END IF;
 END $legitimate_admin$;
+-- Stock-count INSERT and UPDATE must be forbidden to an authenticated user
+-- with branch access but without count.* permissions.
+SET app.test_admin = 'no';
+SET app.allowed_branch = '00000000-0000-0000-0000-000000000001';
+SET app.test_permissions = '';
+DO $no_write_permission$
+DECLARE n integer;
+BEGIN
+ BEGIN
+  INSERT INTO public.stock_counts VALUES
+   ('00000000-0000-0000-0000-000000000151','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000011');
+  RAISE EXCEPTION 'UNPRIVILEGED_STOCK_COUNT_INSERT_ALLOWED';
+ EXCEPTION WHEN insufficient_privilege THEN NULL;
+ END;
+ UPDATE public.stock_counts SET branch_id=branch_id
+ WHERE id='00000000-0000-0000-0000-000000000141';
+ GET DIAGNOSTICS n = ROW_COUNT;
+ IF n<>0 THEN RAISE EXCEPTION 'UNPRIVILEGED_STOCK_COUNT_UPDATE_ALLOWED'; END IF;
+END $no_write_permission$;
+
+-- Count creator can insert only within their own accessible branch; branch B
+-- stays blocked even with inventory.count.create granted.
+SET app.test_permissions = 'inventory.count.create,inventory.view';
+DO $allowed_count_write$
+DECLARE n integer;
+BEGIN
+ INSERT INTO public.stock_counts VALUES
+  ('00000000-0000-0000-0000-000000000152','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000011');
+ UPDATE public.stock_counts SET branch_id=branch_id
+ WHERE id='00000000-0000-0000-0000-000000000152';
+ GET DIAGNOSTICS n = ROW_COUNT;
+ IF n<>1 THEN RAISE EXCEPTION 'LEGITIMATE_STOCK_COUNT_WRITE_BLOCKED'; END IF;
+ BEGIN
+  INSERT INTO public.stock_counts VALUES
+   ('00000000-0000-0000-0000-000000000153','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000012');
+  RAISE EXCEPTION 'CROSS_BRANCH_STOCK_COUNT_INSERT_ALLOWED';
+ EXCEPTION WHEN insufficient_privilege THEN NULL;
+ END;
+ UPDATE public.stock_counts SET branch_id=branch_id
+ WHERE id='00000000-0000-0000-0000-000000000142';
+ GET DIAGNOSTICS n = ROW_COUNT;
+ IF n<>0 THEN RAISE EXCEPTION 'CROSS_BRANCH_STOCK_COUNT_UPDATE_ALLOWED'; END IF;
+END $allowed_count_write$;
 RESET ROLE;
 SELECT 'TENANT_FK_RLS_NEGATIVE_AND_AUTHORIZED_POSITIVE_TESTS_PASSED' AS result;
