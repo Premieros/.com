@@ -44,3 +44,12 @@ Date: 2026-11-09. Status: DRAFT only. No production writes, migrations, RLS chan
 ### Deployment state
 
 No additional Supabase production migration was applied during this reconciliation pass. The production database changes were already present on discovery. PR #142 remains a DRAFT pending integration tests and merge, so GitHub `main` is not yet synchronized with these 14 recorded migrations.
+
+## 2026-11-09 stock-count WRITE gate — ACTUALLY DEPLOYED AND VERIFIED
+
+- A follow-up live RLS audit revealed that authenticated `stock_counts` INSERT and UPDATE policies were each `WITH CHECK (true)` (UPDATE also `USING (true)`), even though the newer SELECT gate restricted branch access. Table `INSERT`, `UPDATE` and `DELETE` grants existed for authenticated. This was a meaningful write-access gap.
+- Confirmed that the Premier StockCountsPage uses the authorized `create_stock_count`, `approve_stock_count`, `apply_stock_count` SECURITY DEFINER RPC workflows rather than direct table mutations.
+- Added `scripts/db/candidates/premier_stock_counts_write_rls_NOT_FOR_PRODUCTION.sql`, exercising new RESTRICTIVE policies `premier_stock_counts_insert_scope_gate` and `premier_stock_counts_update_scope_gate` in the disposable Postgres workflow. Tests demonstrate denial to branch-authenticated users without count permissions, rejection of branch-B inserts and updates by branch-A users, and permission-preserving branch-A writes.
+- **Isolated CI run 42584908870 PASSED.** Subsequently, with the owner's explicit staged-deployment instruction, applied only this targeted change to the Premier production Supabase project through tracked migration **20261109081844_premier_stock_counts_write_permission_gate_20261109**.
+- Read-only post-deploy inspection confirms both restrictive policies exist in live pg_policies with branch/permission USING and WITH CHECK clauses; no cash sales, inventory, or stock counts were mutated in the deployment. Recorded the exact already-applied SQL body in `supabase/migrations/20261109081844_premier_stock_counts_write_permission_gate_20261109.sql`.
+- Do not apply the same candidate again. Existing permissive policies remain but are now combined with restrictive ones. Platform admin access retained; ordinary stock-count creation requires `inventory.count.create` and updates require the respective count permission.
