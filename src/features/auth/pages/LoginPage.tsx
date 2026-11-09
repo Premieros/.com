@@ -1,15 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  ArrowLeft,
-  ArrowRight,
-  Loader2,
-  LockKeyhole,
-  ChevronLeft,
-  ChevronRight,
-  ShieldCheck,
-  Sparkles,
-} from 'lucide-react';
+import { ArrowLeft, ArrowRight, Loader2, LockKeyhole, ShieldCheck, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/Button';
@@ -18,363 +9,183 @@ import { Logo } from '@/components/Logo';
 import { useToast } from '@/components/Toast';
 import { DesignSurface } from '@/components/design/DesignSurface';
 import { APP_ROUTES } from '@/core/navigation/routes';
+import { AntigravityLoginHero } from '@/features/auth/components/AntigravityLoginHero';
 
 export function LoginPage() {
   const { signIn, signInWithUsername } = useAuth();
   const { t, lang, setLang } = useLanguage();
   const { show } = useToast();
-
+  const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<'pin' | 'password'>('pin');
   const [username, setUsername] = useState('');
   const [pin, setPin] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [slideIndex, setSlideIndex] = useState(0);
-  const [slideshowPaused, setSlideshowPaused] = useState(false);
-
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const isAr = lang === 'ar';
 
   useEffect(() => {
     const html = document.documentElement;
     const body = document.body;
     const root = document.getElementById('root');
-
     const previous = {
-      htmlOverflow: html.style.overflow,
-      htmlHeight: html.style.height,
-      bodyOverflow: body.style.overflow,
-      bodyHeight: body.style.height,
-      rootOverflow: root?.style.overflow ?? '',
-      rootHeight: root?.style.height ?? '',
+      htmlOverflow: html.style.overflow, htmlHeight: html.style.height,
+      bodyOverflow: body.style.overflow, bodyHeight: body.style.height,
+      rootOverflow: root?.style.overflow ?? '', rootHeight: root?.style.height ?? '',
     };
-
     html.style.overflow = 'hidden';
     html.style.height = '100%';
     body.style.overflow = 'hidden';
     body.style.height = '100%';
-
-    if (root) {
-      root.style.overflow = 'hidden';
-      root.style.height = '100%';
-    }
-
+    if (root) { root.style.overflow = 'hidden'; root.style.height = '100%'; }
     return () => {
-      html.style.overflow = previous.htmlOverflow;
-      html.style.height = previous.htmlHeight;
-      body.style.overflow = previous.bodyOverflow;
-      body.style.height = previous.bodyHeight;
-
-      if (root) {
-        root.style.overflow = previous.rootOverflow;
-        root.style.height = previous.rootHeight;
-      }
+      html.style.overflow = previous.htmlOverflow; html.style.height = previous.htmlHeight;
+      body.style.overflow = previous.bodyOverflow; body.style.height = previous.bodyHeight;
+      if (root) { root.style.overflow = previous.rootOverflow; root.style.height = previous.rootHeight; }
     };
   }, []);
 
-  // Each visual has an explicit product capability and an accessible description.
-  const slides = useMemo(() => [
-    { image: '/auth/hq/pos.webp', titleAr: 'نقطة بيع سريعة ومرنة', titleEn: 'Fast, flexible point of sale', textAr: 'طلبات ومبيعات ومدفوعات من واجهة واحدة', textEn: 'Orders, sales and payments in one workspace' },
-    { image: '/auth/hq/tables.webp', titleAr: 'إدارة الطاولات والطلبات', titleEn: 'Tables & order management', textAr: 'تابع الصالة، الطاولات، وحالة كل طلب', textEn: 'Keep track of tables, dining areas and orders' },
-    { image: '/auth/hq/kitchen.webp', titleAr: 'المطبخ والإنتاج', titleEn: 'Kitchen & production', textAr: 'نظّم تحضير الطلبات والوصفات والمكونات', textEn: 'Coordinate kitchen orders, recipes and ingredients' },
-    { image: '/auth/hq/dashboard.webp', titleAr: 'لوحات تحكم وتقارير', titleEn: 'Dashboards & reports', textAr: 'راقب الأداء والمبيعات والتكاليف في مكان واحد', textEn: 'See performance, sales and costing in one place' },
-    { image: '/auth/creative/dashboard.webp', titleAr: 'المخزون والمشتريات', titleEn: 'Inventory & purchasing', textAr: 'تابع حركة المخزون والخامات والتوريد', textEn: 'Track stock, raw materials and purchases' },
-    { image: '/auth/exact/login-art-4.webp', titleAr: 'المحاسبة والفروع', titleEn: 'Accounting & branches', textAr: 'إدارة مالية وصلاحيات وفروع متعددة', textEn: 'Financial workflows, permissions and multiple branches' },
-  ], []);
-
-  const activeSlide = slides[slideIndex];
-
   useEffect(() => {
-    if (slideshowPaused || (typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
-    const timer = window.setInterval(() => {
-      setSlideIndex((value) => (value + 1) % slides.length);
-    }, 6500);
-
-    return () => window.clearInterval(timer);
-  }, [slides.length, slideshowPaused]);
-
-  useEffect(() => {
-    const nextSlide = slides[(slideIndex + 1) % slides.length];
-    const preload = new Image();
-    preload.src = nextSlide.image;
-  }, [slideIndex, slides]);
-
+    if (!open) return;
+    const focusBefore = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const dialog = dialogRef.current;
+    dialog?.querySelector<HTMLInputElement>('input')?.focus();
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !loading) { event.preventDefault(); setOpen(false); }
+      if (event.key !== 'Tab' || !dialog) return;
+      const focusable = Array.from(dialog.querySelectorAll<HTMLElement>('button:not(:disabled),a[href],input:not(:disabled)'));
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last.focus(); }
+      else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first.focus(); }
+    };
+    document.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.removeEventListener('keydown', onKeyDown);
+      if (focusBefore?.isConnected) focusBefore.focus();
+      else triggerRef.current?.focus();
+    };
+  }, [open, loading]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (mode === 'pin' && !/^\d{4}$/.test(pin)) {
-      show(t('pinInvalid'), 'error');
-      return;
-    }
-
+    if (mode === 'pin' && !/^\d{4}$/.test(pin)) { show(t('pinInvalid'), 'error'); return; }
     setLoading(true);
     try {
-      const result =
-        mode === 'pin'
-          ? await signInWithUsername(username, pin)
-          : await signIn(email, password);
-
+      const result = mode === 'pin' ? await signInWithUsername(username, pin) : await signIn(email, password);
       if (result.error) {
         const code = result.error.code;
         let msg: string;
-
         if (code === 'invalid_credentials') msg = t('invalidCredentials');
         else if (code === 'email_not_confirmed') msg = t('emailNotConfirmed');
-        else if (code === 'user_not_found') {
-          msg = mode === 'pin' ? t('usernameNotFound') : t('userNotFound');
-        } else if (code === 'user_inactive') msg = t('userInactive');
+        else if (code === 'user_not_found') msg = mode === 'pin' ? t('usernameNotFound') : t('userNotFound');
+        else if (code === 'user_inactive') msg = t('userInactive');
         else if (code === 'user_locked') msg = t('userLocked');
         else if (code === 'over_request_rate_limit') msg = t('rateLimited');
         else if (code === 'email_address_invalid') msg = t('invalidCredentials');
-        else msg = `${t('loginFailed')} ${result.error.message}`;
-
+        else msg = t('loginFailed') + ' ' + result.error.message;
         show(msg, 'error');
       }
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
+  const inputClass = '!border-white/20 !bg-white/10 !text-white !rounded-2xl !min-h-12 placeholder:!text-slate-400';
 
   return (
     <DesignSurface testId="login-surface" className="h-[100dvh] overflow-hidden !space-y-0">
-      <style>{`
-        @keyframes login-scene-zoom-out {
-          0% {
-            transform: scale(1.025);
-            opacity: 0;
-          }
-          10% {
-            opacity: 1;
-          }
-          92% {
-            opacity: 1;
-          }
-          100% {
-            transform: scale(1);
-            opacity: 0;
-          }
-        }
+      <div className="relative h-[100dvh] overflow-hidden bg-[#090517] text-white" dir={isAr ? 'rtl' : 'ltr'}>
+        <AntigravityLoginHero isAr={isAr} />
 
-        @media (max-height: 760px) and (min-width: 1024px) {
-          .login-panel-shell {
-            transform: scale(0.9);
-            transform-origin: center;
-            width: 111.111%;
-          }
-        }
-
-        @media (max-height: 680px) and (min-width: 1024px) {
-          .login-panel-shell {
-            transform: scale(0.82);
-            width: 121.951%;
-          }
-        }
-
-        @media (prefers-reduced-motion: reduce) {
-          [style*='login-scene-zoom-out'] {
-            animation: none !important;
-            transform: scale(1) !important;
-            opacity: 1 !important;
-          }
-        }
-      `}</style>
-      <div className="h-[100dvh] overflow-hidden bg-white text-slate-950 lg:grid lg:grid-cols-[60%_40%] xl:grid-cols-[62%_38%]" dir="ltr">
-        <section className="group relative hidden h-full min-h-0 overflow-hidden bg-[#07172e] lg:block" onMouseEnter={() => setSlideshowPaused(true)} onMouseLeave={() => setSlideshowPaused(false)} onFocusCapture={() => setSlideshowPaused(true)} onBlurCapture={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSlideshowPaused(false); }}>
-          <img
-            key={activeSlide.image}
-            src={activeSlide.image}
-            alt={isAr ? activeSlide.titleAr : activeSlide.titleEn}
-            loading="eager"
-            decoding="async"
-            fetchPriority="high"
-            draggable={false}
-            className="absolute inset-0 h-full w-full object-cover object-center will-change-transform"
-            style={{ animation: 'login-scene-zoom-out 6500ms ease-out both' }}
-          />
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#06152b]/65 via-transparent to-[#06152b]/95" />
-          <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between px-9 pt-9 text-white xl:px-14" dir={isAr ? "rtl" : "ltr"}>
-            <div className="flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black tracking-wider backdrop-blur-xl"><Sparkles className="h-4 w-4 text-sky-300" /> PREMIER OS</div>
-            <span className="rounded-full border border-white/20 bg-slate-950/25 px-3 py-2 text-xs font-semibold backdrop-blur-xl">{isAr ? "منصة متكاملة لإدارة أعمالك" : "Your connected business workspace"}</span>
-          </div>
-          <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 px-9 pb-9 pt-28 text-white xl:px-14" dir={isAr ? 'rtl' : 'ltr'}>
-            <div className="max-w-2xl">
-              <p className="mb-3 text-xs font-black tracking-widest text-sky-300">{String(slideIndex + 1).padStart(2, "0")} / {String(slides.length).padStart(2, "0")} · {isAr ? "اكتشف الإمكانيات" : "EXPLORE THE PLATFORM"}</p>
-              <h2 className="max-w-xl text-3xl font-black leading-tight drop-shadow-lg xl:text-5xl">{isAr ? activeSlide.titleAr : activeSlide.titleEn}</h2>
-              <p className="mt-3 max-w-xl text-base font-medium leading-relaxed text-slate-100 xl:text-lg">{isAr ? activeSlide.textAr : activeSlide.textEn}</p>
-            </div>
-            <div className="pointer-events-auto mt-7 flex items-center justify-between gap-3"><div className="flex items-center gap-2" role="tablist" aria-label={isAr ? 'إمكانيات النظام' : 'System capabilities'}>
-              {slides.map((slide, index) => (
-                <button key={slide.image} type="button" role="tab" aria-selected={slideIndex === index}
-                  aria-label={isAr ? slide.titleAr : slide.titleEn}
-                  onClick={() => setSlideIndex(index)}
-                  className={`h-2.5 rounded-full transition-all focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${slideIndex === index ? 'w-9 bg-sky-400' : 'w-2.5 bg-white/60 hover:bg-white'}`}
-                />
-              ))}
-              </div><div className="flex gap-2" dir="ltr">
-                <button type="button" aria-label={isAr ? "الشريحة السابقة" : "Previous slide"} onClick={() => setSlideIndex((i) => (i - 1 + slides.length) % slides.length)} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/10 backdrop-blur-md transition hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"><ChevronLeft className="h-5 w-5" /></button>
-                <button type="button" aria-label={isAr ? "الشريحة التالية" : "Next slide"} onClick={() => setSlideIndex((i) => (i + 1) % slides.length)} className="flex h-10 w-10 items-center justify-center rounded-full border border-white/30 bg-white/10 backdrop-blur-md transition hover:bg-white/25 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white"><ChevronRight className="h-5 w-5" /></button>
-              </div></div>
-          </div>
-        </section>
-
-        <section
-          className="relative flex h-full min-h-0 items-center justify-center overflow-y-auto bg-gradient-to-b from-white via-white to-slate-50 px-6 py-4 sm:px-10 lg:border-s lg:border-slate-100 lg:px-9 xl:px-12"
-          dir={isAr ? 'rtl' : 'ltr'}
-        >
-          <div className="login-panel-shell relative z-10 w-full max-w-[430px]">
-            <div className="mb-6 flex items-center justify-between gap-4">
-              <Logo variant="horizontal" size={62} tone="navy" showTagline={false} />
-
-              <button
-                data-testid="login-language-toggle"
-                type="button"
-                onClick={() => setLang(isAr ? 'en' : 'ar')}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2.5 text-xs font-black text-slate-600 shadow-sm transition hover:border-blue-300 hover:text-blue-700"
-              >
-                {isAr ? 'English' : 'العربية'}
-              </button>
-            </div>
-
-            <div className="mb-5">
-              <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-blue-50 px-3 py-1.5 text-[11px] font-black text-blue-700"><ShieldCheck className="h-3.5 w-3.5" />{isAr ? "بوابة دخول Premier الآمنة" : "Premier secure sign-in"}</div>
-              <h1 className="text-4xl font-black tracking-tight text-slate-950">
-                {isAr ? 'مرحبًا بعودتك' : 'Welcome back'}
-              </h1>
-              <p className="mt-2 text-base font-semibold leading-6 text-slate-500">
-                {isAr ? 'سجّل دخولك إلى نظام Premier' : 'Sign in to Premier'}
-              </p>
-            </div>
-
-            <div
-              data-testid="login-mode-toggle"
-              className="mb-4 grid grid-cols-2 rounded-2xl bg-slate-100 p-1"
-            >
-              <button
-                type="button"
-                onClick={() => setMode('pin')}
-                className={`rounded-xl py-3 text-sm font-black transition ${
-                  mode === 'pin' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'
-                }`}
-              >
-                {t('loginWithPin')}
-              </button>
-              <button
-                type="button"
-                onClick={() => setMode('password')}
-                className={`rounded-xl py-3 text-sm font-black transition ${
-                  mode === 'password' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-500'
-                }`}
-              >
-                {t('loginWithEmail')}
-              </button>
-            </div>
-
-            <form data-testid="login-form" onSubmit={handleSubmit} className="space-y-4">
-              {mode === 'pin' ? (
-                <>
-                  <Input
-                    id="login-username"
-                    label={t('username')}
-                    value={username}
-                    onChange={(e) => setUsername(e.target.value)}
-                    required
-                    autoComplete="username"
-                  />
-                  <Input
-                    id="login-pin"
-                    label={t('pin')}
-                    type="password"
-                    value={pin}
-                    onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                    required
-                    inputMode="numeric"
-                    maxLength={4}
-                    placeholder="••••"
-                  />
-                </>
-              ) : (
-                <>
-                  <Input
-                    id="login-email"
-                    label={t('email')}
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
-                    autoComplete="email"
-                  />
-                  <Input
-                    id="login-password"
-                    label={t('password')}
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    required
-                    minLength={6}
-                    autoComplete="current-password"
-                  />
-                </>
-              )}
-
-              <Button
-                data-testid="login-submit"
-                type="submit"
-                size="lg"
-                className="mt-2 min-h-14 w-full rounded-2xl text-base font-black shadow-lg shadow-blue-600/20"
-                disabled={loading}
-              >
-                {loading ? (
-                  <Loader2 className="h-5 w-5 animate-spin" />
-                ) : (
-                  <span className="inline-flex items-center gap-2">
-                    {t('signIn')}
-                    {isAr ? (
-                      <ArrowLeft className="h-5 w-5" />
-                    ) : (
-                      <ArrowRight className="h-5 w-5" />
-                    )}
-                  </span>
-                )}
-              </Button>
-            </form>
-
-            <div className="my-3 flex items-center gap-4">
-              <div className="h-px flex-1 bg-slate-200" />
-              <span className="text-xs font-black text-slate-400">{isAr ? 'أو' : 'OR'}</span>
-              <div className="h-px flex-1 bg-slate-200" />
-            </div>
-
-            <button
-              type="button"
-              onClick={() => setMode(mode === 'pin' ? 'password' : 'pin')}
-              className="flex min-h-14 w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 text-sm font-black text-slate-700 transition hover:border-blue-300 hover:bg-blue-50/40"
-            >
-              <LockKeyhole className="h-5 w-5 text-blue-600" />
-              {mode === 'pin'
-                ? isAr
-                  ? 'الدخول بالبريد الإلكتروني'
-                  : 'Sign in with email'
-                : isAr
-                  ? 'الدخول برمز الموظف'
-                  : 'Sign in with staff PIN'}
+        <header className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 border-b border-white/10 bg-[#0d071b]/60 px-4 py-3 backdrop-blur-xl sm:px-9 sm:py-5">
+          <Logo variant="horizontal" size={48} tone="white" showTagline={false} />
+          <div className="flex items-center gap-2">
+            <button data-testid="login-language-toggle" type="button" onClick={() => setLang(isAr ? 'en' : 'ar')}
+              className="rounded-full border border-white/20 bg-white/5 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/15">
+              {isAr ? 'English' : 'العربية'}
             </button>
+            <button data-testid="login-open-modal" type="button" ref={triggerRef} onClick={() => setOpen(true)}
+              className="rounded-full bg-[#8054F6] px-5 py-2.5 text-xs font-extrabold text-white shadow-lg shadow-violet-800/40 transition hover:bg-[#946fff]">
+              {t('signIn')}
+            </button>
+          </div>
+        </header>
 
-            <div className="mt-5 border-t border-slate-100 pt-3">
-              <Link
-                data-testid="login-register-link"
-                to={APP_ROUTES.register}
-                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border-2 border-blue-200 bg-blue-50 px-4 text-sm font-black text-blue-800 transition hover:border-blue-400 hover:bg-blue-100 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500"
-              >
+        {open && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#05020d]/75 px-4 py-4 backdrop-blur-lg" onMouseDown={(event) => {
+            if (event.target === event.currentTarget && !loading) setOpen(false);
+          }}>
+            <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="premier-login-title"
+              data-testid="login-modal"
+              className="relative my-auto w-full max-w-[455px] rounded-[30px] border border-white/15 bg-[#140d28]/95 p-5 text-white shadow-[0_30px_100px_rgba(0,0,0,.65)] sm:p-7">
+              <div className="mb-5 flex items-start justify-between gap-3">
+                <Logo variant="horizontal" size={48} tone="white" showTagline={false} />
+                <button type="button" aria-label={isAr ? 'إغلاق نافذة الدخول' : 'Close sign in dialog'}
+                  onClick={() => !loading && setOpen(false)} disabled={loading}
+                  className="rounded-full border border-white/15 bg-white/10 p-2 text-white hover:bg-white/20 disabled:opacity-50">
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+              <div className="mb-4">
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-violet-500/15 px-3 py-1.5 text-[11px] font-bold text-violet-200">
+                  <ShieldCheck className="h-4 w-4" />{isAr ? 'بوابة دخول Premier الآمنة' : 'Premier secure sign-in'}
+                </div>
+                <h2 id="premier-login-title" className="text-3xl font-black">{isAr ? 'مرحبًا بعودتك' : 'Welcome back'}</h2>
+                <p className="mt-1 text-sm text-slate-300">{isAr ? 'سجّل دخولك إلى نظام Premier' : 'Sign in to Premier'}</p>
+              </div>
+              <div data-testid="login-mode-toggle" className="mb-4 grid grid-cols-2 gap-1 rounded-2xl bg-white/10 p-1">
+                <button type="button" onClick={() => setMode('pin')}
+                  className={'rounded-xl px-2 py-3 text-sm font-bold transition ' + (mode === 'pin' ? 'bg-white text-[#221339]' : 'text-slate-200 hover:bg-white/10')}>
+                  {t('loginWithPin')}
+                </button>
+                <button type="button" onClick={() => setMode('password')}
+                  className={'rounded-xl px-2 py-3 text-sm font-bold transition ' + (mode === 'password' ? 'bg-white text-[#221339]' : 'text-slate-200 hover:bg-white/10')}>
+                  {t('loginWithEmail')}
+                </button>
+              </div>
+              <form data-testid="login-form" onSubmit={handleSubmit} className="space-y-3">
+                {mode === 'pin' ? (
+                  <>
+                    <div className="[&_label]:!text-slate-200"><Input id="login-username" className={inputClass} label={t('username')}
+                      value={username} onChange={(e) => setUsername(e.target.value)} required autoComplete="username" /></div>
+                    <div className="[&_label]:!text-slate-200"><Input id="login-pin" className={inputClass} label={t('pin')} type="password"
+                      value={pin} onChange={(e) => setPin(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                      required inputMode="numeric" maxLength={4} placeholder="••••" /></div>
+                  </>
+                ) : (
+                  <>
+                    <div className="[&_label]:!text-slate-200"><Input id="login-email" className={inputClass} label={t('email')}
+                      type="email" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" /></div>
+                    <div className="[&_label]:!text-slate-200"><Input id="login-password" className={inputClass} label={t('password')}
+                      type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                      required minLength={6} autoComplete="current-password" /></div>
+                  </>
+                )}
+                <Button data-testid="login-submit" type="submit" size="lg"
+                  className="!mt-4 !min-h-14 w-full !rounded-2xl !bg-[#8054F6] !text-base !font-bold !text-white shadow-lg shadow-violet-900/30"
+                  disabled={loading}>
+                  {loading ? <Loader2 className="h-5 w-5 animate-spin" /> :
+                    <span className="inline-flex items-center gap-2">{t('signIn')}
+                      {isAr ? <ArrowLeft className="h-5 w-5" /> : <ArrowRight className="h-5 w-5" />}
+                    </span>}
+                </Button>
+              </form>
+              <button type="button" onClick={() => setMode(mode === 'pin' ? 'password' : 'pin')}
+                className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10">
+                <LockKeyhole className="h-4 w-4 text-violet-300" />
+                {mode === 'pin' ? (isAr ? 'الدخول بالبريد الإلكتروني' : 'Sign in with email') : (isAr ? 'الدخول برمز الموظف' : 'Sign in with staff PIN')}
+              </button>
+              <Link data-testid="login-register-link" to={APP_ROUTES.register}
+                className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-violet-300/30 bg-violet-500/10 px-3 text-center text-sm font-bold text-violet-100 transition hover:bg-violet-500/20">
                 {isAr ? 'أنشئ مؤسستك الآن — 14 يومًا مجانًا' : 'Create your business — 14 days free'}
                 {isAr ? <ArrowLeft className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
               </Link>
-              <p className="mt-2 text-center text-[11px] text-slate-400">Premier © 2026</p>
+              <p className="mt-3 text-center text-[11px] text-slate-400">premier.os © 2026</p>
             </div>
-
           </div>
-        </section>
+        )}
       </div>
     </DesignSurface>
   );
