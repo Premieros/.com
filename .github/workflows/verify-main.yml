@@ -77,8 +77,10 @@ jobs:
         run: node scripts/db/verify-project-references.js
       - name: Apply auth stub (CI only, never on real Supabase)
         run: node scripts/db/apply-migration.js --file supabase/ci/stub_auth.sql
-      - name: Apply canonical migrations
-        run: node scripts/db/apply-migration.js --dir supabase/migrations
+      - name: Verify pinned CI-only historical migration replay
+        run: node --test scripts/db/ci-migration-compat.test.mjs
+      - name: Apply canonical migrations to disposable CI PostgreSQL
+        run: node scripts/db/apply-migration.js --dir supabase/migrations --ci-replay
       - name: Verify schema
         run: node scripts/db/verify-schema.js
       - name: Isolate subscription guard for order integration fixtures

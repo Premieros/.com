@@ -24,6 +24,7 @@ import { join, resolve, basename } from 'node:path';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import pg from 'pg';
+import { assertCiReplayOnly, normalizeHistoricalMigrationForCi } from './ci-migration-compat.js';
 
 const __dirname = resolve(fileURLToPath(import.meta.url), '..');
 const ROOT = resolve(__dirname, '..', '..');
@@ -55,10 +56,11 @@ function loadEnv(filePath) {
 }
 
 function parseArgs(argv) {
-  const opts = { dryRun: false, dir: null, file: null };
+  const opts = { dryRun: false, dir: null, file: null, ciReplay: false };
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (arg === '--dry-run') opts.dryRun = true;
+    else if (arg === '--ci-replay') opts.ciReplay = true;
     else if (arg === '--dir') opts.dir = argv[++i];
     else if (arg === '--file') opts.file = argv[++i];
     else if (arg === '--help' || arg === '-h') {
@@ -109,6 +111,8 @@ async function main() {
     console.error('ERROR: no database URL found. Add SUPABASE_DB_URL (or DATABASE_URL) to .env.');
     process.exit(1);
   }
+  // CI replay is explicitly opt-in and forbidden for any non-local database.
+  if (opts.ciReplay) assertCiReplayOnly({ env: process.env, databaseUrl: dbUrl });
 
   let targets = [];
   if (opts.file) {
@@ -174,7 +178,10 @@ async function main() {
         continue;
       }
 
-      const runSql = opts.dryRun ? neutralizeTxnControl(sql) : sql;
+      // Keep the original SHA-256 history checksum; only the in-memory SQL
+      // sent to a disposable CI PostgreSQL instance gets the one pinned fix.
+      const replaySql = opts.ciReplay ? normalizeHistoricalMigrationForCi(target, sql) : sql;
+      const runSql = opts.dryRun ? neutralizeTxnControl(replaySql) : replaySql;
       const label = opts.dryRun ? 'DRY-RUN' : 'APPLY';
 
       if (opts.dryRun) {
