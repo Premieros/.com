@@ -10,6 +10,7 @@ CREATE TABLE public.inventory(id uuid PRIMARY KEY,branch_id uuid NOT NULL,wareho
 CREATE TABLE public.purchases(id uuid PRIMARY KEY,branch_id uuid,warehouse_id uuid,created_at timestamptz NOT NULL);
 CREATE TABLE public.purchase_items(id uuid PRIMARY KEY,purchase_id uuid NOT NULL);
 CREATE TABLE public.stock_counts(id uuid PRIMARY KEY,branch_id uuid NOT NULL,warehouse_id uuid NOT NULL);
+CREATE TABLE public.stock_count_items(id uuid PRIMARY KEY,stock_count_id uuid NOT NULL REFERENCES public.stock_counts(id));
 CREATE TABLE public.recipes(id uuid PRIMARY KEY,branch_id uuid NOT NULL,product_id uuid NOT NULL);
 CREATE TABLE public.sale_payments(id uuid PRIMARY KEY,sale_id uuid NOT NULL,branch_id uuid NOT NULL);
 CREATE TABLE public.order_items(id uuid PRIMARY KEY,order_id uuid NOT NULL);
@@ -51,6 +52,7 @@ ALTER TABLE public.expenses ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.purchases ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.purchase_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.stock_counts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.stock_count_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sale_items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.sales ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.product_unit_links ENABLE ROW LEVEL SECURITY;
@@ -63,13 +65,17 @@ CREATE POLICY legacy_purchase_items_select ON public.purchase_items FOR SELECT T
 CREATE POLICY legacy_stock_counts_select ON public.stock_counts FOR SELECT TO authenticated USING (true);
 CREATE POLICY auth_stock_counts_insert ON public.stock_counts FOR INSERT TO authenticated WITH CHECK (true);
 CREATE POLICY auth_stock_counts_update ON public.stock_counts FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
+CREATE POLICY auth_stock_count_items_select ON public.stock_count_items FOR SELECT TO authenticated USING (true);
+CREATE POLICY auth_stock_count_items_insert ON public.stock_count_items FOR INSERT TO authenticated WITH CHECK (true);
+CREATE POLICY auth_stock_count_items_update ON public.stock_count_items FOR UPDATE TO authenticated USING (true) WITH CHECK (true);
 CREATE POLICY legacy_sale_items_select ON public.sale_items FOR SELECT TO authenticated USING (true);
 CREATE POLICY legacy_sales_select ON public.sales FOR SELECT TO authenticated USING (true);
 CREATE POLICY legacy_pul_select ON public.product_unit_links FOR SELECT TO authenticated USING (true);
 
 GRANT USAGE ON SCHEMA private TO authenticated;
 GRANT SELECT ON ALL TABLES IN SCHEMA public TO authenticated;
-GRANT INSERT,UPDATE ON public.stock_counts TO authenticated;
+GRANT INSERT,UPDATE,DELETE ON public.stock_counts TO authenticated;
+GRANT SELECT,INSERT,UPDATE,DELETE ON public.stock_count_items TO authenticated;
 
 INSERT INTO public.branches VALUES
  ('00000000-0000-0000-0000-000000000001'),
@@ -117,3 +123,7 @@ INSERT INTO public.purchase_items VALUES
 INSERT INTO public.stock_counts VALUES
  ('00000000-0000-0000-0000-000000000141','00000000-0000-0000-0000-000000000001','00000000-0000-0000-0000-000000000011'),
  ('00000000-0000-0000-0000-000000000142','00000000-0000-0000-0000-000000000002','00000000-0000-0000-0000-000000000012');
+INSERT INTO public.stock_count_items VALUES
+ ('00000000-0000-0000-0000-000000000161','00000000-0000-0000-0000-000000000141'),
+ ('00000000-0000-0000-0000-000000000162','00000000-0000-0000-0000-000000000142');
+
