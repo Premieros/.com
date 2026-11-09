@@ -150,12 +150,17 @@ async function queueOfflineSale(p: ProcessSalePayload): Promise<string> {
   };
   await enqueueOfflineSale(queuedSale);
 
-  // Record local stock movements in the authoritative local ledger
+  // The outbox transaction is already durable at this point.
+  // Stock projection is separately best-effort: stockProjection.ts subtracts
+  // unrecorded outbox lines, including partially written multi-item sales.
+  // Never report a failed capture or enqueue a second sale solely because
+  // its derived IndexedDB movement failed.
   if (Array.isArray(p.p_items)) {
-    for (const item of p.p_items) {
-      if (item.product_id) {
+    for (const [index, item] of p.p_items.entries()) {
+      if (!item.product_id) continue;
+      try {
         await InventoryRepository.recordLocalMovement({
-          id: `mov_${createOfflineToken()}`,
+          id: `queued-sale:${id}:${index}`,
           productId: item.product_id,
           branchId: p.p_branch_id,
           warehouseId: p.p_warehouse_id,
@@ -164,6 +169,10 @@ async function queueOfflineSale(p: ProcessSalePayload): Promise<string> {
           referenceId: id,
           createdAt: new Date().toISOString(),
         });
+      } catch {
+        // The pending sale remains the source of truth; report only a cache
+        // projection warning and let stockProjection reconcile missing lines.
+        console.warn('POS_OFFLINE_SALE_MOVEMENT_PROJECTION_FAILED');
       }
     }
   }
