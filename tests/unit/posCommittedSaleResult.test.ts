@@ -27,7 +27,7 @@ vi.mock('@/core/repositories', () => ({
     recordLocalMovement: mocks.recordLocalMovement,
   },
 }));
-vi.mock('@/core/offline/offlineStorage', () => ({ enqueueOfflineSaleIdempotent: mocks.enqueueOfflineSaleIdempotentIdempotent }));
+vi.mock('@/core/offline/offlineStorage', () => ({ enqueueOfflineSaleIdempotent: mocks.enqueueOfflineSaleIdempotent }));
 vi.mock('@/core/offline/warehouseBinding', () => ({ saveVerifiedSaleWarehouse: vi.fn() }));
 
 import {
@@ -70,7 +70,7 @@ describe('POS confirmed and queued sales survive local projection errors', () =>
     mocks.getBranchSettings.mockResolvedValue({ allow_negative_stock: true });
     mocks.getGlobalSettings.mockResolvedValue({ allow_negative_stock: true });
     mocks.recordLocalMovement.mockRejectedValue(new Error('IndexedDB unavailable'));
-    mocks.enqueueOfflineSaleIdempotentIdempotent.mockImplementation(async (sale: { id: string }) => ({ id: sale.id, inserted: true }));
+    mocks.enqueueOfflineSaleIdempotent.mockImplementation(async (sale: { id: string }) => ({ id: sale.id, inserted: true }));
     mocks.getSession.mockResolvedValue({ data: { session: { user: { id: 'cashier-1' } } }, error: null });
   });
 
