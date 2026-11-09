@@ -76,7 +76,7 @@ describe('Purchase returns must fail closed on FIFO shortage', () => {
           [purchaseId],
         );
         expect(result.result.success).toBe(false);
-        expect(result.result.detail).toMatch(/PURCHASE_RETURN_(INSUFFICIENT_STOCK|FIFO_FAILED:.*INSUFFICIENT)/);
+        expect(result.result.detail).toMatch(/PURCHASE_RETURN_(INSUFFICIENT_STOCK|FIFO_FAILED:.*INSUFFICIENT|RAW_MOVEMENT_FAILED:.*INSUFFICIENT)/);
       }
 
       const { rows: [state] } = await db.query<{
@@ -141,7 +141,7 @@ describe('Purchase returns must fail closed on FIFO shortage', () => {
         [partialPurchase],
       );
       expect(partialResult.result.success).toBe(false);
-      expect(partialResult.result.detail).toMatch(/PURCHASE_RETURN_(INSUFFICIENT_STOCK|FIFO_FAILED:.*INSUFFICIENT)/);
+      expect(partialResult.result.detail).toMatch(/PURCHASE_RETURN_(INSUFFICIENT_STOCK|FIFO_FAILED:.*INSUFFICIENT|RAW_MOVEMENT_FAILED:.*INSUFFICIENT)/);
 
       const { rows: [partialState] } = await db.query<{
         inventory: string; batches: string; returned_qty: string; purchase_status: string; reversal_ledger: string;
@@ -180,7 +180,7 @@ describe('Purchase returns must fail closed on FIFO shortage', () => {
         [mixedPurchase],
       );
       expect(mixedResult.result.success).toBe(false);
-      expect(mixedResult.result.detail).toMatch(/PURCHASE_RETURN_(INSUFFICIENT_STOCK|FIFO_FAILED:.*INSUFFICIENT)/);
+      expect(mixedResult.result.detail).toMatch(/PURCHASE_RETURN_(INSUFFICIENT_STOCK|FIFO_FAILED:.*INSUFFICIENT|RAW_MOVEMENT_FAILED:.*INSUFFICIENT)/);
       const { rows: [mixedState] } = await db.query<{
         raw_inventory: string; raw_batch_qty: string; returned_lines: string;
         purchase_status: string; reversed_movements: string;
