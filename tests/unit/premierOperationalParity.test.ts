@@ -5,6 +5,8 @@ import { describe, expect, it } from 'vitest';
 // isolated local PostgreSQL/Supabase fixture before this migration is deployed.
 const migration = readFileSync('supabase/migrations/20261109140000_premier_stock_count_atomic_failures.sql', 'utf8');
 const kds = readFileSync('src/features/inventory/pages/KitchenDisplayPage.tsx', 'utf8');
+const kdsAccess = readFileSync('supabase/migrations/20261109143000_premier_kds_read_only_permissions.sql', 'utf8');
+const catalog = readFileSync('src/api/domains/catalog.ts', 'utf8');
 
 describe('Premier operational parity safety guards', () => {
   it('preserves the Premier stock count movement/accounting writers', () => {
@@ -27,10 +29,13 @@ describe('Premier operational parity safety guards', () => {
 
   it('refreshes kitchen cards without changing orders or completing aged work', () => {
     expect(kds).not.toContain('catalog.completeStaleKitchenOrders(');
+    expect(catalog).not.toContain('completeStaleKitchenOrders(');
     expect(kds).toContain("supabase.rpc('get_kitchen_queue'");
     expect(kds).toContain('item.elapsed_seconds >= 2400');
     expect(kds).toContain('pendingStatusWrites.has(item.order_id)');
     expect(kds).toContain('statusWritesRef.current.has(orderId)');
     expect(kds).toContain("can('pos.kds_update')");
+    expect(kdsAccess).toContain('REVOKE EXECUTE ON FUNCTION public.complete_stale_kitchen_orders(uuid) FROM authenticated');
+    expect(kdsAccess).toContain('GRANT EXECUTE ON FUNCTION public.complete_stale_kitchen_orders(uuid) TO service_role');
   });
 });
