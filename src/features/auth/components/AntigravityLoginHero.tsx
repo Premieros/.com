@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react';
-import { Logo } from '@/components/Logo';
 import './premier-login-motion.css';
 
 type Props = { isAr: boolean };
@@ -72,7 +71,7 @@ export function AntigravityLoginHero({ isAr }: Props) {
                 ['--pixel-y' as string]: pixel.dy + 'px',
               }} />
             ))}
-            <span className="premier-pixel-wordmark"><Logo variant="horizontal" tone="white" size={0} showTagline={false} /></span>
+            <span className="premier-pixel-wordmark">premier<span style={{ color: '#8054F6' }}>.</span>os</span>
           </div>
           <div className="premier-showcase-panels">
             {showcase.map((screen, index) => (
