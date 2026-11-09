@@ -4,6 +4,7 @@ import { SettingsRepository, InventoryRepository } from '@/core/repositories';
 import { saveVerifiedSaleWarehouse } from '@/core/offline/warehouseBinding';
 import type { RpcResult, OrderType } from '@/lib/types';
 import type { ItemPayload } from '../utils/cart';
+import { cacheConfirmedSaleMovements } from './saleConfirmationCache';
 
 export interface ProcessSalePayload {
   p_client_operation_key?: string;
@@ -364,22 +365,17 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
         return { result, error: error?.message || result?.detail || result?.error || 'Manual payment sale failed' };
       }
 
-      if (Array.isArray(p.p_items)) {
-        for (const item of p.p_items) {
-          if (item.product_id) {
-            await InventoryRepository.recordLocalMovement({
-              id: `mov_${createOfflineToken()}`,
-              productId: item.product_id,
-              branchId: p.p_branch_id,
-              quantityDelta: -Number(item.quantity || 0),
-              reason: 'sale',
-              referenceId: p.p_invoice_number,
-              createdAt: new Date().toISOString(),
-              synced: true,
-            });
-          }
-        }
-      }
+      // The server transaction is already committed. IndexedDB is a
+      // best-effort synced projection, never part of payment confirmation.
+      await cacheConfirmedSaleMovements({
+        items: p.p_items || [],
+        branchId: p.p_branch_id,
+        warehouseId: p.p_warehouse_id,
+        saleId: (result as { sale_id?: string }).sale_id,
+        invoiceNumber: p.p_invoice_number,
+        record: (movement) => InventoryRepository.recordLocalMovement(movement),
+        onFailure: (count) => console.warn('POS_CONFIRMED_SALE_CACHE_WRITE_FAILED', { count }),
+      });
 
       return {
         result: {
@@ -417,22 +413,17 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   try {
     const { data, error } = await posApi.processSaleIdempotent(settlementPayload);
     if (!error && (data as { success?: boolean })?.success) {
-      if (Array.isArray(p.p_items)) {
-        for (const item of p.p_items) {
-          if (item.product_id) {
-            await InventoryRepository.recordLocalMovement({
-              id: `mov_${createOfflineToken()}`,
-              productId: item.product_id,
-              branchId: p.p_branch_id,
-              quantityDelta: -Number(item.quantity || 0),
-              reason: 'sale',
-              referenceId: p.p_invoice_number,
-              createdAt: new Date().toISOString(),
-              synced: true,
-            });
-          }
-        }
-      }
+      // The server transaction is already committed. IndexedDB is a
+      // best-effort synced projection, never part of payment confirmation.
+      await cacheConfirmedSaleMovements({
+        items: p.p_items || [],
+        branchId: p.p_branch_id,
+        warehouseId: p.p_warehouse_id,
+        saleId: (result as { sale_id?: string }).sale_id,
+        invoiceNumber: p.p_invoice_number,
+        record: (movement) => InventoryRepository.recordLocalMovement(movement),
+        onFailure: (count) => console.warn('POS_CONFIRMED_SALE_CACHE_WRITE_FAILED', { count }),
+      });
 
       return {
         result: {
