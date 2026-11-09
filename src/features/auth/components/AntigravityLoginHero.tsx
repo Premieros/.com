@@ -45,48 +45,50 @@ export function AntigravityLoginHero({ isAr }: Props) {
     <section className="premier-motion-scene absolute inset-0 overflow-hidden" aria-label={isAr ? 'مقدمة منصة Premier' : 'Premier platform introduction'}>
       <div className="premier-motion-grid" aria-hidden="true" />
       <div className="premier-motion-halo" aria-hidden="true" />
-      {!reduceMotion && (
-        <video
-          className={'premier-motion-video ' + (videoReady ? 'premier-motion-video-ready' : '')}
-          src="/auth/premier-login-motion.mp4"
-          autoPlay
-          muted
-          loop
-          playsInline
-          preload="metadata"
-          aria-hidden="true"
-          onCanPlay={() => setVideoReady(true)}
-          onError={() => setVideoReady(false)}
-        />
-      )}
-      {!videoReady && (
-        <div className="premier-motion-fallback" aria-hidden="true">
-          <div className="premier-pixel-logo">
-            {pixels.map((pixel) => (
-              <i key={pixel.x + '-' + pixel.y} className={'premier-pixel ' + (pixel.dot ? 'premier-pixel-dot' : '')} style={{
-                left: pixel.x * 4 + '%',
-                top: pixel.y * 4 + '%',
-                animationDelay: reduceMotion ? '0ms' : pixel.delay + 'ms',
-                ['--pixel-x' as string]: pixel.dx + 'px',
-                ['--pixel-y' as string]: pixel.dy + 'px',
-              }} />
-            ))}
-            <span className="premier-pixel-wordmark">premier<span style={{ color: '#8054F6' }}>.</span>os</span>
-          </div>
-          <div className="premier-showcase-panels">
-            {showcase.map((screen, index) => (
-              <div key={screen.src} className={'premier-showcase-card ' + (active === index ? 'is-active' : '')}>
-                <img src={screen.src} alt="" decoding="async" loading={index === 0 ? 'eager' : 'lazy'} />
-                <span>{isAr ? screen.ar : screen.en}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
       <div className="premier-motion-copy" dir={isAr ? 'rtl' : 'ltr'}>
         <p>PREMIER OS</p>
         <h1>{isAr ? 'كل أعمالك. في عالم واحد.' : 'Your entire business. One universe.'}</h1>
         <span>{isAr ? 'المبيعات والتقارير والإدارة، بتجربة واحدة متكاملة' : 'Sales, analytics and operations, seamlessly connected'}</span>
+      </div>
+      <div className="premier-motion-video-frame" data-testid="login-video-frame">
+        {!reduceMotion && (
+          <video
+            className={'premier-motion-video ' + (videoReady ? 'premier-motion-video-ready' : '')}
+            src="/auth/premier-login-motion.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            preload="metadata"
+            aria-hidden="true"
+            onCanPlay={() => setVideoReady(true)}
+            onError={() => setVideoReady(false)}
+          />
+        )}
+        {!videoReady && (
+          <div className="premier-motion-fallback" aria-hidden="true">
+            <div className="premier-pixel-logo">
+              {pixels.map((pixel) => (
+                <i key={pixel.x + '-' + pixel.y} className={'premier-pixel ' + (pixel.dot ? 'premier-pixel-dot' : '')} style={{
+                  left: pixel.x * 4 + '%',
+                  top: pixel.y * 4 + '%',
+                  animationDelay: reduceMotion ? '0ms' : pixel.delay + 'ms',
+                  ['--pixel-x' as string]: pixel.dx + 'px',
+                  ['--pixel-y' as string]: pixel.dy + 'px',
+                }} />
+              ))}
+              <span className="premier-pixel-wordmark">premier<span style={{ color: '#8054F6' }}>.</span>os</span>
+            </div>
+            <div className="premier-showcase-panels">
+              {showcase.map((screen, index) => (
+                <div key={screen.src} className={'premier-showcase-card ' + (active === index ? 'is-active' : '')}>
+                  <img src={screen.src} alt="" decoding="async" loading={index === 0 ? 'eager' : 'lazy'} />
+                  <span>{isAr ? screen.ar : screen.en}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
     </section>
   );
