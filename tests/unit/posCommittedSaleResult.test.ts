@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProcessSalePayload } from '@/features/pos/services/payment';
 
 const mocks = vi.hoisted(() => ({
@@ -7,6 +7,8 @@ const mocks = vi.hoisted(() => ({
   recordLocalMovement: vi.fn(),
   getBranchSettings: vi.fn(),
   getGlobalSettings: vi.fn(),
+  enqueueOfflineSale: vi.fn(),
+  getSession: vi.fn(),
 }));
 
 vi.mock('@/api', () => ({
@@ -14,7 +16,7 @@ vi.mock('@/api', () => ({
     processSaleIdempotent: mocks.processSaleIdempotent,
     processSaleManualPayment: mocks.processSaleManualPayment,
   },
-  supabase: { auth: { getSession: vi.fn() } },
+  supabase: { auth: { getSession: mocks.getSession } },
 }));
 vi.mock('@/core/repositories', () => ({
   SettingsRepository: {
@@ -25,7 +27,7 @@ vi.mock('@/core/repositories', () => ({
     recordLocalMovement: mocks.recordLocalMovement,
   },
 }));
-vi.mock('@/core/offline/offlineStorage', () => ({ enqueueOfflineSale: vi.fn() }));
+vi.mock('@/core/offline/offlineStorage', () => ({ enqueueOfflineSale: mocks.enqueueOfflineSale }));
 vi.mock('@/core/offline/warehouseBinding', () => ({ saveVerifiedSaleWarehouse: vi.fn() }));
 
 import {
@@ -59,7 +61,8 @@ const payload = {
   p_guest_count: 1,
 } as ProcessSalePayload;
 
-describe('POS confirmed sale remains confirmed after a postcommit cache write error', () => {
+describe('POS confirmed and queued sales survive local projection errors', () => {
+  afterEach(() => vi.unstubAllGlobals());
   beforeEach(() => {
     vi.clearAllMocks();
     clearArmedSplitTender();
@@ -67,6 +70,8 @@ describe('POS confirmed sale remains confirmed after a postcommit cache write er
     mocks.getBranchSettings.mockResolvedValue({ allow_negative_stock: true });
     mocks.getGlobalSettings.mockResolvedValue({ allow_negative_stock: true });
     mocks.recordLocalMovement.mockRejectedValue(new Error('IndexedDB unavailable'));
+    mocks.enqueueOfflineSale.mockResolvedValue(undefined);
+    mocks.getSession.mockResolvedValue({ data: { session: { user: { id: 'cashier-1' } } }, error: null });
   });
 
   it('returns a real online RPC confirmation for a normal cash sale', async () => {
@@ -97,6 +102,18 @@ describe('POS confirmed sale remains confirmed after a postcommit cache write er
     expect(result?.success).toBe(true);
     expect(mocks.processSaleManualPayment).toHaveBeenCalledTimes(1);
     expect(mocks.recordLocalMovement).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps an offline sale pending after its outbox commit even when stock cache fails', async () => {
+    vi.stubGlobal('navigator', { onLine: false });
+    const { result, error } = await processSaleForOrder(payload);
+    expect(error).toBeNull();
+    expect(result?.success).toBe(true);
+    expect(result?.offline).toBe(true);
+    expect(result?.pending_sync).toBe(true);
+    expect(mocks.enqueueOfflineSale).toHaveBeenCalledTimes(1);
+    expect(mocks.recordLocalMovement).toHaveBeenCalledTimes(1);
+    expect(mocks.processSaleIdempotent).not.toHaveBeenCalled();
   });
 
   it('does not generate a local confirmation when the server rejects the sale', async () => {
