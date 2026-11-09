@@ -97,8 +97,14 @@ jobs:
         run: node scripts/db/verify-project-references.js
       - name: Apply auth stub
         run: node scripts/db/apply-migration.js --file supabase/ci/stub_auth.sql
-      - name: Apply canonical migrations
-        run: node scripts/db/apply-migration.js --dir supabase/migrations
+      - name: Verify pinned CI-only migration replay
+        run: node --test scripts/db/ci-migration-compat.test.mjs
+      - name: Apply canonical migrations on disposable PostgreSQL only
+        env:
+          CI: 'true'
+        run: node scripts/db/apply-migration.js --dir supabase/migrations --ci-replay
+      - name: Stage batch-accurate ready-product COGS on isolated CI database only
+        run: node scripts/db/apply-migration.js --file scripts/db/candidates/premier_ready_product_batch_cogs_NOT_FOR_PRODUCTION.sql
       - name: Verify schema
         run: node scripts/db/verify-schema.js
       - name: Prepare integration fixtures
