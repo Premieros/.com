@@ -34,9 +34,9 @@ CREATE FUNCTION private.sale_read_visible(p_sale_id uuid,p_branch_id uuid,p_crea
  RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
  SELECT private.financial_row_visible(p_sale_id,p_branch_id,p_created_at) $$;
 CREATE FUNCTION private.purchase_read_visible_by_id(p_purchase_id uuid)
- RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $
+ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $function$
  SELECT coalesce((SELECT private.financial_row_visible(p.id,p.branch_id,p.created_at)
-                  FROM public.purchases p WHERE p.id=p_purchase_id),false) $;
+                  FROM public.purchases p WHERE p.id=p_purchase_id),false) $function$;
 CREATE FUNCTION private.sale_read_visible_by_id(p_sale_id uuid)
  RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER AS $$
  SELECT coalesce((SELECT private.sale_read_visible(s.id,s.branch_id,s.created_at)
