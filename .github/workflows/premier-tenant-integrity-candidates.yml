@@ -6,6 +6,8 @@ on:
       - 'scripts/db/candidates/premier_branch_*.sql'
       - 'scripts/db/tests/branch_hardening_*.sql'
       - 'scripts/db/candidates/premier_stock_counts_write_rls_NOT_FOR_PRODUCTION.sql'
+      - 'scripts/db/candidates/premier_stock_count_child_dml_hardening_NOT_FOR_PRODUCTION.sql'
+      - 'scripts/db/tests/stock_count_child_access_assertions.sql'
       - '.github/workflows/premier-tenant-integrity-candidates.yml'
   workflow_dispatch:
 
@@ -49,3 +51,7 @@ jobs:
         run: psql -v ON_ERROR_STOP=1 -f scripts/db/candidates/premier_stock_counts_write_rls_NOT_FOR_PRODUCTION.sql
       - name: Assert cross-branch FK violations and authenticated history isolation
         run: psql -v ON_ERROR_STOP=1 -f scripts/db/tests/branch_hardening_assertions.sql
+      - name: Restrict child count visibility and revoke direct DML in isolated DB
+        run: psql -v ON_ERROR_STOP=1 -f scripts/db/candidates/premier_stock_count_child_dml_hardening_NOT_FOR_PRODUCTION.sql
+      - name: Verify child RLS branch isolation and blocked direct DML
+        run: psql -v ON_ERROR_STOP=1 -f scripts/db/tests/stock_count_child_access_assertions.sql
