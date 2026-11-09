@@ -257,16 +257,26 @@ export function DashboardDataPage() {
     }
     const effectiveRange: Range = range;
     const window = periodWindow(effectiveRange);
-    const boundedSnapshot = await loadDashboardSalesSnapshot({
-      branchId: branchFilter || null,
-      branchIds: readBranchIds,
-      currentFrom: window.start.toISOString(),
-      currentTo: window.end.toISOString(),
-      previousFrom: window.previousStart.toISOString(),
-      previousTo: window.previousEnd.toISOString(),
-      granularity: effectiveRange === 'today' ? 'hour' : effectiveRange === 'year' ? 'month' : 'day',
-      timezone: 'Africa/Cairo',
-    }).catch(() => null);
+    let boundedSnapshot: DashboardSalesSnapshot | null;
+    try {
+      boundedSnapshot = await loadDashboardSalesSnapshot({
+        branchId: branchFilter || null,
+        branchIds: readBranchIds,
+        currentFrom: window.start.toISOString(),
+        currentTo: window.end.toISOString(),
+        previousFrom: window.previousStart.toISOString(),
+        previousTo: window.previousEnd.toISOString(),
+        granularity: effectiveRange === 'today' ? 'hour' : effectiveRange === 'year' ? 'month' : 'day',
+        timezone: 'Africa/Cairo',
+      });
+    } catch {
+      // Keep the last successful dashboard instead of turning a slow/failed
+      // snapshot into a burst of raw sales, sale-items and payment queries.
+      setError(ar ? 'تعذر تحديث ملخص المبيعات. أعد المحاولة.' : 'Sales summary could not refresh. Please retry.');
+      setLoading(false);
+      setRefreshing(false);
+      return;
+    }
 
     if (boundedSnapshot) {
       setSnapshot(boundedSnapshot);
