@@ -180,11 +180,11 @@ describeLocal('Premier real SQL stock count atomicity (disposable PostgreSQL onl
             (select status from public.stock_counts where id=$1) status,
             (select coalesce(sum(quantity),0)::text from public.inventory where warehouse_id=$2 and product_id=$3) quantity,
             (select count(*)::text from public.inventory_ledger where reference_type='stock_count' and reference_id=$1) ledger_count,
-            (select count(*)::text from public.journal_entries where source_type='stock_count' and source_id=$1) journal_count,
+            (select count(*)::text from public.journal_entries where reference_type='stock_count' and reference_id=$1) journal_count,
             (select coalesce(sum(debit),0)::text from public.journal_entry_lines
-               where journal_entry_id in (select id from public.journal_entries where source_type='stock_count' and source_id=$1)) debit,
+               where journal_entry_id in (select id from public.journal_entries where reference_type='stock_count' and reference_id=$1)) debit,
             (select coalesce(sum(credit),0)::text from public.journal_entry_lines
-               where journal_entry_id in (select id from public.journal_entries where source_type='stock_count' and source_id=$1)) credit
+               where journal_entry_id in (select id from public.journal_entries where reference_type='stock_count' and reference_id=$1)) credit
         `, [countId, warehouseId, productId]);
         return rows[0];
       };
