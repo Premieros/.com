@@ -1,0 +1,17 @@
+[
+  {
+    "proname": "_process_refund_single_core",
+    "definition_md5": "c550a6de1a79d13527433bed80af4f69",
+    "p0_structure_pass": true
+  },
+  {
+    "proname": "apply_stock_count",
+    "definition_md5": "4a52e8e375507a470d8f8d395ea945d1",
+    "p0_structure_pass": true
+  },
+  {
+    "proname": "get_stock_valuation",
+    "definition_md5": "6f3568a6e2d3c198b80923892709fdf3",
+    "p0_structure_pass": true
+  }
+]
