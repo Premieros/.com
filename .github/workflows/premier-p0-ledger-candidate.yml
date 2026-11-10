@@ -4,6 +4,8 @@ on:
     branches: [main]
     paths:
       - scripts/db/candidates/reconcile-premier-p0-ledger*
+      - scripts/db/candidates/premier-p0-ledger-batch.mjs
+      - scripts/db/candidates/premier_p0_ledger_metadata_ACK_ONLY_NOT_A_MIGRATION.sql
       - docs/database/production-p0-20261110/**
       - supabase/migrations/20261109140000_premier_stock_count_atomic_failures.sql
       - supabase/migrations/20261109180000_premier_stock_valuation_rpc_branch_auth.sql

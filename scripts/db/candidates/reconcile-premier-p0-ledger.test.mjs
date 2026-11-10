@@ -4,7 +4,8 @@ import { randomBytes } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PROJECT, assertTarget, loadEvidence, reconcile } from './reconcile-premier-p0-ledger.mjs';
+import { PROJECT, assertTarget, loadEvidence, reconcile as reconcileClient } from './reconcile-premier-p0-ledger.mjs';
+import { buildApprovedBatch, reconcileBatch } from './premier-p0-ledger-batch.mjs';
 
 const ROOT = fileURLToPath(new URL('../../../', import.meta.url));
 const url = process.env.P0_LEDGER_TEST_DB_URL;
@@ -22,7 +23,7 @@ it('rejects incorrect project and connection identities before any SQL', async (
   assert.doesNotThrow(() => assertTarget(`db.${PROJECT}.supabase.co`, 'postgres', PROJECT));
   assert.doesNotThrow(() => assertTarget('aws-0-eu-central-1.pooler.supabase.com', `postgres.${PROJECT}`, PROJECT));
   let calls = 0;
-  await assert.rejects(reconcile({connectionParameters:{host:'localhost',user:'postgres'},
+  await assert.rejects(reconcileClient({connectionParameters:{host:'localhost',user:'postgres'},
     query: async () => { calls++; }}, {project:PROJECT,execute:true}), /CONNECTION_IDENTITY/);
   assert.equal(calls, 0);
 });
@@ -31,7 +32,13 @@ it('verifies immutable local files against pinned production hashes', async () =
   assert.equal((await loadEvidence()).migrations.length, 3);
 });
 
-describe('isolated PostgreSQL ledger reconciliation', {skip: !url}, () => {
+it('tests the exact single-request SQL artifact used by the project-scoped connector', async () => {
+  assert.equal(await buildApprovedBatch(),await readFile(resolve(ROOT,
+    'scripts/db/candidates/premier_p0_ledger_metadata_ACK_ONLY_NOT_A_MIGRATION.sql'),'utf8'));
+});
+
+for (const [label,reconcile] of [['client engine',reconcileClient],['single-request SQL',reconcileBatch]]) {
+describe('isolated PostgreSQL ledger reconciliation: '+label, {skip: !url}, () => {
   let Client, admin, client, database, manifest;
   const options = {project:PROJECT,execute:true,testOnly:true};
   before(async () => { ({Client} = await import('pg')); manifest = await loadEvidence(); });
@@ -129,17 +136,14 @@ describe('isolated PostgreSQL ledger reconciliation', {skip: !url}, () => {
     await assert.rejects(reconcile(client,options),/LEDGER_SCHEMA_DRIFT/);
   });
   it('rolls back the first insertion when the second SQL insertion fails', async () => {
-    const before=await rows(), query=client.query.bind(client);
-    let inserts=0;
-    client.query=async (...args) => {
-      if (args[0].startsWith('INSERT INTO public.schema_migrations') && ++inserts===2) {
-        // Actual PostgreSQL division error aborts the transaction after the first insert.
-        await query('SELECT 1/0');
-      }
-      return query(...args);
-    };
+    // First insert gets id=1; second gets id=2 and hits the existing unrelated PK.
+    // Sequence values survive rollback, providing evidence of both attempts.
+    await client.query("UPDATE public.schema_migrations SET id=2 WHERE version='unrelated'");
+    await client.query("SELECT setval('public.schema_migrations_id_seq',1,false)");
+    const before=await rows();
     await assert.rejects(reconcile(client,options),/RECONCILIATION_ABORTED/);
-    client.query=query;
-    assert.equal(inserts,2); assert.deepEqual(await rows(),before);
+    assert.equal(Number((await client.query('SELECT last_value FROM public.schema_migrations_id_seq')).rows[0].last_value),2);
+    assert.deepEqual(await rows(),before);
   });
 });
+}
