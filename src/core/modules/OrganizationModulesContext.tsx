@@ -118,7 +118,10 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
   const [access, setAccess] = useState<ModuleAccessMap>(ALL_ENABLED);
   const [loading, setLoading] = useState(false);
   const [compatibilityFallback, setCompatibilityFallback] = useState(false);
-  const [posOnlyMode, setPosOnlyMode] = useState(false);
+  // Keep the subscription fact separate from the current user's navigation policy.
+  // A platform super admin must retain administrative navigation for expired tenants.
+  const [subscriptionExpired, setSubscriptionExpired] = useState(false);
+  const posOnlyMode = subscriptionExpired && user?.role !== 'super_admin';
 
   const userId = user?.id ?? null;
 
@@ -131,7 +134,7 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
       setBusinessProfile(null);
       setAccess(ALL_DISABLED);
       setCompatibilityFallback(false);
-      setPosOnlyMode(false);
+      setSubscriptionExpired(false);
       setLoading(false);
       return;
     }
@@ -156,7 +159,7 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
       // relationship yet. RLS/permissions remain authoritative.
       setAccess(ALL_ENABLED);
       setCompatibilityFallback(true);
-      setPosOnlyMode(false);
+      setSubscriptionExpired(false);
       setLoading(false);
       return;
     }
@@ -166,13 +169,13 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
       setAccess(cached.access);
       setBusinessType(cached.businessType);
       setBusinessProfile(cached.businessProfile);
-      setPosOnlyMode(cached.posOnlyMode === true);
+      setSubscriptionExpired(cached.posOnlyMode === true);
     } else {
       // Never leak the previous organization's runtime while a new one loads.
       setAccess(ALL_DISABLED);
       setBusinessType(null);
       setBusinessProfile(null);
-      setPosOnlyMode(false);
+      setSubscriptionExpired(false);
     }
 
     setLoading(true);
@@ -207,16 +210,15 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
     }
 
     const subscriptionData = subscriptionResult.data as { expired?: boolean } | null;
-    const nextPosOnlyMode = subscriptionResult.error
+    const nextSubscriptionExpired = subscriptionResult.error
       ? cached?.posOnlyMode === true
       : subscriptionData?.expired === true;
 
-    const nextAccess = nextPosOnlyMode ? { ...ALL_DISABLED, pos: true } : { ...ALL_ENABLED };
+    // Cache the actual catalog, not a role-dependent subscription projection.
+    const nextAccess = { ...ALL_ENABLED };
     for (const row of (modulesResult.data ?? []) as ModuleCatalogRow[]) {
       if (ORGANIZATION_MODULE_KEYS.includes(row.feature_key as OrganizationModuleKey)) {
-        if (!nextPosOnlyMode || row.feature_key === 'pos') {
-          nextAccess[row.feature_key as OrganizationModuleKey] = row.enabled !== false;
-        }
+        nextAccess[row.feature_key as OrganizationModuleKey] = row.enabled !== false;
       }
     }
 
@@ -232,14 +234,14 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
     setBusinessType(nextBusinessType);
     setBusinessProfile(nextBusinessProfile);
     setCompatibilityFallback(false);
-    setPosOnlyMode(nextPosOnlyMode);
+    setSubscriptionExpired(nextSubscriptionExpired);
     setLoading(false);
 
     writeRuntimeCache(nextOrganizationId, {
       access: nextAccess,
       businessType: nextBusinessType,
       businessProfile: nextBusinessProfile,
-      posOnlyMode: nextPosOnlyMode,
+      posOnlyMode: nextSubscriptionExpired,
     });
   }, [
     branchId,
@@ -274,12 +276,17 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
     [businessProfile, businessType],
   );
 
+  const effectiveAccess = useMemo(
+    () => posOnlyMode ? { ...ALL_DISABLED, pos: access.pos } : access,
+    [access, posOnlyMode],
+  );
+
   const canAccessModule = useCallback(
     (moduleKey: OrganizationModuleKey | null | undefined) => {
       if (!moduleKey) return true;
-      return access[moduleKey] !== false;
+      return effectiveAccess[moduleKey] !== false;
     },
-    [access],
+    [effectiveAccess],
   );
 
   const hasCapability = useCallback(
@@ -305,7 +312,7 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
     loading,
     compatibilityFallback,
     posOnlyMode,
-    access,
+    access: effectiveAccess,
     canAccessModule,
     hasCapability,
     canAccessPath,
@@ -318,7 +325,7 @@ export function OrganizationModulesProvider({ children }: { children: ReactNode 
     loading,
     compatibilityFallback,
     posOnlyMode,
-    access,
+    effectiveAccess,
     canAccessModule,
     hasCapability,
     canAccessPath,
