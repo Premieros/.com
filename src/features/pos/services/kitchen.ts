@@ -1,6 +1,7 @@
 import type { KitchenSendItem, KitchenSendResult } from '../types';
 import { rpc } from '@/api/rpc';
 import { dispatchKitchenStations } from './kitchenDispatch';
+import { isLocalEngineAvailable, localSendOrderToKitchen } from '../adapters/localPosAdapter';
 
 const activeSendLocks = new Set<string>();
 
@@ -22,6 +23,14 @@ export async function sendOrderToKitchen(p: { p_order_id: string; p_sent_by?: st
 
   activeSendLocks.add(orderId);
   try {
+    if (isLocalEngineAvailable()) {
+      const localRes = await localSendOrderToKitchen(orderId);
+      return {
+        success: true,
+        order_id: orderId,
+        items_sent_count: localRes.dispatchedCount,
+      };
+    }
     const rpcRes = await rpc<{
       success: boolean; error?: string; detail?: string; order_id?: string; order_number?: string | null;
       table_name?: string | null; order_type?: string | null; guest_count?: number | null; warehouse_id?: string | null;

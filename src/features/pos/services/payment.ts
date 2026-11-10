@@ -4,6 +4,7 @@ import { SettingsRepository, InventoryRepository } from '@/core/repositories';
 import { saveVerifiedSaleWarehouse } from '@/core/offline/warehouseBinding';
 import type { RpcResult, OrderType } from '@/lib/types';
 import type { ItemPayload } from '../utils/cart';
+import { isLocalEngineAvailable, localProcessSaleForOrder } from '../adapters/localPosAdapter';
 
 export interface ProcessSalePayload {
   p_client_operation_key?: string;
@@ -243,6 +244,10 @@ export async function getManualPaymentApprovalStatus(requestId: string): Promise
 }
 
 export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ result: ProcessSaleResult | null; error: string | null }> {
+  // Windows Desktop Offline-First: Route to authoritative SQLite engine
+  if (isLocalEngineAvailable()) {
+    return localProcessSaleForOrder(p);
+  }
   // Authoritative Business Logic Check: Negative Stock Policy
   // If negative stock is disabled, check effective available stock (accounting for unsynced local outbox sales)
   const branchSettings = await SettingsRepository.getBranchSettings(p.p_branch_id);

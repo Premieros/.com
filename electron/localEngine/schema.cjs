@@ -40,7 +40,18 @@ CREATE TABLE IF NOT EXISTS local_users (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- 4. Warehouses
+-- 4. Active Sessions (Electron Main Process Verified Tokens)
+CREATE TABLE IF NOT EXISTS local_sessions (
+  token TEXT PRIMARY KEY,
+  user_id TEXT NOT NULL REFERENCES local_users(id),
+  branch_id TEXT NOT NULL REFERENCES local_branches(id),
+  role TEXT NOT NULL REFERENCES local_roles(name),
+  shift_id TEXT REFERENCES local_shifts(id),
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  expires_at TEXT
+);
+
+-- 5. Warehouses
 CREATE TABLE IF NOT EXISTS local_warehouses (
   id TEXT PRIMARY KEY,
   branch_id TEXT NOT NULL REFERENCES local_branches(id),
@@ -49,7 +60,7 @@ CREATE TABLE IF NOT EXISTS local_warehouses (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- 5. Shifts
+-- 6. Shifts
 CREATE TABLE IF NOT EXISTS local_shifts (
   id TEXT PRIMARY KEY,
   branch_id TEXT NOT NULL REFERENCES local_branches(id),
@@ -61,7 +72,7 @@ CREATE TABLE IF NOT EXISTS local_shifts (
   closed_at TEXT
 );
 
--- 6. Tables / Floor Plan
+-- 7. Tables / Floor Plan
 CREATE TABLE IF NOT EXISTS local_tables (
   id TEXT PRIMARY KEY,
   branch_id TEXT NOT NULL REFERENCES local_branches(id),
@@ -72,7 +83,34 @@ CREATE TABLE IF NOT EXISTS local_tables (
   UNIQUE(branch_id, table_number)
 );
 
--- 7. Orders
+-- 8. Products / Menu Catalog Cache
+CREATE TABLE IF NOT EXISTS local_products (
+  id TEXT PRIMARY KEY,
+  branch_id TEXT NOT NULL REFERENCES local_branches(id),
+  category_id TEXT,
+  category_name TEXT,
+  name TEXT NOT NULL,
+  sku TEXT,
+  barcode TEXT,
+  price REAL NOT NULL CHECK(price >= 0),
+  cost REAL NOT NULL DEFAULT 0.0 CHECK(cost >= 0),
+  station_code TEXT NOT NULL DEFAULT 'kitchen',
+  is_available INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+-- 9. Product Recipes & Ingredients (Raw Material BOM)
+CREATE TABLE IF NOT EXISTS local_product_recipes (
+  id TEXT PRIMARY KEY,
+  product_id TEXT NOT NULL,
+  ingredient_item_id TEXT NOT NULL,
+  quantity_required REAL NOT NULL CHECK(quantity_required > 0),
+  unit_of_measure TEXT NOT NULL DEFAULT 'unit',
+  created_at TEXT NOT NULL DEFAULT (datetime('now')),
+  UNIQUE(product_id, ingredient_item_id)
+);
+
+-- 10. Orders
 CREATE TABLE IF NOT EXISTS local_orders (
   id TEXT PRIMARY KEY,
   order_number TEXT NOT NULL UNIQUE,
@@ -90,7 +128,7 @@ CREATE TABLE IF NOT EXISTS local_orders (
   updated_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- 8. Order Items
+-- 11. Order Items
 CREATE TABLE IF NOT EXISTS local_order_items (
   id TEXT PRIMARY KEY,
   order_id TEXT NOT NULL REFERENCES local_orders(id) ON DELETE CASCADE,
@@ -105,7 +143,7 @@ CREATE TABLE IF NOT EXISTS local_order_items (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- 9. Kitchen Sends (Local KDS Dispatch)
+-- 12. Kitchen Sends (Local KDS Dispatch)
 CREATE TABLE IF NOT EXISTS local_kitchen_sends (
   id TEXT PRIMARY KEY,
   order_id TEXT NOT NULL REFERENCES local_orders(id) ON DELETE CASCADE,
@@ -117,7 +155,7 @@ CREATE TABLE IF NOT EXISTS local_kitchen_sends (
   sent_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- 10. Sales / Invoices
+-- 13. Sales / Invoices
 CREATE TABLE IF NOT EXISTS local_sales (
   id TEXT PRIMARY KEY,
   order_id TEXT UNIQUE REFERENCES local_orders(id),
@@ -133,7 +171,7 @@ CREATE TABLE IF NOT EXISTS local_sales (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- 11. Payments
+-- 14. Payments
 CREATE TABLE IF NOT EXISTS local_payments (
   id TEXT PRIMARY KEY,
   sale_id TEXT NOT NULL REFERENCES local_sales(id),
@@ -143,7 +181,7 @@ CREATE TABLE IF NOT EXISTS local_payments (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- 12. Inventory Movements (Stock Ledger)
+-- 15. Inventory Movements (Stock Ledger)
 CREATE TABLE IF NOT EXISTS local_inventory_movements (
   id TEXT PRIMARY KEY,
   branch_id TEXT NOT NULL REFERENCES local_branches(id),
@@ -158,7 +196,7 @@ CREATE TABLE IF NOT EXISTS local_inventory_movements (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- 13. Double-Entry Journal Entries
+-- 16. Double-Entry Journal Entries
 CREATE TABLE IF NOT EXISTS local_journal_entries (
   id TEXT PRIMARY KEY,
   branch_id TEXT NOT NULL REFERENCES local_branches(id),
@@ -173,7 +211,7 @@ CREATE TABLE IF NOT EXISTS local_journal_entries (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- 14. Journal Lines (Debits and Credits)
+-- 17. Journal Lines (Debits and Credits)
 CREATE TABLE IF NOT EXISTS local_journal_lines (
   id TEXT PRIMARY KEY,
   journal_entry_id TEXT NOT NULL REFERENCES local_journal_entries(id) ON DELETE CASCADE,
@@ -184,7 +222,7 @@ CREATE TABLE IF NOT EXISTS local_journal_lines (
   CHECK(debit > 0 OR credit > 0)
 );
 
--- 15. Cloud Outbox (Durable sync to Supabase when online)
+-- 18. Cloud Outbox (Durable sync to Supabase when online)
 CREATE TABLE IF NOT EXISTS local_outbox (
   id TEXT PRIMARY KEY,
   branch_id TEXT NOT NULL,
@@ -198,7 +236,7 @@ CREATE TABLE IF NOT EXISTS local_outbox (
   created_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
--- 16. Idempotency Keys (Replay prevention)
+-- 19. Idempotency Keys (Replay prevention)
 CREATE TABLE IF NOT EXISTS local_idempotency_keys (
   key TEXT PRIMARY KEY,
   operation_type TEXT NOT NULL,
@@ -214,6 +252,9 @@ CREATE INDEX IF NOT EXISTS idx_local_kitchen_sends_order ON local_kitchen_sends(
 CREATE INDEX IF NOT EXISTS idx_local_inventory_item ON local_inventory_movements(branch_id, warehouse_id, item_id);
 CREATE INDEX IF NOT EXISTS idx_local_journal_lines_entry ON local_journal_lines(journal_entry_id);
 CREATE INDEX IF NOT EXISTS idx_local_outbox_pending ON local_outbox(branch_id, status) WHERE status = 'pending';
+CREATE INDEX IF NOT EXISTS idx_local_sessions_token ON local_sessions(token);
+CREATE INDEX IF NOT EXISTS idx_local_products_branch ON local_products(branch_id, is_available);
+CREATE INDEX IF NOT EXISTS idx_local_product_recipes_prod ON local_product_recipes(product_id);
 `;
 
 function initDatabase(db) {
