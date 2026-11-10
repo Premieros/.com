@@ -2,7 +2,7 @@
 import {readFile} from 'node:fs/promises';
 import {createHash} from 'node:crypto';
 import {loadCloseoutEvidence} from './history-closeout-metadata.mjs';
-import {buildRuntimeProposal} from './history-closeout-runtime.mjs';
+import {buildRuntimeProposal,patchedReportDefinition} from './history-closeout-runtime.mjs';
 const hash=s=>createHash('sha256').update(s).digest('hex');
 export async function finalEvidence(){
   const m=await loadCloseoutEvidence(),runtime=await buildRuntimeProposal({activateScheduler:true});
@@ -24,6 +24,10 @@ export async function finalEvidence(){
       returnType:signature.includes('business_day_fixed_cutoff')?'timestamp with time zone':'jsonb'});
   }
   const before=JSON.parse(await readFile(new URL('../../../docs/database/migration-history-audit-20261110/CLOSEOUT_RUNTIME_BEFORE.json',import.meta.url),'utf8'));
+  const report=await patchedReportDefinition();
+  functions.push({signature:'public._build_day_closing_report(uuid,date)',securityDefiner:true,
+    body:report.match(/AS \$function\$([\s\S]*?)\$function\$/)[1],clientExecute:false,
+    config:['search_path=public, pg_temp'],volatility:'v',returnType:'jsonb'});
   return {m,functions,kdsSha:before.functions.find(f=>f.proname==='complete_stale_kitchen_orders').sha256,
     history:[{name:'premier_history_runtime_closeout',sha256:hash(runtime.installation)},
       {name:'premier_history_auto_close_activation',sha256:hash(runtime.schedulerActivation)}]};

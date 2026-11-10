@@ -47,6 +47,10 @@ If any preflight fails, stop and refresh evidence rather than relaxing a pin. If
 
 ## Validation and precise limits
 
+Preparation also found a report-cutoff dependency: `_build_day_closing_report` can extend an old day's window to now while a cashier shift remains open, even after persisted business-day state has rolled over. The proposed runtime installation includes a narrowly guarded correction requiring `v_window.active_state` before taking that live-window override. The report source/ACL snapshot is in `CLOSEOUT_REPORT_BEFORE.json`; the standalone correction is `history-closeout-report-cutoff_NOT_A_MIGRATION.sql`. The full-schema regression test checks the original overrun, then the corrected snapshot cutoff while leaving the shift open. This is part of the requested automatic-close runtime approval, not a production change performed during preparation.
+
+The first combined candidate run passed all **44 isolated tests** (#42921604247). Its separate Verify run (#42921603931) stopped at a test TypeScript compatibility error (`replaceAll` under the configured library target); the test now uses the repository-compatible global regular expression. Final results for the corrected head must be verified separately.
+
 - The previous 55-file candidate remains independently tested (16 cases) and unchanged.
 - The 147-file SQL artifact is byte-compared against its builder. Database transport tests use synthetic, inert source metadata with all 147 canonical record identities: retries, partial state, conflicts, source/global drift, triggers, schema changes, missing live pins, and genuine failure on the 147th insert. These do not replay production business SQL.
 - The **actual 147-source production preflight passed under BEGIN READ ONLY**, with acknowledgement INSERTs and writer locks removed. Both original fingerprints matched. No production records were written.

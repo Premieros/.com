@@ -45,7 +45,8 @@ describe('runtime closeout on disposable PostgreSQL',{skip:!url},()=>{
       CREATE FUNCTION public._next_unclosed_business_date(uuid,date) RETURNS date LANGUAGE sql AS $$ SELECT $2 $$;
       CREATE FUNCTION public._build_day_closing_report(uuid,date) RETURNS jsonb LANGUAGE plpgsql AS $$ BEGIN IF current_setting('test.close_fail',true)='yes' THEN RAISE EXCEPTION 'TEST_REPORT_FAILED'; END IF; RETURN jsonb_build_object('ci_only',true); END $$;
       CREATE FUNCTION private.normalize_day_close_cash(jsonb,uuid) RETURNS jsonb LANGUAGE sql AS $$ SELECT $1 $$;`);
-    for(const f of before.functions) {
+    const reportBefore=JSON.parse(await readFile(new URL('../../../docs/database/migration-history-audit-20261110/CLOSEOUT_REPORT_BEFORE.json',import.meta.url),'utf8'));
+    for(const f of [...before.functions,{...reportBefore,schema:'public',proname:'_build_day_closing_report',arguments:'p_branch_id uuid, p_business_date date'}]) {
       await db.query(f.definition);
       const signature=f.schema+'.'+f.proname+'('+f.arguments.split(', ').filter(Boolean).map(a=>a.slice(a.indexOf(' ')+1)).join(',')+')';
       await db.query('REVOKE ALL ON FUNCTION '+signature+' FROM PUBLIC,anon,authenticated,service_role');
@@ -57,6 +58,7 @@ describe('runtime closeout on disposable PostgreSQL',{skip:!url},()=>{
   });
   afterEach(async()=>{if(db) await db.end();if(admin){await admin.query(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);await admin.end();}});
   const install=async()=>{await db.query('BEGIN');try{await db.query(proposal.installation);await db.query('COMMIT');}catch(e){await db.query('ROLLBACK');throw e;}};
+  const stubReport=async()=>{await db.query(`CREATE OR REPLACE FUNCTION public._build_day_closing_report(p_branch_id uuid,p_business_date date) RETURNS jsonb LANGUAGE plpgsql AS $$ BEGIN IF current_setting('test.close_fail',true)='yes' THEN RAISE EXCEPTION 'TEST_REPORT_FAILED'; END IF; RETURN jsonb_build_object('ci_only',true); END $$`);};
   const branch=async(mode='fixed_time',active=true)=>{
     const org=randomUUID(),id=randomUUID();
     await db.query('INSERT INTO public.organizations VALUES($1,true)',[org]);
@@ -106,14 +108,14 @@ describe('runtime closeout on disposable PostgreSQL',{skip:!url},()=>{
     assert.deepEqual((await db.query('TABLE public.users')).rows[0],first);
   });
   it('closes only eligible fixed-time branches, records system attribution, and retries idempotently',async()=>{
-    const eligible=await branch();await branch('manual');await branch('fixed_time',false);await install();
+    const eligible=await branch();await branch('manual');await branch('fixed_time',false);await install();await stubReport();
     const r=(await db.query('SELECT private.run_due_business_day_closes() AS r')).rows[0].r;
     assert.equal(r.success,true);assert.equal(r.closed_count,1);
     const rows=(await db.query('TABLE public.daily_closes')).rows;assert.equal(rows.length,1);assert.equal(rows[0].branch_id,eligible);assert.equal(rows[0].closed_by,null);
     assert.equal((await db.query('SELECT private.run_due_business_day_closes() AS r')).rows[0].r.closed_count,0);
   });
   it('rolls back state advancement and close creation when report building fails',async()=>{
-    await branch();await install();const state=(await db.query('TABLE public.business_day_state')).rows;
+    await branch();await install();await stubReport();const state=(await db.query('TABLE public.business_day_state')).rows;
     await db.query("SET test.close_fail='yes'");const r=(await db.query('SELECT private.run_due_business_day_closes() AS r')).rows[0].r;
     assert.equal(r.success,false);assert.equal(r.errors.length,1);assert.deepEqual((await db.query('TABLE public.business_day_state')).rows,state);
     assert.equal(Number((await db.query('SELECT count(*) AS n FROM public.daily_closes')).rows[0].n),0);
