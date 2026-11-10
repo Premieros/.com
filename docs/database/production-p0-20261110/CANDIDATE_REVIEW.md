@@ -1,0 +1,45 @@
+# P0 ledger reconciliation candidate — review and execution boundary
+
+This candidate is not wired into deployment or the migration runner. Production execution has not been authorized or performed.
+
+## Scope
+- Exactly three canonical filename/checksum acknowledgements in public.schema_migrations.
+- Keeps original Supabase history, function definitions, privileges and business data unchanged.
+- Uses the captured production manifest and independently pinned SHA-256 hashes.
+- Validates the actual ledger column defaults, primary/unique constraints, RLS enabled state, and absence of triggers/rules. RLS remains enabled; a postgres role with RLS bypass is required.
+- Checks full live function definitions, ACLs, volatility, search paths and effective anon/authenticated privileges before and after.
+- Checks original remote migration names and exact SQL hashes before and after.
+- Serializes ledger writes, checks row-count change and full Supabase-history fingerprint, and commits all missing acknowledgements together.
+- Rejects conflicting existing names/checksums; exact existing records are preserved.
+- PostgreSQL sequences are not transactional: a failed insertion can consume an id and leave a harmless sequence gap even when all inserted rows roll back.
+- applied_at records the acknowledgement time. Original application identities remain in Supabase and the evidence archive.
+
+## Default mode
+Running the candidate without --execute uses a READ ONLY transaction and performs no metadata insertion. Unlike the existing migration runner's --dry-run, it does not execute migration SQL or bootstrap ledger tables.
+
+No hosted candidate invocation was made during preparation. Read-only catalog checks were made through the existing Supabase connector.
+
+## Future execution, after separate explicit approval
+Use a reviewed checkout with dependencies installed and the unchanged canonical migration/archive files. Obtain a secure database connection URL without URL query options; the CLI verifies TLS certificates and rejects unknown hosts, wrong project usernames and localhost. Credentials must stay outside PRs and logs.
+
+The reviewed command shape is:
+```
+node scripts/db/candidates/reconcile-premier-p0-ledger.mjs --execute --approved-project=hvqlkapynjfjikqithvd --approval=P0_LEDGER_METADATA_ONLY
+```
+This is a proposal for the separately approved operation, not an instruction to execute it now. Approval flags express intent but do not replace human approval. The database URL is supplied privately through SUPABASE_DB_URL; it must never appear in the command or report.
+
+A check can be performed using --check. It still requires secure credentials and must target the correct reviewed production project. No --test-local option exists in the CLI; localhost test access is restricted to the imported engine used by automated tests.
+
+Stop on any drift. Do not edit pins or loosen guards merely to make execution pass. Re-read and review evidence first. Use an operator-controlled maintenance window to prevent concurrent function/security changes; ledger table locks do not lock all schema objects.
+
+Before execution, preserve secure copies of the relevant ledgers and confirm this specific operation is approved. Afterward, capture the sanitized result, re-read both ledgers and functions and confirm only the approved missing records were added. Any post-commit reversal requires separate review; do not roll back business functions or erase Supabase history.
+
+## Tests
+Local checks cover connection/project rejection and pinned evidence integrity. Real database tests run in the dedicated P0 ledger candidate safety workflow on disposable PostgreSQL 16 only. They build metadata fixtures and store captured PL/pgSQL definitions with check_function_bodies disabled; they never invoke business functions. These tests validate the metadata operation, not runtime refund or inventory correctness.
+
+Database cases: read-only default; exactly three inserts; repeat with zero inserts; partial existing set; conflicting checksum; remote SQL drift; live definition drift; widened privileges; unexpected ledger trigger; schema drift; and an actual PostgreSQL error after the first insertion proving complete row rollback.
+
+The existing Verify main workflow separately runs full canonical replay and business integration/security/browser tests. No hosted Supabase branch or production write is needed for either workflow.
+
+Remaining global-history differences are outside this candidate. Even if all three acknowledgements later succeed, whole-directory production migration remains blocked until the remaining histories are classified as described in RECONCILIATION_PLAN.md.
+
