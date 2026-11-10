@@ -11,12 +11,13 @@
     "typecheck": "tsc --noEmit -p tsconfig.app.json",
     "typecheck:all": "npm run typecheck && tsc --noEmit -p tsconfig.test.json",
     "verify:db-identity": "node scripts/db/verify-database-identity.js",
-    "verify": "npm run verify:db-identity && npm run typecheck && npm run lint && npm run test:unit",
-    "verify:full": "npm run verify:db-identity && npm run typecheck:all && npm run lint && npm run build && npm run test:unit && npm run test:integration",
+    "verify": "npm run verify:db-identity && npm run typecheck && npm run lint && npm run test:local-engine && npm run test:unit",
+    "verify:full": "npm run verify:db-identity && npm run typecheck:all && npm run lint && npm run build && npm run test:local-engine && npm run test:unit && npm run test:integration",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:unit": "vitest run tests/unit tests/components",
-    "test:integration": "vitest run -c vitest.integration.config.ts"
+    "test:integration": "vitest run -c vitest.integration.config.ts",
+    "test:local-engine": "node electron/localEngine/engine.test.cjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.57.4",
