@@ -3,15 +3,21 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { randomBytes,randomUUID } from 'node:crypto';
 import { buildRuntimeProposal } from './history-closeout-runtime.mjs';
+import { finalEvidence,formatFinalThreeSQL,buildFinalThreeProposal } from './history-closeout-final3.mjs';
 const url=process.env.HISTORY55_TEST_DB_URL;
 if(process.env.CI) assert.ok(url,'CI database required');
 if(url) assert.ok(['localhost','127.0.0.1','[::1]'].includes(new URL(url).hostname));
 it('separates scheduler activation from installation',async()=>{
   const p=await buildRuntimeProposal();assert.equal(p.schedulerActivation,null);
+  assert.equal(p.installation,await readFile(new URL('./history-closeout-runtime_INSTALL_ONLY_NOT_A_MIGRATION.sql',import.meta.url),'utf8'));
   assert.ok(!p.installation.includes('cron.schedule('));
   const active=await buildRuntimeProposal({activateScheduler:true});
   assert.ok(active.schedulerActivation.includes("'auto-business-day-close'"));
+  assert.equal(active.schedulerActivation,await readFile(new URL('./history-closeout-runtime_SCHEDULER_REQUIRES_SEPARATE_APPROVAL.sql',import.meta.url),'utf8'));
   assert.equal(active.schedulingChangesBusinessData,true);
+});
+it('pins the final-three acknowledgement artifact',async()=>{
+  assert.equal(await buildFinalThreeProposal(),await readFile(new URL('./history-closeout-final3_ACK_ONLY_NOT_A_MIGRATION.sql',import.meta.url),'utf8'));
 });
 describe('runtime closeout on disposable PostgreSQL',{skip:!url},()=>{
   let admin,db,database,before,proposal;
@@ -39,8 +45,14 @@ describe('runtime closeout on disposable PostgreSQL',{skip:!url},()=>{
       CREATE FUNCTION public._next_unclosed_business_date(uuid,date) RETURNS date LANGUAGE sql AS $$ SELECT $2 $$;
       CREATE FUNCTION public._build_day_closing_report(uuid,date) RETURNS jsonb LANGUAGE plpgsql AS $$ BEGIN IF current_setting('test.close_fail',true)='yes' THEN RAISE EXCEPTION 'TEST_REPORT_FAILED'; END IF; RETURN jsonb_build_object('ci_only',true); END $$;
       CREATE FUNCTION private.normalize_day_close_cash(jsonb,uuid) RETURNS jsonb LANGUAGE sql AS $$ SELECT $1 $$;`);
-    for(const f of before.functions) await db.query(f.definition);
-    await db.query('GRANT EXECUTE ON FUNCTION public.complete_stale_kitchen_orders(uuid) TO authenticated,service_role');
+    for(const f of before.functions) {
+      await db.query(f.definition);
+      const signature=f.schema+'.'+f.proname+'('+f.arguments.split(', ').filter(Boolean).map(a=>a.slice(a.indexOf(' ')+1)).join(',')+')';
+      await db.query('REVOKE ALL ON FUNCTION '+signature+' FROM PUBLIC,anon,authenticated,service_role');
+      for(const entry of f.acl.slice(1,-1).split(',')) {
+        const role=entry.split('=')[0];if(role!=='postgres') await db.query('GRANT EXECUTE ON FUNCTION '+signature+' TO '+role);
+      }
+    }
     proposal=await buildRuntimeProposal();
   });
   afterEach(async()=>{if(db) await db.end();if(admin){await admin.query(`DROP DATABASE IF EXISTS ${database} WITH (FORCE)`);await admin.end();}});
@@ -52,6 +64,24 @@ describe('runtime closeout on disposable PostgreSQL',{skip:!url},()=>{
     await db.query("INSERT INTO public.branch_settings VALUES($1,'00:00','00:00',$2)",[id,mode]);
     await db.query("INSERT INTO public.business_day_state VALUES($1,(now() AT TIME ZONE 'Africa/Cairo')::date-1,now()-interval '2 days',now())",[id]);return id;
   };
+  const finalFixture=async()=>{
+    await install();await db.query(`SET timezone='UTC';
+      CREATE TABLE public.schema_migrations(id bigserial PRIMARY KEY,version text NOT NULL UNIQUE,name text NOT NULL,checksum text NOT NULL,applied_at timestamptz NOT NULL DEFAULT now());
+      ALTER TABLE public.schema_migrations ENABLE ROW LEVEL SECURITY;
+      CREATE SCHEMA supabase_migrations;CREATE TABLE supabase_migrations.schema_migrations(version text PRIMARY KEY,name text,statements text[]);
+      CREATE SCHEMA cron;CREATE TABLE cron.job(jobname text,schedule text,active boolean,command text,username text,database text);
+      INSERT INTO public.schema_migrations(version,name,checksum) VALUES('unrelated','unrelated.sql','keep');
+      INSERT INTO cron.job VALUES('auto-business-day-close','* * * * *',true,'SELECT private.run_due_business_day_closes();','postgres',current_database());`);
+    const d=await finalEvidence();
+    d.m.baseline.custom_rows=1;d.m.baseline.history_rows=0;
+    d.m.baseline.custom_fingerprint=(await db.query("SELECT md5(coalesce(string_agg(md5(row_to_json(x)::text),'' ORDER BY id),'')) AS h FROM public.schema_migrations x")).rows[0].h;
+    d.m.baseline.history_fingerprint='d41d8cd98f00b204e9800998ecf8427e';
+    for(const f of d.m.candidates)await db.query('INSERT INTO public.schema_migrations(version,name,checksum) VALUES($1,$2,$3)',[f.version,f.name,f.canonical_sha256]);
+    const p=await buildRuntimeProposal({activateScheduler:true});
+    for(const [i,sql] of [p.installation,p.schedulerActivation].entries())await db.query('INSERT INTO supabase_migrations.schema_migrations VALUES($1,$2,$3)',['runtime_'+i,d.history[i].name,[sql]]);
+    return d;
+  };
+  const finalRun=async(d)=>{try{await db.query(formatFinalThreeSQL(d));}catch(e){await db.query('ROLLBACK');throw e;}};
   it('installs without changing business rows and preserves KDS function body',async()=>{
     const id=await branch();await install();
     assert.equal(Number((await db.query('SELECT count(*) AS n FROM public.daily_closes')).rows[0].n),0);
@@ -92,5 +122,29 @@ describe('runtime closeout on disposable PostgreSQL',{skip:!url},()=>{
     await db.query("CREATE OR REPLACE FUNCTION public.record_login_failure(p_username text) RETURNS jsonb LANGUAGE sql AS $$ SELECT '{}'::jsonb $$");
     await assert.rejects(install(),/CLOSEOUT_FUNCTION_DRIFT/);
     assert.equal((await db.query("SELECT to_regprocedure('private.run_due_business_day_closes()') AS f")).rows[0].f,null);
+  });
+  it('rejects unexpected widened privileges before changing functions',async()=>{
+    await db.query('GRANT EXECUTE ON FUNCTION public.complete_stale_kitchen_orders(uuid) TO anon');
+    await assert.rejects(install(),/CLOSEOUT_ACL_DRIFT/);
+    assert.equal((await db.query("SELECT to_regprocedure('private.run_due_business_day_closes()') AS f")).rows[0].f,null);
+  });
+  it('acknowledges final three only after runtime history, active scheduler and all 147 records, then retries',async()=>{
+    const d=await finalFixture();await finalRun(d);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM public.schema_migrations')).rows[0].n,151);
+    await finalRun(d);assert.equal((await db.query('SELECT count(*)::int AS n FROM public.schema_migrations')).rows[0].n,151);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM public.daily_closes')).rows[0].n,0);
+  });
+  it('refuses final acknowledgement if scheduling is not active',async()=>{
+    const d=await finalFixture();await db.query('DELETE FROM cron.job');await assert.rejects(finalRun(d),/FINAL3_SCHEDULER_NOT_ACTIVE/);
+    assert.equal((await db.query('SELECT count(*)::int AS n FROM public.schema_migrations')).rows[0].n,148);
+  });
+  it('refuses final acknowledgement if the earlier metadata batch is incomplete',async()=>{
+    const d=await finalFixture();await db.query('DELETE FROM public.schema_migrations WHERE version=$1',[d.m.candidates[146].version]);await assert.rejects(finalRun(d),/FINAL3_147_INCOMPLETE/);
+  });
+  it('refuses final acknowledgement if actual runtime migration evidence is missing',async()=>{
+    const d=await finalFixture();await db.query('DELETE FROM supabase_migrations.schema_migrations');await assert.rejects(finalRun(d),/FINAL3_RUNTIME_HISTORY_MISSING/);
+  });
+  it('rejects a changed live search_path before final acknowledgement',async()=>{
+    const d=await finalFixture();await db.query('ALTER FUNCTION private.run_due_business_day_closes() SET search_path=public');await assert.rejects(finalRun(d),/FINAL3_FUNCTION_DRIFT/);
   });
 });

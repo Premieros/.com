@@ -23,10 +23,11 @@ export async function buildRuntimeProposal({ activateScheduler = false } = {}) {
   const beforeRaw=await readFile(new URL('docs/database/migration-history-audit-20261110/CLOSEOUT_RUNTIME_BEFORE.json',root),'utf8');
   if(hash(beforeRaw)!=='8cb7025037f7d442eb741f3bbb11d3c4e1917b6a1b488a36a8a385a8e4c1a47c') throw Error('ROLLBACK_EVIDENCE_DRIFT');
   const before=JSON.parse(beforeRaw);
-  let guards=`SET LOCAL lock_timeout='2s';\nSET LOCAL statement_timeout='15s';\nDO $preflight$\nBEGIN\n`;
+  let guards=`SET LOCAL lock_timeout='2s';\nSET LOCAL statement_timeout='15s';\nDO $preflight$\nBEGIN\nIF current_user<>'postgres' THEN RAISE EXCEPTION 'CLOSEOUT_ROLE_MISMATCH'; END IF;\n`;
   for(const f of before.functions) {
     const name=f.schema+'.'+f.proname+'('+f.arguments.replace(/p_username text/,'text').replace(/p_branch_id uuid/,'uuid')+')';
     guards+=`IF to_regprocedure('${name}') IS NULL OR encode(sha256(convert_to(pg_get_functiondef(to_regprocedure('${name}')),'UTF8')),'hex') <> '${f.sha256}' THEN RAISE EXCEPTION 'CLOSEOUT_FUNCTION_DRIFT'; END IF;\n`;
+    guards+=`IF (SELECT proacl::text FROM pg_proc WHERE oid=to_regprocedure('${name}')) IS DISTINCT FROM '${f.acl}' THEN RAISE EXCEPTION 'CLOSEOUT_ACL_DRIFT'; END IF;\n`;
   }
   guards+=`IF to_regprocedure('private.run_due_business_day_closes()') IS NOT NULL OR to_regprocedure('private.business_day_fixed_cutoff(uuid,date)') IS NOT NULL THEN RAISE EXCEPTION 'CLOSEOUT_HELPER_ALREADY_PRESENT'; END IF;\nEND;\n$preflight$;\n`;
   // Remove only the known outer transaction of the original KDS candidate.
