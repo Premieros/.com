@@ -1,0 +1,8 @@
+--- canonical/20261008235940_phase1b_consolidate_kitchen_write_policies.sql
++++ history/20261008235940.sql
+@@ -1,5 +1,3 @@
+--- Phase 1B: consolidate duplicate permissive kitchen INSERT/UPDATE policies
+--- by preserving the exact previous OR semantics in one policy per command.
+ 
+ DROP POLICY IF EXISTS auth_insert_order_kitchen_sends ON public.order_kitchen_sends;
+ DROP POLICY IF EXISTS auth_write_order_kitchen_sends ON public.order_kitchen_sends;

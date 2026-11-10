@@ -1,0 +1,15 @@
+--- canonical/20261023042826_stage_non_fifo_warehouse_balances_v2.sql
++++ history/20261023042826.sql
+@@ -1,6 +1,3 @@
+--- Historical migration already recorded in Premier production Supabase history.
+--- Recovered verbatim SQL body to allow disposable CI databases to replay full schema.
+--- DO NOT run manually against production; applied there as migration 20261023042826.
+ CREATE TABLE IF NOT EXISTS private.raw_warehouse_balances_v2 (
+  branch_id uuid NOT NULL REFERENCES public.branches(id),
+  warehouse_id uuid NOT NULL REFERENCES public.warehouses(id),
+@@ -19,4 +16,4 @@
+ WHERE b.warehouse_id IS NOT NULL
+ GROUP BY b.branch_id,b.warehouse_id,b.raw_material_id
+ ON CONFLICT (branch_id,warehouse_id,raw_material_id) DO NOTHING;
+-COMMENT ON TABLE private.raw_warehouse_balances_v2 IS 'Transition-only warehouse balance baseline for non-FIFO quantity engine; NOT authoritative until all stock writers cut over and reconciliation passes.';
++COMMENT ON TABLE private.raw_warehouse_balances_v2 IS 'Transition-only warehouse balance baseline for non-FIFO quantity engine; NOT authoritative until all stock writers cut over and reconciliation passes.';

@@ -1,0 +1,8 @@
+--- canonical/20261027143500_kitchen_unit_debt_valid_sale_fk.sql
++++ history/20261027092106.sql
+@@ -131,4 +131,4 @@
+     'after_qty',v_running
+   );
+ END;
+-$function$;
++$function$;

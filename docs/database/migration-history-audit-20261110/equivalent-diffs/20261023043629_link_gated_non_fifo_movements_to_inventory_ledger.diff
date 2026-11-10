@@ -1,0 +1,13 @@
+--- canonical/20261023043629_link_gated_non_fifo_movements_to_inventory_ledger.sql
++++ history/20261023043629.sql
+@@ -1,5 +1,3 @@
+--- Already-applied Premier production SQL restored verbatim for disposable CI replay.
+--- Production migration 20261023043629; DO NOT manually reapply to production.
+ ALTER TABLE private.raw_warehouse_movements_v2 ADD COLUMN IF NOT EXISTS ledger_id bigint UNIQUE REFERENCES public.inventory_ledger(id);
+ CREATE OR REPLACE FUNCTION private.apply_raw_warehouse_delta_v2(p_operation_id uuid, p_branch_id uuid, p_warehouse_id uuid, p_raw_material_id uuid, p_delta numeric, p_allow_negative boolean DEFAULT false)
+  RETURNS jsonb
+@@ -76,4 +74,3 @@
+   'total_cost',round(p_delta*v_unit_cost,6));
+ END;
+ $function$
+-

@@ -1,0 +1,7 @@
+--- canonical/20261011063245_phase5b_period_lock_and_journal_reversal.sql
++++ history/20261011063245.sql
+@@ -1,3 +1,4 @@
++
+ create or replace function private.assert_accounting_period_postable(
+   p_branch_id uuid,
+   p_entry_date date

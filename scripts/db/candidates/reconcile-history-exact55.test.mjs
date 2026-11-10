@@ -82,7 +82,8 @@ describe('exact55 isolated PostgreSQL', {skip:!url}, () => {
     assert.equal(Number((await client.query('SELECT last_value FROM public.schema_migrations_id_seq')).rows[0].last_value),55);
   });
   it('fails safely on concurrent writer lock',async()=>{
-    const {Client}=await import('pg');const c=new Client({...client.connectionParameters});await c.connect();
+    const {Client}=await import('pg');const lockUrl=new URL(url);lockUrl.pathname='/'+database;
+    const c=new Client({connectionString:lockUrl.href});await c.connect();
     try{await c.query('BEGIN; LOCK TABLE public.schema_migrations IN SHARE ROW EXCLUSIVE MODE');await fail(/RECONCILIATION_ABORTED/);}
     finally{await c.query('ROLLBACK');await c.end();}
   });

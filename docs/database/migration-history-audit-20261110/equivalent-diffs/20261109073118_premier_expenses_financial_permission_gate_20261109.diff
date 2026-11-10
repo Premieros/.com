@@ -1,0 +1,15 @@
+--- canonical/20261109073118_premier_expenses_financial_permission_gate_20261109.sql
++++ history/20261109073118.sql
+@@ -1,6 +1,3 @@
+--- MIRRORED VERBATIM from already-applied Premier production migration history.
+--- Version: 20261109073118; name: premier_expenses_financial_permission_gate_20261109
+--- DO NOT manually rerun on production. A fresh database replays sequentially.
+ BEGIN;
+ SET LOCAL lock_timeout='3s';
+ SET LOCAL statement_timeout='15s';
+@@ -13,4 +10,4 @@
+ CREATE POLICY premier_expenses_financial_select_gate
+   ON public.expenses AS RESTRICTIVE FOR SELECT TO authenticated
+   USING (public.is_platform_admin() OR (public.can_permission('expenses.view') AND private.financial_row_visible(id,branch_id,created_at)));
+-COMMIT;
++COMMIT;

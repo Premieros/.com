@@ -1,0 +1,3632 @@
+{
+  "captured_on": "2026-11-11",
+  "project_ref": "hvqlkapynjfjikqithvd",
+  "parser": "pglast 7.22",
+  "method": "Remove only location/stmt_location/stmt_len/arg_location (source offsets); preserve constants, identifiers, order and literal bodies. Search contiguous statement windows in candidate batches.",
+  "production_writes": false,
+  "custom_ledger_rows": 452,
+  "remote_history_rows": 727,
+  "summary": {
+    "blocked_no_proven_history_match": 18,
+    "contiguous_batch_ast_match_review_required": 2,
+    "fresh_read_reverified_equivalent_not_approved": 59,
+    "new_full_ast_match_review_required": 15
+  },
+  "receipts": [
+    {
+      "version": "20260927064130",
+      "name": "bootstrap_043_user_role_management",
+      "statement_hashes": [
+        "e77c5888b251009957aee15c6c1f66d4899adc7d6145a03a0cf0975620fe21b2"
+      ]
+    },
+    {
+      "version": "20260927064137",
+      "name": "bootstrap_044_rbac_hardening",
+      "statement_hashes": [
+        "9172f327b534174dc0b610e901e61f19b72916cc237363e54204488427949973"
+      ]
+    },
+    {
+      "version": "20260927064301",
+      "name": "bootstrap_055_subscriptions",
+      "statement_hashes": [
+        "953bbe112e5b5d72d3f15027e07aa2adf84b0412e1d9f1973e4ddfa0e8c6cd2f"
+      ]
+    },
+    {
+      "version": "20260927065142",
+      "name": "bootstrap_batch_127_142",
+      "statement_hashes": [
+        "4f551b4a2abdbcae10ab247b404d02b81ad569dd556440ed3d57ce6718163ffd"
+      ]
+    },
+    {
+      "version": "20260927065328",
+      "name": "bootstrap_batch_191_206",
+      "statement_hashes": [
+        "9220ffd421a45a7e1323484291bd8234106162ff3f4a0c7ca4021ff428f8e2be"
+      ]
+    },
+    {
+      "version": "20260927065354",
+      "name": "bootstrap_batch_207_222",
+      "statement_hashes": [
+        "c98fb7ac1e50c2564d365be3808d840d74ee3ad5785fcd4898b3c0b287403987"
+      ]
+    },
+    {
+      "version": "20260927065422",
+      "name": "bootstrap_batch_223_238",
+      "statement_hashes": [
+        "3ae76ff7f0b9a0256e10b06b1fb785e316d52b41f95de638f1c98aa8ba3ab8d9"
+      ]
+    },
+    {
+      "version": "20260927065752",
+      "name": "bootstrap_batch_335_350",
+      "statement_hashes": [
+        "d6419d9a569ed5e9569409469e23b2ba6e7759be8917f793b9bd475b33dc5576"
+      ]
+    },
+    {
+      "version": "20260927065826",
+      "name": "bootstrap_batch_351_366",
+      "statement_hashes": [
+        "e050226df1781c3258e97988db9871591b6989115e1bc6e8050f934ebb16bc69"
+      ]
+    },
+    {
+      "version": "20260927070509",
+      "name": "bootstrap_batch_415_430",
+      "statement_hashes": [
+        "714f80bf7d7f088faf825415ed92a7c23bb17a53f7a8e64d42af80b36d03b0f6"
+      ]
+    },
+    {
+      "version": "20260927141752",
+      "name": "organization_module_controls",
+      "statement_hashes": [
+        "346841369a59ea27cbf9d0c4a4bef5afec40471edd9e7fdd7732fe93dfc57bb2"
+      ]
+    },
+    {
+      "version": "20260927144333",
+      "name": "organization_module_updated_by_index",
+      "statement_hashes": [
+        "1d50486016b2765594599f4b92a531e1ff657894acd9a4a95d5aee475993cbd1"
+      ]
+    },
+    {
+      "version": "20260929132251",
+      "name": "organization_business_profiles",
+      "statement_hashes": [
+        "5a1a0d3866d7aa529f4934e54171abbd181feaf40e45b4630f09474b289166fa"
+      ]
+    },
+    {
+      "version": "20260929132312",
+      "name": "business_profile_runtime_storage",
+      "statement_hashes": [
+        "e701f4937c397c418ae955fd413d09b25f45eade8b71283c66686b15a8e0fe25"
+      ]
+    },
+    {
+      "version": "20261003120340",
+      "name": "fix_production_order_raw_warehouse",
+      "statement_hashes": [
+        "d29ed428c9f1e76b0d88a0ad239721b11967efacb9604234ab51791adc2437a5"
+      ]
+    },
+    {
+      "version": "20261008235622",
+      "name": "phase1a_rpc_surface_hardening",
+      "statement_hashes": [
+        "00c9f647849280778c47ca23e21233d1a7a0835fb8c5ec0e969f6a725b1f49ac"
+      ]
+    },
+    {
+      "version": "20261008235837",
+      "name": "phase1b_remove_redundant_kitchen_delete_policy",
+      "statement_hashes": [
+        "8af32a83e33cd25608927baf02cf5f68d572e286bc70c4b3ee39851c231370c3"
+      ]
+    },
+    {
+      "version": "20261008235940",
+      "name": "phase1b_consolidate_kitchen_write_policies",
+      "statement_hashes": [
+        "2b179b4553185c6ae4cb8e40131e0b078d25208afdd510027d8cf715e31af9ca"
+      ]
+    },
+    {
+      "version": "20261009000022",
+      "name": "phase1b_consolidate_remaining_permissive_policies",
+      "statement_hashes": [
+        "85be2e1ad2825f22367cdffdd61323eca85652d0f34049d3cf79b92bebf5f9e6"
+      ]
+    },
+    {
+      "version": "20261009080923",
+      "name": "phase2a_canonical_item_compatibility",
+      "statement_hashes": [
+        "f6ffd1fe728a006365d6f11d5252de03c63662f9a011f5012e20b3620e8d1846"
+      ]
+    },
+    {
+      "version": "20261009081334",
+      "name": "phase2b_canonical_item_sync",
+      "statement_hashes": [
+        "2b0b809e418f6011a3108ea8d616b7b5779ddcae8d2175c543f23b05031d5178"
+      ]
+    },
+    {
+      "version": "20261009081634",
+      "name": "phase2c_canonical_item_read_model",
+      "statement_hashes": [
+        "4f05e2f5a5ff39c6ced5849d2f4ca02fa5396897a9331a7c7e03ad453d0aec2c"
+      ]
+    },
+    {
+      "version": "20261009085820",
+      "name": "phase2d_canonical_dual_read_reconciliation",
+      "statement_hashes": [
+        "db01053defaa3f2ea90ea4cf3a4311470960b695c14ec497000a45aae20059b9"
+      ]
+    },
+    {
+      "version": "20261009090317",
+      "name": "phase3a_canonical_inventory_movement_read_model",
+      "statement_hashes": [
+        "618a85bce6a6bfa59c4b805ab5393bd59497d05a9f0f7abcf250d8ac9ac31699"
+      ]
+    },
+    {
+      "version": "20261009090833",
+      "name": "phase3b_canonical_inventory_balance_projection",
+      "statement_hashes": [
+        "13dac078863588ab21ea904c0ece985de7b621068b30912511b5d67f3985c877"
+      ]
+    },
+    {
+      "version": "20261009091158",
+      "name": "phase3c_inventory_batch_diagnostics",
+      "statement_hashes": [
+        "2dd43feaef691096ca9c70aa66e0f70f8cd8813a7304049851e093db5bf63ec6"
+      ]
+    },
+    {
+      "version": "20261009091524",
+      "name": "phase3d_inventory_review_evidence",
+      "statement_hashes": [
+        "1520aaf60f404ae936b0e959c6e91dee76346562431eae7a5858839212a9831d"
+      ]
+    },
+    {
+      "version": "20261009092021",
+      "name": "phase4a_costing_v2_baseline",
+      "statement_hashes": [
+        "7cb53b503f5c2de64e5a9845766c2c4a70660d202b8ded26be33ede82347fcb6"
+      ]
+    },
+    {
+      "version": "20261009092803",
+      "name": "phase4b_standard_cost_command",
+      "statement_hashes": [
+        "2ad8afe06e683d83527bb33a2a5014ec9c9c218175d48a006add71304245c0d6"
+      ]
+    },
+    {
+      "version": "20261009131940",
+      "name": "phase4c_cost_variance_read_models",
+      "statement_hashes": [
+        "bb341874494a08c208342c3c7e9f9b344ece51a848ea3114bc3f54e8d4893b55"
+      ]
+    },
+    {
+      "version": "20261009134308",
+      "name": "phase4d_immutable_sale_cost_snapshots",
+      "statement_hashes": [
+        "5a8eb1c63917b73722109bf0b5e65240b32c88b62f747f03efb126a015875ebc"
+      ]
+    },
+    {
+      "version": "20261009135011",
+      "name": "phase4e_cost_variance_summary",
+      "statement_hashes": [
+        "ae39a261b82a822a95b2f746c6f5b3c8e9300ae5709313932d7332cbacf87ac0"
+      ]
+    },
+    {
+      "version": "20261009140019",
+      "name": "phase5a_fiscal_period_posting_metadata",
+      "statement_hashes": [
+        "cd983d8f83345dd46ec16ef2221c6beded4d607b352fe9ef88ad6cbf6b287b74"
+      ]
+    },
+    {
+      "version": "20261011063245",
+      "name": "phase5b_period_lock_and_journal_reversal",
+      "statement_hashes": [
+        "80f1a2734f389077fc785283a4569f56332e3287a8be2538a8da22928de731dd"
+      ]
+    },
+    {
+      "version": "20261011063603",
+      "name": "phase5c_journal_mutation_registry",
+      "statement_hashes": [
+        "963ab4bfe1fb972247f7c13c710bfc6f79e97ac61a9306261c592f647b4c53c2"
+      ]
+    },
+    {
+      "version": "20261011064606",
+      "name": "phase5e_append_only_fifo_sale_cogs",
+      "statement_hashes": [
+        "4a28fd39c98166983a2faec37bad143eb651db80b80c039eb6692b5d9ec01d60"
+      ]
+    },
+    {
+      "version": "20261011064956",
+      "name": "phase5f_append_only_fifo_orphan_and_stock",
+      "statement_hashes": [
+        "ea8e4723cad264fe09e7ccf036528d71074dd513da7fdd7933e009219387dc58"
+      ]
+    },
+    {
+      "version": "20261011133446",
+      "name": "phase8c_scheduled_verified_event_worker",
+      "statement_hashes": [
+        "cc9c40d4e37b74a1947d95def1712ee129ae504d4eb328b164aaaad018c67e1c"
+      ]
+    },
+    {
+      "version": "20261023042826",
+      "name": "stage_non_fifo_warehouse_balances_v2",
+      "statement_hashes": [
+        "2b8eb1a0de66e5e053e5b8f9daf2d35fa16e8da0d5686239522cef6cdd9e169b"
+      ]
+    },
+    {
+      "version": "20261023043004",
+      "name": "stage_non_fifo_idempotent_movement_contract",
+      "statement_hashes": [
+        "d92ff84f9f127e9c12406e2ceb8e6da63710fe7d88854119449c32bd4cd9609d"
+      ]
+    },
+    {
+      "version": "20261023043100",
+      "name": "published_cost_asof_event_v2",
+      "statement_hashes": [
+        "517d97baf1dcb2398e3cfd531c96e0483b60272eb9a4c8c086ebe89884873fac"
+      ]
+    },
+    {
+      "version": "20261023043629",
+      "name": "link_gated_non_fifo_movements_to_inventory_ledger",
+      "statement_hashes": [
+        "5724a80ca406f61c56d18f8f14eaa637e78b0b8bafff7e7049e873df6e9a5378"
+      ]
+    },
+    {
+      "version": "20261023120442",
+      "name": "non_fifo_v3_document_aware_movement_stage",
+      "statement_hashes": [
+        "6405f35bb0f317c7c71b529b696033a1ae87c0be01e9534116401834cabf39b0"
+      ]
+    },
+    {
+      "version": "20261023122353",
+      "name": "sale_snapshot_modifier_cost_asof_published_price",
+      "statement_hashes": [
+        "8ba9817513d91cd90b227b8e7b0efac4d7fdfdf68aa7b4b42164ddd67c67477e"
+      ]
+    },
+    {
+      "version": "20261023123728",
+      "name": "make_kitchen_raw_component_deduction_fail_atomic",
+      "statement_hashes": [
+        "84ba1968989ec4f91fd23caee8fa749215bfc520c3cd0833fe3b70c9aaeebb4f"
+      ]
+    },
+    {
+      "version": "20261023124737",
+      "name": "kitchen_document_context_and_warehouse_guard",
+      "statement_hashes": [
+        "83ff734bf22f36c3dec3aea1369ff16082bbbf2bd81ee910a6048b8741108882"
+      ]
+    },
+    {
+      "version": "20261023125710",
+      "name": "kitchen_raw_operational_cost_published_price_only",
+      "statement_hashes": [
+        "351590d44f1849c510aacdc8f467184ff810880e9527b3c344021a66e98678ee"
+      ]
+    },
+    {
+      "version": "20261023130126",
+      "name": "align_new_kitchen_ledger_cost_with_published_price",
+      "statement_hashes": [
+        "22c4cdeb560d837bd9e0ee2f914edad2ab3f351247dda0beaedad455ce0823e4"
+      ]
+    },
+    {
+      "version": "20261023130618",
+      "name": "reject_repeated_kitchen_inventory_event_before_fifo_deduction",
+      "statement_hashes": [
+        "5db8f466795b45dc430de661423a977816acffaf150d38d6aa30a52ac41b256c"
+      ]
+    },
+    {
+      "version": "20261023132050",
+      "name": "retire_unreferenced_fifo_historical_debt_rebase_helpers",
+      "statement_hashes": [
+        "0f322163254696fcc32e9060f0ebe30f9309d2b27349f1e56b68b8304f6747c2"
+      ]
+    },
+    {
+      "version": "20261023132918",
+      "name": "guard_direct_non_fifo_kitchen_material_event_replay",
+      "statement_hashes": [
+        "ba283bacdb8938a0583948beb58f1e0964ad61c61234f63e58534cc7006abc89"
+      ]
+    },
+    {
+      "version": "20261023133130",
+      "name": "refactor_kitchen_ledger_to_direct_movement_link",
+      "statement_hashes": [
+        "743fbfd94058162aaf937223dd3872bb97b4acb19314d8d4ed3ee43a7a112ed9"
+      ]
+    },
+    {
+      "version": "20261023134151",
+      "name": "sync_non_fifo_kitchen_staged_warehouse_balance_after_write",
+      "statement_hashes": [
+        "4b15157c54e2213a58a5201898e38a90f8e8fe2f073fed3868a0d7cf628b7144"
+      ]
+    },
+    {
+      "version": "20261023140605",
+      "name": "reconcile_nine_verified_raw_branch_balance_cache_rows",
+      "statement_hashes": [
+        "8fa459e4adc8d3403968fcc6147c59445d0316c9c725dd587eb5bceaabe75272"
+      ]
+    },
+    {
+      "version": "20261023152041",
+      "name": "deploy_corrected_unified_raw_movement_core_v1",
+      "statement_hashes": [
+        "ca3d2afe9e891d4b44b8fbc69bd83f4f8b839d794843b670c4a42f6927f5fee8"
+      ]
+    },
+    {
+      "version": "20261023152102",
+      "name": "cutover_manufactured_unit_raw_inputs_to_unified_movements",
+      "statement_hashes": [
+        "25ffeeb1f57daa7c696cb097158efe4f95aa8f1ea4b37d3f72a9082aa07c1348"
+      ]
+    },
+    {
+      "version": "20261023152514",
+      "name": "cutover_stock_count_raw_negative_delta_to_unified_engine",
+      "statement_hashes": [
+        "fb7b138049ff434ce55d7bd762df72ff8731cb0e24e71ada565e103d98d60572"
+      ]
+    },
+    {
+      "version": "20261023152705",
+      "name": "cutover_single_warehouse_branch_raw_adjustment_preserve_journal",
+      "statement_hashes": [
+        "e740ffe8d1137febec235f2877313907215ed68da6a0ba4ccf7b22478bad0056"
+      ]
+    },
+    {
+      "version": "20261023152853",
+      "name": "cutover_purchase_return_raw_to_document_warehouse_unified",
+      "statement_hashes": [
+        "64be8741ddbb1f9c79620c429f52eda6933ce881e31ba16d2098cb616b5926b6"
+      ]
+    },
+    {
+      "version": "20261023152948",
+      "name": "cutover_raw_warehouse_transfer_both_legs_unified",
+      "statement_hashes": [
+        "4211cb7c206dc4d29cac1f53debb40912b0b2137ef72d22484a47e24019ab0a7"
+      ]
+    },
+    {
+      "version": "20261023153040",
+      "name": "cutover_modifiers_sale_raw_warehouse_unified_atomic",
+      "statement_hashes": [
+        "c1aa5c9523d5f372d6000e7202032756948d2222dc5692de6837fbfed78261dd"
+      ]
+    },
+    {
+      "version": "20261023153111",
+      "name": "cutover_legacy_sale_unit_raw_consumption_unified",
+      "statement_hashes": [
+        "36e07d71e83e8d4d558133eef89de3f0a48db9113e7e676d45f05150def36db7"
+      ]
+    },
+    {
+      "version": "20261024170040",
+      "name": "add_product_fifo_cutover_readiness_gate",
+      "statement_hashes": [
+        "c6eb220752ab9b20a64ce18fd61adfd1a5928c304c963489e1c0567881e31e0e"
+      ]
+    },
+    {
+      "version": "20261024174300",
+      "name": "product_non_fifo_stock_removal_compatibility_engine",
+      "statement_hashes": [
+        "497ae6f4e7a07e962673e2ea35bad1b3d2a33eae112130619c0fe316ef670aee"
+      ]
+    },
+    {
+      "version": "20261024174313",
+      "name": "cutover_product_adjustment_without_fifo",
+      "statement_hashes": [
+        "acea39508b500f148f3f2200cae8ed7aef0edf32b97145c319d9a58f06910de6"
+      ]
+    },
+    {
+      "version": "20261024180153",
+      "name": "cutover_stock_count_product_removal_non_fifo",
+      "statement_hashes": [
+        "95347281c074f62a80d58f32cc889868b30b3e95a8705f7dc3a1ec067048ed5f"
+      ]
+    },
+    {
+      "version": "20261024180216",
+      "name": "cutover_purchase_return_product_removal_non_fifo",
+      "statement_hashes": [
+        "f4f3028414d2f4bca58018d78510190e62d31684d1d982e64f67322460f9e327"
+      ]
+    },
+    {
+      "version": "20261024191859",
+      "name": "cutover_sale_products_without_fifo_final",
+      "statement_hashes": [
+        "872aff7b8ac0af3e32fbf0d44c19d62b00f7d6c7832c0f3529b803df90edd833"
+      ]
+    },
+    {
+      "version": "20261024191902",
+      "name": "cutover_transfer_products_without_fifo_final",
+      "statement_hashes": [
+        "cd9d391eeacbbed5b00c3d24f3b7071be8da818e4992ba51576e6946a01544e0"
+      ]
+    },
+    {
+      "version": "20261026200727",
+      "name": "unified_stock_balance_read_contract_products_raw_and_units",
+      "statement_hashes": [
+        "37f3261a10dffdb6a7e28a7bf2b06e196393a00563deb9040ccf6d5623062041"
+      ]
+    },
+    {
+      "version": "20261026201549",
+      "name": "unify_ready_product_sale_stock_cost_and_lock",
+      "statement_hashes": [
+        "12f17ac3e8b5bdb9526dca2c24dc5a91923d31133b8c01dec71c22fe2ee63a27"
+      ]
+    },
+    {
+      "version": "20261026202246",
+      "name": "unify_manufactured_unit_sale_cost_catalog_source",
+      "statement_hashes": [
+        "c45e8453c2853bb31c35fba39a2efa40233ce442a5969b8e591dac6362a120be"
+      ]
+    },
+    {
+      "version": "20261026202407",
+      "name": "canonical_current_display_stock_costs",
+      "statement_hashes": [
+        "cde47c6b2313508fc5d4142bea606d3b239399bc2274560a0ae15d3d9691bc3d"
+      ]
+    },
+    {
+      "version": "20261026202836",
+      "name": "unify_product_valuation_with_signed_stock_and_current_cost",
+      "statement_hashes": [
+        "685294acd739c403e8ac9051c6fe4c7659a52810b921369df34b2979c23ee45d"
+      ]
+    },
+    {
+      "version": "20261027053310",
+      "name": "canonical_current_sale_price_read_contract",
+      "statement_hashes": [
+        "99e003d14e5942086d6e91085d07fe6f2a20531b45f0a420f4242a1a33521952"
+      ]
+    },
+    {
+      "version": "20261027085510",
+      "name": "kitchen_manufactured_group_deduction_and_snapshot_reversal",
+      "statement_hashes": [
+        "42ca8db70e0d6d71b14a8d0443c442ebea10b04404d97e22c52909f29667ada0"
+      ]
+    },
+    {
+      "version": "20261027085656",
+      "name": "avoid_double_raw_consumption_for_manufactured_kitchen_sends",
+      "statement_hashes": [
+        "4cc24bb440b24403c5f90fda7232e36256f5e3ccfc2de52feacf12ccbd11a8ce"
+      ]
+    },
+    {
+      "version": "20261027092007",
+      "name": "honor_branch_negative_stock_policy_for_manufactured_kitchen_send",
+      "statement_hashes": [
+        "f367a08138c46bef2ec72f8b1a65ed7ca9729b246696c1d591fb7c8110df92eb"
+      ]
+    },
+    {
+      "version": "20261027092106",
+      "name": "fix_manufactured_kitchen_oversell_debt_sale_fk",
+      "statement_hashes": [
+        "cb1f8ae7aeb8bfc622042a1bae18dedca4bdfb72fb35197a77096b7efcd1b089"
+      ]
+    },
+    {
+      "version": "20261027175944",
+      "name": "secure_internal_raw_cost_triggers_and_invoker_view",
+      "statement_hashes": [
+        "b8846d4bd1579bbcf0ba7467584d5793090456760f74663b1bb53ad66f9ab59a"
+      ]
+    },
+    {
+      "version": "20261027180005",
+      "name": "allow_branch_scoped_raw_cost_cache_read",
+      "statement_hashes": [
+        "1f9d437de5b955a95f356008faa5ed05ee0f3e058c0b75b1652573d6262486a2"
+      ]
+    },
+    {
+      "version": "20261027180243",
+      "name": "align_cached_raw_cost_access_with_material_visibility",
+      "statement_hashes": [
+        "fa4be14d6e5692f0d3d01259033a1fee545338f3d5ad5956d611736168091bb4"
+      ]
+    },
+    {
+      "version": "20261109072830",
+      "name": "premier_stock_counts_branch_permission_gate_20261109",
+      "statement_hashes": [
+        "ef8be6b4d352ca1356a7ed98841be9be597905c7481129f4be1d9767d5f089e1"
+      ]
+    },
+    {
+      "version": "20261109073118",
+      "name": "premier_expenses_financial_permission_gate_20261109",
+      "statement_hashes": [
+        "c577f3747f3a63070819e3595c97d7f47babe7a5929688daeb2188a4e8cba682"
+      ]
+    },
+    {
+      "version": "20261109073305",
+      "name": "premier_purchase_history_permission_gate_20261109",
+      "statement_hashes": [
+        "7a8f168b7e42fb8db913f19ed0fdc023a3b15d72b1795397590f6bbb469a89f3"
+      ]
+    },
+    {
+      "version": "20261109073426",
+      "name": "premier_sales_items_view_permission_gate_20261109",
+      "statement_hashes": [
+        "6539ab5c4428b9425548c8791cbedf6434e9e87efa0cbe15c0c8c27e39452afb"
+      ]
+    },
+    {
+      "version": "20261109073617",
+      "name": "premier_inventory_tenant_keys_stage1_20261109",
+      "statement_hashes": [
+        "a339ec8d2278862b2c7d1817c3b5b21ec1ac819f936f3cad66c6d7dd3f5ec62c"
+      ]
+    },
+    {
+      "version": "20261109073705",
+      "name": "premier_inventory_composite_fk_delete_parity_20261109",
+      "statement_hashes": [
+        "5377261d4211dc82e89a0a3cd086ee703f6a38563f97c3bb0dd8a7f26e6bdcb0"
+      ]
+    },
+    {
+      "version": "20261109073733",
+      "name": "premier_orders_recipes_branch_foreign_keys_stage2_20261109",
+      "statement_hashes": [
+        "5daa54f4d63112b4dc83ae7fdb9c7af642228c2a86e0b91c08f41bc08b88515d"
+      ]
+    },
+    {
+      "version": "20261109073754",
+      "name": "premier_sales_purchases_counts_warehouse_keys_stage3_20261109",
+      "statement_hashes": [
+        "fe956cb7431b50650df2889b44fad11cc5c0b28af0f034756a48f28200969e94"
+      ]
+    },
+    {
+      "version": "20261109073818",
+      "name": "premier_sales_orders_parent_composite_keys_stage4_20261109",
+      "statement_hashes": [
+        "db6761dc718f5a25f17cc4b33cc16552778ae4e99a1afc2866430e7bf0650703"
+      ]
+    },
+    {
+      "version": "20261109073839",
+      "name": "premier_payments_kitchen_composite_foreign_keys_stage5_20261109",
+      "statement_hashes": [
+        "c97f39a78c12b9498b22ed15f7379517a59bac02b882474ef2ffd03a61c94c12"
+      ]
+    },
+    {
+      "version": "20261109073920",
+      "name": "premier_validate_inventory_branch_fks_20261109",
+      "statement_hashes": [
+        "52bfb85aa7f6714ec0213d707b06d7029db81fed4ae61e9e610883ac2decadfd"
+      ]
+    },
+    {
+      "version": "20261109073923",
+      "name": "premier_validate_warehouse_document_branch_fks_20261109",
+      "statement_hashes": [
+        "2d1ab6bbe319f9a4b009f342d4092f300af58904133ef9fd55d18d5fb90ff084"
+      ]
+    },
+    {
+      "version": "20261109073928",
+      "name": "premier_validate_sale_payment_kitchen_branch_fks_20261109",
+      "statement_hashes": [
+        "bcc46f4fa405ef383b74e64055d2dadd2267c2821806aa6c481273ef672f6eb1"
+      ]
+    },
+    {
+      "version": "20261109074100",
+      "name": "premier_product_unit_links_multibranch_permission_gate_20261109",
+      "statement_hashes": [
+        "1a6df936f298a12e9fa3fa91d8a27789a32797b09b92f6f51ba6a251882a5b70"
+      ]
+    },
+    {
+      "version": "20261109081844",
+      "name": "premier_stock_counts_write_permission_gate_20261109",
+      "statement_hashes": [
+        "5626e446f6ae06ad38163706a2954d33b8a05b01ab7bcf50aab6e1433d4a6d80"
+      ]
+    },
+    {
+      "version": "20261109084444",
+      "name": "premier_stock_count_lines_rls_direct_dml_lockdown_20261109",
+      "statement_hashes": [
+        "2971c36baab61c75e074d476b1bf3f800f4a52e679aa00758f779461a4bf15d5"
+      ]
+    },
+    {
+      "version": "20261109094032",
+      "name": "premier_ready_product_actual_batch_cogs_20261109",
+      "statement_hashes": [
+        "023f3b3073fc74659d4dafac0eb7092f438ad2ce85a63c0cebe8953e5d6d3470"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "canonical_path": "supabase/migrations/20260927095000_auto_business_day_close.sql",
+      "canonical_sha256": "b0b7ee70cb2bca2a640bf99d18b69e67277ccce6f47e8f3ac58185761e4b4143",
+      "original_category": "unresolved",
+      "candidates": [],
+      "canonical_statements": 7,
+      "normalized_ast_sha256": "37f1ecdecbc2920e6a5baf08eb78cb640705bad6537215d80707793c8467afd7",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [
+        "referenced_private_functions_absent_in_live_catalog"
+      ],
+      "next_gate": "Review absent automatic-close helpers and desired scheduling behavior."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260927133500_reassert_settlement_modifier_order_normalization.sql",
+      "canonical_sha256": "ff7681e9f776b7b6381f13de0d5b60f8d0cc25590c980cfa7fb44da806a9a992",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20260927065328",
+          "statement_hashes": [
+            "9220ffd421a45a7e1323484291bd8234106162ff3f4a0c7ca4021ff428f8e2be"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 181,
+          "normalized_ast_sha256": "f19375b10e240baf064926f927d25be03f699c6cc7947c6e2c3dee5d037bb39c",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 3,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateFunctionStmt",
+            "/0/stmt/DropStmt"
+          ]
+        },
+        {
+          "version": "20260927065354",
+          "statement_hashes": [
+            "c98fb7ac1e50c2564d365be3808d840d74ee3ad5785fcd4898b3c0b287403987"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 157,
+          "normalized_ast_sha256": "6fe573c236cd3e106120399c0ca18bec3f12083296cd5ce923db8eb01731625b",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 7,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateFunctionStmt/funcname/1/String/sval",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/length",
+            "/0/stmt/CreateFunctionStmt/parameters/0/FunctionParameter/name",
+            "/0/stmt/CreateFunctionStmt/parameters/1/FunctionParameter/argType/arrayBounds",
+            "/0/stmt/CreateFunctionStmt/parameters/1/FunctionParameter/name"
+          ]
+        },
+        {
+          "version": "20260927065752",
+          "statement_hashes": [
+            "d6419d9a569ed5e9569409469e23b2ba6e7759be8917f793b9bd475b33dc5576"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 134,
+          "normalized_ast_sha256": "c08b7dea3ae9c7c5bccc841d2c50db665452c5ab96f966176d9d452fc7feac80",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [
+            17
+          ],
+          "ast_difference_count": 4,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateFunctionStmt/funcname/1/String/sval",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/length"
+          ]
+        },
+        {
+          "version": "20260927065826",
+          "statement_hashes": [
+            "e050226df1781c3258e97988db9871591b6989115e1bc6e8050f934ebb16bc69"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 131,
+          "normalized_ast_sha256": "8d81682ffb01a4f21995b667f3d978ce457e972ed4b2268bf2729812c96bbe90",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 9,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateFunctionStmt/funcname/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/funcname/1/String/sval",
+            "/0/stmt/CreateFunctionStmt/options/2/DefElem/arg/VariableSetStmt/args/length",
+            "/0/stmt/CreateFunctionStmt/options/2/DefElem/arg/VariableSetStmt/args/0/A_Const/sval/sval",
+            "/0/stmt/CreateFunctionStmt/options/2/DefElem/arg/VariableSetStmt/args/1/A_Const/sval/sval",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters",
+            "/0/stmt/CreateFunctionStmt/returnType/names/0/String/sval"
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "a33b910eedb7b0982a85a017a720e822642160c8b00ae47c1ad0b41e6921bd49",
+      "resolution": "contiguous_batch_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260927154500_organization_module_controls.sql",
+      "canonical_sha256": "d0c07a90fb1968745c27fd973c030b9129506c77115f2b695a57a887c86d640b",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20260927141752",
+          "statement_hashes": [
+            "346841369a59ea27cbf9d0c4a4bef5afec40471edd9e7fdd7732fe93dfc57bb2"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 31,
+          "normalized_ast_sha256": "d5b090680b86b7b89c8971752928dd1d33132bb638d9e4fd67e18b85656b1d55",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 1,
+          "first_ast_difference_paths": [
+            "/16/stmt/CreateFunctionStmt/options/4/DefElem/arg/List/items/0/String/sval"
+          ]
+        }
+      ],
+      "canonical_statements": 31,
+      "normalized_ast_sha256": "be02a0ca15f143ac143ea665eef499f9f5392d7ec28375f2526697dc45b87824",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260927165000_organization_module_updated_by_index.sql",
+      "canonical_sha256": "d64fddabccff4fbed6ebe7bc2cfbe0cbdfcabaf05f28cf1d16004c14b9e33fff",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20260927144333",
+          "statement_hashes": [
+            "1d50486016b2765594599f4b92a531e1ff657894acd9a4a95d5aee475993cbd1"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "a4c58ccfce31e6585a85cff0654768e85e1182c769cd6224f038df513c80f34f",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "936ddc0835f15bcf49314b9772d88da4e93f1e47f5492fb0b18123523f156cc9"
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "a4c58ccfce31e6585a85cff0654768e85e1182c769cd6224f038df513c80f34f",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20260928153000_internal_trigger_execute_boundary.sql",
+      "canonical_sha256": "65295a61f3b77ee6a8d9fb2207d631c4fddbfaf6b59cecc2ed4e00de3a850012",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20260927070509",
+          "statement_hashes": [
+            "714f80bf7d7f088faf825415ed92a7c23bb17a53f7a8e64d42af80b36d03b0f6"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 304,
+          "normalized_ast_sha256": "eb53caa144561ee1bd9a433ce9f2653eb2e210b835126ddc7795171465a9e53e",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 29,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateFunctionStmt",
+            "/0/stmt/GrantStmt",
+            "/1/stmt/GrantStmt/grantees/0/RoleSpec/rolename",
+            "/1/stmt/GrantStmt/grantees/0/RoleSpec/roletype",
+            "/1/stmt/GrantStmt/grantees/1/RoleSpec/rolename",
+            "/1/stmt/GrantStmt/objects/0/ObjectWithArgs/objargs",
+            "/1/stmt/GrantStmt/objects/0/ObjectWithArgs/objfuncargs",
+            "/1/stmt/GrantStmt/objects/0/ObjectWithArgs/objname/1/String/sval",
+            "/1/stmt/GrantStmt/privileges",
+            "/2/stmt/GrantStmt/grantees/length",
+            "/2/stmt/GrantStmt/grantees/0/RoleSpec/rolename"
+          ]
+        },
+        {
+          "version": "20261008235622",
+          "statement_hashes": [
+            "00c9f647849280778c47ca23e21233d1a7a0835fb8c5ec0e969f6a725b1f49ac"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 11,
+          "normalized_ast_sha256": "f4e65c7273d39149b8f00adec6069afccf10203f22b2ad082eda3973fc93d897",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 53,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/GrantStmt/grantees/length",
+            "/0/stmt/GrantStmt/privileges",
+            "/1/stmt/GrantStmt/grantees/length",
+            "/1/stmt/GrantStmt/grantees/0/RoleSpec/rolename",
+            "/1/stmt/GrantStmt/grantees/0/RoleSpec/roletype",
+            "/1/stmt/GrantStmt/grantees/1/RoleSpec/rolename",
+            "/1/stmt/GrantStmt/objects/0/ObjectWithArgs/objname/1/String/sval",
+            "/2/stmt/GrantStmt/grantees/length",
+            "/2/stmt/GrantStmt/grantees/0/RoleSpec/rolename",
+            "/2/stmt/GrantStmt/grantees/0/RoleSpec/roletype",
+            "/2/stmt/GrantStmt/is_grant"
+          ]
+        }
+      ],
+      "canonical_statements": 10,
+      "normalized_ast_sha256": "f861c96602eaf8fc1f4a2bc3d9cfae4af42e17fa3de4a79a9defeb15b1cb47fd",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260929144000_organization_business_profiles.sql",
+      "canonical_sha256": "4664e1a41a9715393dead687c19e8a8d51947153f6651f98f86641e4facc0c33",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20260929132251",
+          "statement_hashes": [
+            "5a1a0d3866d7aa529f4934e54171abbd181feaf40e45b4630f09474b289166fa"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 6,
+          "normalized_ast_sha256": "b82004b6446c8053f4f0ebd488f93c2df5959f3026c56eb9f6fe7537591da1d2",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 2,
+          "first_ast_difference_paths": [
+            "/2/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/5/stmt/NotifyStmt/payload_location"
+          ]
+        }
+      ],
+      "canonical_statements": 6,
+      "normalized_ast_sha256": "9445afac999324856981b40de6fa88ca4491e92bdfd4eb9bed58d83e8cf03a20",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20260929154500_business_profile_runtime_storage.sql",
+      "canonical_sha256": "87f92aaeeb91b5c09df9536f9f62d91a4cb77a749666221aecd1bf4325f24d50",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20260929132312",
+          "statement_hashes": [
+            "e701f4937c397c418ae955fd413d09b25f45eade8b71283c66686b15a8e0fe25"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 21,
+          "normalized_ast_sha256": "4283578d9f8c224ce018f52859f0b95fa84afa3a7a247ee5dfdb721fd31a30ff",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "0baa12b7c7cae47f9086e9c5c06e6f679c64baf19a5fcab8201ebe1a7064159e"
+        }
+      ],
+      "canonical_statements": 21,
+      "normalized_ast_sha256": "4283578d9f8c224ce018f52859f0b95fa84afa3a7a247ee5dfdb721fd31a30ff",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261008235622_phase1a_rpc_surface_hardening.sql",
+      "canonical_sha256": "046ba808152691f6b3ac9e97b4b647d573010a52855840636249951360ab1a40",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261008235622",
+          "statement_hashes": [
+            "00c9f647849280778c47ca23e21233d1a7a0835fb8c5ec0e969f6a725b1f49ac"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 11,
+          "normalized_ast_sha256": "f4e65c7273d39149b8f00adec6069afccf10203f22b2ad082eda3973fc93d897",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "96d8710f7c42d3b344a21bf879998e72a602bc1f53bfb13cafff5239056f9fbb"
+        }
+      ],
+      "canonical_statements": 11,
+      "normalized_ast_sha256": "f4e65c7273d39149b8f00adec6069afccf10203f22b2ad082eda3973fc93d897",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261008235837_phase1b_remove_redundant_kitchen_delete_policy.sql",
+      "canonical_sha256": "fc58e942653cfdd23e5dd126e48d1e678f33764498b2051dc385ec155bcf1624",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261008235837",
+          "statement_hashes": [
+            "8af32a83e33cd25608927baf02cf5f68d572e286bc70c4b3ee39851c231370c3"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "69fec9a7fa56ba684633908761b5e309b9d789b8330429097a5993b9cfc3dab4",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "b0317b51a3d7e2eeebbaec05d28024966b02479e84d2d32b0592c1a93aa8418a"
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "69fec9a7fa56ba684633908761b5e309b9d789b8330429097a5993b9cfc3dab4",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261008235940_phase1b_consolidate_kitchen_write_policies.sql",
+      "canonical_sha256": "260139d598bb0b3c089b6e295487e96576f71708094fd4aa56ca257edca2490e",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261008235940",
+          "statement_hashes": [
+            "2b179b4553185c6ae4cb8e40131e0b078d25208afdd510027d8cf715e31af9ca"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 8,
+          "normalized_ast_sha256": "24388e6b1952fe5dfda8cbf6fcfae7f3bfe0091b0c2b1fa82e3091bcf9df4e29",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "f967357532bac0de6e4c5dc01c1912542c673053c11a6836ddc029f3fb1cd96f"
+        }
+      ],
+      "canonical_statements": 8,
+      "normalized_ast_sha256": "24388e6b1952fe5dfda8cbf6fcfae7f3bfe0091b0c2b1fa82e3091bcf9df4e29",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009000022_phase1b_consolidate_remaining_permissive_policies.sql",
+      "canonical_sha256": "95b539966618d630ff6f07c31c437958a072622fb308b6976d3ae0c40ade9cc1",
+      "original_category": "sql_ast_equal",
+      "candidates": [
+        {
+          "version": "20261009000022",
+          "statement_hashes": [
+            "85be2e1ad2825f22367cdffdd61323eca85652d0f34049d3cf79b92bebf5f9e6"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 12,
+          "normalized_ast_sha256": "58e22638e1112662a3d6812bbae3718e96e1ee680b94239905f2a694b79346bb",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "5216395f5f94afbe4958aacfcbf14b9e4012fdc621c99ee912206cf326f8703d"
+        }
+      ],
+      "canonical_statements": 12,
+      "normalized_ast_sha256": "58e22638e1112662a3d6812bbae3718e96e1ee680b94239905f2a694b79346bb",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009080923_phase2a_canonical_item_compatibility.sql",
+      "canonical_sha256": "1435f58282c526ef793e9d65c8d25cc609de22ad2939690e8011450a402c37ac",
+      "original_category": "sql_ast_equal",
+      "candidates": [
+        {
+          "version": "20261009080923",
+          "statement_hashes": [
+            "f6ffd1fe728a006365d6f11d5252de03c63662f9a011f5012e20b3620e8d1846"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 30,
+          "normalized_ast_sha256": "ba4d9ff514c5d006d5902ec14ad2a76ed7103050e6014a45edc36e52077701af",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "33b544cb6a63125a5f599b762e9cd4d5532e504b9de4f80840bef3d59d18f470"
+        }
+      ],
+      "canonical_statements": 30,
+      "normalized_ast_sha256": "ba4d9ff514c5d006d5902ec14ad2a76ed7103050e6014a45edc36e52077701af",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009081334_phase2b_canonical_item_sync.sql",
+      "canonical_sha256": "2e37fbd8bc7da3033ec924a253c9c70d01260a4caff66e6ab936cb8b8f9c6df3",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261009081334",
+          "statement_hashes": [
+            "2b0b809e418f6011a3108ea8d616b7b5779ddcae8d2175c543f23b05031d5178"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 15,
+          "normalized_ast_sha256": "2c4492962d7010450e9f93c5fdf40ea81e513f7996971a5cfc1fe94bc15f93ca",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "ced796786fea894534d54342a63d9787ed49f8d3b1f0a74f4be8f56bfd186c36"
+        }
+      ],
+      "canonical_statements": 15,
+      "normalized_ast_sha256": "2c4492962d7010450e9f93c5fdf40ea81e513f7996971a5cfc1fe94bc15f93ca",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009081634_phase2c_canonical_item_read_model.sql",
+      "canonical_sha256": "e819094ec7647b1b678f7923b6857e85f543183fbbba498dded35577e9bfaab7",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261009081634",
+          "statement_hashes": [
+            "4f05e2f5a5ff39c6ced5849d2f4ca02fa5396897a9331a7c7e03ad453d0aec2c"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "238d3c47c3fcf631e9e764c2ffbf43f094cd214fe3e2ab9286b4f59f9d18e96f",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "a613fbc5936796437245528f69249cef9b8f11b4cb6079c4eaa14c9eb6795814"
+        }
+      ],
+      "canonical_statements": 3,
+      "normalized_ast_sha256": "238d3c47c3fcf631e9e764c2ffbf43f094cd214fe3e2ab9286b4f59f9d18e96f",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009085820_phase2d_canonical_dual_read_reconciliation.sql",
+      "canonical_sha256": "da7b355dc3e7aee9136e5840f2372c66530e6fd079ec79aa2cf0ca78c4211b69",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261009085820",
+          "statement_hashes": [
+            "db01053defaa3f2ea90ea4cf3a4311470960b695c14ec497000a45aae20059b9"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "bcfc1da560e9e1121c6d88b09f3b8cb9658b72de03ba6b01a281c4aeed55f754",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "18493c15e5fe781aa67cdf05bf33b4071926844c58f7c0d7b924893490f86b0c"
+        }
+      ],
+      "canonical_statements": 3,
+      "normalized_ast_sha256": "bcfc1da560e9e1121c6d88b09f3b8cb9658b72de03ba6b01a281c4aeed55f754",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009090317_phase3a_canonical_inventory_movement_read_model.sql",
+      "canonical_sha256": "889ec844a9492140e12c245225b998810dcb392db21beef08734e50b4316614a",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261009090317",
+          "statement_hashes": [
+            "618a85bce6a6bfa59c4b805ab5393bd59497d05a9f0f7abcf250d8ac9ac31699"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "9be2d4dccf8040945c57d9bf196f0ed4dc1c8166e92517213342fb6398f97ce3",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "0d19c883b76fc7afc6c0156020b600aed8f3e543e70bb9eb2c130ea529f4764a"
+        }
+      ],
+      "canonical_statements": 3,
+      "normalized_ast_sha256": "9be2d4dccf8040945c57d9bf196f0ed4dc1c8166e92517213342fb6398f97ce3",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009090833_phase3b_canonical_inventory_balance_projection.sql",
+      "canonical_sha256": "6c978e6bb8f6af2a64861fdfdd2c2b6da7ef816051ceebcefa6b4c019ad344cf",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261009090833",
+          "statement_hashes": [
+            "13dac078863588ab21ea904c0ece985de7b621068b30912511b5d67f3985c877"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "55fcd43a911998901b45de43e8f9c4a2093e2fb01335ac1902d9d8f72a767f06",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "e7331b3194d7475980cf3571b9274c358560c0ea129b4b68ffea8b240c24e51f"
+        }
+      ],
+      "canonical_statements": 3,
+      "normalized_ast_sha256": "55fcd43a911998901b45de43e8f9c4a2093e2fb01335ac1902d9d8f72a767f06",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009091158_phase3c_inventory_batch_diagnostics.sql",
+      "canonical_sha256": "dfd484f8cd703330dbc703701e1003bfde1f21e1234e349309e5628f24e695e2",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261009091158",
+          "statement_hashes": [
+            "2dd43feaef691096ca9c70aa66e0f70f8cd8813a7304049851e093db5bf63ec6"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 6,
+          "normalized_ast_sha256": "1d2b8dd69a3439a29d630b8be0bb7232b861141cf5ef0b93a3c90afa74accd5d",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "9fa83394dffc3df90a2e61d80dbead82bf7dd0fe78e802d71bfd7eead71c4f87"
+        }
+      ],
+      "canonical_statements": 6,
+      "normalized_ast_sha256": "1d2b8dd69a3439a29d630b8be0bb7232b861141cf5ef0b93a3c90afa74accd5d",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009091524_phase3d_inventory_review_evidence.sql",
+      "canonical_sha256": "de6ce211b4805b43f3fb8d25df27f3a2049c4570d61977e2d5cbf578ae2494c8",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261009091524",
+          "statement_hashes": [
+            "1520aaf60f404ae936b0e959c6e91dee76346562431eae7a5858839212a9831d"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 6,
+          "normalized_ast_sha256": "ba25c3a3d5ec9590bfa69ff54df874115318a04fcd551770174a041fd69c6a2b",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "85bf6102c661346a2a21391effc7e9f37bf9dcb04175893e1ddb0aeedd64420b"
+        }
+      ],
+      "canonical_statements": 6,
+      "normalized_ast_sha256": "ba25c3a3d5ec9590bfa69ff54df874115318a04fcd551770174a041fd69c6a2b",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009092021_phase4a_costing_v2_baseline.sql",
+      "canonical_sha256": "5252c3256e6d7163e1f0c0548a93425d2f7119a36ca4b72a777fbd93fab7688a",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261009092021",
+          "statement_hashes": [
+            "7cb53b503f5c2de64e5a9845766c2c4a70660d202b8ded26be33ede82347fcb6"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 11,
+          "normalized_ast_sha256": "69bdff61e88d01ebb4b227a6829e7bf72c9fdcccb5dd8bb5412a29576ea81783",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "1e0a52e56bdebce9d1e9c976a6a0635956e09cf3ee4e051b5bf3817a77213ecb"
+        }
+      ],
+      "canonical_statements": 11,
+      "normalized_ast_sha256": "69bdff61e88d01ebb4b227a6829e7bf72c9fdcccb5dd8bb5412a29576ea81783",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009092803_phase4b_standard_cost_command.sql",
+      "canonical_sha256": "da3536565aac73cf77afc1d37d86e7b0ab18169d3eb2c96facf2dada93773184",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261009092803",
+          "statement_hashes": [
+            "2ad8afe06e683d83527bb33a2a5014ec9c9c218175d48a006add71304245c0d6"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 14,
+          "normalized_ast_sha256": "ea9b91853bf09e95ae8428567399648712f0a54b5e7786c8d1f49020ed686bee",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "ffbfe104567fc2857af9cd7c1d781b27dc236754f00b938149b32f45a1ca8eb2"
+        }
+      ],
+      "canonical_statements": 14,
+      "normalized_ast_sha256": "ea9b91853bf09e95ae8428567399648712f0a54b5e7786c8d1f49020ed686bee",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009131940_phase4c_cost_variance_read_models.sql",
+      "canonical_sha256": "6e51e8eae59c93100782b1abaece371b09c913f36fbda469ac54695015b834b1",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261009131940",
+          "statement_hashes": [
+            "bb341874494a08c208342c3c7e9f9b344ece51a848ea3114bc3f54e8d4893b55"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 6,
+          "normalized_ast_sha256": "d72588227daceb5c38ed754c1abb58fb4110e14cc4d292b8e588e41f15954abf",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "eee72efd980a272617fdf5b5a04cc8535b9b14653106cdfed307d3302b7a06a3"
+        }
+      ],
+      "canonical_statements": 6,
+      "normalized_ast_sha256": "d72588227daceb5c38ed754c1abb58fb4110e14cc4d292b8e588e41f15954abf",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009134308_phase4d_immutable_sale_cost_snapshots.sql",
+      "canonical_sha256": "d46857b7084d3908f8a3e172a90bafc15101a70d09211ebbd852677873c26517",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261009134308",
+          "statement_hashes": [
+            "5a8eb1c63917b73722109bf0b5e65240b32c88b62f747f03efb126a015875ebc"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 40,
+          "normalized_ast_sha256": "7e2937d79ca3a65b9abf97a9d771bed5b56273add4d2750134379a4f459cf0c2",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 4,
+          "first_ast_difference_paths": [
+            "/17/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/26/stmt/CreateFunctionStmt/options/4/DefElem/arg/List/items/0/String/sval",
+            "/27/stmt/CreateFunctionStmt/options/4/DefElem/arg/List/items/0/String/sval",
+            "/28/stmt/CreateFunctionStmt/options/4/DefElem/arg/List/items/0/String/sval"
+          ]
+        }
+      ],
+      "canonical_statements": 40,
+      "normalized_ast_sha256": "78e6ef75bd1a803a7493163674543fabd2466a683edb577b40db22a0389b5cf3",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009135011_phase4e_cost_variance_summary.sql",
+      "canonical_sha256": "62f76464f0c3f7c122a0fe2fa99253bc5143a32d48366efba22372cd3b2c328c",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261009135011",
+          "statement_hashes": [
+            "ae39a261b82a822a95b2f746c6f5b3c8e9300ae5709313932d7332cbacf87ac0"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "28b411d8df9631f08f38ee952ae1f9bfac8e767a36fee1b2f6615f300be1872e",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "2a74da1c209df20ca8dc5774cb1fb23d6cf2a299d5a40b44f1cca543782319ed"
+        }
+      ],
+      "canonical_statements": 3,
+      "normalized_ast_sha256": "28b411d8df9631f08f38ee952ae1f9bfac8e767a36fee1b2f6615f300be1872e",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009140019_phase5a_fiscal_period_posting_metadata.sql",
+      "canonical_sha256": "a7d33a4924f5f3e4959455718fb74e14f5bc7f75eba2f69cb3b5726528f9763d",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261009140019",
+          "statement_hashes": [
+            "cd983d8f83345dd46ec16ef2221c6beded4d607b352fe9ef88ad6cbf6b287b74"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 26,
+          "normalized_ast_sha256": "7a580454ee9f40513ce7853ba6be95fa0fd4823dce0563ae8685ddc974791e7b",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 45,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateStmt/tableElts/length",
+            "/0/stmt/CreateStmt/tableElts/5/ColumnDef/constraints/length",
+            "/0/stmt/CreateStmt/tableElts/11/Constraint/raw_expr/A_Expr/kind",
+            "/0/stmt/CreateStmt/tableElts/11/Constraint/raw_expr/A_Expr/lexpr/ColumnRef/fields/0/String/sval",
+            "/0/stmt/CreateStmt/tableElts/11/Constraint/raw_expr/A_Expr/rexpr/List",
+            "/0/stmt/CreateStmt/tableElts/11/Constraint/raw_expr/A_Expr/rexpr/TypeCast",
+            "/0/stmt/CreateStmt/tableElts/12/Constraint/raw_expr/A_Expr/lexpr/ColumnRef/fields/0/String/sval",
+            "/0/stmt/CreateStmt/tableElts/12/Constraint/raw_expr/A_Expr/rexpr/TypeCast/arg/A_Expr",
+            "/0/stmt/CreateStmt/tableElts/12/Constraint/raw_expr/A_Expr/rexpr/TypeCast/arg/FuncCall",
+            "/0/stmt/CreateStmt/tableElts/13/Constraint/raw_expr/A_Expr",
+            "/0/stmt/CreateStmt/tableElts/13/Constraint/raw_expr/BoolExpr"
+          ]
+        }
+      ],
+      "canonical_statements": 22,
+      "normalized_ast_sha256": "36f8452927f049b8219b0db12abf0ecf4bbdbaa02c7fdba639d2b608cd14cf9b",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261011063245_phase5b_period_lock_and_journal_reversal.sql",
+      "canonical_sha256": "a25eddbef922c450d611d7606a8cbd1bb7313da124793e8ea50f68887e6a8a69",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261011063245",
+          "statement_hashes": [
+            "80f1a2734f389077fc785283a4569f56332e3287a8be2538a8da22928de731dd"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 19,
+          "normalized_ast_sha256": "066c1ee1fda7fefdca9a5875e902bbea7b2f72345cb58eca0bd9c3e26f6e9d3c",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "2ec1e8f9d28f75bb550935567b0c2a1e4ece7a5d2e9be4f8cc0ad709b5e43033"
+        }
+      ],
+      "canonical_statements": 19,
+      "normalized_ast_sha256": "066c1ee1fda7fefdca9a5875e902bbea7b2f72345cb58eca0bd9c3e26f6e9d3c",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261011063603_phase5c_journal_mutation_registry.sql",
+      "canonical_sha256": "46be0be1eace52195c38fe446f8da16c1ad924b6c931242433dda9d8dc40f1a5",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261011063603",
+          "statement_hashes": [
+            "963ab4bfe1fb972247f7c13c710bfc6f79e97ac61a9306261c592f647b4c53c2"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 8,
+          "normalized_ast_sha256": "9648f0310e0d4d5a2d98013f7b1ad9bcfee632b7fca4de5532a3b7372f25f732",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "b84c3d2eb820faba9b7e1dbbc043af28e2b9a8cd14263a7990cf1faf816454ab"
+        }
+      ],
+      "canonical_statements": 8,
+      "normalized_ast_sha256": "9648f0310e0d4d5a2d98013f7b1ad9bcfee632b7fca4de5532a3b7372f25f732",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261011064606_phase5e_append_only_fifo_sale_cogs.sql",
+      "canonical_sha256": "22c4dd4011897cb492a4a784366c60fbfa21113957a0c53e468939d24ff2e563",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261011064606",
+          "statement_hashes": [
+            "4a28fd39c98166983a2faec37bad143eb651db80b80c039eb6692b5d9ec01d60"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 14,
+          "normalized_ast_sha256": "f5193e4668ecdc19b3357ce000c0ac2a2e5e5d7a4089be0e766efb806d970bd6",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 2,
+          "first_ast_difference_paths": [
+            "/9/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/12/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval"
+          ]
+        },
+        {
+          "version": "20261011064956",
+          "statement_hashes": [
+            "ea8e4723cad264fe09e7ccf036528d71074dd513da7fdd7933e009219387dc58"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 11,
+          "normalized_ast_sha256": "5bad4a6ee92292e85fa86fd5d07d42d3cfeb1d4f387014ac1fe06e4a6de40629",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 51,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateStmt",
+            "/0/stmt/DropStmt",
+            "/1/stmt/IndexStmt/idxname",
+            "/1/stmt/IndexStmt/if_not_exists",
+            "/1/stmt/IndexStmt/indexParams/length",
+            "/1/stmt/IndexStmt/indexParams/0/IndexElem/name",
+            "/1/stmt/IndexStmt/indexParams/1/IndexElem/name",
+            "/1/stmt/IndexStmt/relation/relname",
+            "/1/stmt/IndexStmt/relation/schemaname",
+            "/1/stmt/IndexStmt/unique",
+            "/1/stmt/IndexStmt/whereClause"
+          ]
+        }
+      ],
+      "canonical_statements": 14,
+      "normalized_ast_sha256": "d738027875963c9d05f028151b1032822768d7955b34b4f5f8e5e2a3da7117fb",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261011064956_phase5f_append_only_fifo_orphan_and_stock.sql",
+      "canonical_sha256": "221ad5b028db2abb11ee65d68a1a818f5b0cb92a94cb831227ed57ae0fb49569",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261011064956",
+          "statement_hashes": [
+            "ea8e4723cad264fe09e7ccf036528d71074dd513da7fdd7933e009219387dc58"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 11,
+          "normalized_ast_sha256": "5bad4a6ee92292e85fa86fd5d07d42d3cfeb1d4f387014ac1fe06e4a6de40629",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 3,
+          "first_ast_difference_paths": [
+            "/2/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/5/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/9/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval"
+          ]
+        },
+        {
+          "version": "20261011064606",
+          "statement_hashes": [
+            "4a28fd39c98166983a2faec37bad143eb651db80b80c039eb6692b5d9ec01d60"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 14,
+          "normalized_ast_sha256": "f5193e4668ecdc19b3357ce000c0ac2a2e5e5d7a4089be0e766efb806d970bd6",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 51,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateStmt",
+            "/0/stmt/DropStmt",
+            "/1/stmt/IndexStmt/idxname",
+            "/1/stmt/IndexStmt/if_not_exists",
+            "/1/stmt/IndexStmt/indexParams/length",
+            "/1/stmt/IndexStmt/indexParams/0/IndexElem/name",
+            "/1/stmt/IndexStmt/indexParams/1/IndexElem/name",
+            "/1/stmt/IndexStmt/relation/relname",
+            "/1/stmt/IndexStmt/relation/schemaname",
+            "/1/stmt/IndexStmt/unique",
+            "/1/stmt/IndexStmt/whereClause"
+          ]
+        }
+      ],
+      "canonical_statements": 11,
+      "normalized_ast_sha256": "84547f1cdeb5b86fadd35ed9a855b15e604753bebc69466277549394fbaebade",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261011133446_phase8c_scheduled_verified_event_worker.sql",
+      "canonical_sha256": "8d31616d2988a0defa61b41765fc60415295491a7439e719365ad021fbe9533a",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261011133446",
+          "statement_hashes": [
+            "cc9c40d4e37b74a1947d95def1712ee129ae504d4eb328b164aaaad018c67e1c"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "a6657453a7b45c8b96e7a4d5412f14893e8c6937402ab2210809a79c37b600b9",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "8277a0447213e2fb0c94cecc0d945da934c9e94e54b1fc182fe467fb5c1a7011"
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "a6657453a7b45c8b96e7a4d5412f14893e8c6937402ab2210809a79c37b600b9",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023042826_stage_non_fifo_warehouse_balances_v2.sql",
+      "canonical_sha256": "4f03d14f3c037c10090b498c28fdd8dd4bd55eb8b7bb7b9898ead2981db77f63",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261023042826",
+          "statement_hashes": [
+            "2b8eb1a0de66e5e053e5b8f9daf2d35fa16e8da0d5686239522cef6cdd9e169b"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 6,
+          "normalized_ast_sha256": "1665800a15b5e3fd4527410964aaed610e96607bf909062f6f1f759597d87504",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "dd04fdc9dce91636cff50bcbe9a07969e0f6daecff4559102a8aac2165940a83"
+        }
+      ],
+      "canonical_statements": 6,
+      "normalized_ast_sha256": "1665800a15b5e3fd4527410964aaed610e96607bf909062f6f1f759597d87504",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023043004_stage_non_fifo_idempotent_movement_contract.sql",
+      "canonical_sha256": "c38ca27f9122f67232523f2347e4f54a8a5fcac08ddb6340fabd00dd1b6ca22a",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261023043004",
+          "statement_hashes": [
+            "d92ff84f9f127e9c12406e2ceb8e6da63710fe7d88854119449c32bd4cd9609d"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 7,
+          "normalized_ast_sha256": "bf2c787bab2c658bf02918ad4c5fa886b10b64f0c3b34ec6f351eb53509d56ee",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "4e50f4653fc1d65b5ceafbc2941993bdcc1f1673aefd67effd1646d895cc4a42"
+        }
+      ],
+      "canonical_statements": 7,
+      "normalized_ast_sha256": "bf2c787bab2c658bf02918ad4c5fa886b10b64f0c3b34ec6f351eb53509d56ee",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023043629_link_gated_non_fifo_movements_to_inventory_ledger.sql",
+      "canonical_sha256": "b224055bd53f76552bd0f79ea769037a812fd227531920bb9ce6742fd5de900a",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261023043629",
+          "statement_hashes": [
+            "5724a80ca406f61c56d18f8f14eaa637e78b0b8bafff7e7049e873df6e9a5378"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 2,
+          "normalized_ast_sha256": "bc16d9ac493d72639838573a8553e8c4615073e8f5ccef21488a21395fae7945",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "fe9bfd06519c2ca7d205aa365330250922744908b1ea185c84f219498794cefb"
+        }
+      ],
+      "canonical_statements": 2,
+      "normalized_ast_sha256": "bc16d9ac493d72639838573a8553e8c4615073e8f5ccef21488a21395fae7945",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023120442_non_fifo_v3_document_aware_movement_stage.sql",
+      "canonical_sha256": "474287830d79dc04bf204c18d0ad37243e599f3bd77bb7ccba511acab8ea3b05",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261023120442",
+          "statement_hashes": [
+            "6405f35bb0f317c7c71b529b696033a1ae87c0be01e9534116401834cabf39b0"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 4,
+          "normalized_ast_sha256": "bd9b97c2babb7e912509ce00aa4398c0a7e91114b68e2bba672fdc6b9441ead6",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "2cf629efc489b32eb9b68b9734f68f52f7b84ed1bdccdc840bdaef869de63d09"
+        }
+      ],
+      "canonical_statements": 4,
+      "normalized_ast_sha256": "bd9b97c2babb7e912509ce00aa4398c0a7e91114b68e2bba672fdc6b9441ead6",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023150600_raw_published_price_asof_helper.sql",
+      "canonical_sha256": "f5a8e02dba0142e117ed039f2401a209696c4cc45eab08d351470b663c8ef6bc",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261023043100",
+          "statement_hashes": [
+            "517d97baf1dcb2398e3cfd531c96e0483b60272eb9a4c8c086ebe89884873fac"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "e41396858ed4ecbfa39a555d98bafed0bcdfec4e7c5ca54fd133c4bf5e57ee20",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": []
+        }
+      ],
+      "parse_error": "syntax error at or near \"REVOKE\", at index 1013",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [
+        "canonical_sql_parse_error"
+      ],
+      "next_gate": "Review historical terminator correction and CI-only compatibility evidence; preserve canonical bytes."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023150700_sale_snapshot_modifier_cost_asof_published_price.sql",
+      "canonical_sha256": "2b94aaceb5b2c3d5e9b84901851c080996dcc563f1713a18a5045cba1aa12667",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261023122353",
+          "statement_hashes": [
+            "8ba9817513d91cd90b227b8e7b0efac4d7fdfdf68aa7b4b42164ddd67c67477e"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "c1f660b4012ce7331e29d6cd1918b0fc407239e3b7522935d16fc4dda5d69028",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 1,
+          "first_ast_difference_paths": [
+            "/0/stmt/CreateFunctionStmt/options/4/DefElem/arg/List/items/0/String/sval"
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "10471cd29de7bfe6edcca5d27c2ecf7f8aa8268fb560addaa086a96c91881d17",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023152041_deploy_corrected_unified_raw_movement_core_v1.sql",
+      "canonical_sha256": "8f6fa7a7d9b822ee34931a9afa45261b026f67d2122d63ba7fa307581cbc3978",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261023152041",
+          "statement_hashes": [
+            "ca3d2afe9e891d4b44b8fbc69bd83f4f8b839d794843b670c4a42f6927f5fee8"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "b593cabdbc98cd19cad84ddd8e4f87ec8d7aebac528454a51dce0c274536aad4",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "e59a5f3ea8fac41f0ab7bb17e937859304f88c8f93ba235cf8d69f8a39c65b5e"
+        }
+      ],
+      "canonical_statements": 3,
+      "normalized_ast_sha256": "b593cabdbc98cd19cad84ddd8e4f87ec8d7aebac528454a51dce0c274536aad4",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023161000_kitchen_raw_deduction_failure_atomic.sql",
+      "canonical_sha256": "43c0944c58cf448a11d56d08f071727dc740a61572e2f158cd7a38543f6457ea",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261023123728",
+          "statement_hashes": [
+            "84ba1968989ec4f91fd23caee8fa749215bfc520c3cd0833fe3b70c9aaeebb4f"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "1aa1b078b09a050beb7ac091ddda32101561cf804102d9534b7a4f18608e3f28",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "827c6e4cf3daf8ca21591c7a3fdc74a467b5ba6c00a4f57fdb759b28df26fd3d"
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "1aa1b078b09a050beb7ac091ddda32101561cf804102d9534b7a4f18608e3f28",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023163500_refactor_kitchen_direct_ledger_reference.sql",
+      "canonical_sha256": "a5b46fab12d6f1c5a324753294475b7a43ba2020ca5d299f9123644929f4cea7",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261023133130",
+          "statement_hashes": [
+            "743fbfd94058162aaf937223dd3872bb97b4acb19314d8d4ed3ee43a7a112ed9"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "3819aa803d3c0d8698daf2e5cbe16ce2b26c42487838b0ec4d5636ef512e08a8",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "3819aa803d3c0d8698daf2e5cbe16ce2b26c42487838b0ec4d5636ef512e08a8",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023170000_sync_kitchen_staged_warehouse_balance.sql",
+      "canonical_sha256": "66f711ed90546a418f55471d0a474090d2861082d2822e9eba613d00af538019",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261023134151",
+          "statement_hashes": [
+            "4b15157c54e2213a58a5201898e38a90f8e8fe2f073fed3868a0d7cf628b7144"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "d2dadcdd66e828aa07d8e0460229a99e130e2b2d84bf19ae908d51ad11e5efd4",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "d2dadcdd66e828aa07d8e0460229a99e130e2b2d84bf19ae908d51ad11e5efd4",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023172500_reconcile_nine_verified_raw_branch_balance_cache_rows.sql",
+      "canonical_sha256": "4e68f2e06f2a4dd01d044ca91d66035d9526ecfd7a8489a7f373c04d2dc4e3ef",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261023140605",
+          "statement_hashes": [
+            "8fa459e4adc8d3403968fcc6147c59445d0316c9c725dd587eb5bceaabe75272"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "fba332e907442eb3f79d0d38e4fc82087dea3be9d6a13246e6ea39719885e7ac",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 1,
+          "first_ast_difference_paths": [
+            "/0/stmt/DoStmt/args/0/DefElem/arg/String/sval"
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "7811f3ef00b0e0a10021a3941c5b3a2a476f0f8bf1020d4d16807d0e1abf0f2e",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023173000_kitchen_document_warehouse_guard.sql",
+      "canonical_sha256": "12c82f0a282322862543289dbdf1a06b700a1498998de825f725c0ea3a9bfb4d",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261023124737",
+          "statement_hashes": [
+            "83ff734bf22f36c3dec3aea1369ff16082bbbf2bd81ee910a6048b8741108882"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "eefea564b84a0750780dff8cbf01ca56ad6449ec14c4f262362f938040bc2fcb",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "582a3b22c2b869c903d391bcd2bb68b59db4e4cb039422b2042fa982a482b36d"
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "eefea564b84a0750780dff8cbf01ca56ad6449ec14c4f262362f938040bc2fcb",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023180500_kitchen_raw_published_price_cost.sql",
+      "canonical_sha256": "12f011176cd376427ed7d5102571fd34d2e00c39fd337c1e82c5aaa913fc4df3",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261023125710",
+          "statement_hashes": [
+            "351590d44f1849c510aacdc8f467184ff810880e9527b3c344021a66e98678ee"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "900c7bd6c4d2953f2a274651d022fb8bc644040eaafd30a91f151ee9b8d7a991",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "182cc366d0034da4e5e03c83e93c4ea161a45cac66f6963ecebbf1f32a52fa16"
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "900c7bd6c4d2953f2a274651d022fb8bc644040eaafd30a91f151ee9b8d7a991",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023184500_align_kitchen_inventory_ledger_published_cost.sql",
+      "canonical_sha256": "dc3d50cf9a5e35ccd2c356109a0457809ff8a4b39078a5016e8845b55c093cf2",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261023130126",
+          "statement_hashes": [
+            "22c4cdeb560d837bd9e0ee2f914edad2ab3f351247dda0beaedad455ce0823e4"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "a49eb06dad865fa0c4c6f72dc268f426b5940f0e9df657fe46ca0d11c5c25ea2",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "e55e2401b53cd390e92cc68f126d58816844e2ab213880e70cf3c2c3a0beecb4"
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "a49eb06dad865fa0c4c6f72dc268f426b5940f0e9df657fe46ca0d11c5c25ea2",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023192500_reject_duplicate_kitchen_send_stock_events.sql",
+      "canonical_sha256": "d9d6a37452270c1e59a2fa7788342cadb44e49c168aa0f88b6e150c965d80a81",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261023130618",
+          "statement_hashes": [
+            "5db8f466795b45dc430de661423a977816acffaf150d38d6aa30a52ac41b256c"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "4e9e33186560878eaac5310efbc868f6becb9a00a71e335f11a8d8685774595d",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "68bb30171ee58690172d222df4514bc1c585ab6a3743a89a7593ebfa78513647"
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "4e9e33186560878eaac5310efbc868f6becb9a00a71e335f11a8d8685774595d",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023200500_retire_unreferenced_fifo_debt_rebase_helpers.sql",
+      "canonical_sha256": "85f50b75964c30ff5db237074f20ed48ac343bfd211f8141f2c200e31ea0b6c7",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261023132050",
+          "statement_hashes": [
+            "0f322163254696fcc32e9060f0ebe30f9309d2b27349f1e56b68b8304f6747c2"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 2,
+          "normalized_ast_sha256": "3872f9d26b56928ef7915205bc4a3c13c7f2396c958c77e472fa3f4a51afb88a",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "5b37b585e559c1a2a2361830580cb020fb72b7be7d1617d572effac477ea9d96"
+        }
+      ],
+      "canonical_statements": 2,
+      "normalized_ast_sha256": "3872f9d26b56928ef7915205bc4a3c13c7f2396c958c77e472fa3f4a51afb88a",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023211500_guard_direct_kitchen_material_replay.sql",
+      "canonical_sha256": "e75ae39a8c243026bda706ee410f589f24a3ed320a5cefedbae7480d44fa056e",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261023132918",
+          "statement_hashes": [
+            "ba283bacdb8938a0583948beb58f1e0964ad61c61234f63e58534cc7006abc89"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "38b7808e75f534ab4734c97ee8f747a5e42f7a3c3f19f6294823000ab6ab9b3c",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 1,
+          "first_ast_difference_paths": [
+            "/length"
+          ]
+        }
+      ],
+      "canonical_statements": 3,
+      "normalized_ast_sha256": "06c4330d1f4478d765c4e572dd9edd508cdf25aedd7dcdcf84e476bc6ad2afd3",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023214500_kitchen_stock_precision_guard.sql",
+      "canonical_sha256": "5fcfce2dedabe38b899b07f04f01c945365a4d5ec254755ebc552dae30b23519",
+      "original_category": "unresolved",
+      "candidates": [],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "9822a849a78b402d82bbac1b1a463f9867b9484ea346f8fa0f50f7d8d16a504d",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023233000_cutover_manufactured_inventory_unit_raw_consumption.sql",
+      "canonical_sha256": "ae48f57a7d0536fc44fdc3a84024997c0bd8ae09870c4a2f9fb6dbd5cfe8f367",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261023152102",
+          "statement_hashes": [
+            "25ffeeb1f57daa7c696cb097158efe4f95aa8f1ea4b37d3f72a9082aa07c1348"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "4baefab434a346b3bb0fb570a8dcff61b7b7b7909c6daf6e86adcaeac769a773",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        },
+        {
+          "version": "20261023153111",
+          "statement_hashes": [
+            "36e07d71e83e8d4d558133eef89de3f0a48db9113e7e676d45f05150def36db7"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "20b7ac001a87a4ccbb47c44bed6e9db7f13dc457cbaf680a4e32dbb5018a434c",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 14,
+          "first_ast_difference_paths": [
+            "/0/stmt/CreateFunctionStmt/funcname/1/String/sval",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/length",
+            "/0/stmt/CreateFunctionStmt/parameters/0/FunctionParameter/name",
+            "/0/stmt/CreateFunctionStmt/parameters/1/FunctionParameter/argType/names/length",
+            "/0/stmt/CreateFunctionStmt/parameters/1/FunctionParameter/argType/names/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/1/FunctionParameter/name",
+            "/0/stmt/CreateFunctionStmt/parameters/2/FunctionParameter/argType/names/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/2/FunctionParameter/name",
+            "/0/stmt/CreateFunctionStmt/parameters/3/FunctionParameter/defexpr",
+            "/0/stmt/CreateFunctionStmt/parameters/3/FunctionParameter/name",
+            "/0/stmt/CreateFunctionStmt/parameters/4/FunctionParameter/defexpr"
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "4baefab434a346b3bb0fb570a8dcff61b7b7b7909c6daf6e86adcaeac769a773",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023234000_production_order_non_fifo_raw_and_waste.sql",
+      "canonical_sha256": "cb2c52e5fe36a7d23817713a89ccfa356536544c3fd9abf13df2ed159e9a3673",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261003120340",
+          "statement_hashes": [
+            "d29ed428c9f1e76b0d88a0ad239721b11967efacb9604234ab51791adc2437a5"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "86ed2a903531d855971de8475e0c955f85b5b193c2d829d801587047bfe83e86",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 1,
+          "first_ast_difference_paths": [
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval"
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "98ef09ab46b96f3162135844eb2346614c648559cd4641e0de47d63b69444306",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023235000_stock_count_raw_negative_unified_movement.sql",
+      "canonical_sha256": "dc1307f1a11e6a47d81c002fda34539bd39b4117e4b6baa932a517ae3748a38b",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261023152514",
+          "statement_hashes": [
+            "fb7b138049ff434ce55d7bd762df72ff8731cb0e24e71ada565e103d98d60572"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "a56ca615fa04ea27f28cbb6aef85ad19d5941ab1ba33eb2e9c44ee12c3a6a18b",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "a56ca615fa04ea27f28cbb6aef85ad19d5941ab1ba33eb2e9c44ee12c3a6a18b",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023235500_raw_adjustment_single_warehouse_unified.sql",
+      "canonical_sha256": "38cc0f0150c3dd02d129ec195bccdbff2405fb7e99fff46fdf8949ed2b73cb84",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261023152705",
+          "statement_hashes": [
+            "e740ffe8d1137febec235f2877313907215ed68da6a0ba4ccf7b22478bad0056"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "c5682c0bdc6ac28277d401768fb88f869e9a15f74b22796bc21a7de0e9c267fb",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "c5682c0bdc6ac28277d401768fb88f869e9a15f74b22796bc21a7de0e9c267fb",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023235900_purchase_return_raw_document_warehouse_unified.sql",
+      "canonical_sha256": "7bab1739341a21d58cf056d6966624712a101c1f8eaf6b04975c5df5cb59acde",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261023152853",
+          "statement_hashes": [
+            "64be8741ddbb1f9c79620c429f52eda6933ce881e31ba16d2098cb616b5926b6"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "ce004e886c308d3b358d13f4eaf4bb402b52e45377124738e0ffd802d882a379",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "ce004e886c308d3b358d13f4eaf4bb402b52e45377124738e0ffd802d882a379",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261024000500_raw_warehouse_transfer_both_legs_unified.sql",
+      "canonical_sha256": "eeed1fa3ef05bd678d4034be3fb85a2a7a1d25cab00a17128ed02ddbb172c1f9",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261023152948",
+          "statement_hashes": [
+            "4211cb7c206dc4d29cac1f53debb40912b0b2137ef72d22484a47e24019ab0a7"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "ad02c0746cf8ba7169b8cf4a0c056ba345b31c56051fb62c551c9d6cdcfc9b2a",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "ad02c0746cf8ba7169b8cf4a0c056ba345b31c56051fb62c551c9d6cdcfc9b2a",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261024001500_sale_modifiers_raw_unified.sql",
+      "canonical_sha256": "adb51ec427fe39afdf67b44e06f8b1d007d837c8a009ee0eb61b0028c4defaa1",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261023153040",
+          "statement_hashes": [
+            "c1aa5c9523d5f372d6000e7202032756948d2222dc5692de6837fbfed78261dd"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "3aec371eda2dd21bb07886a21d2e78b9eb2ae4c446d5e97069422eeccda13061",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "3aec371eda2dd21bb07886a21d2e78b9eb2ae4c446d5e97069422eeccda13061",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261024002500_legacy_sale_unit_raw_unified.sql",
+      "canonical_sha256": "6c702f4460e0d082bc5c117768929689e1e498d7403c4803eea9c487e4fc1149",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261023153111",
+          "statement_hashes": [
+            "36e07d71e83e8d4d558133eef89de3f0a48db9113e7e676d45f05150def36db7"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "20b7ac001a87a4ccbb47c44bed6e9db7f13dc457cbaf680a4e32dbb5018a434c",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "20b7ac001a87a4ccbb47c44bed6e9db7f13dc457cbaf680a4e32dbb5018a434c",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261024192500_product_fifo_cutover_readiness_gate.sql",
+      "canonical_sha256": "03fbff7e295251f043f06e69f2203eab3134f51349730d3dc51369879c6cd657",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261024170040",
+          "statement_hashes": [
+            "c6eb220752ab9b20a64ce18fd61adfd1a5928c304c963489e1c0567881e31e0e"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "932f9080d474df856ca8dc97d644110f679a7810eb9920a097beb5f04ea43efd",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 7,
+          "first_ast_difference_paths": [
+            "/0/stmt/CreateFunctionStmt/options/length",
+            "/0/stmt/CreateFunctionStmt/options/2/DefElem/arg/Boolean",
+            "/0/stmt/CreateFunctionStmt/options/2/DefElem/arg/VariableSetStmt",
+            "/0/stmt/CreateFunctionStmt/options/2/DefElem/defname",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/VariableSetStmt",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/defname"
+          ]
+        },
+        {
+          "version": "20261024174313",
+          "statement_hashes": [
+            "acea39508b500f148f3f2200cae8ed7aef0edf32b97145c319d9a58f06910de6"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "22ef2aea726aa32ba307acbf9b56e36081d47f60d6be8103ac62320eb6639162",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 11,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateFunctionStmt/funcname/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/funcname/1/String/sval",
+            "/0/stmt/CreateFunctionStmt/options/0/DefElem/arg/String/sval",
+            "/0/stmt/CreateFunctionStmt/options/1/DefElem/arg/Boolean",
+            "/0/stmt/CreateFunctionStmt/options/1/DefElem/arg/String",
+            "/0/stmt/CreateFunctionStmt/options/1/DefElem/defname",
+            "/0/stmt/CreateFunctionStmt/options/2/DefElem/arg/VariableSetStmt/args/length",
+            "/0/stmt/CreateFunctionStmt/options/2/DefElem/arg/VariableSetStmt/args/0/A_Const/sval/sval",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters"
+          ]
+        }
+      ],
+      "canonical_statements": 3,
+      "normalized_ast_sha256": "5e9a3d26682bb35f0e32c6ea5efceda8a94aeeec30997ddb61bdd2fe718fcb32",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261024194500_product_non_fifo_batch_compatible_removal.sql",
+      "canonical_sha256": "8087db945ddba64f6328e214097c9a5aa26e88ac71464fc16aa191bf6e4d2a1a",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261024174300",
+          "statement_hashes": [
+            "497ae6f4e7a07e962673e2ea35bad1b3d2a33eae112130619c0fe316ef670aee"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "aa6f19c24eb71e9280b50c330ba204d642f5d61f7168506f3fe456899c83a4c0",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "ast_difference_count": 1,
+          "first_ast_difference_paths": [
+            "/length"
+          ]
+        },
+        {
+          "version": "20261024180153",
+          "statement_hashes": [
+            "95347281c074f62a80d58f32cc889868b30b3e95a8705f7dc3a1ec067048ed5f"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "7993abe85e50dec5f20c7fae06f8ccaee408798c42e9c4b7e042f85302082903",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 5,
+          "first_ast_difference_paths": [
+            "/0/stmt/CreateFunctionStmt/funcname/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/funcname/1/String/sval",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/length",
+            "/0/stmt/CreateFunctionStmt/parameters/0/FunctionParameter/name"
+          ]
+        },
+        {
+          "version": "20261024180216",
+          "statement_hashes": [
+            "f4f3028414d2f4bca58018d78510190e62d31684d1d982e64f67322460f9e327"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "e80e4509ebca8541ad727df38210f36fbc5f66292d18fe225e611c2b204496b8",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 11,
+          "first_ast_difference_paths": [
+            "/0/stmt/CreateFunctionStmt/funcname/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/funcname/1/String/sval",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/length",
+            "/0/stmt/CreateFunctionStmt/parameters/0/FunctionParameter/name",
+            "/0/stmt/CreateFunctionStmt/parameters/1/FunctionParameter/argType/names/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/1/FunctionParameter/defexpr",
+            "/0/stmt/CreateFunctionStmt/parameters/1/FunctionParameter/name",
+            "/0/stmt/CreateFunctionStmt/parameters/2/FunctionParameter/argType/names/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/2/FunctionParameter/defexpr",
+            "/0/stmt/CreateFunctionStmt/parameters/2/FunctionParameter/name"
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "c2d8ae2d1900dcd1962f428ec912689d50ddb1fb3128d2881dbb1c605643d3dc",
+      "resolution": "contiguous_batch_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261024195000_cutover_product_stock_adjustment_non_fifo.sql",
+      "canonical_sha256": "3f689f54d01aa43c43d72443f468c23347192cc7fa402ae20a2ba78da359b2f3",
+      "original_category": "sql_ast_equal",
+      "candidates": [
+        {
+          "version": "20261024174313",
+          "statement_hashes": [
+            "acea39508b500f148f3f2200cae8ed7aef0edf32b97145c319d9a58f06910de6"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "22ef2aea726aa32ba307acbf9b56e36081d47f60d6be8103ac62320eb6639162",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "8f9ad2387ad740bd128b8317e61102aa8087808e02d302da1b5d8442a85e1c18"
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "22ef2aea726aa32ba307acbf9b56e36081d47f60d6be8103ac62320eb6639162",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261024210500_stock_count_product_removal_non_fifo.sql",
+      "canonical_sha256": "dcff19b794d776c7337aaae9d00d5f86362eba5c040d84fb018c6c7ba59b0967",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261024180153",
+          "statement_hashes": [
+            "95347281c074f62a80d58f32cc889868b30b3e95a8705f7dc3a1ec067048ed5f"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "7993abe85e50dec5f20c7fae06f8ccaee408798c42e9c4b7e042f85302082903",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        },
+        {
+          "version": "20261024174300",
+          "statement_hashes": [
+            "497ae6f4e7a07e962673e2ea35bad1b3d2a33eae112130619c0fe316ef670aee"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "aa6f19c24eb71e9280b50c330ba204d642f5d61f7168506f3fe456899c83a4c0",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 6,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateFunctionStmt/funcname/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/funcname/1/String/sval",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/length",
+            "/0/stmt/CreateFunctionStmt/parameters/0/FunctionParameter/name"
+          ]
+        },
+        {
+          "version": "20261024180216",
+          "statement_hashes": [
+            "f4f3028414d2f4bca58018d78510190e62d31684d1d982e64f67322460f9e327"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "e80e4509ebca8541ad727df38210f36fbc5f66292d18fe225e611c2b204496b8",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 4,
+          "first_ast_difference_paths": [
+            "/0/stmt/CreateFunctionStmt/funcname/1/String/sval",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/length",
+            "/0/stmt/CreateFunctionStmt/parameters/0/FunctionParameter/name"
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "7993abe85e50dec5f20c7fae06f8ccaee408798c42e9c4b7e042f85302082903",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261024211000_purchase_return_product_removal_non_fifo.sql",
+      "canonical_sha256": "37c8b58536172d7c7f42ee291d044cb41d0b7e0be0901bc9c4c7f09416680789",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261024180216",
+          "statement_hashes": [
+            "f4f3028414d2f4bca58018d78510190e62d31684d1d982e64f67322460f9e327"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "e80e4509ebca8541ad727df38210f36fbc5f66292d18fe225e611c2b204496b8",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        },
+        {
+          "version": "20261024174300",
+          "statement_hashes": [
+            "497ae6f4e7a07e962673e2ea35bad1b3d2a33eae112130619c0fe316ef670aee"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "aa6f19c24eb71e9280b50c330ba204d642f5d61f7168506f3fe456899c83a4c0",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 12,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateFunctionStmt/funcname/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/funcname/1/String/sval",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/length",
+            "/0/stmt/CreateFunctionStmt/parameters/0/FunctionParameter/name",
+            "/0/stmt/CreateFunctionStmt/parameters/1/FunctionParameter/argType/names/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/1/FunctionParameter/defexpr",
+            "/0/stmt/CreateFunctionStmt/parameters/1/FunctionParameter/name",
+            "/0/stmt/CreateFunctionStmt/parameters/2/FunctionParameter/argType/names/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/2/FunctionParameter/defexpr",
+            "/0/stmt/CreateFunctionStmt/parameters/2/FunctionParameter/name"
+          ]
+        },
+        {
+          "version": "20261024180153",
+          "statement_hashes": [
+            "95347281c074f62a80d58f32cc889868b30b3e95a8705f7dc3a1ec067048ed5f"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "7993abe85e50dec5f20c7fae06f8ccaee408798c42e9c4b7e042f85302082903",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 4,
+          "first_ast_difference_paths": [
+            "/0/stmt/CreateFunctionStmt/funcname/1/String/sval",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/length",
+            "/0/stmt/CreateFunctionStmt/parameters/0/FunctionParameter/name"
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "e80e4509ebca8541ad727df38210f36fbc5f66292d18fe225e611c2b204496b8",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261024222000_sale_product_non_fifo.sql",
+      "canonical_sha256": "b98f00bf1bf753662e20149173f9f2c56be8e342ccfdca435e5b74f2df920438",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261024191859",
+          "statement_hashes": [
+            "872aff7b8ac0af3e32fbf0d44c19d62b00f7d6c7832c0f3529b803df90edd833"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "ecaefb382e6381e18ce4ab7f39a195c0289e4a6a46bd25dee5a963ed2b1c47c3",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "ecaefb382e6381e18ce4ab7f39a195c0289e4a6a46bd25dee5a963ed2b1c47c3",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261024222500_transfer_product_non_fifo.sql",
+      "canonical_sha256": "642a38ff6175e9899ea7ab6e5aa0d7b8bb3ce9197fed77f69df7213dd2747b99",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261024191902",
+          "statement_hashes": [
+            "cd9d391eeacbbed5b00c3d24f3b7071be8da818e4992ba51576e6946a01544e0"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "759bb3bf9868765715ccfdc72175169c2b433a85a24559684de8d3d8cb68fc0f",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "759bb3bf9868765715ccfdc72175169c2b433a85a24559684de8d3d8cb68fc0f",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261026190000_unified_stock_balances_read_contract.sql",
+      "canonical_sha256": "dbae34b53038719e4f131621d4c2882d83bc1cd38b399f0debd148018e952d83",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261026200727",
+          "statement_hashes": [
+            "37f3261a10dffdb6a7e28a7bf2b06e196393a00563deb9040ccf6d5623062041"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "8c83f72a34d5b7d5438ff59e1f6e8dc2f8d548f2193bd77fef1a22517a9ca1c3",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 1,
+          "first_ast_difference_paths": [
+            "/2/stmt/CommentStmt/comment"
+          ]
+        }
+      ],
+      "canonical_statements": 3,
+      "normalized_ast_sha256": "bdebe16632ecc2ded6aea7c5f5eb5d9991b43dd6140c3bd739cb87cc32734dff",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261026235000_unify_manufactured_unit_sale_catalog_cost.sql",
+      "canonical_sha256": "eb907addc9a4c75ea4351d454d85735254f544d66c280f8ff5a46dc91bfc7523",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261026202246",
+          "statement_hashes": [
+            "c45e8453c2853bb31c35fba39a2efa40233ce442a5969b8e591dac6362a120be"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "5c62a92624c329adc88343187d434f923a8e3730827b4d0e200fbf5cd344c53c",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "5c62a92624c329adc88343187d434f923a8e3730827b4d0e200fbf5cd344c53c",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261027000500_canonical_stock_current_costs.sql",
+      "canonical_sha256": "5bcd17eb6baf1e70a3a0edf3bcb98d4f04c301027d28d9d6693c4e49b47326a0",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261026202407",
+          "statement_hashes": [
+            "cde47c6b2313508fc5d4142bea606d3b239399bc2274560a0ae15d3d9691bc3d"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "6e153439ae24257574843cd9feb7c8dc41b40dd5422b3e3942502b662f564d2d",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "99780ecc369a944b56f183b5cc1eb680806f2a893f6bdec0ceeb7c2f34c0b7bb"
+        }
+      ],
+      "canonical_statements": 3,
+      "normalized_ast_sha256": "6e153439ae24257574843cd9feb7c8dc41b40dd5422b3e3942502b662f564d2d",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261027004000_unify_product_valuation_stock_cost.sql",
+      "canonical_sha256": "7df8ef3851baeb4f211173c75e947cb97c2b1aa8d34b57bf4dae5c952646fefa",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20261026202836",
+          "statement_hashes": [
+            "685294acd739c403e8ac9051c6fe4c7659a52810b921369df34b2979c23ee45d"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "c7d6e261171fa3fa35f37383135c0a3621edcff92af4d6aa50a765ba9b8628a7",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ]
+        },
+        {
+          "version": "20261026201549",
+          "statement_hashes": [
+            "12f17ac3e8b5bdb9526dca2c24dc5a91923d31133b8c01dec71c22fe2ee63a27"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "1b2f18be83e4105ded08edaeada0c93fb3ed924c7d69240cc02837d5fd038a19",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 34,
+          "first_ast_difference_paths": [
+            "/0/stmt/CreateFunctionStmt/funcname/1/String/sval",
+            "/0/stmt/CreateFunctionStmt/options/length",
+            "/0/stmt/CreateFunctionStmt/options/1/DefElem/arg/Boolean",
+            "/0/stmt/CreateFunctionStmt/options/1/DefElem/arg/String",
+            "/0/stmt/CreateFunctionStmt/options/1/DefElem/defname",
+            "/0/stmt/CreateFunctionStmt/options/2/DefElem/arg/Boolean",
+            "/0/stmt/CreateFunctionStmt/options/2/DefElem/arg/VariableSetStmt",
+            "/0/stmt/CreateFunctionStmt/options/2/DefElem/defname",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/VariableSetStmt",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/defname",
+            "/0/stmt/CreateFunctionStmt/parameters/length"
+          ]
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "c7d6e261171fa3fa35f37383135c0a3621edcff92af4d6aa50a765ba9b8628a7",
+      "resolution": "new_full_ast_match_review_required",
+      "flags": [],
+      "next_gate": "Review batch boundaries and independent original statement hashes; do not acknowledge automatically."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261027083000_canonical_current_sale_prices.sql",
+      "canonical_sha256": "0540dece0db2ff25b7b8ddea590b868920b0d49c8fa993675fadd83bf01290a8",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261027053310",
+          "statement_hashes": [
+            "99e003d14e5942086d6e91085d07fe6f2a20531b45f0a420f4242a1a33521952"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "a4cc8cbc06271cf904485260af2c31e32320545118b6530ea435297bb783b4f6",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "d32f7553704ad004c7c6f4b750fe8d0bbe74c9969b21bc4468b960a5068b1b03"
+        }
+      ],
+      "canonical_statements": 3,
+      "normalized_ast_sha256": "a4cc8cbc06271cf904485260af2c31e32320545118b6530ea435297bb783b4f6",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261027124500_kitchen_manufactured_group_stock_deduction_and_reversal.sql",
+      "canonical_sha256": "156853f9dce492ed7c862b6ffd9d626f0cad849c5bbc70616105d22e1b797e31",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261027085510",
+          "statement_hashes": [
+            "42ca8db70e0d6d71b14a8d0443c442ebea10b04404d97e22c52909f29667ada0"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 3,
+          "normalized_ast_sha256": "a5823d048d14f06f22dbace546bacc4fbc5a51ec34f44f50b087a0e73763e182",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "ca60618ddbbc453569efa26162257f59f0bd1ea901a9dc3a312dfae809546562"
+        }
+      ],
+      "canonical_statements": 3,
+      "normalized_ast_sha256": "a5823d048d14f06f22dbace546bacc4fbc5a51ec34f44f50b087a0e73763e182",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261027125500_prevent_double_raw_deduction_for_manufactured_kitchen_sends.sql",
+      "canonical_sha256": "e0871ad25080119a455b952839baba2b4c5d5707d34319058cb0ee18d631ca76",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261027085656",
+          "statement_hashes": [
+            "4cc24bb440b24403c5f90fda7232e36256f5e3ccfc2de52feacf12ccbd11a8ce"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "d6817ef924f7ec790138e1e0eb7c0b52e5e204479fa72a6cdc186a4efd7a38e7",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "bc09e2ebae925afcf1ac97c2a81c67664cd604009ef20e2739fe19812d0fc460"
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "d6817ef924f7ec790138e1e0eb7c0b52e5e204479fa72a6cdc186a4efd7a38e7",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261027143000_kitchen_manufactured_allow_negative_by_branch.sql",
+      "canonical_sha256": "9f36c662d24cf465e29014d70a5e4d64bf26ed184f46ed3796b55c4e14a6e563",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261027092007",
+          "statement_hashes": [
+            "f367a08138c46bef2ec72f8b1a65ed7ca9729b246696c1d591fb7c8110df92eb"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "9ddd24d96d0b6f2b3fa1254409be3741484b927f60ab2f05b7e1d756ea433017",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "0870aa5461c829510d509b2adf87b70a264e038616f4fc9f6924f3ea762aa1d8"
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "9ddd24d96d0b6f2b3fa1254409be3741484b927f60ab2f05b7e1d756ea433017",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261027143500_kitchen_unit_debt_valid_sale_fk.sql",
+      "canonical_sha256": "3534ab530c0b5b5d05798659c0183ec0a3603ff3d12e02eb6dd34817f9fc5ac0",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261027092106",
+          "statement_hashes": [
+            "cb1f8ae7aeb8bfc622042a1bae18dedca4bdfb72fb35197a77096b7efcd1b089"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 1,
+          "normalized_ast_sha256": "57a1e97aa8ad8c6cac601fd5436d10dac11640e5238ca56100114d1e53d07118",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "a4811fa42f43a4165e546ce189f3e4774c896a8b5b87baa8abfb098f7003cf0d"
+        }
+      ],
+      "canonical_statements": 1,
+      "normalized_ast_sha256": "57a1e97aa8ad8c6cac601fd5436d10dac11640e5238ca56100114d1e53d07118",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261027175500_secure_internal_raw_cost_triggers_and_invoker_view.sql",
+      "canonical_sha256": "01be7c97d351b64b2bc57e3cb41c50873cdedbcd2576ab2b9b1ca91453bce4c6",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261027175944",
+          "statement_hashes": [
+            "b8846d4bd1579bbcf0ba7467584d5793090456760f74663b1bb53ad66f9ab59a"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 4,
+          "normalized_ast_sha256": "313ff2c906a01cf2f5422e1bd306c26ae09205a81609438dfcc2beda12d96806",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "07de7763a7b624569464a51a80b36d26989efb2821a609e188e0f518c0c8c775"
+        }
+      ],
+      "canonical_statements": 4,
+      "normalized_ast_sha256": "313ff2c906a01cf2f5422e1bd306c26ae09205a81609438dfcc2beda12d96806",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261027175600_allow_branch_scoped_raw_cost_cache_read.sql",
+      "canonical_sha256": "9e09fe35fee7a22a0dc4bf7d71a19b3d6b780e57e59a1ad4539c2bb0a923145c",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261027180005",
+          "statement_hashes": [
+            "1f9d437de5b955a95f356008faa5ed05ee0f3e058c0b75b1652573d6262486a2"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 2,
+          "normalized_ast_sha256": "11ee161cd9a861694addd059ce91b5f121f794d27746ad41271757bc51c5f443",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "e9812ca7210c15313d64b5807d3bf70725d14e641d1c69c6ade16a967d8e3493"
+        }
+      ],
+      "canonical_statements": 2,
+      "normalized_ast_sha256": "11ee161cd9a861694addd059ce91b5f121f794d27746ad41271757bc51c5f443",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261027190000_align_cached_raw_cost_access_with_material_visibility.sql",
+      "canonical_sha256": "e2b96b056b34a09c1506407533a28c005ad7f63f932d383a3d3474cc32ba9495",
+      "original_category": "outer_whitespace_only",
+      "candidates": [
+        {
+          "version": "20261027180243",
+          "statement_hashes": [
+            "fa4be14d6e5692f0d3d01259033a1fee545338f3d5ad5956d611736168091bb4"
+          ],
+          "outer_whitespace_equal": true,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 2,
+          "normalized_ast_sha256": "ad6bbee122a561ddfe190b4da95eeed54881576943d5ba169a18d99cefb138e6",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "9bf9c3e70718906ceb257bd30d37b742a4522feb56bde20126e024a1ffa976c4"
+        }
+      ],
+      "canonical_statements": 2,
+      "normalized_ast_sha256": "ad6bbee122a561ddfe190b4da95eeed54881576943d5ba169a18d99cefb138e6",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261105010000_harden_login_failure_and_user_security.sql",
+      "canonical_sha256": "86f7ea28b687723b3d42337a92e9b85799271da1d594c26396f6abb508c6f788",
+      "original_category": "unresolved",
+      "candidates": [
+        {
+          "version": "20260927064130",
+          "statement_hashes": [
+            "e77c5888b251009957aee15c6c1f66d4899adc7d6145a03a0cf0975620fe21b2"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 54,
+          "normalized_ast_sha256": "b11d3b14647b7b8a61f0f81c904a2e124a0944d025da2954f574d0b3058baec8",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 15,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/AlterTableStmt",
+            "/0/stmt/CreateFunctionStmt",
+            "/1/stmt/AlterTableStmt",
+            "/1/stmt/GrantStmt",
+            "/2/stmt/AlterTableStmt",
+            "/2/stmt/GrantStmt",
+            "/3/stmt/AlterTableStmt",
+            "/3/stmt/CreateFunctionStmt",
+            "/4/stmt/AlterTableStmt",
+            "/4/stmt/GrantStmt",
+            "/5/stmt/DoStmt"
+          ]
+        },
+        {
+          "version": "20260927064137",
+          "statement_hashes": [
+            "9172f327b534174dc0b610e901e61f19b72916cc237363e54204488427949973"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 80,
+          "normalized_ast_sha256": "7b095bc691388880f2271c6984e87f7d942a91489ae635ef264cb126d7dc3d90",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 28,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateFunctionStmt",
+            "/0/stmt/GrantStmt",
+            "/1/stmt/GrantStmt/grantees/length",
+            "/1/stmt/GrantStmt/objects/0/ObjectWithArgs/objargs/length",
+            "/1/stmt/GrantStmt/objects/0/ObjectWithArgs/objargs/0/TypeName/names/0/String/sval",
+            "/1/stmt/GrantStmt/objects/0/ObjectWithArgs/objfuncargs/length",
+            "/1/stmt/GrantStmt/objects/0/ObjectWithArgs/objfuncargs/0/FunctionParameter/argType/names/0/String/sval",
+            "/1/stmt/GrantStmt/objects/0/ObjectWithArgs/objname/0/String/sval",
+            "/1/stmt/GrantStmt/objects/0/ObjectWithArgs/objname/1/String/sval",
+            "/1/stmt/GrantStmt/privileges",
+            "/2/stmt/CreateFunctionStmt"
+          ]
+        },
+        {
+          "version": "20260927064301",
+          "statement_hashes": [
+            "953bbe112e5b5d72d3f15027e07aa2adf84b0412e1d9f1973e4ddfa0e8c6cd2f"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 36,
+          "normalized_ast_sha256": "3129dbb804feb03e889dc43f527677186ecf3094b35ee4885318ea24ad2bb6e6",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 17,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateFunctionStmt",
+            "/0/stmt/CreateStmt",
+            "/1/stmt/GrantStmt",
+            "/1/stmt/InsertStmt",
+            "/2/stmt/AlterTableStmt",
+            "/2/stmt/GrantStmt",
+            "/3/stmt/CreateFunctionStmt",
+            "/3/stmt/DropStmt",
+            "/4/stmt/CreatePolicyStmt",
+            "/4/stmt/GrantStmt",
+            "/5/stmt/GrantStmt/objects/0/ObjectWithArgs"
+          ]
+        },
+        {
+          "version": "20260927065142",
+          "statement_hashes": [
+            "4f551b4a2abdbcae10ab247b404d02b81ad569dd556440ed3d57ce6718163ffd"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 150,
+          "normalized_ast_sha256": "c6fdcd286d8953ad8951696490e7760f2bba7eccd1e6e0692683f9a7a118b513",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 23,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateFunctionStmt",
+            "/0/stmt/DoStmt",
+            "/1/stmt/GrantStmt",
+            "/1/stmt/InsertStmt",
+            "/2/stmt/CreateFunctionStmt",
+            "/2/stmt/GrantStmt",
+            "/3/stmt/CreateFunctionStmt",
+            "/3/stmt/GrantStmt",
+            "/4/stmt/GrantStmt/grantees/length",
+            "/4/stmt/GrantStmt/grantees/0/RoleSpec/rolename",
+            "/4/stmt/GrantStmt/grantees/0/RoleSpec/roletype"
+          ]
+        },
+        {
+          "version": "20260927065354",
+          "statement_hashes": [
+            "c98fb7ac1e50c2564d365be3808d840d74ee3ad5785fcd4898b3c0b287403987"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 157,
+          "normalized_ast_sha256": "6fe573c236cd3e106120399c0ca18bec3f12083296cd5ce923db8eb01731625b",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 26,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateFunctionStmt/funcname/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/funcname/1/String/sval",
+            "/0/stmt/CreateFunctionStmt/options/3/DefElem/arg/List/items/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/length",
+            "/0/stmt/CreateFunctionStmt/parameters/0/FunctionParameter/argType/names/0/String/sval",
+            "/0/stmt/CreateFunctionStmt/parameters/0/FunctionParameter/name",
+            "/1/stmt/GrantStmt",
+            "/1/stmt/InsertStmt",
+            "/2/stmt/GrantStmt",
+            "/2/stmt/UpdateStmt",
+            "/3/stmt/CreateFunctionStmt"
+          ]
+        },
+        {
+          "version": "20260927065422",
+          "statement_hashes": [
+            "3ae76ff7f0b9a0256e10b06b1fb785e316d52b41f95de638f1c98aa8ba3ab8d9"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": false,
+          "remote_statements": 174,
+          "normalized_ast_sha256": "90cc5e83f5f292365ff50493b07e52c8161633641dd75f624151f0a13c434fd8",
+          "full_ast_equal": false,
+          "matching_contiguous_ast_windows": [],
+          "ast_difference_count": 15,
+          "first_ast_difference_paths": [
+            "/length",
+            "/0/stmt/CreateFunctionStmt",
+            "/0/stmt/UpdateStmt",
+            "/1/stmt/GrantStmt",
+            "/1/stmt/UpdateStmt",
+            "/2/stmt/GrantStmt",
+            "/2/stmt/UpdateStmt",
+            "/3/stmt/CreateFunctionStmt",
+            "/3/stmt/UpdateStmt",
+            "/4/stmt/GrantStmt",
+            "/4/stmt/UpdateStmt",
+            "/5/stmt/GrantStmt"
+          ]
+        }
+      ],
+      "canonical_statements": 7,
+      "normalized_ast_sha256": "b246a9fcc01bee24a9b04a9b3d2fb102429793d3ee86104dd8f5c3dffbfafaa1",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [],
+      "next_gate": "Locate original history or later supersession evidence; inspect all reported AST differences, including literal function bodies."
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109072830_premier_stock_counts_branch_permission_gate_20261109.sql",
+      "canonical_sha256": "2612c98afbd12e7cba7cad9a1d4697bd5f83c2c1cb63e3fbd7836f103178cabe",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109072830",
+          "statement_hashes": [
+            "ef8be6b4d352ca1356a7ed98841be9be597905c7481129f4be1d9767d5f089e1"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 7,
+          "normalized_ast_sha256": "aecd75783799530a163b5183022fad638bc4667896c65b96e204a34550350486",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "2f559f3063b029eaba0f13e6bd0b7a5f778645c142cc7eb74687821da55c58d9"
+        }
+      ],
+      "canonical_statements": 7,
+      "normalized_ast_sha256": "aecd75783799530a163b5183022fad638bc4667896c65b96e204a34550350486",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109073118_premier_expenses_financial_permission_gate_20261109.sql",
+      "canonical_sha256": "c788179b7347b3b3516ff85be696e782ea605fc3fc3b745be4fad215529bd80e",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109073118",
+          "statement_hashes": [
+            "c577f3747f3a63070819e3595c97d7f47babe7a5929688daeb2188a4e8cba682"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 6,
+          "normalized_ast_sha256": "95b4902784c3c30dfc9b2e8773f671c7d8d59e4f62a1449cede6ab522fa9adea",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "9f500ec7c398bc71a6fd7331c4b2c4a233c7f0ade7263e46ecf342b4fd21347f"
+        }
+      ],
+      "canonical_statements": 6,
+      "normalized_ast_sha256": "95b4902784c3c30dfc9b2e8773f671c7d8d59e4f62a1449cede6ab522fa9adea",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109073305_premier_purchase_history_permission_gate_20261109.sql",
+      "canonical_sha256": "899747e9488bde6a51f0f57a98a374a55f5418281bc53e23e0f020af929360ae",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109073305",
+          "statement_hashes": [
+            "7a8f168b7e42fb8db913f19ed0fdc023a3b15d72b1795397590f6bbb469a89f3"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 7,
+          "normalized_ast_sha256": "b6e169d4f3497ec850beec2b8255856e20c49545f3718685d3dd2ae0082de947",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "a52a1dc4edcd4a24f0f582b0a42fb28b32bbee3add13e9adbcf4fd7818f8489a"
+        }
+      ],
+      "canonical_statements": 7,
+      "normalized_ast_sha256": "b6e169d4f3497ec850beec2b8255856e20c49545f3718685d3dd2ae0082de947",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109073426_premier_sales_items_view_permission_gate_20261109.sql",
+      "canonical_sha256": "00d0db49a6ef7cb2e1c1438b3fd3f8ff7756e87dbdce1ae8f95ec099fbaa2b4b",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109073426",
+          "statement_hashes": [
+            "6539ab5c4428b9425548c8791cbedf6434e9e87efa0cbe15c0c8c27e39452afb"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 7,
+          "normalized_ast_sha256": "fe11ed15d90f653687277ea022b29b0055827c1020f972a88f83714297a7d37d",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "cb5c54f13bde467a34a13c65da08741607cb27e2d5bfe438936f23ca1c628c85"
+        }
+      ],
+      "canonical_statements": 7,
+      "normalized_ast_sha256": "fe11ed15d90f653687277ea022b29b0055827c1020f972a88f83714297a7d37d",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109073617_premier_inventory_tenant_keys_stage1_20261109.sql",
+      "canonical_sha256": "23f123ddfbd910d4f938685245ad6704cff1cd50b8132df7b60b838056a6bfc8",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109073617",
+          "statement_hashes": [
+            "a339ec8d2278862b2c7d1817c3b5b21ec1ac819f936f3cad66c6d7dd3f5ec62c"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 9,
+          "normalized_ast_sha256": "1fafe09538f2cf757f2e535492b5aa9f0631b8f223b07a5b70d2151d10141e59",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "3bb0abd82350646b0ce511fbf6a428dde7c147e5551e8b332db0af0b34a533c6"
+        }
+      ],
+      "canonical_statements": 9,
+      "normalized_ast_sha256": "1fafe09538f2cf757f2e535492b5aa9f0631b8f223b07a5b70d2151d10141e59",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109073705_premier_inventory_composite_fk_delete_parity_20261109.sql",
+      "canonical_sha256": "a21f8eb1380f12043439e84f8e1d49c9c1fe2fb40475c95d896483fa994da044",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109073705",
+          "statement_hashes": [
+            "5377261d4211dc82e89a0a3cd086ee703f6a38563f97c3bb0dd8a7f26e6bdcb0"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 9,
+          "normalized_ast_sha256": "079027f766a9331ea3deaaaf496be291382ccf3e8b41e5c03b9d93d8f2d0452b",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "3870d2ca838dfd3f180e4525a3c1ade5007d7ece411d01c3d7ae4c033e7a36bd"
+        }
+      ],
+      "canonical_statements": 9,
+      "normalized_ast_sha256": "079027f766a9331ea3deaaaf496be291382ccf3e8b41e5c03b9d93d8f2d0452b",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109073733_premier_orders_recipes_branch_foreign_keys_stage2_20261109.sql",
+      "canonical_sha256": "fb513274e6a0a4ef5347e335ba199172632462cb0e35f77e9da46ec58c7c74aa",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109073733",
+          "statement_hashes": [
+            "5daa54f4d63112b4dc83ae7fdb9c7af642228c2a86e0b91c08f41bc08b88515d"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 7,
+          "normalized_ast_sha256": "3d81a2149950109c50fd450e4fc133947818ffc56f436110a26bacdad1083122",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "50ca62a6b756ddd24277f810d9b8ae34f5a6dbb807c889ef440ed543d3bd62dd"
+        }
+      ],
+      "canonical_statements": 7,
+      "normalized_ast_sha256": "3d81a2149950109c50fd450e4fc133947818ffc56f436110a26bacdad1083122",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109073754_premier_sales_purchases_counts_warehouse_keys_stage3_20261109.sql",
+      "canonical_sha256": "b708f1dff01a7f59c9cd11bb7d8caafd2f5503ad12f3843b8ce9ef1657b340b0",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109073754",
+          "statement_hashes": [
+            "fe956cb7431b50650df2889b44fad11cc5c0b28af0f034756a48f28200969e94"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 8,
+          "normalized_ast_sha256": "206dbe5e79318708fe36a3f0499b6cc11d32390f0fa2dcb7a474280fde02b4af",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "176d3e20f02a337be21e2c5f8ebb9b39389d082d6e3605c434a74f748dc564c5"
+        }
+      ],
+      "canonical_statements": 8,
+      "normalized_ast_sha256": "206dbe5e79318708fe36a3f0499b6cc11d32390f0fa2dcb7a474280fde02b4af",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109073818_premier_sales_orders_parent_composite_keys_stage4_20261109.sql",
+      "canonical_sha256": "4c4b2957f2763ade7a14738aeb6d04a1de5dbbf915a1df4cc886da09dc05b975",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109073818",
+          "statement_hashes": [
+            "db6761dc718f5a25f17cc4b33cc16552778ae4e99a1afc2866430e7bf0650703"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 8,
+          "normalized_ast_sha256": "ab3a43a8ae2e7e3e373d23c59b361213436302ed07c9c1e88e581889501bf527",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "f12ef0ccc776e19a079882e36b91840b9b6971be88b8e32c94027074862c18b5"
+        }
+      ],
+      "canonical_statements": 8,
+      "normalized_ast_sha256": "ab3a43a8ae2e7e3e373d23c59b361213436302ed07c9c1e88e581889501bf527",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109073839_premier_payments_kitchen_composite_foreign_keys_stage5_20261109.sql",
+      "canonical_sha256": "1bc1046fad611a50e5032306a2b0f4d45c9ac3a0486b2a406656748eb3a1a75d",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109073839",
+          "statement_hashes": [
+            "c97f39a78c12b9498b22ed15f7379517a59bac02b882474ef2ffd03a61c94c12"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 8,
+          "normalized_ast_sha256": "e6cae532bf2bf07a07119fa53da6c0c70848767e56be82307f90ffa3985f7ed2",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "ea28210cef57cb1b2769ecb2b6aad59debbdac7d1c0ce1ace4edd4d6468afc74"
+        }
+      ],
+      "canonical_statements": 8,
+      "normalized_ast_sha256": "e6cae532bf2bf07a07119fa53da6c0c70848767e56be82307f90ffa3985f7ed2",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109073920_premier_validate_inventory_branch_fks_20261109.sql",
+      "canonical_sha256": "7a1de677bd07012bc84fc39bd32f2007512e6e09471eb2a99989f2fbeccd15f0",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109073920",
+          "statement_hashes": [
+            "52bfb85aa7f6714ec0213d707b06d7029db81fed4ae61e9e610883ac2decadfd"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 6,
+          "normalized_ast_sha256": "1b2a4a1d5fadbda219da9f3dbe3027f03cd83c06934de7fe8e752fad888da9c7",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "1785de49a730582dc4f4ad9e37ceb12a76564cd949af914a2b318fb7d6ba3b26"
+        }
+      ],
+      "canonical_statements": 6,
+      "normalized_ast_sha256": "1b2a4a1d5fadbda219da9f3dbe3027f03cd83c06934de7fe8e752fad888da9c7",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109073923_premier_validate_warehouse_document_branch_fks_20261109.sql",
+      "canonical_sha256": "319590b079bb1922ae33ba6d74887c69e4b59d0e06c712ae8d8cae928e29c7f7",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109073923",
+          "statement_hashes": [
+            "2d1ab6bbe319f9a4b009f342d4092f300af58904133ef9fd55d18d5fb90ff084"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 9,
+          "normalized_ast_sha256": "702676675ee5b29ad23c52a605ea7c844c3662ffeb8dde1985733689a835c69f",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "fa717f3fa32d527c73319bbbef7c0c55196f0d057f52d71d6e505f63c6cbb856"
+        }
+      ],
+      "canonical_statements": 9,
+      "normalized_ast_sha256": "702676675ee5b29ad23c52a605ea7c844c3662ffeb8dde1985733689a835c69f",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109073928_premier_validate_sale_payment_kitchen_branch_fks_20261109.sql",
+      "canonical_sha256": "41dce8e38dcebf57a947304715ca14860c949eca4e4c15601e7901da4aa75473",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109073928",
+          "statement_hashes": [
+            "bcc46f4fa405ef383b74e64055d2dadd2267c2821806aa6c481273ef672f6eb1"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 7,
+          "normalized_ast_sha256": "c618f367bd960e9fa39981d9151f494e950f0402e914748aeab840e369ac5e7c",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "296c35cf313d954f89ef4b119e189a3dea56b2e0964e488199375c21af218436"
+        }
+      ],
+      "canonical_statements": 7,
+      "normalized_ast_sha256": "c618f367bd960e9fa39981d9151f494e950f0402e914748aeab840e369ac5e7c",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109074100_premier_product_unit_links_multibranch_permission_gate_20261109.sql",
+      "canonical_sha256": "0d71dea27140181ee4e91af3519e1563abe5d35eeaee67a650c16659534f7d96",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109074100",
+          "statement_hashes": [
+            "1a6df936f298a12e9fa3fa91d8a27789a32797b09b92f6f51ba6a251882a5b70"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 7,
+          "normalized_ast_sha256": "5b079d41d19a1cc7b3a6e9104089caf0230463d1b876e97e1a431a1b7dc4fa1d",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "3f92a72facee4f16b260d2e9be1ca60a083eeffd5bc138e0f8279e7a347eb057"
+        }
+      ],
+      "canonical_statements": 7,
+      "normalized_ast_sha256": "5b079d41d19a1cc7b3a6e9104089caf0230463d1b876e97e1a431a1b7dc4fa1d",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109081844_premier_stock_counts_write_permission_gate_20261109.sql",
+      "canonical_sha256": "effeb0b85b9aa0ae9c31057bbbdeefa9bbb9fc4302795d18e8f317da5b7f31c8",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109081844",
+          "statement_hashes": [
+            "5626e446f6ae06ad38163706a2954d33b8a05b01ab7bcf50aab6e1433d4a6d80"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 7,
+          "normalized_ast_sha256": "5a25c5c0a3e60ed3359171993aa5f34874eeaeaca9a209ef2d1de922b4fcfcfe",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "03833addc01a75cf1f9c7cb6ad735e2655909e4e306a54b4ba7a66ed7dc7dd67"
+        }
+      ],
+      "canonical_statements": 7,
+      "normalized_ast_sha256": "5a25c5c0a3e60ed3359171993aa5f34874eeaeaca9a209ef2d1de922b4fcfcfe",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109084444_premier_stock_count_lines_rls_direct_dml_lockdown_20261109.sql",
+      "canonical_sha256": "1aa206b9f496afe7b1ada7e1db578265464d469592b723f7b7be7d92ff130756",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109084444",
+          "statement_hashes": [
+            "2971c36baab61c75e074d476b1bf3f800f4a52e679aa00758f779461a4bf15d5"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 8,
+          "normalized_ast_sha256": "0c7cbe263b5bdc162b500ca173e33fec6cd1412fd9036b91ab26626e5c909bc3",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "f5bc11cd21726dc42238b8d84dd8565b3ac3cf721985f85b192fac2ada0feceb"
+        }
+      ],
+      "canonical_statements": 8,
+      "normalized_ast_sha256": "0c7cbe263b5bdc162b500ca173e33fec6cd1412fd9036b91ab26626e5c909bc3",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109094032_premier_ready_product_actual_batch_cogs_20261109.sql",
+      "canonical_sha256": "fb6a82edfd421c21282792a204232c611e0a68531272446f43c8fd786c978080",
+      "original_category": "outer_comments_only",
+      "candidates": [
+        {
+          "version": "20261109094032",
+          "statement_hashes": [
+            "023f3b3073fc74659d4dafac0eb7092f438ad2ce85a63c0cebe8953e5d6d3470"
+          ],
+          "outer_whitespace_equal": false,
+          "outer_comment_envelope_equal": true,
+          "remote_statements": 7,
+          "normalized_ast_sha256": "e94b1f055878049cb4b3240b60471e884d9f9d8fea027e8796c7254f1201e5f6",
+          "full_ast_equal": true,
+          "matching_contiguous_ast_windows": [
+            0
+          ],
+          "diff_sha256": "d851128f3155227a5ddabc17879294df625e05120d301f0112af0047307c68a5"
+        }
+      ],
+      "canonical_statements": 7,
+      "normalized_ast_sha256": "e94b1f055878049cb4b3240b60471e884d9f9d8fea027e8796c7254f1201e5f6",
+      "resolution": "fresh_read_reverified_equivalent_not_approved"
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109143000_premier_kds_read_only_permissions.sql",
+      "canonical_sha256": "35d9793cd540525f1c5a6e5aaa4854caa0749b0cd634a6625bab80fbdec4e048",
+      "original_category": "unresolved",
+      "candidates": [],
+      "canonical_statements": 8,
+      "normalized_ast_sha256": "87a9014e34e116eda86f5dbfda89c3243954253f03e4ab82d96169f5cfdd678b",
+      "resolution": "blocked_no_proven_history_match",
+      "flags": [
+        "expected_authenticated_revoke_not_present_live"
+      ],
+      "next_gate": "Review KDS client impact and separately approve permission correction."
+    }
+  ]
+}

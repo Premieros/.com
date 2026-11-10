@@ -1,0 +1,14 @@
+--- canonical/20261011133446_phase8c_scheduled_verified_event_worker.sql
++++ history/20261011133446.sql
+@@ -1,4 +1,4 @@
+--- Phase 8C: opt in to a bounded DB-local scheduler where pg_cron is available.
++-- Phase 8C: opt-in to a bounded DB-local scheduler where pg_cron is available.
+ -- The CI PostgreSQL image lacks pg_cron; production installation and job are
+ -- verified independently after deployment. No external delivery is implied.
+ -- The cron job runs with its creator's DB privileges (postgres), NOT as an API user.
+@@ -31,4 +31,4 @@
+     raise exception 'PHASE8C_SCHEDULE_FAILED';
+   end if;
+ end;
+-$setup$;
++$setup$;

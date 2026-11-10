@@ -1,0 +1,15 @@
+{
+  "captured_on": "2026-11-11",
+  "project_ref": "hvqlkapynjfjikqithvd",
+  "read_only": true,
+  "rows": [
+    {
+      "custom_rows": 452,
+      "remote_rows": 727,
+      "close_helpers": [],
+      "kds_anon_execute": false,
+      "kds_authenticated_execute": true,
+      "kds_service_role_execute": true
+    }
+  ]
+}
