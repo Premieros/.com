@@ -6,7 +6,7 @@ const sha = value => createHash('sha256').update(value).digest('hex');
 const demand = (ok, code) => { if (!ok) throw new Error(code); };
 export async function evidence() {
   const raw = await readFile(new URL('docs/database/migration-history-audit-20261110/matrix.json', root));
-  demand(sha(raw) === '642ab7835967c26a8f8d07264012a14a4a2c14b3949fdf8dbd833ae6561329cb', 'MATRIX_DRIFT');
+  demand(sha(raw) === '9980ae0fd9e0d55dac4c2dac44ee7be8821c86fcb6ad5fa7783542a01458a55e', 'MATRIX_DRIFT');
   const files = JSON.parse(raw).files.filter(f => f.category === 'byte_exact' && f.matches.length === 1);
   demand(files.length === 55 && new Set(files.map(f => f.matches[0].version)).size === 55, 'SCOPE_DRIFT');
   for (const f of files) {
