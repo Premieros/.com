@@ -27,4 +27,4 @@ jobs:
       - name: Verify isolated metadata candidate (no hosted credentials)
         env:
           HISTORY55_TEST_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres
-        run: node --test scripts/db/candidates/reconcile-history-exact55.test.mjs
+        run: node --test scripts/db/candidates/reconcile-history-exact55.test.mjs scripts/db/candidates/history-closeout-runtime.test.mjs
