@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BarChart3, CalendarDays, ExternalLink, Layers3, RefreshCw, Store, Trophy, TrendingUp } from 'lucide-react';
+import { BarChart3, CalendarDays, Check, Layers3, RefreshCw, Store, Trophy, TrendingUp } from 'lucide-react';
 import {
   Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
@@ -270,10 +270,10 @@ export function ReportsShowcase({
                   <Icon className="h-5 w-5 shrink-0 text-ui-primary" />
                   {isAr ? panel.ar : panel.en}
                 </h3>
-                <button type="button" aria-label={isAr ? 'فتح تفاصيل التقرير' : 'Open report details'}
+                <button type="button" aria-label={isAr ? 'تحديد نوع التقرير من هذه اللوحة' : 'Select this report type'}
                   onClick={() => onSelectReport(panel.report)}
                   className="shrink-0 rounded-lg p-2 text-ui-primary hover:bg-ui-primary-soft">
-                  <ExternalLink className="h-4 w-4" />
+                  <Check className="h-4 w-4" />
                 </button>
               </div>
               <div className="mt-4 min-h-44 rounded-xl bg-ui-page-alt/40 py-2">
