@@ -168,6 +168,12 @@ export function ReportsCenterPage() {
     () => new Set(permittedOperational.map((report) => report.key)),
     [permittedOperational],
   );
+  const chosenName = pendingReport.startsWith('financial:')
+    ? allowedFinancialViews.find((item) => item.key === pendingReport.slice('financial:'.length))
+    : permittedOperational.find((item) => item.key === pendingReport);
+  const chosenLabel = chosenName
+    ? ('title' in chosenName ? (lang === 'ar' ? chosenName.title : chosenName.titleEn) : (lang === 'ar' ? chosenName.ar : chosenName.en))
+    : (lang === 'ar' ? 'اختر تقريرًا' : 'Choose a report');
   const isAr = lang === 'ar';
   const reportList = (
     <div className="overflow-hidden rounded-xl border border-[#d9ddec] bg-white shadow-sm dark:border-ui-border dark:bg-ui-surface" data-testid="premier-reports-directory">
@@ -264,6 +270,7 @@ export function ReportsCenterPage() {
             <p className="text-xs text-ui-muted">{isAr ? 'ملخص مجمع مباشر — افتح التقرير للحصول على كل تفاصيله' : 'Live summary — open a report to see its complete details'}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <span className="max-w-52 truncate rounded-lg bg-ui-page-alt px-3 py-2 text-xs font-semibold text-ui-text" data-testid="reports-selected-type" title={chosenLabel}>{chosenLabel}</span>
             <span className="max-w-56 truncate rounded-lg bg-ui-page-alt px-3 py-2 text-xs text-ui-muted" data-testid="reports-applied-range">
               {draftFrom} — {draftTo}
             </span>
