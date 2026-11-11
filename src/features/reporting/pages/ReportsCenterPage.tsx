@@ -342,7 +342,7 @@ export function ReportsCenterPage() {
       </p>}
       <div className="relative min-w-0">
         {showDirectory && <aside id="reports-type-directory" dir={isAr ? 'rtl' : 'ltr'}
-          className="absolute start-0 top-0 z-30 w-[min(88vw,320px)] max-h-[75vh] overflow-y-auto rounded-xl bg-ui-surface shadow-2xl" data-testid="reports-collapsible-directory">
+          className="absolute end-0 top-0 z-30 w-[min(88vw,320px)] max-h-[75vh] overflow-y-auto rounded-xl bg-ui-surface shadow-2xl" data-testid="reports-collapsible-directory">
           {reportList}
         </aside>}
         <main dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 space-y-3" data-testid="premier-reports-content">
