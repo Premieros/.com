@@ -53,14 +53,20 @@ import {
 type FinancialReportType = 'trial_balance' | 'ledger' | 'treasury_statement' | 'inventory_movement' | 'income' | 'balance_sheet' | 'ar_aging' | 'ap_aging' | 'aging_summary' | 'cash_flow' | 'party_statement';
 type PeriodKey = 'custom' | 'today' | 'yesterday' | 'last7' | 'last30' | 'this_month' | 'last_month' | 'this_year';
 
+export interface ReportsPageActions {
+  exportExcel: () => void;
+  print: () => void;
+  save: () => void;
+}
 interface ReportsPageProps {
   controlledReportType?: ReportType;
   onReportTypeChange?: (type: ReportType) => void;
   controlledFrom?: string;
   controlledTo?: string;
+  onActionsReady?: (actions: ReportsPageActions | null) => void;
 }
 
-export function ReportsPage({ controlledReportType, onReportTypeChange, controlledFrom, controlledTo }: ReportsPageProps = {}) {
+export function ReportsPage({ controlledReportType, onReportTypeChange, controlledFrom, controlledTo, onActionsReady }: ReportsPageProps = {}) {
   /* REPORT-BRANCH-AUDIT-2026 */
   const { t, lang } = useLanguage();
   const can = useCan();
@@ -119,6 +125,9 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     }
   }, [controlledReportType, onReportTypeChange]);
 
+  const latestReportActions = useRef<ReportsPageActions>({
+    exportExcel: () => undefined, print: () => undefined, save: () => undefined,
+  });
   const lastControlledRange = useRef({ from: controlledFrom, to: controlledTo });
   useEffect(() => {
     if (!controlledFrom || !controlledTo) return;
@@ -1313,6 +1322,22 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     }));
     openPrintWindow({ title: reportLabel, subtitle: `${reportBranchLabel} — ${from} - ${to}`, headers, rows, lang: lang as 'ar' | 'en' });
   };
+
+  latestReportActions.current = {
+    exportExcel: handleExportExcel,
+    print: handlePrint,
+    save: handleSaveCustomReport,
+  };
+  useEffect(() => {
+    if (!onActionsReady) return;
+    const controls: ReportsPageActions = {
+      exportExcel: () => latestReportActions.current.exportExcel(),
+      print: () => latestReportActions.current.print(),
+      save: () => latestReportActions.current.save(),
+    };
+    onActionsReady(controls);
+    return () => onActionsReady(null);
+  }, [onActionsReady]);
 
   return (
     <div>
