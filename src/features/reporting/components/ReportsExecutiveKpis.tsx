@@ -74,8 +74,6 @@ export function ReportsExecutiveKpis({ controlledFrom, controlledTo }: { control
     setTo(controlledTo);
   }, [controlledFrom, controlledTo]);
 
-  if (!authorized) return null;
-
   const run = async () => {
     const callId = ++generation.current;
     setSnapshot(null);
@@ -130,6 +128,15 @@ export function ReportsExecutiveKpis({ controlledFrom, controlledTo }: { control
     }
   };
 
+  useEffect(() => {
+    if (!authorized || branchScope.selectedBranchIds.length === 0) return;
+    void run();
+    // Data is refreshed on date, scope, or authorization changes; generation guards stale responses.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [authorized, branchScope.scopeKey, from, to]);
+
+  if (!authorized) return null;
+
   const current = snapshot?.scopeKey === branchScope.scopeKey && snapshot.from === from && snapshot.to === to
     ? snapshot : null;
   const readiness = current?.readiness;
@@ -171,7 +178,7 @@ export function ReportsExecutiveKpis({ controlledFrom, controlledTo }: { control
           className="inline-flex h-10 items-center gap-2 rounded-lg bg-ui-primary px-4 text-sm font-bold text-ui-primary-fg disabled:opacity-50"
           data-testid="run-income-kpis">
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? (isAr ? 'جارٍ تحميل البيانات...' : 'Loading data...') : (isAr ? 'تحميل / تحديث المؤشرات' : 'Load / refresh KPIs')}
+          {loading ? (isAr ? 'جارٍ تحميل البيانات...' : 'Loading data...') : (isAr ? 'تحديث المؤشرات' : 'Refresh KPIs')}
         </button>
       </div>
 
