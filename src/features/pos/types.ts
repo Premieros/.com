@@ -1,4 +1,4 @@
-import type { DiningTable, Order, OrderItem, ProductModifierSnapshot } from '@/lib/types';
+import type { DiningTable, Order, OrderItem, ProductModifierSnapshot, RpcResult } from '@/lib/types';
 
 export interface OrderKitchenSend {
   id: string;
