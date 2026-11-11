@@ -29,8 +29,8 @@ describe('Reports screenshot correction', () => {
   it('uses authorized existing reporting services, Cairo range, safe missing states and no demo numbers', () => {
     expect(dashboard).toContain('loadSalesReportRows({');
     expect(dashboard).toContain('loadSalesByProductItems({');
-    expect(dashboard).toContain('reporting.getSalesByPaymentReport({');
-    expect(dashboard).toContain('requireFinancialReport(');
+    expect(dashboard).toContain('byOrderType.set(');
+    expect(dashboard).toContain('const channels: Point[] | null = currency');
     expect(dashboard).toContain('history.clampRange(');
     expect(dashboard).toContain('scope.selectedBranchIds');
     expect(dashboard).toContain('reportDateRangeUtc(');
