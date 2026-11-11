@@ -16,6 +16,8 @@ import { useCan } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useColumnPreferences } from '../useColumnPreferences';
 import { filterAndSortReportRows, paginateReportRows, type ReportSortDirection } from '../reportTablePresentation';
+import { linkSourceSale, sourceSaleId } from '../reportSourceLinks';
+import { APP_ROUTES } from '@/core/navigation/routes';
 import { ColumnPicker } from '../ColumnPicker';
 import { useCustomReports } from '../useCustomReports';
 import { getReportExcelProfile } from '../reportExcelProfiles';
@@ -279,7 +281,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
           const net = netSaleAmount(sale);
           const cashier = sale.cashier as { full_name?: string; email?: string } | null;
           const warehouse = sale.warehouse as { name?: string } | null;
-          return withBranch(sale.branch_id, {
+          return linkSourceSale(withBranch(sale.branch_id, {
             [lang === 'ar' ? 'الفاتورة' : 'Invoice']: sale.invoice_number,
             [lang === 'ar' ? 'التاريخ' : 'Date']: formatDate(sale.created_at as string, lang),
             [lang === 'ar' ? 'العميل' : 'Customer']: (sale.customer as { name?: string })?.name || '',
@@ -295,7 +297,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
             [lang === 'ar' ? 'المدفوع' : 'Paid']: Number(sale.paid_amount || 0),
             [lang === 'ar' ? 'المرتجع' : 'Refunded']: Number(sale.refunded_amount || 0),
             [lang === 'ar' ? 'صافي التحصيل' : 'Net Collection']: net,
-          });
+          }), sale.id);
         });
         setData(rows);
         setChartData(sales.slice(0, 10).map((sale: Record<string, unknown>) => ({ name: String(sale.invoice_number), value: netSaleAmount(sale) })));
@@ -552,7 +554,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
         const rows = sales.map((sale: Record<string, unknown>) => {
           const customer = sale.customer as { name?: string } | null;
           const cashier = sale.cashier as { full_name?: string } | null;
-          return withBranch(sale.branch_id, {
+          return linkSourceSale(withBranch(sale.branch_id, {
             [lang === 'ar' ? 'رقم الفاتورة' : 'Invoice']: sale.invoice_number,
             [lang === 'ar' ? 'التاريخ' : 'Date']: formatDate(sale.created_at as string, lang),
             [lang === 'ar' ? 'العميل' : 'Customer']: customer?.name || '-',
@@ -563,7 +565,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
             [lang === 'ar' ? 'صافي الفاتورة' : 'Net Total']: netSaleAmount(sale),
             [lang === 'ar' ? 'صافي المدفوع' : 'Net Paid']: netSalePayment(sale),
             [lang === 'ar' ? 'الحالة' : 'Status']: sale.status,
-          });
+          }), sale.id);
         });
         setData(rows);
         setChartData([]);
@@ -790,14 +792,14 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
           const customer = sale.customer as { name?: string } | null;
           const cashier = sale.cashier as { full_name?: string } | null;
           const refunded = Number(sale.refunded_amount || 0) || Number(sale.total || 0);
-          return withBranch(sale.branch_id, {
+          return linkSourceSale(withBranch(sale.branch_id, {
             [lang === 'ar' ? 'رقم الفاتورة' : 'Invoice']: sale.invoice_number,
             [lang === 'ar' ? 'التاريخ' : 'Date']: formatDate(sale.created_at as string, lang),
             [lang === 'ar' ? 'العميل' : 'Customer']: customer?.name || '-',
             [lang === 'ar' ? 'أمين الصندوق' : 'Cashier']: cashier?.full_name || '-',
             [lang === 'ar' ? 'المبلغ المرتجع' : 'Refunded Amount']: refunded,
             [lang === 'ar' ? 'الحالة' : 'Status']: statusLabels[String(sale.status)] || sale.status,
-          });
+          }), sale.id);
         });
         setData(rows);
         setChartData([]);
@@ -1271,6 +1273,24 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
     }
   };
 
+  const renderReportCell = (row: Record<string, unknown>, key: string) => {
+    const value = row[key];
+    const display = typeof value === 'number' && moneyKeys.includes(key)
+      ? formatFinancialCurrency(value, currency, lang)
+      : String(value ?? '');
+    const saleId = sourceSaleId(row);
+    const isInvoice = key === 'الفاتورة' || key === 'رقم الفاتورة' || key === 'Invoice';
+    if (!saleId || !isInvoice || !can('sales.view')) return display;
+    return (
+      <button type="button"
+        className="font-semibold text-ui-primary underline-offset-2 hover:underline focus-visible:underline"
+        onClick={() => navigate(`${APP_ROUTES.sales}?saleId=${encodeURIComponent(saleId)}`)}
+        aria-label={lang === 'ar' ? `عرض مصدر الفاتورة ${display}` : `Open source sale ${display}`}>
+        {display}
+      </button>
+    );
+  };
+
   const handlePrint = () => {
     const reportLabel = reportTypes.find((row) => row.key === reportType)?.label ?? reportType;
     const headers = presentedRows.length > 0 ? Object.keys(presentedRows[0]) : [];
@@ -1432,7 +1452,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
                         <div key={key} className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-3 py-2 first:pt-0 last:pb-0">
                           <dt className="break-words text-xs font-semibold text-ui-muted">{key}</dt>
                           <dd className="break-words text-sm text-ui-text">
-                            {typeof value === 'number' && moneyKeys.includes(key) ? formatFinancialCurrency(value, currency, lang) : String(value ?? '')}
+                            {renderReportCell(row, key)}
                           </dd>
                         </div>
                       );
@@ -1450,7 +1470,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
                             <div key={key} className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-3 py-2">
                               <dt className="break-words text-xs font-semibold text-ui-muted">{key}</dt>
                               <dd className="break-words text-sm text-ui-text">
-                                {typeof value === 'number' && moneyKeys.includes(key) ? formatFinancialCurrency(value, currency, lang) : String(value ?? '')}
+                                {renderReportCell(row, key)}
                               </dd>
                             </div>
                           );
@@ -1485,7 +1505,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
                         const value = row[key];
                         return (
                           <td key={columnIndex} data-primary={columnIndex === 0} className={`px-3 py-2.5 text-ui-text ${columnIndex === 0 ? 'font-semibold' : 'tabular-nums'}`}>
-                            {typeof value === 'number' && moneyKeys.includes(key) ? formatFinancialCurrency(value, currency, lang) : String(value ?? '')}
+                            {renderReportCell(row, key)}
                           </td>
                         );
                       })}
