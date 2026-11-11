@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Search, ChevronDown, ChevronUp, BarChart3, Star, LayoutGrid, ArrowLeft, ArrowRight, ShieldCheck, Zap, FileBarChart } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, BarChart3, Star, LayoutGrid, ArrowLeft, ArrowRight, ShieldCheck, Zap, FileBarChart, CalendarDays, RefreshCw } from 'lucide-react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ReportsPage } from './ReportsPage';
 import { FinancialReportsPage } from '@/features/accounting/pages/FinancialReportsPage';
@@ -7,6 +7,8 @@ import { ReportsExecutiveKpis } from '../components/ReportsExecutiveKpis';
 import { ReportsShowcase } from '../components/ReportsShowcase';
 import { useCan, type Permission } from '@/lib/permissions';
 import { useBranchScope } from '@/lib/branchScope';
+import { useHistoryAccess } from '@/lib/useHistoryAccess';
+import { addIsoDays, businessDateISO } from '@/lib/businessTime';
 import { useLanguage } from '@/context/LanguageContext';
 import { REPORT_REGISTRY, REPORT_CATEGORIES, type ReportCategory } from '../reportRegistry';
 import type { ReportType } from '../reportFilters';
@@ -61,6 +63,12 @@ const FINANCIAL_REPORTS: Array<{ key: FinancialView; ar: string; en: string }> =
 export function ReportsCenterPage() {
   const can = useCan();
   const branchScope = useBranchScope();
+  const history = useHistoryAccess();
+  const [draftFrom, setDraftFrom] = useState(() => addIsoDays(businessDateISO(), -29));
+  const [draftTo, setDraftTo] = useState(() => businessDateISO());
+  const [dateRange, setDateRange] = useState(() => ({ from: addIsoDays(businessDateISO(), -29), to: businessDateISO() }));
+  const [periodError, setPeriodError] = useState(false);
+  const [overviewRun, setOverviewRun] = useState(0);
   const { lang } = useLanguage();
   const { runtime } = useOrganizationModules();
   const location = useLocation();
@@ -150,18 +158,36 @@ export function ReportsCenterPage() {
       .sort((a, b) => a[1].order - b[1].order);
   }, [permittedOperational, canFinancial, runtime]);
 
+  const applyOverviewDates = () => {
+    const valid = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
+      && !Number.isNaN(Date.parse(`${value}T12:00:00Z`))
+      && new Date(`${value}T12:00:00Z`).toISOString().slice(0, 10) === value;
+    if (!valid(draftFrom) || !valid(draftTo) || draftFrom > draftTo) {
+      setPeriodError(true);
+      return;
+    }
+    const allowed = history.clampRange(draftFrom, draftTo);
+    if (allowed.from !== draftFrom || allowed.to !== draftTo) {
+      setPeriodError(true);
+      return;
+    }
+    setPeriodError(false);
+    setDateRange({ from: draftFrom, to: draftTo });
+    setOverviewRun((value) => value + 1);
+  };
+
   const selectOperational = useCallback((type: ReportType) => {
     setActiveReport(type);
     setMobileListOpen(false);
     setShowDirectory(false);
-    navigate(`/reports?type=${type}`, { replace: true });
-  }, [navigate]);
+    navigate(`/reports?type=${type}&from=${dateRange.from}&to=${dateRange.to}`, { replace: true });
+  }, [navigate, dateRange]);
 
   const selectFinancial = useCallback((view: FinancialView) => {
     setMobileListOpen(false);
     setShowDirectory(false);
-    navigate(`/reports?section=financial&view=${view}`, { replace: true });
-  }, [navigate]);
+    navigate(`/reports?section=financial&view=${view}&from=${dateRange.from}&to=${dateRange.to}`, { replace: true });
+  }, [navigate, dateRange]);
 
   const allowedReportTypes = useMemo(
     () => new Set(permittedOperational.map((report) => report.key)),
@@ -275,7 +301,23 @@ export function ReportsCenterPage() {
               </p>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted">
+              {isAr ? 'من تاريخ' : 'From'}
+              <input type="date" value={draftFrom} onChange={(event) => setDraftFrom(event.target.value)}
+                className="h-9 rounded-lg border border-ui-border bg-ui-page-alt px-2 text-xs text-ui-text" />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted">
+              {isAr ? 'إلى تاريخ' : 'To'}
+              <input type="date" value={draftTo} onChange={(event) => setDraftTo(event.target.value)}
+                className="h-9 rounded-lg border border-ui-border bg-ui-page-alt px-2 text-xs text-ui-text" />
+            </label>
+            <button type="button" onClick={applyOverviewDates} data-testid="apply-overview-dates"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-ui-primary px-3 text-xs font-bold text-ui-primary-fg">
+              <CalendarDays className="h-4 w-4" />
+              <RefreshCw className="h-3.5 w-3.5" />
+              {isAr ? 'تطبيق الفترة' : 'Apply period'}
+            </button>
             <label className="flex min-w-[180px] flex-col gap-1 text-xs font-semibold text-ui-muted">
               {isAr ? 'نطاق الفروع' : 'Branch scope'}
               <select
@@ -336,24 +378,30 @@ export function ReportsCenterPage() {
           </div>
         </div>
       </header>
+      {periodError && <p role="alert" className="rounded-lg border border-ui-danger/30 bg-ui-danger-soft px-4 py-2 text-xs text-ui-danger">
+        {isAr ? 'الفترة غير صالحة أو خارج حدود تاريخ التقارير المسموح.' : 'Invalid period or outside authorized history.'}
+      </p>}
       {showDirectory && <div className="lg:hidden">{reportList}</div>}
       <div className="grid min-w-0 gap-4 lg:grid-cols-[236px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)]" dir="ltr">
         <aside dir={isAr ? 'rtl' : 'ltr'} className="hidden lg:sticky lg:top-3 lg:block lg:self-start">
           {reportList}
         </aside>
         <main dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 space-y-4" data-testid="premier-reports-content">
-          {canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis />}
+          {canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis controlledFrom={dateRange.from} controlledTo={dateRange.to} />}
           {isOverview && (
             <ReportsShowcase
               isAr={isAr}
               allowedReportTypes={allowedReportTypes}
+              from={dateRange.from}
+              to={dateRange.to}
+              key={overviewRun}
               onSelectReport={selectOperational}
             />
           )}
           {!isOverview && requestedFinancial && canFinancial && allowedFinancialViews.length > 0 ? (
             <FinancialReportsPage hideViewPicker />
           ) : !isOverview && permittedOperational.some((report) => report.key === activeReport) ? (
-            <ReportsPage controlledReportType={activeReport} onReportTypeChange={selectOperational} />
+            <ReportsPage controlledReportType={activeReport} onReportTypeChange={selectOperational} controlledFrom={dateRange.from} controlledTo={dateRange.to} />
           ) : !isOverview && (
             <div className="rounded-xl border border-ui-border bg-ui-surface px-6 py-12 text-center text-sm text-ui-muted">
               {isAr ? 'اختر تقريرًا مسموحًا لك لعرض بياناته الحقيقية' : 'Select an authorized report to view live data'}
