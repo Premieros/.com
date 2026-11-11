@@ -18,6 +18,18 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
     expect(layout).toContain('location.pathname === APP_ROUTES.reports');
   });
 
+  it('keeps the global sidebar styling identical across reporting and other routes', () => {
+    // Reports can have their own internal directory, but must not restyle the app shell.
+    expect(layout).toContain('const fullWidthContent = location.pathname === APP_ROUTES.dashboard || isReportsWorkspace');
+    expect(layout).toContain('data-testid="app-sidebar" className=');
+    expect(layout).toContain('className="text-ui-primary"');
+    expect(layout).not.toContain('style={isReportsWorkspace');
+    expect(layout).not.toContain("isReportsWorkspace ? 'text-violet-300'");
+    expect(layout).not.toContain("isReportsWorkspace ? 'text-slate-300");
+    expect(layout).not.toContain("isReportsWorkspace ? (isActive");
+    expect(layout).toContain("isActive ? 'bg-ui-primary text-ui-primary-fg");
+  });
+
   it('retains current reporting engines and places the report directory on the visual left', () => {
     expect(center).toContain('<FinancialReportsPage hideViewPicker />');
     expect(center).toContain('<ReportsPage controlledReportType={activeReport}');
