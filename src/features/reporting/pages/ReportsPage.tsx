@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, BarChart as RechartsBarChart, LineChart as RechartsLineChart, PieChart as RechartsPieChart, Pie, Cell, Line, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { Download, TrendingUp, ShoppingCart, Receipt, Package, BarChart3, CreditCard, Users, List, Layers, AlertTriangle, FileDown, Printer, UserCheck, RotateCcw, Trash2 } from 'lucide-react';
 import { costing, reporting, supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -1324,13 +1324,32 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnl
         ) : (
           <div className="h-48 w-full" dir="ltr" role="img" aria-label={lang === 'ar' ? 'رسم بياني من بيانات التقرير الفعلية' : 'Chart of actual report data'}>
             <ResponsiveContainer width="100%" height="100%">
-              <RechartsBarChart data={chartData.slice(0, 10)} margin={{ top: 8, right: 8, left: 0, bottom: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                <XAxis dataKey="name" interval={0} tick={{ fontSize: 9 }} tickFormatter={(value: string) => String(value).slice(0, 9)} />
-                <YAxis tick={{ fontSize: 10 }} width={46} />
-                <Tooltip formatter={(value: number) => [Number(value).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US'), lang === 'ar' ? 'القيمة' : 'Value']} />
-                <Bar dataKey="value" fill="var(--ui-primary, #2563eb)" radius={[4, 4, 0, 0]} />
-              </RechartsBarChart>
+              {reportType === 'sales_by_payment' ? (
+                <RechartsPieChart>
+                  <Pie data={chartData.slice(0, 10)} dataKey="value" nameKey="name" innerRadius="47%" outerRadius="79%" paddingAngle={2}>
+                    {chartData.slice(0, 10).map((row, index) => (
+                      <Cell key={`${row.name}-${index}`} fill={['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ec4899'][index % 5]} />
+                    ))}
+                  </Pie>
+                  <Tooltip formatter={(value: number) => Number(value).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')} />
+                </RechartsPieChart>
+              ) : reportType === 'sales' ? (
+                <RechartsLineChart data={[...chartData.slice(0, 10)].reverse()} margin={{ top: 8, right: 8, left: 0, bottom: 16 }}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis dataKey="name" interval="preserveStartEnd" tick={{ fontSize: 9 }} tickFormatter={(value: string) => String(value).slice(0, 9)} />
+                  <YAxis tick={{ fontSize: 10 }} width={46} />
+                  <Tooltip formatter={(value: number) => Number(value).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')} />
+                  <Line type="monotone" dataKey="value" stroke="#7c3aed" strokeWidth={2.5} dot={{ r: 3 }} />
+                </RechartsLineChart>
+              ) : (
+                <RechartsBarChart data={chartData.slice(0, 10)} margin={{ top: 8, right: 8, left: 0, bottom: 16 }}>
+                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                  <XAxis dataKey="name" interval={0} tick={{ fontSize: 9 }} tickFormatter={(value: string) => String(value).slice(0, 9)} />
+                  <YAxis tick={{ fontSize: 10 }} width={46} />
+                  <Tooltip formatter={(value: number) => Number(value).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')} />
+                  <Bar dataKey="value" fill="var(--ui-primary, #7c3aed)" radius={[4, 4, 0, 0]} />
+                </RechartsBarChart>
+              )}
             </ResponsiveContainer>
           </div>
         )}
