@@ -3,7 +3,7 @@ import { Search, ChevronDown, ChevronUp, BarChart3, Star, LayoutGrid, ArrowLeft,
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ReportsPage, type ReportsPageActions } from './ReportsPage';
 import { FinancialReportsPage } from '@/features/accounting/pages/FinancialReportsPage';
-import { ReportsExecutiveKpis } from '../components/ReportsExecutiveKpis';
+import { ReportsExecutiveKpis, type IncomeKpiVerified } from '../components/ReportsExecutiveKpis';
 import { ReportsShowcase } from '../components/ReportsShowcase';
 import { useCan, type Permission } from '@/lib/permissions';
 import { useBranchScope } from '@/lib/branchScope';
@@ -63,6 +63,7 @@ export function ReportsCenterPage() {
   const [periodError, setPeriodError] = useState(false);
   const [overviewRun, setOverviewRun] = useState(0);
   const [reportActions, setReportActions] = useState<ReportsPageActions | null>(null);
+  const [verifiedIncome, setVerifiedIncome] = useState<IncomeKpiVerified | null>(null);
   const { lang } = useLanguage();
   const { runtime } = useOrganizationModules();
   const location = useLocation();
@@ -403,6 +404,7 @@ export function ReportsCenterPage() {
             <ReportsShowcase
               isAr={isAr}
               allowedReportTypes={allowedReportTypes}
+              verifiedIncome={verifiedIncome?.scopeKey === branchScope.scopeKey && verifiedIncome.from === dateRange.from && verifiedIncome.to === dateRange.to ? verifiedIncome : null}
               hasAuthorizedBranches={branchScope.selectedBranchIds.length > 0}
               from={dateRange.from}
               to={dateRange.to}
@@ -410,7 +412,7 @@ export function ReportsCenterPage() {
               onSelectReport={selectOperational}
             />
           )}
-          {canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis controlledFrom={dateRange.from} controlledTo={dateRange.to} />}
+          {canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis controlledFrom={dateRange.from} controlledTo={dateRange.to} onVerifiedTotal={setVerifiedIncome} />}
           {!isOverview && requestedFinancial && canFinancial && allowedFinancialViews.length > 0 ? (
             <FinancialReportsPage hideViewPicker />
           ) : !isOverview && permittedOperational.some((report) => report.key === activeReport) ? (
