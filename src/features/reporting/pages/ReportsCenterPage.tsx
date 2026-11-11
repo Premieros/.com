@@ -412,7 +412,6 @@ export function ReportsCenterPage() {
               onSelectReport={selectOperational}
             />
           )}
-          {canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis controlledFrom={dateRange.from} controlledTo={dateRange.to} onVerifiedTotal={setVerifiedIncome} />}
           {!isOverview && requestedFinancial && canFinancial && allowedFinancialViews.length > 0 ? (
             <FinancialReportsPage hideViewPicker />
           ) : !isOverview && permittedOperational.some((report) => report.key === activeReport) ? (
@@ -439,6 +438,9 @@ export function ReportsCenterPage() {
                 ))}
               </div>
             </section>
+          )}
+          {isOverview && canFinancial && businessFinancialViewAllowed(runtime, 'income') && (
+            <ReportsExecutiveKpis controlledFrom={dateRange.from} controlledTo={dateRange.to} onVerifiedTotal={setVerifiedIncome} />
           )}
         </main>
       </div>
