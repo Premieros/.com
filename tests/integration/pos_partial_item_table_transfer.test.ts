@@ -51,6 +51,12 @@ describe.skipIf(!dbUrl)('partial table transfer against the full schema and actu
   expect((await client.query('SELECT unit_price::float8 price FROM public.order_items WHERE id=$1',[newLine])).rows[0].price).toBe(20);
   const targets=(await client.query(`SELECT id,quantity::float8 q FROM public.order_items WHERE order_id=$1`,[target])).rows;
   expect(targets).toHaveLength(2); expect(targets.find(r=>r.id===newLine)?.q).toBe(1);
+  // A partial move must repartition the existing KDS send, never enqueue a duplicate.
+  const sendRows = (await client.query(`SELECT order_item_id,sent_quantity::float8 sent FROM public.order_kitchen_sends WHERE order_item_id=ANY($1::uuid[])`,[[line,newLine]])).rows;
+  expect(sendRows).toHaveLength(2);
+  expect(sendRows.find(r=>r.order_item_id===line)?.sent).toBe(2);
+  expect(sendRows.find(r=>r.order_item_id===newLine)?.sent).toBe(1);
+  expect(sendRows.reduce((sum,r)=>sum+r.sent,0)).toBe(3);
   const events=(await client.query(`SELECT * FROM public.order_kitchen_inventory_events WHERE order_item_id=ANY($1::uuid[])`,[[line,newLine]])).rows;
   expect(events).toHaveLength(2); expect(events.find(e=>e.order_item_id===newLine).transfer_origin_event_id).toBe(originalEvent);
   expect(events.reduce((n,e)=>n+Number(e.total_cost),0)).toBe(9);
