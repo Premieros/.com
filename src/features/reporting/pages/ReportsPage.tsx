@@ -57,11 +57,12 @@ interface ReportsPageProps {
   controlledReportType?: ReportType;
   onReportTypeChange?: (type: ReportType) => void;
   chartOnly?: boolean;
+  chartMode?: 'normal' | 'branch';
   controlledFrom?: string;
   controlledTo?: string;
 }
 
-export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnly = false, controlledFrom, controlledTo }: ReportsPageProps = {}) {
+export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnly = false, chartMode = 'normal', controlledFrom, controlledTo }: ReportsPageProps = {}) {
   /* REPORT-BRANCH-AUDIT-2026 */
   const { t, lang } = useLanguage();
   const can = useCan();
@@ -313,7 +314,18 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnl
           }), sale.id);
         });
         setData(rows);
-        setChartData(sales.slice(0, 10).map((sale: Record<string, unknown>) => ({ name: String(sale.invoice_number), value: netSaleAmount(sale) })));
+        if (chartMode === 'branch') {
+          // Visual grouping only: use exactly the existing net-sale definition and authorized report rows.
+          // Each branch is shown separately; no cross-currency grand total is inferred.
+          const byBranch = new Map<string, number>();
+          sales.forEach((sale: Record<string, unknown>) => {
+            const id = String(sale.branch_id || '');
+            byBranch.set(id, (byBranch.get(id) || 0) + netSaleAmount(sale));
+          });
+          setChartData(Array.from(byBranch, ([id, value]) => ({ name: branchNameById(id), value })));
+        } else {
+          setChartData(sales.slice(0, 10).map((sale: Record<string, unknown>) => ({ name: String(sale.invoice_number), value: netSaleAmount(sale) })));
+        }
         setSummary({ total: sales.reduce((sum: number, sale: Record<string, unknown>) => sum + netSaleAmount(sale), 0), count: sales.length });
       } else if (reportType === 'purchases') {
         const purchases = await loadPurchaseReportRows({
@@ -1336,7 +1348,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnl
                   </Pie>
                   <Tooltip formatter={(value: number) => Number(value).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')} />
                 </RechartsPieChart>
-              ) : reportType === 'sales' ? (
+              ) : reportType === 'sales' && chartMode !== 'branch' ? (
                 <RechartsLineChart data={[...chartData.slice(0, 10)].reverse()} margin={{ top: 8, right: 8, left: 0, bottom: 16 }}>
                   <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
                   <XAxis dataKey="name" interval="preserveStartEnd" tick={{ fontSize: 9 }} tickFormatter={(value: string) => String(value).slice(0, 9)} />
