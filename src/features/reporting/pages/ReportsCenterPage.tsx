@@ -1,5 +1,5 @@
-import { useCallback, useMemo, useState } from 'react';
-import { Search, BarChart3, Star, LayoutGrid, ShieldCheck, Zap, FileBarChart, CalendarDays, RefreshCw, Plus } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Search, BarChart3, Star, LayoutGrid, SlidersHorizontal, ChevronDown } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { ReportsExecutiveKpis, type IncomeKpiVerified } from '../components/ReportsExecutiveKpis';
 import { ReportsShowcase } from '../components/ReportsShowcase';
@@ -69,6 +69,8 @@ export function ReportsCenterPage() {
   const [favorites, setFavorites] = useState<string[]>(loadFavorites);
   const [showDirectory, setShowDirectory] = useState(false);
   const [pendingReport, setPendingReport] = useState<string>('');
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  useEffect(() => { if (!pendingReport && initialOperational) setPendingReport(initialOperational); }, [pendingReport, initialOperational]);
   const toggleFavorite = useCallback((key: string) => {
     setFavorites((previous) => {
       const next = previous.includes(key) ? previous.filter((item) => item !== key) : [...previous, key];
@@ -86,10 +88,7 @@ export function ReportsCenterPage() {
     [can, runtime],
   );
 
-  const initialOperational =
-    requestedType && permittedOperational.some((report) => report.key === requestedType)
-      ? requestedType
-      : permittedOperational.find((report) => report.key === 'sales_by_payment')?.key || permittedOperational[0]?.key || 'sales';
+  const initialOperational = permittedOperational.find((report) => report.key === 'sales_by_payment')?.key || permittedOperational[0]?.key || '';
 
   const canFinancial = can('reports.financial');
   const allowedFinancialViews = FINANCIAL_REPORTS.filter((report) => businessFinancialViewAllowed(runtime, report.key));
@@ -169,15 +168,6 @@ export function ReportsCenterPage() {
     () => new Set(permittedOperational.map((report) => report.key)),
     [permittedOperational],
   );
-  const quickPriority: ReportType[] = [
-    'sales', 'detailed_invoices', 'purchases', 'inventory', 'profit',
-    'recipe_costs', 'production_waste', 'returns', 'financial_reconciliation',
-  ];
-  const quickReports = quickPriority
-    .map((key) => permittedOperational.find((report) => report.key === key))
-    .filter((report): report is (typeof permittedOperational)[number] => Boolean(report));
-  const isOverview = true;
-
   const isAr = lang === 'ar';
   const reportList = (
     <div className="overflow-hidden rounded-xl border border-[#d9ddec] bg-white shadow-sm dark:border-ui-border dark:bg-ui-surface" data-testid="premier-reports-directory">
@@ -265,101 +255,98 @@ export function ReportsCenterPage() {
 
   return (
     <section className="space-y-3" dir={isAr ? 'rtl' : 'ltr'} data-testid="unified-reports-center">
-      <header className="overflow-hidden rounded-xl border border-[#d9ddec] bg-white shadow-sm dark:border-ui-border dark:bg-ui-surface">
-        <div className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4">
-          <div className="flex min-w-0 items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ui-primary/10 text-ui-primary">
-              <BarChart3 className="h-6 w-6" />
-            </div>
-            <div>
-              <p className="text-xs font-extrabold tracking-wide text-ui-primary">PREMIER POS & ERP</p>
-              <h1 className="text-xl font-black text-ui-text sm:text-2xl">{isAr ? 'مركز التقارير' : 'Premier Reports Center'}</h1>
-              <p className="mt-1 text-xs text-ui-muted">
-                {isAr ? 'رؤية شاملة لأداء المطعم وإدارة الأعمال من مصادر Premier الفعلية' : 'A unified view of restaurant and business performance from Premier’s real sources'}
-              </p>
-            </div>
+      <header className="relative z-20 rounded-xl border border-ui-border bg-ui-surface p-3 shadow-ui-sm" data-testid="reports-compact-toolbar">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="min-w-0">
+            <h1 className="flex items-center gap-2 text-xl font-black text-ui-text">
+              <BarChart3 className="h-6 w-6 text-ui-primary" />{isAr ? 'التقارير' : 'Reports'}
+            </h1>
+            <p className="text-xs text-ui-muted">{isAr ? 'ملخص مجمع مباشر — افتح التقرير للحصول على كل تفاصيله' : 'Live summary — open a report to see its complete details'}</p>
           </div>
-          <div className="flex flex-wrap items-end gap-2">
-            <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted">
-              {isAr ? 'من تاريخ' : 'From'}
-              <input type="date" value={draftFrom} onChange={(event) => setDraftFrom(event.target.value)}
-                className="h-9 rounded-lg border border-ui-border bg-ui-page-alt px-2 text-xs text-ui-text" />
-            </label>
-            <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted">
-              {isAr ? 'إلى تاريخ' : 'To'}
-              <input type="date" value={draftTo} onChange={(event) => setDraftTo(event.target.value)}
-                className="h-9 rounded-lg border border-ui-border bg-ui-page-alt px-2 text-xs text-ui-text" />
-            </label>
-            <label className="flex min-w-[180px] flex-col gap-1 text-xs font-semibold text-ui-muted">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="max-w-56 truncate rounded-lg bg-ui-page-alt px-3 py-2 text-xs text-ui-muted" data-testid="reports-applied-range">
+              {draftFrom} — {draftTo}
+            </span>
+            <button type="button" data-testid="toggle-reports-filters" aria-expanded={filtersOpen}
+              aria-controls="reports-filters-popup" onClick={() => setFiltersOpen((open) => !open)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border px-3 text-xs font-bold text-ui-text">
+              <SlidersHorizontal className="h-4 w-4" />{isAr ? 'الفلاتر' : 'Filters'}<ChevronDown className="h-3.5 w-3.5" />
+            </button>
+            <button type="button" data-testid="toggle-reports-directory" aria-expanded={showDirectory}
+              aria-controls="reports-type-directory" onClick={() => setShowDirectory((open) => !open)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border px-3 text-xs font-bold text-ui-text">
+              <LayoutGrid className="h-4 w-4" />{isAr ? 'أنواع التقارير' : 'Report types'}
+            </button>
+            <button type="button" onClick={applyOverviewDates} data-testid="apply-overview-dates"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-ui-primary px-4 text-xs font-bold text-ui-primary-fg">
+              {isAr ? 'عرض التقرير التفصيلي' : 'View detailed report'}
+            </button>
+          </div>
+        </div>
+        {filtersOpen && <div id="reports-filters-popup" data-testid="reports-filters-popup"
+          className="absolute end-2 top-full z-40 mt-2 w-[min(92vw,540px)] rounded-xl border border-ui-border bg-ui-surface p-4 shadow-xl">
+          <div className="mb-3 flex items-center justify-between">
+            <h2 className="text-sm font-black text-ui-text">{isAr ? 'خيارات التقرير والفترة والفرع' : 'Report options, dates and branch'}</h2>
+            <button type="button" onClick={() => setFiltersOpen(false)} className="rounded-lg px-3 py-1.5 text-xs text-ui-muted hover:bg-ui-page-alt">{isAr ? 'إغلاق' : 'Close'}</button>
+          </div>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted sm:col-span-2">
               {isAr ? 'نوع التقرير' : 'Report type'}
               <select data-testid="reports-single-type-select" value={pendingReport || initialOperational}
                 onChange={(event) => setPendingReport(event.target.value)}
-                className="h-9 max-w-[240px] rounded-lg border border-ui-border bg-ui-page-alt px-2 text-xs font-bold text-ui-text">
-                <optgroup label={isAr ? 'التقارير التشغيلية' : 'Operational reports'}>
+                className="h-10 w-full rounded-lg border border-ui-border bg-ui-page-alt px-2 text-xs font-bold text-ui-text">
+                <optgroup label={isAr ? 'التقارير التشغيلية' : 'Operational'}>
                   {permittedOperational.map((item) => <option key={item.key} value={item.key}>{isAr ? item.title : item.titleEn}</option>)}
                 </optgroup>
-                {canFinancial && allowedFinancialViews.length > 0 && <optgroup label={isAr ? 'التقارير المالية' : 'Financial reports'}>
+                {canFinancial && allowedFinancialViews.length > 0 && <optgroup label={isAr ? 'التقارير المالية' : 'Financial'}>
                   {allowedFinancialViews.map((item) => <option key={item.key} value={`financial:${item.key}`}>{isAr ? item.ar : item.en}</option>)}
                 </optgroup>}
               </select>
             </label>
-            <button type="button" aria-expanded={showDirectory} aria-controls="reports-type-directory"
-              onClick={() => setShowDirectory((open) => !open)}
-              data-testid="toggle-reports-directory"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border px-3 text-xs font-bold text-ui-text">
-              <LayoutGrid className="h-4 w-4" />{showDirectory ? (isAr ? 'إغلاق قائمة التقارير' : 'Hide report list') : (isAr ? 'قائمة التقارير' : 'Report list')}
-            </button>
-            <button type="button" onClick={applyOverviewDates} data-testid="apply-overview-dates"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-ui-primary px-3 text-xs font-bold text-ui-primary-fg">
-              <CalendarDays className="h-4 w-4" />
-              <RefreshCw className="h-3.5 w-3.5" />
-              {isAr ? 'عرض التقرير التفصيلي' : 'View detailed report'}
-            </button>
-            {isOverview && permittedOperational.length > 0 && (
-              <button type="button" onClick={() => { setPendingReport(initialOperational); setShowDirectory(true); }}
-                data-testid="create-custom-report"
-                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-violet-700 px-3 text-xs font-bold text-white hover:bg-violet-800">
-                <Plus className="h-4 w-4" />{isAr ? 'تقرير مخصص' : 'Custom report'}
-              </button>
-            )}
-            <label className="flex min-w-[180px] flex-col gap-1 text-xs font-semibold text-ui-muted">
+            <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted">
+              {isAr ? 'من تاريخ' : 'From'}
+              <input type="date" value={draftFrom} onChange={(event) => setDraftFrom(event.target.value)}
+                className="h-10 w-full rounded-lg border border-ui-border bg-ui-page-alt px-2 text-xs text-ui-text" />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted">
+              {isAr ? 'إلى تاريخ' : 'To'}
+              <input type="date" value={draftTo} onChange={(event) => setDraftTo(event.target.value)}
+                className="h-10 w-full rounded-lg border border-ui-border bg-ui-page-alt px-2 text-xs text-ui-text" />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted sm:col-span-2">
               {isAr ? 'نطاق الفروع' : 'Branch scope'}
-              <select
-                value={branchScope.allBranchesSelected ? '__all' : branchScope.selectedBranchIds.length === 1 ? branchScope.selectedBranchIds[0] : '__selected'}
+              <select value={branchScope.allBranchesSelected ? '__all' : branchScope.selectedBranchIds.length === 1 ? branchScope.selectedBranchIds[0] : '__selected'}
                 onChange={(event) => {
                   if (event.target.value === '__all') branchScope.setAllBranches(true);
                   else if (event.target.value !== '__selected') branchScope.setSelectedBranchIds([event.target.value]);
                 }}
-                aria-label={isAr ? 'تصفية التقارير حسب الفرع المصرح' : 'Authorized report branch filter'}
-                className="h-9 rounded-lg border border-ui-border bg-ui-page-alt px-2 text-xs font-bold text-ui-text"
-              >
-                <option value="__all">{isAr ? 'كل الفروع المصرح بها' : 'All authorized branches'}</option>
-                {branchScope.selectedBranchIds.length > 1 && !branchScope.allBranchesSelected && (
-                  <option value="__selected">{isAr ? 'فروع محددة' : 'Selected branches'}</option>
-                )}
-                {branchScope.organizationBranches.map((item) => (
-                  <option key={item.id} value={item.id}>{isAr ? item.name : (item.name_en || item.name)}</option>
-                ))}
+                className="h-10 w-full rounded-lg border border-ui-border bg-ui-page-alt px-2 text-xs text-ui-text">
+                <option value="__all">{isAr ? 'جميع الفروع المصرح بها' : 'All authorized branches'}</option>
+                {!branchScope.allBranchesSelected && branchScope.selectedBranchIds.length > 1 && <option value="__selected">{isAr ? 'الفروع المحددة' : 'Selected branches'}</option>}
+                {branchScope.organizationBranches.map((item) => <option key={item.id} value={item.id}>{isAr ? item.name : (item.name_en || item.name)}</option>)}
               </select>
             </label>
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-ui-border bg-ui-page-alt px-3 py-2 text-xs font-semibold text-ui-muted">
-              <ShieldCheck className="h-4 w-4" />
-              {isAr ? 'حسب صلاحياتك' : 'Permission scoped'}
-            </span>
-
           </div>
-        </div>
-
-      </header>
+          <button type="button" onClick={() => {
+            const allowed = history.clampRange(draftFrom, draftTo);
+            if (draftFrom > draftTo || allowed.from !== draftFrom || allowed.to !== draftTo) { setPeriodError(true); return; }
+            setDateRange({ from: draftFrom, to: draftTo }); setOverviewRun((v) => v + 1); setPeriodError(false); setFiltersOpen(false);
+          }} data-testid="apply-summary-filters"
+            className="mt-3 w-full rounded-lg bg-ui-primary px-3 py-2.5 text-xs font-black text-ui-primary-fg">
+            {isAr ? 'تحديث الملخص المجمع' : 'Refresh summary'}
+          </button>
+        </div>}
+      </header>eader>
       {periodError && <p role="alert" className="rounded-lg border border-ui-danger/30 bg-ui-danger-soft px-4 py-2 text-xs text-ui-danger">
         {isAr ? 'الفترة غير صالحة أو خارج حدود تاريخ التقارير المسموح.' : 'Invalid period or outside authorized history.'}
       </p>}
-      <div className={showDirectory ? "grid min-w-0 gap-3 lg:grid-cols-[240px_minmax(0,1fr)]" : "grid min-w-0 gap-3"} dir="ltr">
-        {showDirectory && <aside id="reports-type-directory" dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 lg:self-start" data-testid="reports-collapsible-directory">
+      <div className="relative min-w-0">
+        {showDirectory && <aside id="reports-type-directory" dir={isAr ? 'rtl' : 'ltr'}
+          className="absolute start-0 top-0 z-30 w-[min(88vw,320px)] max-h-[75vh] overflow-y-auto rounded-xl bg-ui-surface shadow-2xl" data-testid="reports-collapsible-directory">
           {reportList}
         </aside>}
         <main dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 space-y-3" data-testid="premier-reports-content">
-          {isOverview && (
+          {(
             <ReportsShowcase
               isAr={isAr}
               allowedReportTypes={allowedReportTypes}
@@ -370,23 +357,6 @@ export function ReportsCenterPage() {
               key={overviewRun}
               onSelectReport={selectOperational}
             />
-          )}
-          {permittedOperational.length > 0 && (
-            <section className="rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm" data-testid="reports-quick-links">
-              <div className="mb-3 flex items-center gap-2">
-                <Zap className="h-5 w-5 text-amber-500" aria-hidden="true" />
-                <h2 className="text-sm font-black text-ui-text">{isAr ? 'تقارير سريعة' : 'Quick reports'}</h2>
-              </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-9">
-                {quickReports.map((report) => (
-                  <button key={report.key} type="button" onClick={() => { setPendingReport(report.key); setShowDirectory(true); }}
-                    className="flex min-w-0 flex-col items-center gap-2 rounded-xl border border-ui-border bg-ui-page-alt p-3 text-center text-xs font-bold text-ui-text transition hover:border-ui-primary hover:text-ui-primary">
-                    <FileBarChart className="h-5 w-5 text-ui-primary" aria-hidden="true" />
-                    <span className="line-clamp-2">{isAr ? report.title : report.titleEn}</span>
-                  </button>
-                ))}
-              </div>
-            </section>
           )}
           {canFinancial && businessFinancialViewAllowed(runtime, 'income') && (
             <ReportsExecutiveKpis controlledFrom={dateRange.from} controlledTo={dateRange.to} onVerifiedTotal={setVerifiedIncome} />
