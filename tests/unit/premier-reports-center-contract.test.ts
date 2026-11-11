@@ -3,16 +3,19 @@ import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 
 const center = readFileSync(resolve(process.cwd(), 'src/features/reporting/pages/ReportsCenterPage.tsx'), 'utf8');
+const full = readFileSync(resolve(process.cwd(), 'src/features/reporting/pages/ReportFullPage.tsx'), 'utf8');
+const routeSource = readFileSync(resolve(process.cwd(), 'src/app/routes.tsx'), 'utf8');
 const report = readFileSync(resolve(process.cwd(), 'src/features/reporting/pages/ReportsPage.tsx'), 'utf8');
 
 describe('Premier Reports Center: reuse, access and truthful presentation', () => {
   it('keeps the existing /reports entry and operational/financial report engines', () => {
-    expect(center).toContain('Premier Reports Center');
+    expect(center).toContain('data-testid="reports-compact-toolbar"');
     expect(center).toContain('data-testid="unified-reports-center"');
-    expect(center).toContain('<ReportsPage controlledReportType={activeReport}');
-    expect(center).toContain('<FinancialReportsPage hideViewPicker />');
-    expect(center).toContain('navigate(`/reports?type=${type}&from=${dateRange.from}&to=${dateRange.to}`');
-    expect(center).toContain("navigate(`/reports?section=financial&view=${view}&from=${dateRange.from}&to=${dateRange.to}`");
+    expect(full).toContain('<ReportsPage key={allowedReport.key}');
+    expect(full).toContain('<FinancialReportsPage hideViewPicker />');
+    expect(routeSource).toContain('path="/reports/view"');
+    expect(center).toContain('navigate(`/reports/view?type=${target}&from=${draftFrom}&to=${draftTo}`');
+    expect(center).toContain('data-testid="toggle-reports-filters"');
   });
   it('uses the existing registry and the organization and permission gates', () => {
     expect(center).toContain('REPORT_REGISTRY.filter');
