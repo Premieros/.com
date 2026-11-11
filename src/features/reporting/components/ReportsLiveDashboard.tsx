@@ -39,7 +39,7 @@ function money(n: number, currency: string | null, lang: string) {
   }).format(n);
 }
 function validDate(value: string) {
-  return /^\\d{4}-\\d{2}-\\d{2}$/.test(value)
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
     && !Number.isNaN(new Date(value + 'T12:00:00Z').getTime())
     && new Date(value + 'T12:00:00Z').toISOString().slice(0, 10) === value;
 }
@@ -101,7 +101,7 @@ export function ReportsLiveDashboard({
         for (const sale of inScope) {
           const net = netSaleAmount(sale);
           total += net;
-          const date = String(sale.created_at || '').slice(0, 10);
+          const date = businessDateISO(new Date(String(sale.created_at)));
           amounts.set(date, (amounts.get(date) || 0) + net);
           const id = String(sale.branch_id);
           byBranch.set(id, (byBranch.get(id) || 0) + net);
