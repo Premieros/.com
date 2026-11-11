@@ -32,6 +32,7 @@ export const MENU_ITEMS: MenuItemConfig[] = [
   { id: 'dashboard', route: APP_ROUTES.dashboard, icon: 'dashboard', labelKey: 'dashboard', permission: 'dashboard.view', group: 'main' },
   { id: 'pos', route: APP_ROUTES.pos, icon: 'pos', labelKey: 'pos', permission: 'pos.view', group: 'main' },
   { id: 'kitchen-display', route: APP_ROUTES.kitchenDisplay, icon: 'kitchenDisplay', labelKey: 'kitchenDisplay', permission: 'pos.kds_view', group: 'main' },
+  { id: 'reports', route: APP_ROUTES.reports, icon: 'reports', labelKey: 'reports', label: { ar: 'مركز التقارير', en: 'Reports Center' }, permissionsAny: ['reports.view', 'reports.financial'], group: 'main' },
   { id: 'business-records', route: APP_ROUTES.businessRecords, icon: 'customers', labelKey: 'customers', label: { ar: 'سجلات النشاط', en: 'Business Records' }, permission: 'customers.view', group: 'main' },
 
   { id: 'operations-center', route: APP_ROUTES.operationsCenter, icon: 'pos', labelKey: 'orders', label: { ar: 'مركز العمليات', en: 'Operations Center' }, permission: 'dashboard.view', group: 'centers' },

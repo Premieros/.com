@@ -19,6 +19,7 @@ type IncomeField = typeof INCOME_KEYS[number];
 type Snapshot = { readiness: IncomeReadiness; scopeKey: string; from: string; to: string };
 
 const METRICS: Array<{ key: IncomeField; ar: string; en: string }> = [
+  { key: 'revenue', ar: 'إجمالي الإيرادات', en: 'Gross revenue' },
   { key: 'net_revenue', ar: 'صافي الإيرادات', en: 'Net revenue' },
   { key: 'cogs', ar: 'تكلفة البضاعة المباعة', en: 'Cost of goods sold' },
   { key: 'gross_profit', ar: 'مجمل الربح', en: 'Gross profit' },
@@ -171,9 +172,18 @@ export function ReportsExecutiveKpis() {
         {total ? (isAr ? 'إجمالي مكتمل للفروع المختارة' : 'Complete total for selected branches')
           : (isAr ? 'الإجمالي الموحّد غير مكتمل — القيم المتاحة لكل فرع بالأسفل' : 'Consolidated total incomplete — available branch figures below')}
       </p>
-      <div className="mt-2 grid grid-cols-2 gap-3 lg:grid-cols-5">
-        {METRICS.map((metric) => (
-          <div key={metric.key} className="min-w-0 rounded-lg border border-ui-border bg-ui-page-alt p-3" data-testid={`income-kpi-${metric.key}`}>
+      <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
+        {METRICS.map((metric, index) => (
+          <div key={metric.key}
+            className={`min-w-0 rounded-xl border border-ui-border/70 bg-gradient-to-br p-4 shadow-ui-xs ${[
+              'from-emerald-100/80 to-white dark:from-emerald-950/40 dark:to-ui-surface',
+              'from-sky-100/90 to-white dark:from-sky-950/40 dark:to-ui-surface',
+              'from-amber-100/85 to-white dark:from-amber-950/40 dark:to-ui-surface',
+              'from-rose-100/80 to-white dark:from-rose-950/40 dark:to-ui-surface',
+              'from-violet-100/90 to-white dark:from-violet-950/40 dark:to-ui-surface',
+              'from-indigo-100/90 to-white dark:from-indigo-950/40 dark:to-ui-surface',
+            ][index]}`}
+            data-testid={`income-kpi-${metric.key}`}>
             <p className="text-xs text-ui-muted">{isAr ? metric.ar : metric.en}</p>
             <p className="mt-2 break-words text-base font-black tabular-nums text-ui-text">
               {total && readiness?.currency
