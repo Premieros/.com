@@ -47,7 +47,8 @@ export function ReportsShowcase({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
-  const canReadSnapshot = can('dashboard.view');
+  // Report readers may see report aggregates; the invoker-security RPC still enforces table RLS.
+  const canReadSnapshot = can('dashboard.view') || can('reports.view');
   const panels = PANELS.filter((panel) => allowedReportTypes.has(panel.report));
   const branchIds = branchScope.selectedBranchIds;
   const currencyCodes = branchIds.map((id) => effectiveSettings(id)?.currency || '');
@@ -77,13 +78,15 @@ export function ReportsShowcase({
       const { startIso, endExclusiveIso } = reportDateRangeUtc(from, to);
       const duration = Date.parse(endExclusiveIso) - Date.parse(startIso);
       if (!Number.isFinite(duration) || duration <= 0) throw new Error('INVALID_PERIOD');
-      const previousTo = new Date(Date.parse(startIso)).toISOString();
+      // The existing RPC uses <= end; supply the final millisecond of the selected day.
+      const currentToInclusive = new Date(Date.parse(endExclusiveIso) - 1).toISOString();
+      const previousTo = new Date(Date.parse(startIso) - 1).toISOString();
       const previousFrom = new Date(Date.parse(startIso) - duration).toISOString();
       const snapshot = await loadDashboardSalesSnapshot({
         branchId: branchIds.length === 1 ? branchIds[0] : null,
         branchIds: [...branchIds],
         currentFrom: startIso,
-        currentTo: endExclusiveIso,
+        currentTo: currentToInclusive,
         previousFrom,
         previousTo,
         granularity: 'day',
@@ -96,7 +99,7 @@ export function ReportsShowcase({
     } catch {
       if (version === generation.current) setError(isAr
         ? 'تعذر تحميل لوحة الرسوم من مصدر المبيعات المعتمد. افتح التقرير التفصيلي أو أعد المحاولة.'
-        : 'The authoritative sales snapshot is unavailable. Open the detailed report or retry.');
+        : 'The authorized sales source is unavailable. Open the detailed report or retry.');
     } finally {
       if (version === generation.current) setLoading(false);
     }
@@ -252,7 +255,7 @@ export function ReportsShowcase({
         {isAr ? 'المبالغ الإجمالية غير معروضة لأن عملات الفروع غير موحّدة أو غير محددة؛ أعداد الطلبات والكميات ما زالت ظاهرة.' : 'Money totals are unavailable because branch currencies differ or are missing. Order counts and product quantities remain visible.'}
       </p>}
       {!canReadSnapshot && <p className="text-xs text-ui-muted">
-        {isAr ? 'الرسوم المجمعة تتطلب صلاحية لوحة المبيعات؛ التقارير المفصلة أدناه متاحة حسب صلاحياتك.' : 'Dashboard access is required for the overview charts; detailed reports remain available according to your permissions.'}
+        {isAr ? 'الرسوم المجمعة تتطلب صلاحية لوحة المبيعات أو التقارير، مع الالتزام بصلاحيات الفروع؛ التقارير المفصلة متاحة حسب صلاحياتها.' : 'Sales dashboard or reporting access is required to view aggregates; detailed reports remain subject to their own permissions.'}
       </p>}
       {error && <p role="alert" className="rounded-lg border border-ui-danger/30 bg-ui-danger-soft p-3 text-xs text-ui-danger">{error}</p>}
       <div className="grid gap-3 md:grid-cols-2">
