@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ReportsPage } from './ReportsPage';
 import { FinancialReportsPage } from '@/features/accounting/pages/FinancialReportsPage';
 import { useCan, type Permission } from '@/lib/permissions';
+import { useBranchScope } from '@/lib/branchScope';
 import { useLanguage } from '@/context/LanguageContext';
 import { REPORT_REGISTRY, REPORT_CATEGORIES, type ReportCategory } from '../reportRegistry';
 import type { ReportType } from '../reportFilters';
@@ -57,6 +58,7 @@ const FINANCIAL_REPORTS: Array<{ key: FinancialView; ar: string; en: string }> =
 
 export function ReportsCenterPage() {
   const can = useCan();
+  const branchScope = useBranchScope();
   const { lang } = useLanguage();
   const { runtime } = useOrganizationModules();
   const location = useLocation();
@@ -262,6 +264,26 @@ export function ReportsCenterPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <label className="flex min-w-[180px] flex-col gap-1 text-xs font-semibold text-ui-muted">
+              {isAr ? 'نطاق الفروع' : 'Branch scope'}
+              <select
+                value={branchScope.allBranchesSelected ? '__all' : branchScope.selectedBranchIds.length === 1 ? branchScope.selectedBranchIds[0] : '__selected'}
+                onChange={(event) => {
+                  if (event.target.value === '__all') branchScope.setAllBranches(true);
+                  else if (event.target.value !== '__selected') branchScope.setSelectedBranchIds([event.target.value]);
+                }}
+                aria-label={isAr ? 'تصفية التقارير حسب الفرع المصرح' : 'Authorized report branch filter'}
+                className="h-9 rounded-lg border border-ui-border bg-ui-page-alt px-2 text-xs font-bold text-ui-text"
+              >
+                <option value="__all">{isAr ? 'كل الفروع المصرح بها' : 'All authorized branches'}</option>
+                {branchScope.selectedBranchIds.length > 1 && !branchScope.allBranchesSelected && (
+                  <option value="__selected">{isAr ? 'فروع محددة' : 'Selected branches'}</option>
+                )}
+                {branchScope.organizationBranches.map((item) => (
+                  <option key={item.id} value={item.id}>{isAr ? item.name : (item.name_en || item.name)}</option>
+                ))}
+              </select>
+            </label>
             <span className="inline-flex items-center gap-1.5 rounded-lg border border-ui-border bg-ui-page-alt px-3 py-2 text-xs font-semibold text-ui-muted">
               <ShieldCheck className="h-4 w-4" />
               {isAr ? 'حسب صلاحياتك' : 'Permission scoped'}
