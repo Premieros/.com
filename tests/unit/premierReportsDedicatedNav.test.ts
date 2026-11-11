@@ -40,7 +40,7 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
     expect(center).toContain('data-testid="toggle-reports-directory"');
     expect(center).toContain('data-testid="reports-collapsible-directory"');
     expect(center).toContain('className="relative min-w-0"');
-    expect(center).toContain('dir="ltr"');
+    expect(center).toContain('data-testid="premier-reports-content"');
     expect(center).toContain("dir={isAr ? 'rtl' : 'ltr'}");
     expect(center).toContain("report.permissions.every");
     expect(center).toContain('businessReportAllowed(runtime');
