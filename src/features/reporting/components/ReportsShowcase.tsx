@@ -99,8 +99,8 @@ export function ReportsShowcase({
       }
     } catch {
       if (version === generation.current) setError(isAr
-        ? 'تعذر تحميل لوحة الرسوم من مصدر المبيعات المعتمد. افتح التقرير التفصيلي أو أعد المحاولة.'
-        : 'The authorized sales source is unavailable. Open the detailed report or retry.');
+        ? 'لم نتمكن من عرض مبيعات الفترة المختارة. اضغط «تحديث الرسوم»؛ وإذا تكرر الأمر جرّب فترة أقصر أو فرعًا واحدًا ثم أبلغ مسؤول النظام.'
+        : 'We could not display sales for this period. Refresh the charts; if this continues, try a shorter period or one branch and contact your administrator.');
     } finally {
       if (version === generation.current) setLoading(false);
     }
@@ -143,7 +143,7 @@ export function ReportsShowcase({
     if (!current) return (
       <p className="flex min-h-44 items-center justify-center px-4 text-center text-xs text-ui-muted">
         {loading ? (isAr ? 'جارٍ تحميل البيانات الحقيقية...' : 'Loading source data...')
-          : (isAr ? 'اختر «عرض الرسوم» لتحميل بيانات الفترة' : 'Choose “Load charts” for live period data')}
+          : (!hasAuthorizedBranches ? (isAr ? 'اختر فرعًا من الفلاتر لعرض بياناته.' : 'Choose a branch in Filters to display its data.') : (isAr ? 'اضغط «تحديث الرسوم» لإعادة عرض البيانات.' : 'Select Refresh charts to load the data.'))}
       </p>
     );
     if (id === 'products') {
@@ -157,11 +157,11 @@ export function ReportsShowcase({
             </div>
           ))}
         </div>
-      ) : <p className="py-12 text-center text-xs text-ui-muted">{isAr ? 'لا توجد أصناف مباعة خلال الفترة' : 'No product sales in this period'}</p>;
+      ) : <p className="py-12 text-center text-xs text-ui-muted">{isAr ? 'لم تُسجّل مبيعات أصناف في هذه الفترة. جرّب توسيع الفترة أو اختيار فرع آخر.' : 'No product sales were recorded in this period. Try a longer period or another branch.'}</p>;
     }
     if (id !== 'payment' && !commonCurrency) return (
       <p className="py-12 text-center text-xs text-ui-muted">
-        {isAr ? 'أكمل التالي: وحّد عملة الفروع المحددة أو اختر فرعًا واحدًا لعرض قيم مالية قابلة للمقارنة.' : 'Select one branch or a common currency before comparing monetary figures.'}
+        {isAr ? 'الفروع المختارة لا تستخدم عملة واحدة معروفة. اختر فرعًا واحدًا أو راجع عملة كل فرع في الإعدادات قبل مقارنة المبالغ.' : 'The selected branches do not have one known currency. Choose a single branch or review branch currency settings before comparing amounts.'}
       </p>
     );
     if (id === 'payment' && payments.length) return (
@@ -207,7 +207,7 @@ export function ReportsShowcase({
           )}
         </ResponsiveContainer>
       </div>
-    ) : <p className="py-12 text-center text-xs text-ui-muted">{isAr ? 'لا توجد بيانات ضمن الفترة المختارة' : 'No data in the selected period'}</p>;
+    ) : <p className="py-12 text-center text-xs text-ui-muted">{isAr ? 'لا توجد عمليات لهذا الرسم ضمن الفترة المختارة. جرّب فترة أخرى أو فرعًا مختلفًا.' : 'No activity for this chart in the selected period. Try another date range or branch.'}</p>;
   };
 
   const comparableIncome = verifiedIncome && commonCurrency && canonicalReportCurrency(verifiedIncome.currency) === commonCurrency
@@ -215,8 +215,8 @@ export function ReportsShowcase({
   const margin = comparableIncome && comparableIncome.net_revenue > 0
     ? comparableIncome.net_income / comparableIncome.net_revenue * 100 : null;
   const accountingNotice = isAr
-    ? 'القيم المحاسبية تُعرض فقط عند اكتمال قائمة الدخل لجميع الفروع المختارة وتوافق عملاتها.'
-    : 'Accounting values display only after all selected branch income statements are complete and currencies match.';
+    ? 'لم يكتمل حساب بعض مؤشرات الربح والتكلفة. راجع قائمة «مؤشرات قائمة الدخل» أدناه لمعرفة الفرع أو البيان الناقص المطلوب استكماله.'
+    : 'Some profit and cost figures are not complete. Check Income statement KPIs below to see the affected branch and missing information.';
   const summaryCards = [
     { id: 'average', ar: 'متوسط قيمة الطلب', en: 'Average order', value: current && commonCurrency ? money(current.current.orders > 0 ? current.current.sales / current.current.orders : 0) : null, tone: 'from-rose-50 to-pink-100/60 dark:from-rose-950/30 dark:to-ui-surface' },
     { id: 'orders', ar: 'عدد الطلبات', en: 'Orders', value: current ? current.current.orders.toLocaleString(isAr ? 'ar-EG' : 'en-US') : null, tone: 'from-blue-50 to-blue-100/70 dark:from-blue-950/30 dark:to-ui-surface' },
@@ -253,10 +253,10 @@ export function ReportsShowcase({
         </button>
       </div>
       {current && !commonCurrency && <p role="status" className="rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-ui-surface dark:text-ui-text">
-        {isAr ? 'المبالغ الإجمالية غير معروضة لأن عملات الفروع غير موحّدة أو غير محددة؛ أعداد الطلبات والكميات ما زالت ظاهرة.' : 'Money totals are unavailable because branch currencies differ or are missing. Order counts and product quantities remain visible.'}
+        {isAr ? 'تعذّر جمع المبالغ: بعض الفروع المختارة لا تستخدم العملة نفسها أو لم تُحدّد عملتها. اختر فرعًا واحدًا أو صحّح عملات الفروع في الإعدادات؛ أعداد الطلبات والكميات متاحة.' : 'Amounts cannot be combined: selected branches use different or missing currencies. Select one branch or correct branch currency settings; counts and quantities remain available.'}
       </p>}
       {!canReadSnapshot && <p className="text-xs text-ui-muted">
-        {isAr ? 'الرسوم المجمعة تتطلب صلاحية لوحة المبيعات أو التقارير، مع الالتزام بصلاحيات الفروع؛ التقارير المفصلة متاحة حسب صلاحياتها.' : 'Sales dashboard or reporting access is required to view aggregates; detailed reports remain subject to their own permissions.'}
+        {isAr ? 'لا تملك صلاحية عرض ملخص المبيعات. اطلب من مدير النظام منحك صلاحية التقارير أو لوحة المبيعات للفروع المطلوبة.' : 'You do not have permission to view the sales overview. Ask your administrator for reporting or sales dashboard access to the needed branches.'}
       </p>}
       {error && <p role="alert" className="rounded-lg border border-ui-danger/30 bg-ui-danger-soft p-3 text-xs text-ui-danger">{error}</p>}
       <div className="grid gap-3 md:grid-cols-2">
