@@ -36,7 +36,7 @@ export function describeReportFailure(
   switch (failure?.kind) {
     case 'permission':
       return ar
-        ? { title: 'لا يمكنك الاطلاع على بيانات هذا التقرير في نطاق الفروع المختار.', action: 'اختر فرعًا لديك صلاحية الوصول إليه، أو اطلب من مدير النظام مراجعة صلاحياتك لهذا التقرير.' }
+        ? { title: 'ليست لديك صلاحية الاطلاع على بيانات هذا التقرير في الفروع المختارة.', action: 'اختر فرعًا لديك صلاحية الوصول إليه، أو اطلب من مدير النظام مراجعة صلاحياتك لهذا التقرير.' }
         : { title: 'You cannot view this report for the selected branches.', action: 'Choose a branch you can access, or ask your administrator to check your report permissions.' };
     case 'timeout':
       return ar
