@@ -10,12 +10,13 @@ import type { CartItem, Customer, DiningTable, Order, OrderItem, OrderType, Prod
 import { ORDER_TYPE_KEY } from '../utils/orderTypes';
 import { resolveOrderBindingForSave } from '../utils/orderBinding';
 import { cartLineKey, cartToItems, orderItemLineKey, orderItemsToCart } from '../utils/cart';
+import { applyItemTransferToCart } from '../utils/itemTransfer';
 import { APPROVED_FIXED_THERMAL_WIDTH_MM, buildReceiptFixedTemplate, buildReceiptHtml, buildReceiptThermalText, enqueueAutomaticReceiptPrint, buildKitchenTicketHtml, openPrintWindow, ReceiptPrintApprovalError, type ReceiptData } from '../utils/printing';
 import { fetchOrderForWorkspace } from '../services/posOrders';
 import { sendOrderToKitchen } from '../services/kitchen';
 import { enqueueCloudOpenOrderPrint } from '../services/cloudPrint';
 import { processSaleForOrder, nextInvoiceNumber, fetchBranchWarehouseId, createSaleOperationKey, type ProcessSalePayload } from '../services/payment';
-import type { KitchenSendItem, KitchenStationDispatchSummary } from '../types';
+import type { KitchenSendItem, KitchenStationDispatchSummary, PosItemTransferResult } from '../types';
 
 export interface ActiveShiftInfo {
   id: string;
@@ -74,6 +75,8 @@ export function usePosOrder(input: UsePosOrderInput) {
   const [tableId, setTableId] = useState<string | null>(null);
   const [guestCount, setGuestCount] = useState<number | null>(null);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(orderId);
+  const transferScopeRef = useRef({ orderId: activeOrderId, branchId });
+  transferScopeRef.current = { orderId: activeOrderId, branchId };
   const [activeOrderNumber, setActiveOrderNumber] = useState<string | null>(null);
   const [activeTable, setActiveTable] = useState<DiningTable | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
@@ -381,6 +384,28 @@ export function usePosOrder(input: UsePosOrderInput) {
     const cartItems = orderItemsToCart(items, orderProducts);
     setCart(cartItems);
   }, []);
+
+  const applyItemsTransfer = useCallback((result: PosItemTransferResult): boolean => {
+    const scope = transferScopeRef.current;
+    const snapshot = result.snapshot;
+    const source = snapshot?.orders.find((order) => order.id === result.source_order_id);
+    if (!result.success || !snapshot || !source || scope.orderId !== source.id || scope.branchId !== source.branch_id) return false;
+    setCart((current) => applyItemTransferToCart(current, result));
+    const sourceTable = snapshot.tables.find((table) => table.id === source.table_id);
+    if (sourceTable) setActiveTable(sourceTable);
+    setDiscountAmount(Number(source.discount_amount || 0));
+    setDiscountType('amount');
+    setPaidAmount(0);
+    setCheckoutOpen(false);
+    // Authoritative kitchen send rows must replace any old session-only deltas.
+    setKitchenSentItems([]);
+    setKitchenDispatch(null);
+    if (source.status !== 'open' && source.status !== 'held') {
+      setActiveOrderId(null);
+      setActiveOrderNumber(null);
+    }
+    return true;
+  }, [setCart]);
 
   const startTableOrder = useCallback((table: DiningTable, guests = 2) => {
     setCart(EMPTY_CART);
@@ -1044,7 +1069,7 @@ export function usePosOrder(input: UsePosOrderInput) {
     addToCart, updateQty, setQty, removeFromCart, clearCart, setItemDiscount, replaceCartLine,
     switchOrderType, holdOrder, sendToKitchen, printKitchenTicket, completeSale, printReceipt,
     detachTable, detachOrder, resetWorkspace,
-    resumeTableOrder, startTableOrder, transferOrderToTable, transferOrderItemToTable, voidSentItem,
+    resumeTableOrder, startTableOrder, transferOrderToTable, transferOrderItemToTable, applyItemsTransfer, voidSentItem,
   };
 }
 
