@@ -205,7 +205,7 @@ export function ReportsShowcase({
   };
 
   const summaryCards = [
-    { id: 'average', ar: 'متوسط قيمة الطلب', en: 'Average order', value: current?.current.orders ? money(current.current.sales / current.current.orders) : current ? money(0) : null, tone: 'from-rose-50 to-pink-100/60 dark:from-rose-950/30 dark:to-ui-surface' },
+    { id: 'average', ar: 'متوسط قيمة الطلب', en: 'Average order', value: current && commonCurrency ? money(current.current.orders > 0 ? current.current.sales / current.current.orders : 0) : null, tone: 'from-rose-50 to-pink-100/60 dark:from-rose-950/30 dark:to-ui-surface' },
     { id: 'orders', ar: 'عدد الطلبات', en: 'Orders', value: current ? current.current.orders.toLocaleString(isAr ? 'ar-EG' : 'en-US') : null, tone: 'from-blue-50 to-blue-100/70 dark:from-blue-950/30 dark:to-ui-surface' },
     { id: 'sales', ar: 'إجمالي المبيعات', en: 'Total sales', value: current && commonCurrency ? money(current.current.sales) : null, tone: 'from-emerald-50 to-green-100/70 dark:from-emerald-950/30 dark:to-ui-surface' },
     { id: 'payments', ar: 'إجمالي التحصيل', en: 'Collected payments', value: current && commonCurrency ? money(current.current.payments) : null, tone: 'from-sky-50 to-blue-100/60 dark:from-sky-950/30 dark:to-ui-surface' },
@@ -238,6 +238,9 @@ export function ReportsShowcase({
           {loading ? (isAr ? 'جارٍ التحميل...' : 'Loading...') : (isAr ? 'عرض / تحديث الرسوم' : 'Load / refresh charts')}
         </button>
       </div>
+      {current && !commonCurrency && <p role="status" className="rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-ui-surface dark:text-ui-text">
+        {isAr ? 'المبالغ الإجمالية غير معروضة لأن عملات الفروع غير موحّدة أو غير محددة؛ أعداد الطلبات والكميات ما زالت ظاهرة.' : 'Money totals are unavailable because branch currencies differ or are missing. Order counts and product quantities remain visible.'}
+      </p>}
       {!canReadSnapshot && <p className="text-xs text-ui-muted">
         {isAr ? 'الرسوم المجمعة تتطلب صلاحية لوحة المبيعات؛ التقارير المفصلة أدناه متاحة حسب صلاحياتك.' : 'Dashboard access is required for the overview charts; detailed reports remain available according to your permissions.'}
       </p>}
