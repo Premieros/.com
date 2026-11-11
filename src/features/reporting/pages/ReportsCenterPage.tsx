@@ -399,7 +399,6 @@ export function ReportsCenterPage() {
           {reportList}
         </aside>
         <main dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 space-y-3" data-testid="premier-reports-content">
-          {canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis controlledFrom={dateRange.from} controlledTo={dateRange.to} />}
           {isOverview && (
             <ReportsShowcase
               isAr={isAr}
@@ -411,6 +410,7 @@ export function ReportsCenterPage() {
               onSelectReport={selectOperational}
             />
           )}
+          {canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis controlledFrom={dateRange.from} controlledTo={dateRange.to} />}
           {!isOverview && requestedFinancial && canFinancial && allowedFinancialViews.length > 0 ? (
             <FinancialReportsPage hideViewPicker />
           ) : !isOverview && permittedOperational.some((report) => report.key === activeReport) ? (
