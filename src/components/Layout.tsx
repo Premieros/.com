@@ -116,7 +116,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const canOpenSettings = can('settings.manage');
 
   const showBackButton = location.pathname !== APP_ROUTES.dashboard;
-  const fullWidthContent = location.pathname === APP_ROUTES.dashboard;
+  const fullWidthContent = location.pathname === APP_ROUTES.dashboard || location.pathname === APP_ROUTES.reports;
 
   const visibleItems = useMemo(() => {
     const order = new Map(runtime.navigation.order.map((id, index) => [id, index]));
