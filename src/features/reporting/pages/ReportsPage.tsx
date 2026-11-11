@@ -54,6 +54,9 @@ type FinancialReportType = 'trial_balance' | 'ledger' | 'treasury_statement' | '
 type PeriodKey = 'custom' | 'today' | 'yesterday' | 'last7' | 'last30' | 'this_month' | 'last_month' | 'this_year';
 
 export interface ReportsPageActions {
+  canExport: boolean;
+  canPrint: boolean;
+  canSave: boolean;
   exportExcel: () => void;
   print: () => void;
   save: () => void;
@@ -125,7 +128,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     }
   }, [controlledReportType, onReportTypeChange]);
 
-  const latestReportActions = useRef<ReportsPageActions>({
+  const latestReportActions = useRef<Pick<ReportsPageActions, 'exportExcel' | 'print' | 'save'>>({
     exportExcel: () => undefined, print: () => undefined, save: () => undefined,
   });
   const lastControlledRange = useRef({ from: controlledFrom, to: controlledTo });
@@ -1330,14 +1333,18 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   };
   useEffect(() => {
     if (!onActionsReady) return;
+    const canExport = !loading && !reportError && can('reports.export');
+    const canPrint = !loading && !reportError && can('reports.print');
+    const canSave = !loading && !reportError;
     const controls: ReportsPageActions = {
-      exportExcel: () => latestReportActions.current.exportExcel(),
-      print: () => latestReportActions.current.print(),
-      save: () => latestReportActions.current.save(),
+      canExport, canPrint, canSave,
+      exportExcel: () => { if (canExport) latestReportActions.current.exportExcel(); },
+      print: () => { if (canPrint) latestReportActions.current.print(); },
+      save: () => { if (canSave) latestReportActions.current.save(); },
     };
     onActionsReady(controls);
     return () => onActionsReady(null);
-  }, [onActionsReady]);
+  }, [onActionsReady, loading, reportError, can]);
 
   return (
     <div>
