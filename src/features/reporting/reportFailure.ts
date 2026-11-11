@@ -19,7 +19,7 @@ export function classifyReportFailure(cause: unknown, allowedBranchIds: readonly
   const branchId = match && allowedBranchIds.includes(match[1]) ? match[1] : null;
   let kind: ReportFailureKind = 'source';
   if (code && ['42501', 'PGRST301', 'PGRST302', '401', '403'].includes(code)) kind = 'permission';
-  else if (code && ['42703', '42P01', '42883', 'PGRST200', 'PGRST202'].includes(code)) kind = 'schema';
+  else if (code && ['42703', '42P01', '42883', 'PGRST200', 'PGRST201', 'PGRST202'].includes(code)) kind = 'schema';
   else if (code && ['57014', 'PGRST003'].includes(code)) kind = 'timeout';
   return { kind, code, branchId };
 }
