@@ -62,6 +62,7 @@ export function SalesPage() {
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
   const can = useCan();
+  const canViewSales = can('sales.view');
   const { rows: items, loading, error, total, hasMore, loadMore, loadingMore, refresh: reloadSales } = usePaginatedRows<SaleRow>({
     table: 'sales',
     select: 'id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))',
@@ -288,9 +289,10 @@ export function SalesPage() {
       setSourceLookup('idle');
       return;
     }
+    setViewSale(null);
     if (branchScope.loading) return;
     if (!/^[\\da-f]{8}-[\\da-f]{4}-[1-8][\\da-f]{3}-[89ab][\\da-f]{3}-[\\da-f]{12}$/i.test(requestedSaleId)
-        || !can('sales.view') || branchScope.selectedBranchIds.length === 0) {
+        || !canViewSales || branchScope.selectedBranchIds.length === 0) {
       setSourceLookup('unavailable');
       return;
     }
@@ -319,9 +321,9 @@ export function SalesPage() {
       setSourceLookup('found');
     })();
     return () => { cancelled = true; };
-    // Branch scope identity controls the query; other on-page edits must not repeat it.
+    // Branch scope identity and permission control source resolution.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestedSaleId, branchScope.scopeKey, branchScope.loading]);
+  }, [requestedSaleId, branchScope.scopeKey, branchScope.loading, canViewSales]);
 
   const openRefund = (sale: SaleRow) => {
     setRefundSale(sale);
