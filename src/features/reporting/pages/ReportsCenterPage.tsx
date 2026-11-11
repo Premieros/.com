@@ -336,13 +336,13 @@ export function ReportsCenterPage() {
           </div>
         </div>
       </header>
-      {canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis />}
       {showDirectory && <div className="lg:hidden">{reportList}</div>}
       <div className="grid min-w-0 gap-4 lg:grid-cols-[236px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)]" dir="ltr">
         <aside dir={isAr ? 'rtl' : 'ltr'} className="hidden lg:sticky lg:top-3 lg:block lg:self-start">
           {reportList}
         </aside>
         <main dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 space-y-4" data-testid="premier-reports-content">
+          {canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis />}
           {isOverview && (
             <ReportsShowcase
               isAr={isAr}
@@ -360,25 +360,26 @@ export function ReportsCenterPage() {
               {isAr ? <ArrowLeft className="mx-auto mt-4 h-5 w-5" /> : <ArrowRight className="mx-auto mt-4 h-5 w-5" />}
             </div>
           )}
+          {permittedOperational.length > 0 && (
+            <section className="rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm" data-testid="reports-quick-links">
+              <div className="mb-3 flex items-center gap-2">
+                <Zap className="h-5 w-5 text-amber-500" aria-hidden="true" />
+                <h2 className="text-sm font-black text-ui-text">{isAr ? 'تقارير سريعة' : 'Quick reports'}</h2>
+              </div>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+                {permittedOperational.slice(0, 6).map((report) => (
+                  <button key={report.key} type="button" onClick={() => selectOperational(report.key)}
+                    className="flex min-w-0 flex-col items-center gap-2 rounded-xl border border-ui-border bg-ui-page-alt p-3 text-center text-xs font-bold text-ui-text transition hover:border-ui-primary hover:text-ui-primary">
+                    <FileBarChart className="h-5 w-5 text-ui-primary" aria-hidden="true" />
+                    <span className="line-clamp-2">{isAr ? report.title : report.titleEn}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
         </main>
       </div>
-      {permittedOperational.length > 0 && (
-        <section className="rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm" data-testid="reports-quick-links">
-          <div className="mb-3 flex items-center gap-2">
-            <Zap className="h-5 w-5 text-amber-500" aria-hidden="true" />
-            <h2 className="text-sm font-black text-ui-text">{isAr ? 'تقارير سريعة' : 'Quick reports'}</h2>
-          </div>
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-6">
-            {permittedOperational.slice(0, 6).map((report) => (
-              <button key={report.key} type="button" onClick={() => selectOperational(report.key)}
-                className="flex min-w-0 flex-col items-center gap-2 rounded-xl border border-ui-border bg-ui-page-alt p-3 text-center text-xs font-bold text-ui-text transition hover:border-ui-primary hover:text-ui-primary">
-                <FileBarChart className="h-5 w-5 text-ui-primary" aria-hidden="true" />
-                <span className="line-clamp-2">{isAr ? report.title : report.titleEn}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
+
     </section>
   );
 }
