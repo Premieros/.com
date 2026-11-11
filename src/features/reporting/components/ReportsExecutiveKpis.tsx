@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { BarChart3, RefreshCw, ShieldCheck } from 'lucide-react';
+import { AlertCircle, BarChart3, RefreshCw, ShieldCheck } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { reporting } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -11,11 +11,34 @@ import { useCan } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { addIsoDays, businessDateISO } from '@/lib/businessTime';
 import { formatFinancialCurrency } from '@/lib/format';
-import type { IncomeStatementResult } from '@/lib/types';
-import { aggregateIncomeStatements, incomeMargin } from '../incomeKpiIntegrity';
+import { incomeMargin, type INCOME_KEYS } from '../incomeKpiIntegrity';
+import { assessIncomeReadiness, type IncomeReadiness } from '../incomeReadiness';
 import { requireFinancialReport } from '../services/requireFinancialReport';
 
-type Snapshot = { data: IncomeStatementResult; currency: string; scopeKey: string; from: string; to: string };
+type IncomeField = typeof INCOME_KEYS[number];
+type Snapshot = { readiness: IncomeReadiness; scopeKey: string; from: string; to: string };
+
+const METRICS: Array<{ key: IncomeField; ar: string; en: string }> = [
+  { key: 'net_revenue', ar: 'صافي الإيرادات', en: 'Net revenue' },
+  { key: 'cogs', ar: 'تكلفة البضاعة المباعة', en: 'Cost of goods sold' },
+  { key: 'gross_profit', ar: 'مجمل الربح', en: 'Gross profit' },
+  { key: 'expenses', ar: 'المصروفات', en: 'Expenses' },
+  { key: 'net_income', ar: 'صافي الربح / الخسارة', en: 'Net income' },
+];
+const LABELS: Record<IncomeField, { ar: string; en: string }> = {
+  revenue: { ar: 'إجمالي الإيرادات', en: 'Gross revenue' },
+  discount: { ar: 'الخصومات', en: 'Discounts' },
+  net_revenue: { ar: 'صافي الإيرادات', en: 'Net revenue' },
+  cogs: { ar: 'تكلفة البضاعة المباعة', en: 'COGS' },
+  gross_profit: { ar: 'مجمل الربح', en: 'Gross profit' },
+  expenses: { ar: 'المصروفات', en: 'Expenses' },
+  net_income: { ar: 'صافي الربح / الخسارة', en: 'Net income' },
+};
+function validDate(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}$/.test(value)
+    && !Number.isNaN(new Date(`${value}T12:00:00Z`).getTime())
+    && new Date(`${value}T12:00:00Z`).toISOString().slice(0, 10) === value;
+}
 
 export function ReportsExecutiveKpis() {
   const { lang } = useLanguage();
@@ -26,9 +49,8 @@ export function ReportsExecutiveKpis() {
   const { effectiveSettings } = useSettings();
   const history = useHistoryAccess();
   const navigate = useNavigate();
-  const today = businessDateISO();
   const [from, setFrom] = useState(() => addIsoDays(businessDateISO(), -29));
-  const [to, setTo] = useState(today);
+  const [to, setTo] = useState(() => businessDateISO());
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -36,8 +58,7 @@ export function ReportsExecutiveKpis() {
   const authorized = can('reports.financial') && businessFinancialViewAllowed(runtime, 'income');
 
   useEffect(() => {
-    // Invalidate results and any in-flight request as soon as the selected
-    // tenant/branch authorization context changes.
+    // Never reuse financial numbers after a permission or branch-scope change.
     generation.current += 1;
     setSnapshot(null);
     setError(null);
@@ -45,10 +66,6 @@ export function ReportsExecutiveKpis() {
   }, [branchScope.scopeKey, authorized]);
 
   if (!authorized) return null;
-
-  const validDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
-    && !Number.isNaN(new Date(`${value}T12:00:00Z`).getTime())
-    && new Date(`${value}T12:00:00Z`).toISOString().slice(0, 10) === value;
 
   const run = async () => {
     const callId = ++generation.current;
@@ -63,28 +80,41 @@ export function ReportsExecutiveKpis() {
       if (!validDate(start) || !validDate(end) || start > end) throw new Error('INVALID_RANGE');
       const allowed = history.clampRange(start, end);
       if (allowed.from !== start || allowed.to !== end) throw new Error('OUTSIDE_ALLOWED_HISTORY');
-      const currencies = branchIds.map((branchId) => effectiveSettings(branchId)?.currency);
-      if (currencies.some((currency) => !currency) || new Set(currencies).size !== 1) {
-        throw new Error('INCOMPATIBLE_CURRENCIES');
-      }
-      const results = await Promise.all(branchIds.map((branchId) =>
-        reporting.getIncomeStatement({ p_branch_id: branchId, p_from_date: start, p_to_date: end })
-      ));
-      const data = aggregateIncomeStatements(results.map((result, index) =>
-        requireFinancialReport(result, 'income', branchIds[index])
-      ));
+
+      // Every authorized branch gets a row, including failed / incomplete RPCs.
+      // Partial branch figures are visible with an explicit completion checklist,
+      // but never labeled as a finalized multi-branch total.
+      const reports = await Promise.all(branchIds.map(async (branchId) => {
+        try {
+          const response = await reporting.getIncomeStatement({
+            p_branch_id: branchId, p_from_date: start, p_to_date: end,
+          });
+          return {
+            report: requireFinancialReport(response, 'income', branchId) as unknown,
+            fetchFailed: false,
+          };
+        } catch {
+          return { report: null, fetchFailed: true };
+        }
+      }));
+      const readiness = assessIncomeReadiness(branchIds.map((branchId, index) => {
+        const branch = branchScope.organizationBranches.find((item) => item.id === branchId);
+        return {
+          branchId,
+          branchName: (isAr ? branch?.name : (branch?.name_en || branch?.name)) || branchId,
+          currency: effectiveSettings(branchId)?.currency || null,
+          report: reports[index].report,
+          fetchFailed: reports[index].fetchFailed,
+        };
+      }));
       if (callId === generation.current) {
-        setSnapshot({ data, currency: currencies[0] as string, scopeKey, from: start, to: end });
+        setSnapshot({ readiness, scopeKey, from: start, to: end });
       }
     } catch (cause) {
       if (callId === generation.current) {
-        setError(cause instanceof Error && cause.message === 'INCOMPATIBLE_CURRENCIES'
-          ? (isAr ? 'الفروع المختارة تستخدم عملات مختلفة أو إعدادات عملات ناقصة. اختر فروعًا بعملة واحدة، فلا يتم جمع العملات دون تحويل معتمد.' : 'Selected branches use different or missing currencies. Choose branches with one currency; no unapproved conversion is performed.')
-          : cause instanceof Error && cause.message === 'NO_BRANCH'
-            ? (isAr ? 'حدد فرعًا مصرحًا لعرض المؤشرات.' : 'Select an authorized branch.')
-            : cause instanceof Error && (cause.message === 'INVALID_RANGE' || cause.message === 'OUTSIDE_ALLOWED_HISTORY')
-              ? (isAr ? 'الفترة غير صحيحة أو خارج نطاق التاريخ المسموح.' : 'Invalid or unauthorized date range.')
-              : (isAr ? 'تعذر استكمال قائمة الدخل لجميع الفروع. تم إخفاء المؤشرات لمنع عرض إجماليات مالية ناقصة.' : 'Could not retrieve complete income statements for every branch. Partial financial totals are hidden.'));
+        setError(cause instanceof Error && cause.message === 'NO_BRANCH'
+          ? (isAr ? 'أكمل التالي: اختر فرعًا مصرحًا لك لعرض المؤشرات.' : 'To complete: select an authorized branch.')
+          : (isAr ? 'أكمل التالي: راجع تاريخ البداية والنهاية ونطاق التاريخ المسموح لك.' : 'To complete: check the start/end dates and permitted history range.'));
       }
     } finally {
       if (callId === generation.current) setLoading(false);
@@ -93,27 +123,28 @@ export function ReportsExecutiveKpis() {
 
   const current = snapshot?.scopeKey === branchScope.scopeKey && snapshot.from === from && snapshot.to === to
     ? snapshot : null;
-  const metrics = current ? [
-    { key: 'net_revenue', ar: 'صافي الإيرادات', en: 'Net revenue' },
-    { key: 'cogs', ar: 'تكلفة البضاعة المباعة', en: 'COGS' },
-    { key: 'gross_profit', ar: 'مجمل الربح', en: 'Gross profit' },
-    { key: 'expenses', ar: 'المصروفات', en: 'Expenses' },
-    { key: 'net_income', ar: 'صافي الربح / الخسارة', en: 'Net income' },
-  ] as const : [];
+  const readiness = current?.readiness;
+  const total = readiness?.total;
+  const missingLabel = isAr ? 'يلزم استكمال البيانات' : 'Needs completion';
 
   return (
     <section className="rounded-xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm sm:p-5"
       data-testid="premier-income-kpi-panel" aria-label={isAr ? 'المؤشرات المحاسبية المعتمدة' : 'Authoritative accounting KPIs'}>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="inline-flex items-center gap-2 text-base font-black text-ui-text"><BarChart3 className="h-5 w-5 text-ui-primary" />{isAr ? 'مؤشرات قائمة الدخل' : 'Income statement KPIs'}</h2>
+          <h2 className="inline-flex items-center gap-2 text-base font-black text-ui-text">
+            <BarChart3 className="h-5 w-5 text-ui-primary" />
+            {isAr ? 'مؤشرات قائمة الدخل' : 'Income statement KPIs'}
+          </h2>
           <p className="mt-1 max-w-2xl text-xs text-ui-muted">
-            {isAr ? 'من نفس تقرير قائمة الدخل المعتمد لكل فرع، وليس من جمع فواتير أو رصيد شاشة الكاشير. تُعرض فقط بعد اكتمال جميع الفروع المحددة.'
-              : 'From the same authorized income-statement report per branch, not reconstructed from invoices or cashier balances. Only shown when every selected branch succeeds.'}
+            {isAr
+              ? 'كل المؤشرات ظاهرة حتى إذا كانت البيانات ناقصة. القيم الموجودة تُعرض من قائمة الدخل المعتمدة، والناقصة تُعرض مع المطلوب استكماله.'
+              : 'All indicators remain visible even with missing data. Available numbers come from the authoritative income statement; missing values have a completion checklist.'}
           </p>
         </div>
         <span className="inline-flex items-center gap-1 rounded-lg bg-ui-page-alt px-2 py-1 text-xs font-semibold text-ui-muted">
-          <ShieldCheck className="h-4 w-4" />{isAr ? 'خاضع للصلاحيات ونطاق الفروع' : 'Scoped by permissions and branches'}
+          <ShieldCheck className="h-4 w-4" />
+          {isAr ? 'خاضع للصلاحيات ونطاق الفروع' : 'Scoped by permissions and branches'}
         </span>
       </div>
       <div className="mt-4 flex flex-wrap items-end gap-3">
@@ -131,35 +162,99 @@ export function ReportsExecutiveKpis() {
           className="inline-flex h-10 items-center gap-2 rounded-lg bg-ui-primary px-4 text-sm font-bold text-ui-primary-fg disabled:opacity-50"
           data-testid="run-income-kpis">
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-          {loading ? (isAr ? 'جارٍ التحقق...' : 'Validating...') : (isAr ? 'تحميل المؤشرات' : 'Load KPIs')}
+          {loading ? (isAr ? 'جارٍ تحميل البيانات...' : 'Loading data...') : (isAr ? 'تحميل / تحديث المؤشرات' : 'Load / refresh KPIs')}
         </button>
       </div>
+
       {error && <p role="alert" className="mt-3 rounded-lg border border-ui-danger/30 bg-ui-danger-soft p-3 text-sm text-ui-danger">{error}</p>}
-      {current && (
+      <p className="mt-4 text-xs font-bold text-ui-muted">
+        {total ? (isAr ? 'إجمالي مكتمل للفروع المختارة' : 'Complete total for selected branches')
+          : (isAr ? 'الإجمالي الموحّد غير مكتمل — القيم المتاحة لكل فرع بالأسفل' : 'Consolidated total incomplete — available branch figures below')}
+      </p>
+      <div className="mt-2 grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {METRICS.map((metric) => (
+          <div key={metric.key} className="min-w-0 rounded-lg border border-ui-border bg-ui-page-alt p-3" data-testid={`income-kpi-${metric.key}`}>
+            <p className="text-xs text-ui-muted">{isAr ? metric.ar : metric.en}</p>
+            <p className="mt-2 break-words text-base font-black tabular-nums text-ui-text">
+              {total && readiness?.currency
+                ? formatFinancialCurrency(total[metric.key], readiness.currency, lang)
+                : <span className="text-sm text-ui-muted">{current ? missingLabel : (isAr ? 'لم يُحمَّل بعد' : 'Not loaded')}</span>}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {readiness && (
         <>
-          <p className="mt-4 text-xs text-ui-muted">{isAr ? 'فترة التقرير المعتمد:' : 'Certified report range:'} {current.from} – {current.to} · {branchScope.selectedBranchIds.length} {isAr ? 'فرع' : 'branch(es)'}</p>
-          <div className="mt-3 grid grid-cols-2 gap-3 lg:grid-cols-5">
-            {metrics.map((metric) => (
-              <div key={metric.key} className="min-w-0 rounded-lg border border-ui-border bg-ui-page-alt p-3">
-                <p className="text-xs text-ui-muted">{isAr ? metric.ar : metric.en}</p>
-                <p className="mt-2 break-words text-base font-black tabular-nums text-ui-text">
-                  {formatFinancialCurrency(current.data[metric.key], current.currency, lang)}
-                </p>
+          <p className="mt-3 text-xs text-ui-muted">{isAr ? 'الفترة:' : 'Period:'} {current?.from} – {current?.to}</p>
+          {readiness.issues.length > 0 && (
+            <section role="alert" className="mt-3 rounded-lg border border-ui-warning/40 bg-ui-page-alt p-4" data-testid="income-completion-checklist">
+              <div className="flex items-center gap-2 font-bold text-ui-text"><AlertCircle className="h-4 w-4" />
+                {isAr ? 'أكمل التالي' : 'Complete the following'}
               </div>
-            ))}
+              <p className="mt-1 text-xs text-ui-muted">
+                {isAr ? 'القيم المتوفرة لكل فرع ظاهرة أدناه. لا يُعتمد الإجمالي الموحّد حتى استكمال المطلوب أو إعادة التحميل.'
+                  : 'Available branch amounts remain visible below. The consolidated total is pending completion or refresh.'}
+              </p>
+              <ul className="mt-2 list-inside list-disc space-y-1 text-xs text-ui-text">
+                {readiness.issues.map((issue, index) => (
+                  <li key={`${issue.branchId}-${index}`}>
+                    <strong>{issue.branchName}:</strong>{' '}
+                    {issue.missing.map((field) =>
+                      field === 'currency_mismatch' ? (isAr ? 'راجع اختلاف عملة الفروع، ولا يتم جمع عملات مختلفة' : 'Resolve different branch currencies before consolidation')
+                        : field === 'currency' ? (isAr ? 'حدد عملة الفرع في الإعدادات' : 'Set the branch currency')
+                          : field === 'report_unavailable' ? (isAr ? 'راجع قيود قائمة الدخل أو اتصال التقرير ثم أعد التحميل' : 'Review income statement records or report connection, then reload')
+                            : isAr ? LABELS[field as IncomeField]?.ar || field : LABELS[field as IncomeField]?.en || field
+                    ).join(isAr ? '، ' : ', ')}
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
+          <div className="mt-4 overflow-x-auto" data-testid="income-branch-values">
+            <table className="w-full min-w-[650px] text-start text-xs">
+              <caption className="mb-2 text-start font-semibold text-ui-text">{isAr ? 'قيم كل فرع، بما فيها الخانات الناقصة' : 'Per-branch amounts, including missing fields'}</caption>
+              <thead><tr className="border-b border-ui-border">
+                <th scope="col" className="p-2 text-start">{isAr ? 'الفرع' : 'Branch'}</th>
+                {METRICS.map((metric) => <th key={metric.key} scope="col" className="p-2 text-start">{isAr ? metric.ar : metric.en}</th>)}
+              </tr></thead>
+              <tbody>
+                {readiness.branches.map((item) => (
+                  <tr key={item.branchId} className="border-b border-ui-border">
+                    <th scope="row" className="p-2 text-start font-bold">{item.branchName}</th>
+                    {METRICS.map((metric) => (
+                      <td key={metric.key} className="p-2 tabular-nums">
+                        {item.values[metric.key] !== undefined && item.currency
+                          ? formatFinancialCurrency(item.values[metric.key], item.currency, lang)
+                          : <span className="font-semibold text-ui-muted">{item.values[metric.key] !== undefined
+                            ? (isAr ? 'العملة غير محددة' : 'Currency missing')
+                            : missingLabel}</span>}
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-ui-muted">
-            <p>{isAr ? 'هامش صافي الربح:' : 'Net margin:'} {incomeMargin(current.data.net_income, current.data.net_revenue) === null
-              ? (isAr ? 'غير قابل للحساب عند غياب إيراد موجب' : 'Not applicable without positive net revenue')
-              : `${incomeMargin(current.data.net_income, current.data.net_revenue)!.toFixed(2)}%`}</p>
-            <button type="button" className="font-bold text-ui-primary hover:underline"
-              onClick={() => navigate(`/reports?section=financial&view=income&from=${current.from}&to=${current.to}`)}>
-              {isAr ? 'فتح قائمة الدخل التفصيلية' : 'Open detailed income statement'}
-            </button>
-          </div>
+          {total && (
+            <div className="mt-3 flex flex-wrap items-center justify-between gap-2 text-xs text-ui-muted">
+              <p>{isAr ? 'هامش صافي الربح:' : 'Net margin:'} {incomeMargin(total.net_income, total.net_revenue) === null
+                ? (isAr ? 'غير قابل للحساب عند غياب إيراد موجب' : 'Not applicable without positive net revenue')
+                : `${incomeMargin(total.net_income, total.net_revenue)!.toFixed(2)}%`}</p>
+            </div>
+          )}
+          <button type="button" className="mt-3 text-xs font-bold text-ui-primary hover:underline"
+            onClick={() => navigate(`/reports?section=financial&view=income&from=${current?.from}&to=${current?.to}`)}>
+            {isAr ? 'فتح قائمة الدخل لاستكمال أو مراجعة البيانات' : 'Open income statement to complete or review the data'}
+          </button>
         </>
       )}
-      {!current && !error && !loading && <p className="mt-4 text-xs text-ui-muted">{isAr ? 'اختر الفترة واضغط تحميل المؤشرات. لا يتم عرض قيم قديمة عند تغيير الفرع أو الفترة.' : 'Choose dates and load KPIs. Previous figures are not reused after changing branches or dates.'}</p>}
+      {!current && !error && !loading && (
+        <p className="mt-4 text-xs text-ui-muted">
+          {isAr ? 'المؤشرات ظاهرة الآن كخانات غير محمّلة. اختر الفترة ثم حمّل القيم لرؤية الناقص والمطلوب استكماله.'
+            : 'Indicators remain visible as unloaded placeholders. Choose a period and load to see missing values and next steps.'}
+        </p>
+      )}
     </section>
   );
 }
