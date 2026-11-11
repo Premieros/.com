@@ -336,13 +336,13 @@ export function ReportsCenterPage() {
           </div>
         </div>
       </header>
-      {canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis />}
       {showDirectory && <div className="lg:hidden">{reportList}</div>}
       <div className="grid min-w-0 gap-4 lg:grid-cols-[236px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)]" dir="ltr">
         <aside dir={isAr ? 'rtl' : 'ltr'} className="hidden lg:sticky lg:top-3 lg:block lg:self-start">
           {reportList}
         </aside>
         <main dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 space-y-4" data-testid="premier-reports-content">
+          {!requestedFinancial && canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis />}
           {(!requestedFinancial || isOverview) && (
             <ReportsLiveDashboard allowedReportTypes={allowedReportTypes} onSelectReport={selectOperational} />
           )}
