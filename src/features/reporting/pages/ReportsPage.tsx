@@ -26,6 +26,7 @@ import type { SavedReportConfig } from '../useCustomReports';
 import { CustomReportBar } from '../CustomReportBar';
 import { ReportFilterBar } from '../ReportFilterBar';
 import { loadExpenseCategoryOptions, loadReportFilterOptions } from '../services/reportFilterOptions';
+import { classifyReportFailure, type ReportFailure } from '../reportFailure';
 import { loadExpenseReportRows, loadPurchaseReportRows, loadSalesReportRows } from '../services/reportCoreLoaders';
 import { loadCashierPerformanceRows, loadDetailedInvoiceRows, loadReturnRows, loadSalesByEmployeeRows } from '../services/reportSalesLoaders';
 import { loadComponentConsumptionRows, loadInventoryBatchRows, loadLowStockSources, loadSalesByProductItems, loadTopConsumedComponentRows, loadTopConsumedProductItems, loadWasteRows } from '../services/reportInventoryLoaders';
@@ -101,7 +102,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   const [summary, setSummary] = useState({ total: 0, count: 0 });
   const [loading, setLoading] = useState(false);
   const [reportError, setReportError] = useState(false);
-  const [reportFailureReason, setReportFailureReason] = useState<'permission' | 'source' | null>(null);
+  const [reportFailure, setReportFailure] = useState<ReportFailure | null>(null);
   const [filters, setFilters] = useState<ReportFilters>({});
   const [filtersDirty, setFiltersDirty] = useState(false);
   const [detailFiltersOpen, setDetailFiltersOpen] = useState(false);
@@ -290,7 +291,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   async function loadReport() {
     setLoading(true);
     setReportError(false);
-    setReportFailureReason(null);
+    setReportFailure(null);
     try {
       const allowed = history.clampRange(from, to);
       if (allowed.from !== from) setFrom(allowed.from);
@@ -1127,8 +1128,9 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
       }
     } catch (cause) {
       // Never expose prior-branch data or misleading partial financial totals.
-      const code = cause && typeof cause === 'object' && 'code' in cause ? String(cause.code) : '';
-      setReportFailureReason(['42501', 'PGRST301', 'PGRST302'].includes(code) ? 'permission' : 'source');
+      const failure = classifyReportFailure(cause, reportBranchIds);
+      setReportFailure(failure);
+      if (import.meta.env.DEV) console.warn('[ReportsPage] Failed to load report', { type: reportType, kind: failure.kind, code: failure.code });
       setData([]);
       setChartData([]);
       setSummary({ total: 0, count: 0 });
@@ -1382,9 +1384,29 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
 
       {reportError && !loading && (
         <div role="alert" data-testid="reports-incomplete-error" className="mb-3 rounded-xl border border-ui-danger/30 bg-ui-danger-soft px-4 py-3 text-sm text-ui-danger">
-          {reportFailureReason === 'permission'
-            ? (lang === 'ar' ? 'لا تسمح صلاحيات الحساب الحالي بقراءة مصدر هذا التقرير. راجع صلاحيات التقرير والفروع ثم أعد المحاولة.' : 'This account cannot read the report source. Review report and branch permissions and retry.')
-            : (lang === 'ar' ? 'فشل مصدر التقرير أو تعذر تحميل جميع الفروع. لم تُعرض أرقام جزئية على أنها إجمالي صحيح. أعد المحاولة أو راجع إعدادات المصدر.' : 'The report source failed or one or more branches could not load. Partial numbers are never presented as a complete total. Retry or check the source.')}
+          <div className="space-y-2">
+            <p className="font-bold">
+              {reportFailure?.kind === 'permission'
+                ? (lang === 'ar' ? 'تم رفض الوصول إلى أحد مصادر هذا التقرير. تحقق من صلاحيات المستخدم والفروع.' : 'Access to a report source was denied. Check user and branch permissions.')
+                : reportFailure?.kind === 'schema'
+                  ? (lang === 'ar' ? 'يوجد اختلاف بين بنية قاعدة البيانات واستعلام التقرير. يحتاج المصدر إلى إصلاح.' : 'The report query does not match the database schema. This source needs repair.')
+                  : reportFailure?.kind === 'timeout'
+                    ? (lang === 'ar' ? 'انتهت مهلة جلب التقرير. قلّص الفترة أو نطاق الفروع ثم أعد المحاولة.' : 'Report loading timed out. Try a smaller period or branch scope.')
+                    : (lang === 'ar' ? 'تعذر تحميل جميع بيانات التقرير. لم تُعرض نتائج جزئية على أنها إجمالي صحيح.' : 'The complete report could not be loaded. Partial results are not shown as a full total.')}
+            </p>
+            {reportFailure?.branchId && <p className="text-xs">
+              {lang === 'ar' ? 'الفرع المتأثر: ' : 'Affected branch: '}{branchNameById(reportFailure.branchId)}
+            </p>}
+            <p className="text-xs">
+              {lang === 'ar' ? 'التقرير: ' : 'Report: '}{reportType}
+              {reportFailure?.code ? ` · ${lang === 'ar' ? 'رمز الخطأ:' : 'Error code:'} ${reportFailure.code}` : ''}
+            </p>
+            <button type="button" onClick={() => setQueryVersion((v) => v + 1)}
+              data-testid="retry-failed-report"
+              className="rounded-lg border border-current px-3 py-1.5 text-xs font-bold">
+              {lang === 'ar' ? 'إعادة تحميل التقرير' : 'Retry report'}
+            </button>
+          </div>
         </div>
       )}
 
