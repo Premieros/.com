@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ResponsiveContainer, BarChart as RechartsBarChart, LineChart as RechartsLineChart, PieChart as RechartsPieChart, Pie, Cell, Line, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { Download, TrendingUp, ShoppingCart, Receipt, Package, BarChart3, CreditCard, Users, List, Layers, AlertTriangle, FileDown, Printer, UserCheck, RotateCcw, Trash2 } from 'lucide-react';
 import { costing, reporting, supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -56,13 +56,11 @@ type PeriodKey = 'custom' | 'today' | 'yesterday' | 'last7' | 'last30' | 'this_m
 interface ReportsPageProps {
   controlledReportType?: ReportType;
   onReportTypeChange?: (type: ReportType) => void;
-  chartOnly?: boolean;
-  chartMode?: 'normal' | 'branch';
   controlledFrom?: string;
   controlledTo?: string;
 }
 
-export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnly = false, chartMode = 'normal', controlledFrom, controlledTo }: ReportsPageProps = {}) {
+export function ReportsPage({ controlledReportType, onReportTypeChange, controlledFrom, controlledTo }: ReportsPageProps = {}) {
   /* REPORT-BRANCH-AUDIT-2026 */
   const { t, lang } = useLanguage();
   const can = useCan();
@@ -226,7 +224,6 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnl
   }
 
   useEffect(() => {
-    if (chartOnly) return;
     if (reportBranchIds.length === 0) {
       setOptions({ warehouses: [], cashiers: [], customers: [], suppliers: [], products: [], categories: [], tables: [], expenseCategories: [] });
       return;
@@ -261,7 +258,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnl
   }, [reportType, branchScope.scopeKey]);
 
   useEffect(() => {
-    if (chartOnly || reportType !== 'expenses' || reportBranchIds.length === 0) return;
+    if (reportType !== 'expenses' || reportBranchIds.length === 0) return;
     (async () => {
       const unique = await loadExpenseCategoryOptions(reportBranchIds);
       setOptions((prev) => ({ ...prev, expenseCategories: unique }));
@@ -315,18 +312,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnl
           }), sale.id);
         });
         setData(rows);
-        if (chartMode === 'branch') {
-          // Visual grouping only: use exactly the existing net-sale definition and authorized report rows.
-          // Each branch is shown separately; no cross-currency grand total is inferred.
-          const byBranch = new Map<string, number>();
-          sales.forEach((sale: Record<string, unknown>) => {
-            const id = String(sale.branch_id || '');
-            byBranch.set(id, (byBranch.get(id) || 0) + netSaleAmount(sale));
-          });
-          setChartData(Array.from(byBranch, ([id, value]) => ({ name: branchNameById(id), value })));
-        } else {
-          setChartData(sales.slice(0, 10).map((sale: Record<string, unknown>) => ({ name: String(sale.invoice_number), value: netSaleAmount(sale) })));
-        }
+        setChartData(sales.slice(0, 10).map((sale: Record<string, unknown>) => ({ name: String(sale.invoice_number), value: netSaleAmount(sale) })));
         setSummary({ total: sales.reduce((sum: number, sale: Record<string, unknown>) => sum + netSaleAmount(sale), 0), count: sales.length });
       } else if (reportType === 'purchases') {
         const purchases = await loadPurchaseReportRows({
@@ -1327,51 +1313,6 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnl
     }));
     openPrintWindow({ title: reportLabel, subtitle: `${reportBranchLabel} — ${from} - ${to}`, headers, rows, lang: lang as 'ar' | 'en' });
   };
-
-  if (chartOnly) {
-    return (
-      <div data-testid={`premier-overview-chart-${reportType}`} className="min-w-0">
-        {loading ? (
-          <p role="status" className="py-12 text-center text-xs text-ui-muted">{lang === 'ar' ? 'جارٍ تحميل بيانات التقرير...' : 'Loading report data...'}</p>
-        ) : reportError ? (
-          <p role="alert" className="py-12 text-center text-xs text-ui-danger">{lang === 'ar' ? 'تعذر تحميل بيانات هذا التقرير كاملة.' : 'Complete report data could not be loaded.'}</p>
-        ) : chartData.length === 0 ? (
-          <p className="py-12 text-center text-xs text-ui-muted">{lang === 'ar' ? 'لا توجد بيانات ضمن الفترة والفروع المصرح بها.' : 'No data for the selected period and authorized branches.'}</p>
-        ) : (
-          <div className="h-48 w-full" dir="ltr" role="img" aria-label={lang === 'ar' ? 'رسم بياني من بيانات التقرير الفعلية' : 'Chart of actual report data'}>
-            <ResponsiveContainer width="100%" height="100%">
-              {reportType === 'sales_by_payment' && chartData.every((point) => point.value >= 0) ? (
-                <RechartsPieChart>
-                  <Pie data={chartData.slice(0, 10)} dataKey="value" nameKey="name" innerRadius="47%" outerRadius="79%" paddingAngle={2}>
-                    {chartData.slice(0, 10).map((row, index) => (
-                      <Cell key={`${row.name}-${index}`} fill={['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ec4899'][index % 5]} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value: number) => Number(value).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')} />
-                </RechartsPieChart>
-              ) : reportType === 'sales' && chartMode !== 'branch' ? (
-                <RechartsLineChart data={[...chartData.slice(0, 10)].reverse()} margin={{ top: 8, right: 8, left: 0, bottom: 16 }}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                  <XAxis dataKey="name" interval="preserveStartEnd" tick={{ fontSize: 9 }} tickFormatter={(value: string) => String(value).slice(0, 9)} />
-                  <YAxis tick={{ fontSize: 10 }} width={46} />
-                  <Tooltip formatter={(value: number) => Number(value).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')} />
-                  <Line type="monotone" dataKey="value" stroke="#7c3aed" strokeWidth={2.5} dot={{ r: 3 }} />
-                </RechartsLineChart>
-              ) : (
-                <RechartsBarChart data={chartData.slice(0, 10)} margin={{ top: 8, right: 8, left: 0, bottom: 16 }}>
-                  <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
-                  <XAxis dataKey="name" interval={0} tick={{ fontSize: 9 }} tickFormatter={(value: string) => String(value).slice(0, 9)} />
-                  <YAxis tick={{ fontSize: 10 }} width={46} />
-                  <Tooltip formatter={(value: number) => Number(value).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US')} />
-                  <Bar dataKey="value" fill="var(--ui-primary, #7c3aed)" radius={[4, 4, 0, 0]} />
-                </RechartsBarChart>
-              )}
-            </ResponsiveContainer>
-          </div>
-        )}
-      </div>
-    );
-  }
 
   return (
     <div>
