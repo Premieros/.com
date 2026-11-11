@@ -1447,7 +1447,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
                 <article key={index} className="rounded-xl border border-ui-border bg-ui-surface p-3 shadow-ui-sm">
                   <dl className="divide-y divide-ui-border">
                     {reportMobilePrimaryColumns.map((key) => {
-                      const value = row[key];
+
                       return (
                         <div key={key} className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-3 py-2 first:pt-0 last:pb-0">
                           <dt className="break-words text-xs font-semibold text-ui-muted">{key}</dt>
@@ -1465,7 +1465,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
                       </summary>
                       <dl className="divide-y divide-ui-border border-t border-ui-border px-3">
                         {reportMobileSecondaryColumns.map((key) => {
-                          const value = row[key];
+
                           return (
                             <div key={key} className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-3 py-2">
                               <dt className="break-words text-xs font-semibold text-ui-muted">{key}</dt>
@@ -1502,7 +1502,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
                   {pagedRows.rows.map((row, index) => (
                     <tr key={index} className="border-b border-ui-border/60 hover:bg-ui-page-alt">
                       {columns.map((key, columnIndex) => {
-                        const value = row[key];
+
                         return (
                           <td key={columnIndex} data-primary={columnIndex === 0} className={`px-3 py-2.5 text-ui-text ${columnIndex === 0 ? 'font-semibold' : 'tabular-nums'}`}>
                             {renderReportCell(row, key)}
