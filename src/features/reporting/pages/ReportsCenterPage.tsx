@@ -3,6 +3,7 @@ import { Search, ChevronDown, ChevronUp, BarChart3, Star, LayoutGrid, ArrowLeft,
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ReportsPage } from './ReportsPage';
 import { FinancialReportsPage } from '@/features/accounting/pages/FinancialReportsPage';
+import { ReportsExecutiveKpis } from '../components/ReportsExecutiveKpis';
 import { useCan, type Permission } from '@/lib/permissions';
 import { useBranchScope } from '@/lib/branchScope';
 import { useLanguage } from '@/context/LanguageContext';
@@ -324,6 +325,7 @@ export function ReportsCenterPage() {
           </div>
         </div>
       </header>
+      {canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis />}
       {showDirectory && <div className="lg:hidden">{reportList}</div>}
       <div className="grid min-w-0 gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
         <aside className="hidden lg:sticky lg:top-3 lg:block lg:self-start">
