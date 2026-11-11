@@ -1,8 +1,6 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Search, ChevronDown, ChevronUp, BarChart3, Star, LayoutGrid, ArrowLeft, ArrowRight, ShieldCheck, Zap, FileBarChart, CalendarDays, RefreshCw, Download, Printer, Plus } from 'lucide-react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { ReportsPage, type ReportsPageActions } from './ReportsPage';
-import { FinancialReportsPage } from '@/features/accounting/pages/FinancialReportsPage';
+import { useCallback, useMemo, useState } from 'react';
+import { Search, BarChart3, Star, LayoutGrid, ShieldCheck, Zap, FileBarChart, CalendarDays, RefreshCw, Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { ReportsExecutiveKpis, type IncomeKpiVerified } from '../components/ReportsExecutiveKpis';
 import { ReportsShowcase } from '../components/ReportsShowcase';
 import { useCan, type Permission } from '@/lib/permissions';
@@ -62,18 +60,15 @@ export function ReportsCenterPage() {
   const [dateRange, setDateRange] = useState(() => ({ from: addIsoDays(businessDateISO(), -6), to: businessDateISO() }));
   const [periodError, setPeriodError] = useState(false);
   const [overviewRun, setOverviewRun] = useState(0);
-  const [reportActions, setReportActions] = useState<ReportsPageActions | null>(null);
   const [verifiedIncome, setVerifiedIncome] = useState<IncomeKpiVerified | null>(null);
   const { lang } = useLanguage();
   const { runtime } = useOrganizationModules();
-  const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [mobileListOpen, setMobileListOpen] = useState(false);
   const [activeCategory, setActiveCategory] = useState<ReportCategory | 'all'>('all');
   const [favorites, setFavorites] = useState<string[]>(loadFavorites);
   const [showDirectory, setShowDirectory] = useState(false);
+  const [pendingReport, setPendingReport] = useState<string>('');
   const toggleFavorite = useCallback((key: string) => {
     setFavorites((previous) => {
       const next = previous.includes(key) ? previous.filter((item) => item !== key) : [...previous, key];
@@ -82,12 +77,6 @@ export function ReportsCenterPage() {
     });
   }, []);
 
-  const requestedType = searchParams.get('type') as ReportType | null;
-  const requestedFinancialView = searchParams.get('view') as FinancialView | null;
-  const requestedFinancial =
-    location.pathname.includes('financial-reports')
-    || searchParams.get('section') === 'financial'
-    || Boolean(requestedFinancialView);
 
   const permittedOperational = useMemo(
     () => REPORT_REGISTRY.filter((report) =>
@@ -102,20 +91,8 @@ export function ReportsCenterPage() {
       ? requestedType
       : permittedOperational.find((report) => report.key === 'sales_by_payment')?.key || permittedOperational[0]?.key || 'sales';
 
-  const [activeReport, setActiveReport] = useState<ReportType>(initialOperational);
-
-  useEffect(() => {
-    if (requestedType && permittedOperational.some((report) => report.key === requestedType)) {
-      setActiveReport(requestedType);
-    }
-  }, [requestedType, permittedOperational]);
-
   const canFinancial = can('reports.financial');
   const allowedFinancialViews = FINANCIAL_REPORTS.filter((report) => businessFinancialViewAllowed(runtime, report.key));
-  const activeFinancialView: FinancialView =
-    requestedFinancialView && allowedFinancialViews.some((report) => report.key === requestedFinancialView)
-      ? requestedFinancialView
-      : allowedFinancialViews[0]?.key || 'trial_balance';
 
   const filteredOperational = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -168,20 +145,25 @@ export function ReportsCenterPage() {
     setPeriodError(false);
     setDateRange({ from: draftFrom, to: draftTo });
     setOverviewRun((value) => value + 1);
+    const target = pendingReport || initialOperational;
+    if (target.startsWith('financial:')) {
+      const view = target.slice('financial:'.length);
+      if (canFinancial && allowedFinancialViews.some((entry) => entry.key === view)) {
+        navigate(`/reports/view?section=financial&view=${view}&from=${draftFrom}&to=${draftTo}`);
+      }
+    } else if (permittedOperational.some((entry) => entry.key === target)) {
+      navigate(`/reports/view?type=${target}&from=${draftFrom}&to=${draftTo}`);
+    }
+    setShowDirectory(false);
   };
 
+  // Choosing a type only changes the selection; the single View button opens details.
   const selectOperational = useCallback((type: ReportType) => {
-    setActiveReport(type);
-    setMobileListOpen(false);
-    setShowDirectory(false);
-    navigate(`/reports?type=${type}&from=${dateRange.from}&to=${dateRange.to}`, { replace: true });
-  }, [navigate, dateRange]);
-
+    setPendingReport(type);
+  }, []);
   const selectFinancial = useCallback((view: FinancialView) => {
-    setMobileListOpen(false);
-    setShowDirectory(false);
-    navigate(`/reports?section=financial&view=${view}&from=${dateRange.from}&to=${dateRange.to}`, { replace: true });
-  }, [navigate, dateRange]);
+    setPendingReport(`financial:${view}`);
+  }, []);
 
   const allowedReportTypes = useMemo(
     () => new Set(permittedOperational.map((report) => report.key)),
@@ -194,12 +176,7 @@ export function ReportsCenterPage() {
   const quickReports = quickPriority
     .map((key) => permittedOperational.find((report) => report.key === key))
     .filter((report): report is (typeof permittedOperational)[number] => Boolean(report));
-  const isOverview = !requestedType && !requestedFinancial;
-
-  const currentName = requestedFinancial
-    ? allowedFinancialViews.find((report) => report.key === activeFinancialView)
-    : permittedOperational.find((report) => report.key === activeReport);
-
+  const isOverview = true;
 
   const isAr = lang === 'ar';
   const reportList = (
@@ -242,12 +219,12 @@ export function ReportsCenterPage() {
       </div>
       <div className="max-h-[min(76vh,760px)] overflow-y-auto p-2">
         {filteredOperational.map((report) => {
-          const selected = !requestedFinancial && activeReport === report.key;
+          const selected = pendingReport === report.key;
           return (
             <div key={report.key} className={`group mb-1 flex items-center rounded-lg transition ${selected ? 'bg-ui-primary/10' : 'hover:bg-ui-page-alt'}`}>
               <button
                 type="button"
-                aria-current={selected ? 'page' : undefined}
+                aria-pressed={selected}
                 onClick={() => selectOperational(report.key)}
                 className={`min-w-0 flex-1 px-3 py-2.5 text-start ${selected ? 'text-ui-primary' : 'text-ui-text'}`}
               >
@@ -266,7 +243,7 @@ export function ReportsCenterPage() {
           );
         })}
         {filteredFinancial.map((report) => {
-          const selected = requestedFinancial && activeFinancialView === report.key;
+          const selected = pendingReport === `financial:${report.key}`;
           return (
             <button
               key={report.key}
@@ -313,37 +290,37 @@ export function ReportsCenterPage() {
               <input type="date" value={draftTo} onChange={(event) => setDraftTo(event.target.value)}
                 className="h-9 rounded-lg border border-ui-border bg-ui-page-alt px-2 text-xs text-ui-text" />
             </label>
+            <label className="flex min-w-[180px] flex-col gap-1 text-xs font-semibold text-ui-muted">
+              {isAr ? 'نوع التقرير' : 'Report type'}
+              <select data-testid="reports-single-type-select" value={pendingReport || initialOperational}
+                onChange={(event) => setPendingReport(event.target.value)}
+                className="h-9 max-w-[240px] rounded-lg border border-ui-border bg-ui-page-alt px-2 text-xs font-bold text-ui-text">
+                <optgroup label={isAr ? 'التقارير التشغيلية' : 'Operational reports'}>
+                  {permittedOperational.map((item) => <option key={item.key} value={item.key}>{isAr ? item.title : item.titleEn}</option>)}
+                </optgroup>
+                {canFinancial && allowedFinancialViews.length > 0 && <optgroup label={isAr ? 'التقارير المالية' : 'Financial reports'}>
+                  {allowedFinancialViews.map((item) => <option key={item.key} value={`financial:${item.key}`}>{isAr ? item.ar : item.en}</option>)}
+                </optgroup>}
+              </select>
+            </label>
+            <button type="button" aria-expanded={showDirectory} aria-controls="reports-type-directory"
+              onClick={() => setShowDirectory((open) => !open)}
+              data-testid="toggle-reports-directory"
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border px-3 text-xs font-bold text-ui-text">
+              <LayoutGrid className="h-4 w-4" />{showDirectory ? (isAr ? 'إغلاق قائمة التقارير' : 'Hide report list') : (isAr ? 'قائمة التقارير' : 'Report list')}
+            </button>
             <button type="button" onClick={applyOverviewDates} data-testid="apply-overview-dates"
               className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-ui-primary px-3 text-xs font-bold text-ui-primary-fg">
               <CalendarDays className="h-4 w-4" />
               <RefreshCw className="h-3.5 w-3.5" />
-              {isAr ? 'تطبيق الفترة' : 'Apply period'}
+              {isAr ? 'عرض التقرير التفصيلي' : 'View detailed report'}
             </button>
             {isOverview && permittedOperational.length > 0 && (
-              <button type="button" onClick={() => selectOperational(initialOperational)}
+              <button type="button" onClick={() => { setPendingReport(initialOperational); setShowDirectory(true); }}
                 data-testid="create-custom-report"
                 className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-violet-700 px-3 text-xs font-bold text-white hover:bg-violet-800">
                 <Plus className="h-4 w-4" />{isAr ? 'تقرير مخصص' : 'Custom report'}
               </button>
-            )}
-            {!isOverview && !requestedFinancial && (
-              <div className="flex flex-wrap items-center gap-2" data-testid="reports-header-actions">
-                {can('reports.export') && <button type="button" disabled={!reportActions?.canExport}
-                  onClick={() => reportActions?.exportExcel()}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border bg-ui-surface px-3 text-xs font-bold text-ui-text disabled:opacity-50">
-                  <Download className="h-4 w-4" />{isAr ? 'تصدير' : 'Export'}
-                </button>}
-                {can('reports.print') && <button type="button" disabled={!reportActions?.canPrint}
-                  onClick={() => reportActions?.print()}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border bg-ui-surface px-3 text-xs font-bold text-ui-text disabled:opacity-50">
-                  <Printer className="h-4 w-4" />{isAr ? 'طباعة' : 'Print'}
-                </button>}
-                <button type="button" disabled={!reportActions?.canSave}
-                  onClick={() => reportActions?.save()}
-                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border bg-ui-surface px-3 text-xs font-bold text-ui-text disabled:opacity-50">
-                  <Plus className="h-4 w-4" />{isAr ? 'حفظ تقرير مخصص' : 'Save custom report'}
-                </button>
-              </div>
             )}
             <label className="flex min-w-[180px] flex-col gap-1 text-xs font-semibold text-ui-muted">
               {isAr ? 'نطاق الفروع' : 'Branch scope'}
@@ -369,50 +346,18 @@ export function ReportsCenterPage() {
               <ShieldCheck className="h-4 w-4" />
               {isAr ? 'حسب صلاحياتك' : 'Permission scoped'}
             </span>
-            <button
-              type="button"
-              aria-expanded={showDirectory}
-              onClick={() => setShowDirectory(!showDirectory)}
-              className="inline-flex items-center gap-2 rounded-lg border border-ui-border bg-ui-page-alt px-3 py-2 text-xs font-bold text-ui-text hover:border-ui-primary lg:hidden"
-            >
-              <LayoutGrid className="h-4 w-4" />{isAr ? 'استعراض الأقسام' : 'Browse sections'}
-            </button>
+
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ui-border bg-ui-page-alt/40 px-4 py-3 sm:px-6">
-          <div className="min-w-0">
-            <span className="text-[11px] font-semibold text-ui-muted">{isAr ? 'التقرير الحالي' : 'Current report'}</span>
-            <h2 className="truncate text-sm font-extrabold text-ui-text">
-              {currentName
-                ? ('title' in currentName ? (isAr ? currentName.title : currentName.titleEn) : (isAr ? currentName.ar : currentName.en))
-                : (isAr ? 'التقارير المتاحة' : 'Available reports')}
-            </h2>
-          </div>
-          <div className="flex gap-2">
-            {favorites.filter((key) => permittedOperational.some((report) => report.key === key)).slice(0, 2).map((key) => {
-              const favorite = permittedOperational.find((report) => report.key === key);
-              return favorite ? (
-                <button key={key} type="button" onClick={() => selectOperational(favorite.key)}
-                  className="hidden max-w-36 truncate rounded-lg border border-ui-border bg-ui-surface px-3 py-2 text-xs font-bold text-ui-muted hover:text-ui-primary sm:block">
-                  <Star className="me-1 inline h-3.5 w-3.5 fill-current" />{isAr ? favorite.title : favorite.titleEn}
-                </button>
-              ) : null;
-            })}
-            <button type="button" onClick={() => { setMobileListOpen(!mobileListOpen); setShowDirectory(!mobileListOpen); }}
-              className="flex items-center gap-2 rounded-lg border border-ui-border bg-ui-surface px-3 py-2 text-xs font-bold text-ui-text lg:hidden">
-              {isAr ? 'اختيار تقرير' : 'Choose report'} {mobileListOpen ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-            </button>
-          </div>
-        </div>
+
       </header>
       {periodError && <p role="alert" className="rounded-lg border border-ui-danger/30 bg-ui-danger-soft px-4 py-2 text-xs text-ui-danger">
         {isAr ? 'الفترة غير صالحة أو خارج حدود تاريخ التقارير المسموح.' : 'Invalid period or outside authorized history.'}
       </p>}
-      {showDirectory && <div className="lg:hidden">{reportList}</div>}
-      <div className="grid min-w-0 gap-3 lg:grid-cols-[236px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)]" dir="ltr">
-        <aside dir={isAr ? 'rtl' : 'ltr'} className="hidden lg:sticky lg:top-3 lg:block lg:self-start">
+      <div className={showDirectory ? "grid min-w-0 gap-3 lg:grid-cols-[240px_minmax(0,1fr)]" : "grid min-w-0 gap-3"} dir="ltr">
+        {showDirectory && <aside id="reports-type-directory" dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 lg:self-start" data-testid="reports-collapsible-directory">
           {reportList}
-        </aside>
+        </aside>}
         <main dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 space-y-3" data-testid="premier-reports-content">
           {isOverview && (
             <ReportsShowcase
@@ -426,16 +371,6 @@ export function ReportsCenterPage() {
               onSelectReport={selectOperational}
             />
           )}
-          {!isOverview && requestedFinancial && canFinancial && allowedFinancialViews.length > 0 ? (
-            <FinancialReportsPage hideViewPicker />
-          ) : !isOverview && permittedOperational.some((report) => report.key === activeReport) ? (
-            <ReportsPage controlledReportType={activeReport} onReportTypeChange={selectOperational} controlledFrom={dateRange.from} controlledTo={dateRange.to} onActionsReady={setReportActions} />
-          ) : !isOverview && (
-            <div className="rounded-xl border border-ui-border bg-ui-surface px-6 py-12 text-center text-sm text-ui-muted">
-              {isAr ? 'اختر تقريرًا مسموحًا لك لعرض بياناته الحقيقية' : 'Select an authorized report to view live data'}
-              {isAr ? <ArrowLeft className="mx-auto mt-4 h-5 w-5" /> : <ArrowRight className="mx-auto mt-4 h-5 w-5" />}
-            </div>
-          )}
           {permittedOperational.length > 0 && (
             <section className="rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm" data-testid="reports-quick-links">
               <div className="mb-3 flex items-center gap-2">
@@ -444,7 +379,7 @@ export function ReportsCenterPage() {
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-9">
                 {quickReports.map((report) => (
-                  <button key={report.key} type="button" onClick={() => selectOperational(report.key)}
+                  <button key={report.key} type="button" onClick={() => { setPendingReport(report.key); setShowDirectory(true); }}
                     className="flex min-w-0 flex-col items-center gap-2 rounded-xl border border-ui-border bg-ui-page-alt p-3 text-center text-xs font-bold text-ui-text transition hover:border-ui-primary hover:text-ui-primary">
                     <FileBarChart className="h-5 w-5 text-ui-primary" aria-hidden="true" />
                     <span className="line-clamp-2">{isAr ? report.title : report.titleEn}</span>
@@ -453,7 +388,7 @@ export function ReportsCenterPage() {
               </div>
             </section>
           )}
-          {isOverview && canFinancial && businessFinancialViewAllowed(runtime, 'income') && (
+          {canFinancial && businessFinancialViewAllowed(runtime, 'income') && (
             <ReportsExecutiveKpis controlledFrom={dateRange.from} controlledTo={dateRange.to} onVerifiedTotal={setVerifiedIncome} />
           )}
         </main>
