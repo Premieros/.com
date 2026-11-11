@@ -1388,7 +1388,8 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         </div>
       )}
 
-      {standalone && <div className="relative mb-3 flex items-center justify-between gap-2">
+      <div className="relative mb-3"> 
+      {standalone && <div className="flex items-center justify-between gap-2">
         <span className="text-xs text-ui-muted">{lang === 'ar' ? 'النتائج الكاملة متاحة أدناه. غيّر الفلاتر الإضافية عند الحاجة.' : 'Complete results appear below. Adjust additional filters if needed.'}</span>
         <button type="button" data-testid="toggle-detail-filters"
           aria-expanded={detailFiltersOpen} onClick={() => setDetailFiltersOpen((open) => !open)}
@@ -1397,7 +1398,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         </button>
       </div>}
       {(!standalone || detailFiltersOpen) && (
-        <div data-testid="detail-filters-popup" className={standalone ? 'relative z-10 mb-3 rounded-xl border border-ui-border bg-ui-surface p-2 shadow-lg' : ''}>
+        <div data-testid="detail-filters-popup" className={standalone ? 'absolute end-0 top-full z-30 mt-2 max-h-[70vh] w-[min(90vw,680px)] overflow-y-auto rounded-xl border border-ui-border bg-ui-surface p-3 shadow-xl' : ''}>
       <CustomReportBar
         savedReports={savedReports}
         currentReportType={reportType}
@@ -1447,6 +1448,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
 
         </div>
       )}
+      </div>
 
       {/* Reuse the existing report loader's series; never compute a second
           financial truth from a partial table/page or unrelated SQL. */}
