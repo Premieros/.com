@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { Download, TrendingUp, ShoppingCart, Receipt, Package, BarChart3, CreditCard, Users, List, Layers, AlertTriangle, FileDown, Printer, UserCheck, RotateCcw, Trash2 } from 'lucide-react';
@@ -53,12 +53,23 @@ import {
 type FinancialReportType = 'trial_balance' | 'ledger' | 'treasury_statement' | 'inventory_movement' | 'income' | 'balance_sheet' | 'ar_aging' | 'ap_aging' | 'aging_summary' | 'cash_flow' | 'party_statement';
 type PeriodKey = 'custom' | 'today' | 'yesterday' | 'last7' | 'last30' | 'this_month' | 'last_month' | 'this_year';
 
+export interface ReportsPageActions {
+  canExport: boolean;
+  canPrint: boolean;
+  canSave: boolean;
+  exportExcel: () => void;
+  print: () => void;
+  save: () => void;
+}
 interface ReportsPageProps {
   controlledReportType?: ReportType;
   onReportTypeChange?: (type: ReportType) => void;
+  controlledFrom?: string;
+  controlledTo?: string;
+  onActionsReady?: (actions: ReportsPageActions | null) => void;
 }
 
-export function ReportsPage({ controlledReportType, onReportTypeChange }: ReportsPageProps = {}) {
+export function ReportsPage({ controlledReportType, onReportTypeChange, controlledFrom, controlledTo, onActionsReady }: ReportsPageProps = {}) {
   /* REPORT-BRANCH-AUDIT-2026 */
   const { t, lang } = useLanguage();
   const can = useCan();
@@ -67,9 +78,9 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
   const reportBranchIds = branchScope.selectedBranchIds;
-  const [reportType, setReportType] = useState<ReportType>('sales');
-  const [from, setFrom] = useState(() => history.minDate || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
-  const [to, setTo] = useState(todayISO());
+  const [reportType, setReportType] = useState<ReportType>(controlledReportType || 'sales');
+  const [from, setFrom] = useState(() => controlledFrom || history.minDate || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => controlledTo || todayISO());
   const [period, setPeriod] = useState<PeriodKey>('custom');
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [tableSearch, setTableSearch] = useState('');
@@ -116,6 +127,19 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       });
     }
   }, [controlledReportType, onReportTypeChange]);
+
+  const latestReportActions = useRef<Pick<ReportsPageActions, 'exportExcel' | 'print' | 'save'>>({
+    exportExcel: () => undefined, print: () => undefined, save: () => undefined,
+  });
+  const lastControlledRange = useRef({ from: controlledFrom, to: controlledTo });
+  useEffect(() => {
+    if (!controlledFrom || !controlledTo) return;
+    if (lastControlledRange.current.from === controlledFrom && lastControlledRange.current.to === controlledTo) return;
+    lastControlledRange.current = { from: controlledFrom, to: controlledTo };
+    setFrom(controlledFrom);
+    setTo(controlledTo);
+    setQueryVersion((version) => version + 1);
+  }, [controlledFrom, controlledTo]);
 
   const effectiveBranchFilter = reportBranchIds.length === 1 ? reportBranchIds[0] : null;
   const { branches } = useBranches();
@@ -1301,6 +1325,28 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
     }));
     openPrintWindow({ title: reportLabel, subtitle: `${reportBranchLabel} — ${from} - ${to}`, headers, rows, lang: lang as 'ar' | 'en' });
   };
+
+  latestReportActions.current = {
+    exportExcel: handleExportExcel,
+    print: handlePrint,
+    save: handleSaveCustomReport,
+  };
+  const canExportHeader = !loading && !reportError && can('reports.export');
+  const canPrintHeader = !loading && !reportError && can('reports.print');
+  useEffect(() => {
+    if (!onActionsReady) return;
+    const canExport = canExportHeader;
+    const canPrint = canPrintHeader;
+    const canSave = !loading && !reportError;
+    const controls: ReportsPageActions = {
+      canExport, canPrint, canSave,
+      exportExcel: () => { if (canExport) latestReportActions.current.exportExcel(); },
+      print: () => { if (canPrint) latestReportActions.current.print(); },
+      save: () => { if (canSave) latestReportActions.current.save(); },
+    };
+    onActionsReady(controls);
+    return () => onActionsReady(null);
+  }, [onActionsReady, loading, reportError, canExportHeader, canPrintHeader]);
 
   return (
     <div>

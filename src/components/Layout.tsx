@@ -262,9 +262,9 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <aside data-testid="app-sidebar" style={isReportsWorkspace ? { background: 'linear-gradient(180deg, #1a1d37 0%, #13172a 100%)', borderColor: '#383553' } : undefined} className={`fixed top-0 bottom-0 start-0 z-50 w-[260px] liquid-glass border-e border-ui-border shadow-ui-md transition-transform duration-200 ease-[var(--ui-ease)] ${mobileOpen ? 'translate-x-0' : ar ? 'translate-x-full' : '-translate-x-full'} ${desktopSidebarHidden ? (ar ? 'lg:translate-x-full' : 'lg:-translate-x-full') : 'lg:translate-x-0'}`}>
+      <aside data-testid="app-sidebar" className={`fixed top-0 bottom-0 start-0 z-50 w-[260px] liquid-glass border-e border-ui-border shadow-ui-md transition-transform duration-200 ease-[var(--ui-ease)] ${mobileOpen ? 'translate-x-0' : ar ? 'translate-x-full' : '-translate-x-full'} ${desktopSidebarHidden ? (ar ? 'lg:translate-x-full' : 'lg:-translate-x-full') : 'lg:translate-x-0'}`}>
         <div className="flex h-14 items-center justify-between border-b border-ui-border px-5">
-          <Logo variant="horizontal" size={28} tone="mono" showTagline={false} className={isReportsWorkspace ? 'text-violet-300' : 'text-ui-primary'} />
+          <Logo variant="horizontal" size={28} tone="mono" showTagline={false} className="text-ui-primary" />
           <button data-testid="sidebar-close" type="button" onClick={() => setMobileOpen(false)} className="rounded-lg p-2 text-ui-muted hover:bg-ui-page-alt lg:hidden" aria-label={ar ? 'إغلاق القائمة' : 'Close sidebar'}><X className="h-5 w-5" /></button>
           <button
             data-testid="desktop-sidebar-hide"
@@ -343,7 +343,7 @@ export function Layout({ children }: { children: ReactNode }) {
             if (!items.length) return null;
             return (
               <section key={group} data-testid={`nav-group-${group}`} className="mb-2">
-                <button data-testid={`nav-group-toggle-${group}`} type="button" onClick={() => setCollapsed((v) => ({ ...v, [group]: !v[group] }))} className={`flex min-h-9 w-full items-center justify-between rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition ${isReportsWorkspace ? 'text-slate-300 hover:bg-violet-500/20 hover:text-white' : 'text-ui-subtle hover:bg-ui-page-alt hover:text-ui-text'}`}>
+                <button data-testid={`nav-group-toggle-${group}`} type="button" onClick={() => setCollapsed((v) => ({ ...v, [group]: !v[group] }))} className={`flex min-h-9 w-full items-center justify-between rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition text-ui-subtle hover:bg-ui-page-alt hover:text-ui-text`}>
                   <span>{businessGroupLabel(runtime, group, ar ? 'ar' : 'en', MENU_GROUPS[group][ar ? 'ar' : 'en'])}</span>
                   <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-150 ${collapsed[group] ? 'rotate-90' : ''}`} />
                 </button>
@@ -358,7 +358,7 @@ export function Layout({ children }: { children: ReactNode }) {
                         onFocus={() => prefetchAppRoute(item.route)}
                         onTouchStart={() => prefetchAppRoute(item.route)}
                         onClick={() => setMobileOpen(false)}
-                        className={({ isActive }) => `group flex min-h-[38px] items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-all duration-150 ${isReportsWorkspace ? (isActive ? 'bg-violet-700 text-white shadow-[0_4px_12px_rgba(109,40,217,0.35)]' : 'text-slate-200 hover:bg-violet-600/25 hover:text-white') : (isActive ? 'bg-ui-primary text-ui-primary-fg shadow-[0_4px_12px_rgba(91,43,216,0.18)]' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary')}`}
+                        className={({ isActive }) => `group flex min-h-[38px] items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-all duration-150 ${isActive ? 'bg-ui-primary text-ui-primary-fg shadow-[0_4px_12px_rgba(91,43,216,0.18)]' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary'}`}
                       >
                         {ICONS[item.icon]}
                         <span className="flex-1 truncate">{businessMenuLabel(

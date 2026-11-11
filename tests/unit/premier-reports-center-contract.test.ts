@@ -11,8 +11,8 @@ describe('Premier Reports Center: reuse, access and truthful presentation', () =
     expect(center).toContain('data-testid="unified-reports-center"');
     expect(center).toContain('<ReportsPage controlledReportType={activeReport}');
     expect(center).toContain('<FinancialReportsPage hideViewPicker />');
-    expect(center).toContain('navigate(`/reports?type=${type}`');
-    expect(center).toContain("navigate(`/reports?section=financial&view=${view}`");
+    expect(center).toContain('navigate(`/reports?type=${type}&from=${dateRange.from}&to=${dateRange.to}`');
+    expect(center).toContain("navigate(`/reports?section=financial&view=${view}&from=${dateRange.from}&to=${dateRange.to}`");
   });
   it('uses the existing registry and the organization and permission gates', () => {
     expect(center).toContain('REPORT_REGISTRY.filter');
