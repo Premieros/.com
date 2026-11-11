@@ -392,6 +392,7 @@ export function ReportsCenterPage() {
             <ReportsShowcase
               isAr={isAr}
               allowedReportTypes={allowedReportTypes}
+              hasAuthorizedBranches={branchScope.selectedBranchIds.length > 0}
               from={dateRange.from}
               to={dateRange.to}
               key={overviewRun}
