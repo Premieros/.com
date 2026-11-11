@@ -17,6 +17,7 @@ describe('report failures preserve source diagnostics safely', () => {
   it('distinguishes database mismatch, timeouts and missing payloads', () => {
     expect(classifyReportFailure({ code: '42703' }, []).kind).toBe('schema');
     expect(classifyReportFailure({ code: 'PGRST200' }, []).kind).toBe('schema');
+    expect(classifyReportFailure({ code: 'PGRST201' }, []).kind).toBe('schema');
     expect(classifyReportFailure({ code: '57014' }, []).kind).toBe('timeout');
     expect(classifyReportFailure(new Error('FINANCIAL_REPORT_INCOMPLETE:income:' + first + ':EMPTY_RESULT'), [first]).kind).toBe('source');
   });
