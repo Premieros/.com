@@ -186,9 +186,11 @@ export function ReportsLiveDashboard({
     { key: 'average', label: ar ? 'متوسط الفاتورة' : 'Average invoice', value: data?.currency && data.invoiceCount ? money(data.amount / data.invoiceCount, data.currency, lang) : null, icon: ShoppingBag, tone: 'bg-violet-50 dark:bg-violet-950/30' },
     { key: 'refunds', label: ar ? 'المرتجعات' : 'Refunds', value: data?.currency ? money(data.refundAmount, data.currency, lang) : null, icon: Undo2, tone: 'bg-rose-50 dark:bg-rose-950/30' },
   ];
-  const renderUnavailable = (key: string) => (
+  const renderUnavailable = (key: string, empty = false) => (
     <p className="flex min-h-48 items-center justify-center p-4 text-center text-sm text-ui-muted" data-testid={`overview-missing-${key}`}>
-      {ar ? 'أكمل التالي: البيانات غير متاحة من مصدر التقرير حاليًا.' : 'Complete the following: report source data is unavailable.'}
+      {empty
+        ? (ar ? 'لا توجد معاملات في الفترة المحددة.' : 'No transactions in the selected period.')
+        : (ar ? 'أكمل التالي: البيانات غير متاحة من مصدر التقرير حاليًا.' : 'Complete the following: report source data is unavailable.')}
     </p>
   );
   const drill = (type: ReportType) => onSelectReport(type);
@@ -221,25 +223,25 @@ export function ReportsLiveDashboard({
       <div className="grid gap-4 xl:grid-cols-2">
         <article className="min-w-0 rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm" data-testid="overview-sales-trend">
           <button className="mb-3 w-full text-start text-sm font-black text-ui-text hover:text-ui-primary" type="button" onClick={() => drill('sales')}>{ar ? 'المبيعات حسب الفترة ↗' : 'Sales by period ↗'}</button>
-          {data?.trend.length && data.currency ? <div className="h-56" dir="ltr"><ResponsiveContainer width="100%" height="100%"><AreaChart data={data.trend}><defs><linearGradient id="salesOverviewGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#8649ec" stopOpacity={0.4}/><stop offset="100%" stopColor="#8649ec" stopOpacity={0.02}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" opacity={0.2}/><XAxis dataKey="name" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}}/><Tooltip/><Area type="monotone" dataKey="value" stroke="#8649ec" strokeWidth={2.5} fill="url(#salesOverviewGradient)"/></AreaChart></ResponsiveContainer></div> : renderUnavailable('trend')}
+          {data?.trend.length && data.currency ? <div className="h-56" dir="ltr"><ResponsiveContainer width="100%" height="100%"><AreaChart data={data.trend}><defs><linearGradient id="salesOverviewGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#8649ec" stopOpacity={0.4}/><stop offset="100%" stopColor="#8649ec" stopOpacity={0.02}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" opacity={0.2}/><XAxis dataKey="name" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}}/><Tooltip/><Area type="monotone" dataKey="value" stroke="#8649ec" strokeWidth={2.5} fill="url(#salesOverviewGradient)"/></AreaChart></ResponsiveContainer></div> : renderUnavailable('trend', Boolean(data && data.trend.length === 0))}
         </article>
         <article className="min-w-0 rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm" data-testid="overview-payment-mix">
           <button className="mb-3 w-full text-start text-sm font-black text-ui-text hover:text-ui-primary" type="button" onClick={() => drill('sales')}>{ar ? 'توزيع المبيعات حسب قنوات الطلب ↗' : 'Sales by order channel ↗'}</button>
           {data?.channels?.length ? <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2">
             <div className="h-56" dir="ltr"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={data.channels} innerRadius="54%" outerRadius="81%" dataKey="value" nameKey="name" paddingAngle={2}>{data.channels.map((p,i) => <Cell key={p.name} fill={COLORS[i % COLORS.length]}/>)}</Pie><Tooltip/></PieChart></ResponsiveContainer></div>
             <div className="space-y-2">{data.channels.map((p,i) => <div key={p.name} className="flex items-center gap-2 text-xs"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{background:COLORS[i%COLORS.length]}}/><span className="min-w-0 flex-1 truncate text-ui-text">{p.name}</span><span className="font-bold tabular-nums">{money(p.value,data.currency,lang)}</span></div>)}</div>
-          </div> : renderUnavailable('payments')}
+          </div> : renderUnavailable('payments', Boolean(data && data.channels?.length === 0))}
         </article>
         <article className="min-w-0 rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm" data-testid="overview-products">
           <button className="mb-3 w-full text-start text-sm font-black text-ui-text hover:text-ui-primary" type="button" onClick={() => drill('sales_by_product')}>{ar ? 'الأصناف الأكثر مبيعًا ↗' : 'Top selling items ↗'}</button>
-          {data?.products?.length ? <div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="border-b border-ui-border text-ui-muted"><th className="p-2 text-start">{ar?'الصنف':'Product'}</th><th className="p-2 text-end">{ar?'الكمية':'Quantity'}</th><th className="p-2 text-end">{ar?'المبيعات':'Sales'}</th></tr></thead><tbody>{data.products.map((p,i)=><tr key={i} className="border-b border-ui-border/50"><td className="p-2 font-semibold">{p.name}</td><td className="p-2 text-end tabular-nums">{p.quantity.toLocaleString()}</td><td className="p-2 text-end font-bold tabular-nums">{data.currency ? money(p.sales,data.currency,lang) : (ar ? 'أكمل عملات الفروع' : 'Complete currencies')}</td></tr>)}</tbody></table></div> : renderUnavailable('products')}
+          {data?.products?.length ? <div className="overflow-x-auto"><table className="w-full text-xs"><thead><tr className="border-b border-ui-border text-ui-muted"><th className="p-2 text-start">{ar?'الصنف':'Product'}</th><th className="p-2 text-end">{ar?'الكمية':'Quantity'}</th><th className="p-2 text-end">{ar?'المبيعات':'Sales'}</th></tr></thead><tbody>{data.products.map((p,i)=><tr key={i} className="border-b border-ui-border/50"><td className="p-2 font-semibold">{p.name}</td><td className="p-2 text-end tabular-nums">{p.quantity.toLocaleString()}</td><td className="p-2 text-end font-bold tabular-nums">{data.currency ? money(p.sales,data.currency,lang) : (ar ? 'أكمل عملات الفروع' : 'Complete currencies')}</td></tr>)}</tbody></table></div> : renderUnavailable('products', Boolean(data && data.products?.length === 0))}
         </article>
         <article className="min-w-0 rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm" data-testid="overview-branches">
           <button className="mb-3 w-full text-start text-sm font-black text-ui-text hover:text-ui-primary" type="button" onClick={() => drill('sales')}>{ar ? 'المبيعات حسب الفروع ↗' : 'Sales by branch ↗'}</button>
           {data?.branches.length && data.currency
             ? <div className="h-56" dir="ltr"><ResponsiveContainer width="100%" height="100%"><BarChart data={data.branches} margin={{bottom:22}}><CartesianGrid strokeDasharray="3 3" opacity={0.2}/><XAxis dataKey="name" tick={{fontSize:10}} interval={0}/><YAxis tick={{fontSize:10}}/><Tooltip/><Bar dataKey="value" fill="#9c76e8" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></div>
             : data?.branches.length ? <div className="space-y-2">{data.branches.map((b) => <div className="flex justify-between gap-2 border-b border-ui-border p-2 text-xs" key={b.name}><span>{b.name}</span><span className="font-bold tabular-nums">{money(b.value, b.currency, lang)}{!b.currency && (ar ? ' (أكمل عملة الفرع)' : ' (currency required)')}</span></div>)}</div>
-              : renderUnavailable('branches')}
+              : renderUnavailable('branches', Boolean(data && data.branches.length === 0))}
         </article>
       </div>
     </section>
