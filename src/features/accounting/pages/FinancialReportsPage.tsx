@@ -30,7 +30,7 @@ type BranchScopedArAgingRow = ArAgingRow & { branch_id: string; branch_name: str
 type BranchScopedApAgingRow = ApAgingRow & { branch_id: string; branch_name: string };
 type BranchScopedCashFlowRow = CashFlowRow & { branch_id: string; branch_name: string };
 
-export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicker?: boolean } = {}) {
+export function FinancialReportsPage({ hideViewPicker = false, compactFilters = false }: { hideViewPicker?: boolean; compactFilters?: boolean } = {}) {
   const { t, lang } = useLanguage();
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
@@ -60,6 +60,7 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
   const [to, setTo] = useState(() => history.clampRange(searchParams.get('from'), searchParams.get('to') || todayISO()).to);
   const [loading, setLoading] = useState(false);
   const [reportError, setReportError] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const { effectiveSettings } = useSettings();
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
   const [accountId, setAccountId] = useState('');
@@ -585,6 +586,17 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
         </div>
       )}
 
+      <div className="relative mb-3">
+        {compactFilters && <div className="flex items-center justify-between gap-2">
+          <span className="text-xs text-ui-muted">{isAr ? 'كل تفاصيل التقرير تظهر أدناه' : 'Complete report results below'}</span>
+          <button type="button" data-testid="toggle-financial-filters" aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((open) => !open)}
+            className="rounded-lg border border-ui-border bg-ui-surface px-3 py-2 text-xs font-bold text-ui-text">
+            {isAr ? 'الفلاتر المالية' : 'Financial filters'}
+          </button>
+        </div>}
+        {(!compactFilters || filtersOpen) && <div data-testid="financial-filters-popup"
+          className={compactFilters ? 'absolute end-0 top-full z-30 mt-2 max-h-[70vh] w-[min(90vw,680px)] overflow-y-auto rounded-xl border border-ui-border bg-ui-surface p-3 shadow-xl' : ''}>
       <DesignPanel testId="financial-reports-filters" className="ui-accent-finance">
         <div className="flex flex-col gap-4">
           {!hideViewPicker && (
@@ -643,6 +655,8 @@ export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicke
           </div>
         </div>
       </DesignPanel>
+        </div>}
+      </div>
 
       {reportError && !loading && (
         <DesignPanel testId="financial-reports-error"><div role="alert" className="rounded-xl border border-ui-danger/30 bg-ui-danger-soft p-4 text-ui-danger text-sm">{isAr ? 'تعذر تحميل جميع بيانات التقرير للفروع المحددة. لن تُعرض أو تُصدَّر أرقام مالية ناقصة. أعد المحاولة.' : 'Could not load the financial report for every selected branch. Incomplete totals are hidden and cannot be exported. Please retry.'}</div></DesignPanel>
