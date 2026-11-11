@@ -4,7 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ReportsPage } from './ReportsPage';
 import { FinancialReportsPage } from '@/features/accounting/pages/FinancialReportsPage';
 import { ReportsExecutiveKpis } from '../components/ReportsExecutiveKpis';
-import { ReportsShowcase } from '../components/ReportsShowcase';
+import { ReportsLiveDashboard } from '../components/ReportsLiveDashboard';
 import { useCan, type Permission } from '@/lib/permissions';
 import { useBranchScope } from '@/lib/branchScope';
 import { useLanguage } from '@/context/LanguageContext';
@@ -343,18 +343,14 @@ export function ReportsCenterPage() {
           {reportList}
         </aside>
         <main dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 space-y-4" data-testid="premier-reports-content">
-          {isOverview && (
-            <ReportsShowcase
-              isAr={isAr}
-              allowedReportTypes={allowedReportTypes}
-              onSelectReport={selectOperational}
-            />
+          {(!requestedFinancial || isOverview) && (
+            <ReportsLiveDashboard allowedReportTypes={allowedReportTypes} onSelectReport={selectOperational} />
           )}
           {requestedFinancial && canFinancial && allowedFinancialViews.length > 0 ? (
             <FinancialReportsPage hideViewPicker />
-          ) : permittedOperational.some((report) => report.key === activeReport) ? (
+          ) : requestedType && permittedOperational.some((report) => report.key === activeReport) ? (
             <ReportsPage controlledReportType={activeReport} onReportTypeChange={selectOperational} />
-          ) : (
+          ) : !isOverview ? (
             <div className="rounded-xl border border-ui-border bg-ui-surface px-6 py-12 text-center text-sm text-ui-muted">
               {isAr ? 'اختر تقريرًا مسموحًا لك لعرض بياناته الحقيقية' : 'Select an authorized report to view live data'}
               {isAr ? <ArrowLeft className="mx-auto mt-4 h-5 w-5" /> : <ArrowRight className="mx-auto mt-4 h-5 w-5" />}
