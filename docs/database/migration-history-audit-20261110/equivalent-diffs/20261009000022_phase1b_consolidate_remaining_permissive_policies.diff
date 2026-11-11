@@ -1,0 +1,29 @@
+--- canonical/20261009000022_phase1b_consolidate_remaining_permissive_policies.sql
++++ history/20261009000022.sql
+@@ -1,7 +1,5 @@
+--- Phase 1B: consolidate remaining same-role permissive policy duplicates.
+--- Each replacement preserves the previous effective OR semantics.
+ 
+--- subscription_plans: true OR is_active = true => true
++-- subscription_plans: preserve existing effective behavior (true OR is_active = true)
+ DROP POLICY IF EXISTS plans_read_all ON public.subscription_plans;
+ DROP POLICY IF EXISTS subscription_plans_public_read ON public.subscription_plans;
+ DROP POLICY IF EXISTS subscription_plans_public_read_combined ON public.subscription_plans;
+@@ -12,7 +10,7 @@
+ TO anon, authenticated
+ USING (true);
+ 
+--- treasury_accounts: preserve branch-access OR organization-access semantics.
++-- treasury_accounts: preserve OR semantics of branch-access and organization-access policies.
+ DROP POLICY IF EXISTS auth_select_organization_treasury_accounts ON public.treasury_accounts;
+ DROP POLICY IF EXISTS auth_select_treasury_accounts ON public.treasury_accounts;
+ DROP POLICY IF EXISTS auth_select_treasury_accounts_combined ON public.treasury_accounts;
+@@ -39,7 +37,7 @@
+   )
+ );
+ 
+--- user_branch_access: preserve both management permission paths.
++-- user_branch_access: preserve OR semantics of both management paths.
+ DROP POLICY IF EXISTS auth_manage_user_branch_access ON public.user_branch_access;
+ DROP POLICY IF EXISTS auth_permission_manage_user_branch_access ON public.user_branch_access;
+ DROP POLICY IF EXISTS auth_manage_user_branch_access_combined ON public.user_branch_access;

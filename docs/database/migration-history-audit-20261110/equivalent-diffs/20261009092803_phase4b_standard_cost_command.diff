@@ -1,0 +1,7 @@
+--- canonical/20261009092803_phase4b_standard_cost_command.sql
++++ history/20261009092803.sql
+@@ -1,3 +1,4 @@
++
+ create or replace function private.guard_item_standard_cost_overlap()
+ returns trigger
+ language plpgsql

@@ -1,0 +1,13 @@
+--- canonical/20261109084444_premier_stock_count_lines_rls_direct_dml_lockdown_20261109.sql
++++ history/20261109084444.sql
+@@ -1,5 +1,3 @@
+--- Already applied to Premier production via tracked Supabase migration 20261109084444.
+--- Verbatim SQL body from supabase_migrations.schema_migrations; do not rerun manually.
+ -- Premier production hardening candidate: isolated CI validation REQUIRED.
+ -- Revoke direct stock-count DML from the authenticated Data API role and
+ -- restrict line SELECT via already-protected parent stock_counts RLS.
+@@ -74,4 +72,3 @@
+  THEN RAISE EXCEPTION 'STOCK_COUNT_LINE_RLS_GATE_MISSING'; END IF;
+ END $postcheck$;
+ COMMIT;
+-

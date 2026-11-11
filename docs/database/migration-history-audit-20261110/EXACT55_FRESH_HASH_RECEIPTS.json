@@ -1,0 +1,447 @@
+{
+  "captured_on": "2026-11-11",
+  "project_ref": "hvqlkapynjfjikqithvd",
+  "read_only": true,
+  "rows": [
+    {
+      "version": "20260929111943",
+      "name": "dashboard_sales_snapshot",
+      "statement_count": 1,
+      "statement_hashes": [
+        "e77e711f75593d801ce9277d44a814d7b9fe9c30c112558ee361ed2b8bac8b7a"
+      ]
+    },
+    {
+      "version": "20260929111949",
+      "name": "system_health_snapshot",
+      "statement_count": 1,
+      "statement_hashes": [
+        "740b157b9491bfd0a6c1d74edb93fa75886e25571e30b5336077d59c904d46d0"
+      ]
+    },
+    {
+      "version": "20261003092937",
+      "name": "harden_negative_stock_debt_tables",
+      "statement_count": 1,
+      "statement_hashes": [
+        "a95bf9c025a1e22a632620e6fe2349cfe0e8dc1f998c17765ef4f41df349fb79"
+      ]
+    },
+    {
+      "version": "20261003103213",
+      "name": "allow_negative_stock_server_policy",
+      "statement_count": 1,
+      "statement_hashes": [
+        "97b32715f7c394a4472c7ed5760df9ed37868b86da81b3f62e43122762f2e0a4"
+      ]
+    },
+    {
+      "version": "20261003120340",
+      "name": "fix_production_order_raw_warehouse",
+      "statement_count": 1,
+      "statement_hashes": [
+        "d29ed428c9f1e76b0d88a0ad239721b11967efacb9604234ab51791adc2437a5"
+      ]
+    },
+    {
+      "version": "20261003120345",
+      "name": "restore_sale_finished_stock_routing",
+      "statement_count": 1,
+      "statement_hashes": [
+        "3a264d337c0389f15b7034386c51e394125c6a8169c1e74e8f722d4286aed668"
+      ]
+    },
+    {
+      "version": "20261007144421",
+      "name": "costing_linked_component_groups",
+      "statement_count": 1,
+      "statement_hashes": [
+        "c9fd63c367879001a0a7e6eb4e304a5342ab146c044ad7136c72be1cb72ec825"
+      ]
+    },
+    {
+      "version": "20261007144423",
+      "name": "costing_theoretical_recipe_source",
+      "statement_count": 1,
+      "statement_hashes": [
+        "4e8a0c84684fd967f1546cb8c4e9318038d084669afec74191fca994ebac98a6"
+      ]
+    },
+    {
+      "version": "20261007145835",
+      "name": "pos_sale_idempotency_guard",
+      "statement_count": 1,
+      "statement_hashes": [
+        "6ccbf5f08af3c76ba9cd5e7739c647a10421d13051490bf26a457307dc39e677"
+      ]
+    },
+    {
+      "version": "20261007150012",
+      "name": "erp04_stock_count_accounting_posting",
+      "statement_count": 1,
+      "statement_hashes": [
+        "da018cf8a861fd6cf5c03137517687ae4f7df0e837e61acd2b0160a66e636e22"
+      ]
+    },
+    {
+      "version": "20261007150018",
+      "name": "erp05_waste_fifo_approval",
+      "statement_count": 1,
+      "statement_hashes": [
+        "b73f2ba41e37457b6df8a1ad94def8ab806ef881fffb4a74aaa222b0fbec66b2"
+      ]
+    },
+    {
+      "version": "20261007150123",
+      "name": "kds_served_order_incremental_resend",
+      "statement_count": 1,
+      "statement_hashes": [
+        "5f3ba76409479325748345b3eb6dfb385dfbce1142140fb0f6093f0cc7552db3"
+      ]
+    },
+    {
+      "version": "20261007150128",
+      "name": "kds_finish_empty_order",
+      "statement_count": 1,
+      "statement_hashes": [
+        "9d00953ad813171e412836513961ce4f5729a86677f4fd855c950b8dd71dbfe4"
+      ]
+    },
+    {
+      "version": "20261007150220",
+      "name": "shift_refund_single_deduction",
+      "statement_count": 1,
+      "statement_hashes": [
+        "a55d8078052db33f076886e8d54203749ed823f11a55c32b56a54bc41adb3dfd"
+      ]
+    },
+    {
+      "version": "20261007150227",
+      "name": "treasury_business_day_chain_reconciliation",
+      "statement_count": 1,
+      "statement_hashes": [
+        "d5de8e685f2f676ba8cbea487d6cfea38f80c39de17d0a0f6aebcd314f225e54"
+      ]
+    },
+    {
+      "version": "20261008090819",
+      "name": "recursive_product_composition_cost",
+      "statement_count": 1,
+      "statement_hashes": [
+        "6937dab04a45ca9bfe49a22593e6df52ad993f3521bc4daac533f49aac2e06fd"
+      ]
+    },
+    {
+      "version": "20261008090929",
+      "name": "product_live_costs",
+      "statement_count": 1,
+      "statement_hashes": [
+        "6832ad629feecc88a7976a80140cd9df6e50917f8119420786eed0bf69f8d203"
+      ]
+    },
+    {
+      "version": "20261011064018",
+      "name": "phase5d_append_only_payment_reclassification",
+      "statement_count": 1,
+      "statement_hashes": [
+        "290e6d8f1c6cd1081a687a099639c6fdc3bdf5934e928fe888d9bf2443474f26"
+      ]
+    },
+    {
+      "version": "20261011065554",
+      "name": "phase5g_purchase_correction_insert_time_journal_dates",
+      "statement_count": 1,
+      "statement_hashes": [
+        "b69de956bb7f8914d762fcf265e9ae2f286beaf45ed10074ce6495def6a69798"
+      ]
+    },
+    {
+      "version": "20261011080408",
+      "name": "phase4d_component_cost_evidence",
+      "statement_count": 1,
+      "statement_hashes": [
+        "749c966d217be1ebee5f593401447656a9f32069d523bf2bb33a02042ecd2905"
+      ]
+    },
+    {
+      "version": "20261011081037",
+      "name": "phase4d_fail_closed_missing_component_cost",
+      "statement_count": 1,
+      "statement_hashes": [
+        "38b5d35175a47a808bd96e813b7955a64a083de8738ab3b55ff9ad355cfdb310"
+      ]
+    },
+    {
+      "version": "20261011085158",
+      "name": "phase5h_organization_coa_readiness",
+      "statement_count": 1,
+      "statement_hashes": [
+        "f63b791e66da86f746046e60eeb64324ac833c6aee44fa8086472b2349ca24fd"
+      ]
+    },
+    {
+      "version": "20261011092600",
+      "name": "phase5i_organization_account_shadow",
+      "statement_count": 1,
+      "statement_hashes": [
+        "a0527253253cdea513618e5c753483b4347ac5c7913b5fc756959a8b40a352ec"
+      ]
+    },
+    {
+      "version": "20261011101007",
+      "name": "phase5j_controlled_org_account_sync",
+      "statement_count": 1,
+      "statement_hashes": [
+        "db70c77fb97a6b7c29fe77b06533e1e2f30297b82fb6c7f0682f00b86143c43d"
+      ]
+    },
+    {
+      "version": "20261011104816",
+      "name": "phase5k_org_account_workbench_read_api",
+      "statement_count": 1,
+      "statement_hashes": [
+        "752f635617a2d34d4ea023ee3ce693c73d0e3db1e20ddb20c3562a79d69a4d4e"
+      ]
+    },
+    {
+      "version": "20261011105332",
+      "name": "phase5k_unmapped_existing_master_preview",
+      "statement_count": 1,
+      "statement_hashes": [
+        "f263a6c8e1ce7106dd46ae46ee3545961b9aa8fb4218d21599a9958e2c2bed4c"
+      ]
+    },
+    {
+      "version": "20261011113106",
+      "name": "phase5l_org_journal_identity_bridge",
+      "statement_count": 1,
+      "statement_hashes": [
+        "c8917c1b237da12aa4e39f1745b7e1343def1735838d9d2023aabcab8a87f3be"
+      ]
+    },
+    {
+      "version": "20261011113110",
+      "name": "phase6_procurement_receipt_integrity",
+      "statement_count": 1,
+      "statement_hashes": [
+        "1040476eec60e1823d43fbbe5cc9aaa3197109304d9987e11a3847f51348226b"
+      ]
+    },
+    {
+      "version": "20261011113114",
+      "name": "phase8_event_outbox_phase9_agent_context",
+      "statement_count": 1,
+      "statement_hashes": [
+        "832845f29702ccbe8e7cb1f5e4562b94511a3c600ed5c76df9a3895b18dd4ffd"
+      ]
+    },
+    {
+      "version": "20261011130910",
+      "name": "phase8b_verified_event_consumer",
+      "statement_count": 1,
+      "statement_hashes": [
+        "e215bd76dea179eb4f34a457595438a3aada968f5e97ab4da1cb34f6b716238a"
+      ]
+    },
+    {
+      "version": "20261012134314",
+      "name": "purchase_return_fifo_shortage_guard",
+      "statement_count": 1,
+      "statement_hashes": [
+        "d152633ab0b14ba2789404640bdd715551bd7df81abfe116c53eb2b34d7daefa"
+      ]
+    },
+    {
+      "version": "20261013060012",
+      "name": "receipt_atomicity_fail_closed",
+      "statement_count": 1,
+      "statement_hashes": [
+        "1bcde1a409bb3916b3e4683f2355adbf16da1fd5c2c2fe67d6707713914f33e5"
+      ]
+    },
+    {
+      "version": "20261022083851",
+      "name": "guarded_inactive_organization_deletion",
+      "statement_count": 1,
+      "statement_hashes": [
+        "00ac367692e7a0900867637925067ffc8034e806c4348c8fca558df09038d567"
+      ]
+    },
+    {
+      "version": "20261022090902",
+      "name": "owner_tenant_branch_isolation",
+      "statement_count": 1,
+      "statement_hashes": [
+        "c8edd55b0f99d001c694f95ff0b5cb1bf61707fecf0ad4d596daf20e4178e1cb"
+      ]
+    },
+    {
+      "version": "20261022094134",
+      "name": "public_trial_signup_bootstrap_fix",
+      "statement_count": 1,
+      "statement_hashes": [
+        "62e898ba07e4858a0ad89a824da2fb1c1051f659da0817a527b2689946d31c2f"
+      ]
+    },
+    {
+      "version": "20261022094146",
+      "name": "global_super_admin_detachment",
+      "statement_count": 1,
+      "statement_hashes": [
+        "76e8bd349bdd8fea621c826321739c7d32281c9ec32989b52852854405b0969f"
+      ]
+    },
+    {
+      "version": "20261022095729",
+      "name": "floor_plan_custom_area_management",
+      "statement_count": 1,
+      "statement_hashes": [
+        "96b59a212f79dbe2566c3e99bed2f58c5de8d4c63b767dc44ddbdde823524c17"
+      ]
+    },
+    {
+      "version": "20261022102936",
+      "name": "full_organization_purge",
+      "statement_count": 1,
+      "statement_hashes": [
+        "a4f073fcc3dae2244606689cdf187afd6043e0a4744925dde340e9edb9f6dc92"
+      ]
+    },
+    {
+      "version": "20261022110426",
+      "name": "fix_pos_bootstrap_trigger_and_purge_logging",
+      "statement_count": 1,
+      "statement_hashes": [
+        "eb9291801e96610e50632b07e79cc512f2628b369c1fc3197b02c1b1000a0218"
+      ]
+    },
+    {
+      "version": "20261022110437",
+      "name": "full_org_purge_multi_branch_guards",
+      "statement_count": 1,
+      "statement_hashes": [
+        "0bcf255a5d1919a03b385df1f68b9df321fc5f5de5c3fc9cbbfb7694312205f0"
+      ]
+    },
+    {
+      "version": "20261022114212",
+      "name": "full_org_purge_immutable_evidence",
+      "statement_count": 1,
+      "statement_hashes": [
+        "d3e03140f49dd53102af0648a06e85ff920eb22c5cc276a76199c450f48b1f38"
+      ]
+    },
+    {
+      "version": "20261022115723",
+      "name": "full_org_purge_sales_before_customers",
+      "statement_count": 1,
+      "statement_hashes": [
+        "127167364ed62064fd1354218ebca58f8aaa76616804b222e2ef225dc8b7586e"
+      ]
+    },
+    {
+      "version": "20261022120420",
+      "name": "full_tenant_purge_fifo_ledger_references",
+      "statement_count": 1,
+      "statement_hashes": [
+        "d09d5976da346b7320484458f0f36181fdb72b68dc8fda7af7e1c4e6732a7eb5"
+      ]
+    },
+    {
+      "version": "20261022124549",
+      "name": "full_organization_deletion_rpc_timeout",
+      "statement_count": 1,
+      "statement_hashes": [
+        "ad18819b0898b3629342184bbc368ace606461e8a259cca642114601f9db7db4"
+      ]
+    },
+    {
+      "version": "20261022131308",
+      "name": "async_org_delete_queue",
+      "statement_count": 1,
+      "statement_hashes": [
+        "2d7a75684d6d4e07c1c772eab92f54d9bd76e23040bd1fe01bba8926a0eb6b3a"
+      ]
+    },
+    {
+      "version": "20261022154714",
+      "name": "full_org_delete_stock_count_fk",
+      "statement_count": 1,
+      "statement_hashes": [
+        "0d5a71df3eed18e6b900b8a2323d7826c008625f8683e45a02187853fcbf1e8e"
+      ]
+    },
+    {
+      "version": "20261023152041",
+      "name": "deploy_corrected_unified_raw_movement_core_v1",
+      "statement_count": 1,
+      "statement_hashes": [
+        "ca3d2afe9e891d4b44b8fbc69bd83f4f8b839d794843b670c4a42f6927f5fee8"
+      ]
+    },
+    {
+      "version": "20261026201549",
+      "name": "unify_ready_product_sale_stock_cost_and_lock",
+      "statement_count": 1,
+      "statement_hashes": [
+        "12f17ac3e8b5bdb9526dca2c24dc5a91923d31133b8c01dec71c22fe2ee63a27"
+      ]
+    },
+    {
+      "version": "20261027053343",
+      "name": "unified_current_stock_position_with_cost_and_price",
+      "statement_count": 1,
+      "statement_hashes": [
+        "a39f89a8eb068deaaed54f3878b7986b9378812779cbcdecf6bd40318dcaa7a1"
+      ]
+    },
+    {
+      "version": "20261027073700",
+      "name": "align_manufactured_units_visibility_with_authorized_active_branches",
+      "statement_count": 1,
+      "statement_hashes": [
+        "95e84aff5dcbd65895d3f1ca90c938ecd67c8c765dc1d3bec355854952b2be31"
+      ]
+    },
+    {
+      "version": "20261027110322",
+      "name": "raw_material_single_row_cached_costs",
+      "statement_count": 1,
+      "statement_hashes": [
+        "09547feae1fe4415459fc5ef89984b2bea8592993ccaab9611d3792df70dda51"
+      ]
+    },
+    {
+      "version": "20261027113242",
+      "name": "recipe_cost_context_from_cached_raw_prices",
+      "statement_count": 1,
+      "statement_hashes": [
+        "bd498961d52a493280583fbf005a66a8242e2c9485eb8dda8b7c5fce67a241d7"
+      ]
+    },
+    {
+      "version": "20261027113412",
+      "name": "publish_completed_purchase_raw_cost_incrementally",
+      "statement_count": 1,
+      "statement_hashes": [
+        "2bb3691325ff12d332e3424e24c865ac7d504a0bced4fe6fa2de0a1af1aa84d1"
+      ]
+    },
+    {
+      "version": "20261027182002",
+      "name": "enforce_financial_rpc_branch_authorization_v2",
+      "statement_count": 1,
+      "statement_hashes": [
+        "5d44186ccdb96697ec5584e10296312a9f76461342ce89ac31fa1b86110b777e"
+      ]
+    },
+    {
+      "version": "20261027182457",
+      "name": "finance_treasury_and_reconciliation_branch_guards",
+      "statement_count": 1,
+      "statement_hashes": [
+        "2b685e8738e42b0a0eeb1ead71ababd6f1780a27002c5be18be6386e4c46b3fb"
+      ]
+    }
+  ]
+}

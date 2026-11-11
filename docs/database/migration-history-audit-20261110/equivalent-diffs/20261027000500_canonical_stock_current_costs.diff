@@ -1,0 +1,13 @@
+--- canonical/20261027000500_canonical_stock_current_costs.sql
++++ history/20261026202407.sql
+@@ -1,4 +1,3 @@
+--- Canonical current display cost, not a historical journal repricing.
+ CREATE OR REPLACE VIEW public.v_stock_current_costs WITH (security_invoker=true) AS
+ SELECT 'raw'::text item_type,r.id item_id,r.branch_id,r.name::text item_name,
+ COALESCE(e.unit_cost,0)::numeric unit_cost,e.priced_at cost_effective_at,
+@@ -14,4 +13,4 @@
+ UNION ALL
+ SELECT 'manufactured'::text,u.id,u.branch_id,u.name::text,COALESCE(u.cost_price,0)::numeric,NULL::timestamptz,'inventory_unit_catalog_cost'::text FROM public.inventory_units u;
+ GRANT SELECT ON public.v_stock_current_costs TO authenticated,service_role;
+-COMMENT ON VIEW public.v_stock_current_costs IS 'Canonical current display cost. Historical journal and stock movement costs remain immutable; raw missing published price is zero.';
++COMMENT ON VIEW public.v_stock_current_costs IS 'Canonical current display cost. Historical journal and stock movement costs remain immutable; raw missing published price is zero.';

@@ -1,0 +1,8 @@
+--- canonical/20261023200500_retire_unreferenced_fifo_debt_rebase_helpers.sql
++++ history/20261023132050.sql
+@@ -1,4 +1,2 @@
+--- Retire historical FIFO debt rebase helper functions with no SQL callers.
+--- Keep operational FIFO functions and historical accounting records until a safe cutover.
+ DROP FUNCTION IF EXISTS public._raw_fifo_rebase_historical_debt_state(uuid) RESTRICT;
+-DROP FUNCTION IF EXISTS public._raw_fifo_restore_rebased_debt_state(uuid) RESTRICT;
++DROP FUNCTION IF EXISTS public._raw_fifo_restore_rebased_debt_state(uuid) RESTRICT;

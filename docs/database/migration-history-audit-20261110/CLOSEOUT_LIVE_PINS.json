@@ -1,0 +1,170 @@
+[
+  {
+    "signature": "app_private.record_login_failure(text)",
+    "sha256": "ef44ae545f7a34991dd1cadb2a85091340501454c847f47ff70fc4dafa9d8140",
+    "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "private.assign_journal_posting_metadata()",
+    "sha256": "2a18435d4f33d19504edd7f490cd7b7be3f804b4fd8d66a6cb394740d7505157",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "private.capture_sale_item_cost_snapshot_trigger()",
+    "sha256": "dc4488c069b217165dbc900ac8b9092aef207439b247382734b3707cc179fe04",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "private.compute_sale_item_cost_snapshot(uuid,uuid,uuid[],numeric,timestamp with time zone)",
+    "sha256": "8cc2a42f989421dbd5a879bbbf56852ce300fcfb219adff208dd8cab08d49259",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "private.consume_kitchen_raw_without_fifo_v1(uuid,uuid,uuid,numeric,uuid,text,uuid)",
+    "sha256": "4b15157c54e2213a58a5201898e38a90f8e8fe2f073fed3868a0d7cf628b7144",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": false
+  },
+  {
+    "signature": "private.ensure_accounting_period_for_date(uuid,date)",
+    "sha256": "8374ba45b6e4e0359388f224fb8fee2683e49f0a0934731bfc878ec5fb10f765",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "private.post_fifo_orphan_sale_cogs_event(uuid,uuid,text,date,numeric,numeric,numeric,uuid,uuid,uuid)",
+    "sha256": "af621109afe952616b164c4aede889169c5fd37daf19cc02ff0c54fd6249e79c",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "private.post_fifo_sale_cogs_event(uuid,uuid,text,date,numeric,numeric,numeric,uuid,uuid,uuid)",
+    "sha256": "737a421912e99f4dd69e926e871fb3992cd71291bdcf123ad3e12663d2e44945",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "private.post_fifo_stock_variance_event(uuid,text,uuid,text,date,numeric,numeric,numeric,uuid,uuid)",
+    "sha256": "5697a4466ca641a186ef8f90bd97b93d1ddbc28ea95b3e07b2092b0b484b6468",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "private.product_non_fifo_cutover_gate_v1()",
+    "sha256": "e16138d00aba7356c564e2331e51102b7f82e6f315ffdfc8d6f6c612eea40654",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": false
+  },
+  {
+    "signature": "private.raw_published_unit_cost_at_v2(uuid,uuid,timestamp with time zone)",
+    "sha256": "d9a48c3555a4e585de4d011ed38ecca159bc40f7761f321a23604f539057d090",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": false
+  },
+  {
+    "signature": "public._fifo_adjust_orphan_sale_cogs_delta(uuid,uuid,numeric)",
+    "sha256": "6e01972a069ea11de6ed546612321b56944c9d3313b141c8facb8474b8560a20",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public._fifo_adjust_sale_cogs_delta(uuid,numeric)",
+    "sha256": "4eab39686610298fb789d6b37ebcbfaf8a915dad7227b89ae19cd503b30536ca",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public._fifo_adjust_stock_variance_delta(uuid,text,uuid,text,date,numeric)",
+    "sha256": "afb00c9791e3b9af1dcd420172cc74967e9888454e3cb6d4ba842bf911e7070e",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public._raw_inventory_actual_avg_cost_guard()",
+    "sha256": "3feae0351231f87adcd9b5908b9c579f748f6db03aa89dd62e1db0f976b3f097",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public._raw_price_oversold_batch_from_fifo()",
+    "sha256": "0dfca1542ccd97839da7eee96d45ce86173a2c1551959e392a3a4bc00f239aa6",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public.complete_production_order(uuid,jsonb)",
+    "sha256": "805574fc6c4ee52e6ec5baa5c4c8efe6fe64f014419b7ddbcac19bc3907a0933",
+    "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public.complete_stale_kitchen_orders(uuid)",
+    "sha256": "a4c9a46a7d06e707461b4e9d30d78a8a56c9c9d705c93a93bc5d803619ac7197",
+    "acl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public.get_costing_snapshot_health_v2(uuid)",
+    "sha256": "837654f74b3da9c20560c6f2f1e27641553e71c0e190f56dd0ed605c6ccc4a89",
+    "acl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public.get_organization_module_catalog(uuid)",
+    "sha256": "204cc26843d1607d56974404b0de79e82e56c65bdfa3e59a594ca568157effee",
+    "acl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public.get_purchase_cost_variance_v2(uuid,date,date,integer,integer)",
+    "sha256": "e9560727a56856fb4a18a824ced22d32b95113daf1789e07b4b28340409d094e",
+    "acl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public.get_sale_cost_variance_v2(uuid,date,date,integer,integer)",
+    "sha256": "60f9f265d8d06e1254bd49fe3fc72e05b17b12f9d8cb1e70c3d832ce07b6ed43",
+    "acl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public.record_login_failure(text)",
+    "sha256": "0b217643c62cdcbe8815134f5a3f4bc44263d7e4c05c75e3e902a841f19ac107",
+    "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres,anon=X/postgres}",
+    "security_definer": false
+  },
+  {
+    "signature": "public.resolve_feature_access(uuid,uuid,text,uuid)",
+    "sha256": "6e5f3358c89a83d0854dd029d5a50492888669f4c4b68f640f1a09490b86663b",
+    "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public.super_admin_create_organization_from_profile(text,text,text,text[],jsonb,text,text,text,text,text,text,boolean,numeric)",
+    "sha256": "33ced69d4cdf68702f9ba7f3137a56c83aa0ad8828d01eed0293ab895dfbe83a",
+    "acl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public.super_admin_set_organization_module(uuid,text,boolean,text)",
+    "sha256": "554b0a9ed9f7e9f14bf5dc009099b88d00f537a38b1e328b2845a0ad6d865f3b",
+    "acl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public.treasury_accounts_fill_model_defaults()",
+    "sha256": "2813e3d90c69e47dcab14de24217586e960266a0ca015d3346cdbca8944a1e24",
+    "acl": "{postgres=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  },
+  {
+    "signature": "public.user_can_access_organization(uuid)",
+    "sha256": "7903c166a0605e3a07428a45a8d0dfe320e1bca0f40ba2e5e298d3272ba52e59",
+    "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+    "security_definer": true
+  }
+]

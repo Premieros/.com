@@ -1,0 +1,7 @@
+--- canonical/20261009081634_phase2c_canonical_item_read_model.sql
++++ history/20261009081634.sql
+@@ -1,3 +1,4 @@
++
+ create or replace view public.canonical_item_catalog
+ with (security_invoker = true)
+ as
