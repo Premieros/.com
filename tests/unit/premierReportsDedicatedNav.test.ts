@@ -34,7 +34,7 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
   });
 
   it('retains current reporting engines and places the report directory on the visual left', () => {
-    expect(full).toContain('<FinancialReportsPage hideViewPicker />');
+    expect(full).toContain('<FinancialReportsPage hideViewPicker compactFilters />');
     expect(full).toContain('<ReportsPage key={allowedReport.key}');
     expect(center).toContain('data-testid="premier-reports-directory"');
     expect(center).toContain('data-testid="toggle-reports-directory"');
@@ -80,6 +80,7 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
     expect(full).toContain('standalone />');
     expect(routes).toContain('path="/reports/view"');
     expect(detail).toContain('data-testid="toggle-detail-filters"');
+    expect(full).toContain('compactFilters />');
     expect(detail).toContain('exportExcel: handleExportExcel');
     expect(detail).toContain('print: handlePrint');
     expect(detail).toContain('save: handleSaveCustomReport');
