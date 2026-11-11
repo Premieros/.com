@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Search, ChevronDown, ChevronUp, BarChart3, Star, LayoutGrid, ArrowLeft, ArrowRight, ShieldCheck } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, BarChart3, Star, LayoutGrid, ArrowLeft, ArrowRight, ShieldCheck, Zap, FileBarChart } from 'lucide-react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ReportsPage } from './ReportsPage';
 import { FinancialReportsPage } from '@/features/accounting/pages/FinancialReportsPage';
@@ -362,6 +362,23 @@ export function ReportsCenterPage() {
           )}
         </main>
       </div>
+      {permittedOperational.length > 0 && (
+        <section className="rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm" data-testid="reports-quick-links">
+          <div className="mb-3 flex items-center gap-2">
+            <Zap className="h-5 w-5 text-amber-500" aria-hidden="true" />
+            <h2 className="text-sm font-black text-ui-text">{isAr ? 'تقارير سريعة' : 'Quick reports'}</h2>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-6">
+            {permittedOperational.slice(0, 6).map((report) => (
+              <button key={report.key} type="button" onClick={() => selectOperational(report.key)}
+                className="flex min-w-0 flex-col items-center gap-2 rounded-xl border border-ui-border bg-ui-page-alt p-3 text-center text-xs font-bold text-ui-text transition hover:border-ui-primary hover:text-ui-primary">
+                <FileBarChart className="h-5 w-5 text-ui-primary" aria-hidden="true" />
+                <span className="line-clamp-2">{isAr ? report.title : report.titleEn}</span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
     </section>
   );
 }
