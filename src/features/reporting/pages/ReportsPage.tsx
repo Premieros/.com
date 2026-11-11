@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { Download, TrendingUp, ShoppingCart, Receipt, Package, BarChart3, CreditCard, Users, List, Layers, AlertTriangle, FileDown, Printer, UserCheck, RotateCcw, Trash2 } from 'lucide-react';
@@ -15,6 +15,7 @@ import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useColumnPreferences } from '../useColumnPreferences';
+import { filterAndSortReportRows, paginateReportRows, type ReportSortDirection } from '../reportTablePresentation';
 import { ColumnPicker } from '../ColumnPicker';
 import { useCustomReports } from '../useCustomReports';
 import { getReportExcelProfile } from '../reportExcelProfiles';
@@ -69,6 +70,19 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
   const [to, setTo] = useState(todayISO());
   const [period, setPeriod] = useState<PeriodKey>('custom');
   const [data, setData] = useState<Record<string, unknown>[]>([]);
+  const [tableSearch, setTableSearch] = useState('');
+  const [tableSort, setTableSort] = useState<string | null>(null);
+  const [tableSortDirection, setTableSortDirection] = useState<ReportSortDirection>('asc');
+  const [tablePage, setTablePage] = useState(1);
+  const [tablePageSize, setTablePageSize] = useState(25);
+  const presentedRows = useMemo(
+    () => filterAndSortReportRows(data, tableSearch, tableSort, tableSortDirection),
+    [data, tableSearch, tableSort, tableSortDirection],
+  );
+  const pagedRows = useMemo(
+    () => paginateReportRows(presentedRows, tablePage, tablePageSize),
+    [presentedRows, tablePage, tablePageSize],
+  );
   const [chartData, setChartData] = useState<{ name: string; value: number }[]>([]);
   const [summary, setSummary] = useState({ total: 0, count: 0 });
   const [loading, setLoading] = useState(false);
@@ -1092,6 +1106,12 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
     }
   }
 
+  const changeSort = (column: string) => {
+    setTableSortDirection((previous) => tableSort === column ? (previous === 'asc' ? 'desc' : 'asc') : 'asc');
+    setTableSort(column);
+    setTablePage(1);
+  };
+
   const handleExportExcel = () => {
     const excelProfile = getReportExcelProfile(reportType, lang as 'ar' | 'en');
     const totalRow = reportType === 'financial_reconciliation'
@@ -1104,12 +1124,12 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
         [lang === 'ar' ? 'عدد السجلات' : 'Record Count']: summary.count,
       };
     void exportToExcelAdvanced({
-      data,
+      data: presentedRows,
       filename: `report_${reportType}_${from}_${to}`,
       sheetName: (reportTypes.find((row) => row.key === reportType)?.label ?? reportType).slice(0, 31),
       title: reportTypes.find((row) => row.key === reportType)?.label ?? reportType,
       subtitle: `${reportBranchLabel} — ${from} — ${to}`,
-      totalRow,
+      totalRow: tableSearch.trim() ? undefined : totalRow,
       currencyColumns: moneyKeys,
       integerColumns: excelProfile.integerColumns,
       columns: excelProfile.columns,
@@ -1118,7 +1138,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       lang,
     });
   };
-  const handleExportCSV = () => { downloadCSV(data, `report_${reportType}_${from}_${to}`); };
+  const handleExportCSV = () => { downloadCSV(presentedRows, `report_${reportType}_${from}_${to}`); };
 
   const reportTypes: { key: ReportType; label: string; icon: React.ReactNode }[] = [
     { key: 'sales', label: t('salesReport'), icon: <TrendingUp className="w-4 h-4" /> },
@@ -1253,8 +1273,8 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
 
   const handlePrint = () => {
     const reportLabel = reportTypes.find((row) => row.key === reportType)?.label ?? reportType;
-    const headers = data.length > 0 ? Object.keys(data[0]) : [];
-    const rows = data.map((row) => headers.map((header) => {
+    const headers = presentedRows.length > 0 ? Object.keys(presentedRows[0]) : [];
+    const rows = presentedRows.map((row) => headers.map((header) => {
       const value = row[header];
       if (typeof value === 'number' && moneyKeys.includes(header)) return formatFinancialCurrency(value, currency, lang);
       return String(value ?? '');
@@ -1367,14 +1387,43 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       )}
 
       <Card className="p-4 border-ui-border bg-ui-surface shadow-ui">
+        <div className="mb-3 flex flex-wrap items-end justify-between gap-3 border-b border-ui-border pb-3" data-testid="report-table-controls">
+          <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-semibold text-ui-muted sm:max-w-md">
+            {lang === 'ar' ? 'بحث داخل نتائج التقرير' : 'Search report results'}
+            <input type="search" value={tableSearch}
+              onChange={(event) => { setTableSearch(event.target.value); setTablePage(1); }}
+              placeholder={lang === 'ar' ? 'ابحث عن فاتورة أو صنف أو مبلغ...' : 'Search invoice, item or amount...'}
+              className="h-10 min-w-0 rounded-lg border border-ui-border bg-ui-page-alt px-3 text-sm text-ui-text focus-visible:ring-2 focus-visible:ring-ui-ring"
+              data-testid="report-table-search" />
+          </label>
+          <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted">
+            {lang === 'ar' ? 'صفوف الصفحة' : 'Rows per page'}
+            <select value={tablePageSize}
+              onChange={(event) => { setTablePageSize(Number(event.target.value)); setTablePage(1); }}
+              className="h-10 rounded-lg border border-ui-border bg-ui-page-alt px-3 text-sm text-ui-text"
+              data-testid="report-table-page-size">
+              {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}
+            </select>
+          </label>
+          <p className="w-full text-xs text-ui-muted">
+            {lang === 'ar'
+              ? `عرض ${pagedRows.first}–${pagedRows.last} من ${pagedRows.total} نتيجة محمّلة ومصرّح بها. الإجمالي المالي بالأعلى من مصدر التقرير ولا يتغير ببحث الجدول.`
+              : `Showing ${pagedRows.first}–${pagedRows.last} of ${pagedRows.total} loaded authorized rows. Financial total above comes from the report source and is unaffected by table search.`}
+            {tableSearch.trim() && (lang === 'ar'
+              ? ' التصدير والطباعة يشملان نتائج البحث فقط، دون إجمالي مالي غير متطابق.'
+              : ' Export and print include searched rows only, without an unmatched financial total.')}
+          </p>
+        </div>
         {loading ? (
           <div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" /></div>
-        ) : data.length === 0 ? (
-          <div className="text-center py-12 text-ui-subtle text-sm">{t('noData')}</div>
+        ) : presentedRows.length === 0 ? (
+          <div className="text-center py-12 text-ui-subtle text-sm">{data.length > 0
+            ? (lang === 'ar' ? 'لا توجد نتائج مطابقة للبحث' : 'No matching rows')
+            : t('noData')}</div>
         ) : (
           <div>
             <div data-testid="reports-mobile-results" className="space-y-2 sm:hidden">
-              {data.map((row, index) => (
+              {pagedRows.rows.map((row, index) => (
                 <article key={index} className="rounded-xl border border-ui-border bg-ui-surface p-3 shadow-ui-sm">
                   <dl className="divide-y divide-ui-border">
                     {reportMobilePrimaryColumns.map((key) => {
@@ -1417,11 +1466,20 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
               <table className="w-full min-w-max text-sm" data-testid="report-results-table">
                 <thead className="sticky top-0 z-10 bg-ui-page-alt">
                   <tr className="border-b border-ui-border">
-                    {columns.map((key, columnIndex) => <th key={key} scope="col" className={`px-3 py-2 text-start text-xs font-bold text-ui-muted ${columnIndex === 0 ? 'min-w-[190px]' : 'whitespace-nowrap'}`}>{key}</th>)}
+                    {columns.map((key, columnIndex) => (
+                      <th key={key} scope="col" aria-sort={tableSort === key ? (tableSortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
+                        className={`px-3 py-2 text-start text-xs font-bold text-ui-muted ${columnIndex === 0 ? 'min-w-[190px]' : 'whitespace-nowrap'}`}>
+                        <button type="button" onClick={() => changeSort(key)}
+                          className="inline-flex items-center gap-1 hover:text-ui-primary"
+                          aria-label={lang === 'ar' ? `ترتيب حسب ${key}` : `Sort by ${key}`}>
+                          {key}<span aria-hidden="true">{tableSort === key ? (tableSortDirection === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}</span>
+                        </button>
+                      </th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  {data.map((row, index) => (
+                  {pagedRows.rows.map((row, index) => (
                     <tr key={index} className="border-b border-ui-border/60 hover:bg-ui-page-alt">
                       {columns.map((key, columnIndex) => {
                         const value = row[key];
@@ -1436,6 +1494,21 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
                 </tbody>
               </table>
             </div>
+            {pagedRows.totalPages > 1 && (
+              <nav className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-ui-border pt-3 text-xs text-ui-muted" aria-label={lang === 'ar' ? 'صفحات نتائج التقرير' : 'Report result pages'} data-testid="report-table-pagination">
+                <span>{lang === 'ar' ? `الصفحة ${pagedRows.page} من ${pagedRows.totalPages}` : `Page ${pagedRows.page} of ${pagedRows.totalPages}`}</span>
+                <div className="flex items-center gap-2">
+                  <button type="button" disabled={pagedRows.page <= 1} onClick={() => setTablePage(pagedRows.page - 1)}
+                    className="rounded-lg border border-ui-border px-3 py-2 text-ui-text disabled:cursor-not-allowed disabled:opacity-40">
+                    {lang === 'ar' ? 'السابق' : 'Previous'}
+                  </button>
+                  <button type="button" disabled={pagedRows.page >= pagedRows.totalPages} onClick={() => setTablePage(pagedRows.page + 1)}
+                    className="rounded-lg border border-ui-border px-3 py-2 text-ui-text disabled:cursor-not-allowed disabled:opacity-40">
+                    {lang === 'ar' ? 'التالي' : 'Next'}
+                  </button>
+                </div>
+              </nav>
+            )}
           </div>
         )}
       </Card>
