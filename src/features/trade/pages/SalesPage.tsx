@@ -310,7 +310,14 @@ export function SalesPage() {
         setSourceLookup('unavailable');
         return;
       }
-      const sale = data as SaleRow;
+      // PostgREST runtime resolves these many-to-one joins to objects.
+      // Generated relationship typing may describe arrays; normalize both forms.
+      const mapped = data as unknown as SaleRow;
+      const sale: SaleRow = {
+        ...mapped,
+        customer: Array.isArray(mapped.customer) ? (mapped.customer[0] ?? null) : mapped.customer,
+        source_order: Array.isArray(mapped.source_order) ? (mapped.source_order[0] ?? null) : mapped.source_order,
+      };
       setViewSale(sale);
       setEditForm({
         customer_id: sale.customer_id || '',
