@@ -34,6 +34,13 @@ Every report is further subject to organization module visibility, branch scope 
 - Unit tests cover negative transactions, Arabic search, natural invoice sorting, missing values, page bounds, and preservation of input rows.
 - **Caution:** This is **presentation pagination** of records already loaded by existing report services, not a claim of backend/server paging. Some legacy loaders still call `fetchAllReportRows` to exhaust their authorized result range in batches. Converting those to server-backed page/count endpoints must not be attempted without retaining report-wide financial correctness and export completeness.
 
+## Iteration 3 — exact-source invoice drilldown
+
+- For **sales, detailed invoices and returns** loaded through the existing authorized report services, the report row now carries its actual `sales.id` in non-enumerable, symbol-backed **navigation-only metadata**. The source ID cannot accidentally appear in visible report columns, CSV/XLSX, JSON, print or saved column selections.
+- When a user has `sales.view`, the invoice value becomes a link to `/sales?saleId=<uuid>`; there are no guessed invoice-name joins, no arbitrary new financial queries and no links on grouped cost/profit rows that have no single source invoice.
+- The existing SalesPage resolves that exact ID with the **same sale detail projection**, the authenticated Supabase connection, `branch_id IN current authorized branchScope.selectedBranchIds`, `is_archived=false`, and the `sales.view` gate. Missing, invalid, inaccessible or out-of-scope invoice URLs all show the **same unavailable message**, without revealing if a foreign-branch ID exists. Changing branch scope or permission clears any previously displayed detail.
+- This source navigation provides a supported invoice detail entry, not a guarantee that every report row (e.g. aggregated profitability, inventory consumption, finance reconciliation) has a corresponding source record link. Do not infer transaction IDs from displayed invoice numbers.
+
 ## Not yet implemented / intentionally not misrepresented
 - A unified multi-report executive KPI panel (net profit, inventory valuation, COGS, net sales, returns and comparisons) **requires auditing exact source definitions and completeness before showing numeric cards**. It has not been asserted as available. Existing report totals appear where authoritative source already supports them.
 - Full advanced report-builder with SQL-free custom aggregations, arbitrary column widths, all cross-module deep links, automated email schedules, all specialized restaurant/HR/production reports, unusual trend detection, and AI analysis **not implemented**. Existing saved custom report preferences are retained.
