@@ -1417,7 +1417,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
           setFilters((prev) => ({ ...prev, [dim]: value }));
           setFiltersDirty(true);
         }}
-        showDate={standalone ? false : showDate}
+        showDate={showDate}
         period={period}
         onPeriodChange={(key) => applyPeriod(key as PeriodKey)}
         from={from}
