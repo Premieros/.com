@@ -46,8 +46,9 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
     expect(center).toContain('allowedReportTypes={allowedReportTypes}');
     expect(center).toContain('onSelectReport={selectOperational}');
     expect(showcase).toContain('TILES.filter((tile) => allowedReportTypes.has(tile.key))');
-    expect(showcase).toContain('data-testid={`report-shortcut-${tile.key}`}');
-    expect(showcase).toContain('chartOnly controlledFrom={from} controlledTo={to}');
+    expect(showcase).toContain('data-testid={`report-shortcut-${tile.kind}`}');
+    expect(showcase).toContain("chartMode={tile.kind === 'bars' ? 'branch' : 'normal'}");
+    expect(showcase).toContain('controlledFrom={from} controlledTo={to}');
     expect(showcase).toContain('data-testid="load-overview-charts"');
     expect(center).toContain('data-testid="apply-overview-dates"');
     expect(center).toContain('controlledFrom={dateRange.from}');
