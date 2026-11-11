@@ -70,8 +70,6 @@ export function ReportsShowcase({
     return () => { generation.current += 1; };
   }, [branchScope.scopeKey, from, to, canReadSnapshot]);
 
-  if (!panels.length) return null;
-
   const load = async () => {
     if (!canReadSnapshot || !hasAuthorizedBranches || loading) return;
     const version = ++generation.current;
@@ -107,11 +105,28 @@ export function ReportsShowcase({
     }
   };
 
-  const payments = current ? Array.from(current.paymentMethods.reduce((map, item) => {
-    const name = (PAYMENT_LABELS[item.method] || { ar: item.method, en: item.method })[isAr ? 'ar' : 'en'];
-    map.set(name, (map.get(name) || 0) + item.total);
-    return map;
-  }, new Map<string, number>()), ([name, value]) => ({ name, value })).filter((item) => item.value > 0) : [];
+  // Query the existing snapshot as soon as authorized scope/period changes.
+  // A failed request remains visible, never silently replaced with zeros.
+  useEffect(() => {
+    if (canReadSnapshot && hasAuthorizedBranches && panels.length > 0) void load();
+    // One request per authorized scope/range; manual refresh is also available.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchScope.scopeKey, from, to, canReadSnapshot, hasAuthorizedBranches]);
+
+  if (!panels.length) return null;
+
+  const channelNames: Record<string, { ar: string; en: string }> = {
+    dine_in: { ar: 'داخل المطعم', en: 'Dine in' },
+    delivery: { ar: 'طلبات خارجية (توصيل)', en: 'Delivery' },
+    takeaway: { ar: 'طلبات استلام', en: 'Takeaway' },
+    drive_thru: { ar: 'طلبات السيارات', en: 'Drive through' },
+    online: { ar: 'الطلبات الإلكترونية', en: 'Online' },
+  };
+  const payments = (current?.orderTypes || []).map((item) => ({
+    name: (channelNames[item.key] || { ar: item.key, en: item.key })[isAr ? 'ar' : 'en'],
+    value: item.count,
+  })).filter((item) => item.value > 0);
+  const channelCount = payments.reduce((total, item) => total + item.value, 0);
   const series = (current?.currentSeries || []).map((item) => ({ name: item.bucket.slice(0, 10), value: item.sales }));
   const branches = (current?.branches || []).map((item) => {
     const branch = branchScope.organizationBranches.find((entry) => entry.id === item.branchId);
@@ -123,6 +138,7 @@ export function ReportsShowcase({
   const topProducts = current?.topProducts || [];
 
   const chart = (id: Panel['id']) => {
+    if (error) return <p role="alert" className="flex min-h-44 items-center justify-center px-4 text-center text-xs text-ui-danger">{error}</p>;
     if (!current) return (
       <p className="flex min-h-44 items-center justify-center px-4 text-center text-xs text-ui-muted">
         {loading ? (isAr ? 'جارٍ تحميل البيانات الحقيقية...' : 'Loading source data...')
@@ -142,21 +158,29 @@ export function ReportsShowcase({
         </div>
       ) : <p className="py-12 text-center text-xs text-ui-muted">{isAr ? 'لا توجد أصناف مباعة خلال الفترة' : 'No product sales in this period'}</p>;
     }
-    if (!commonCurrency) return (
+    if (id !== 'payment' && !commonCurrency) return (
       <p className="py-12 text-center text-xs text-ui-muted">
         {isAr ? 'أكمل التالي: وحّد عملة الفروع المحددة أو اختر فرعًا واحدًا لعرض قيم مالية قابلة للمقارنة.' : 'Select one branch or a common currency before comparing monetary figures.'}
       </p>
     );
     if (id === 'payment' && payments.length) return (
-      <div className="h-48 w-full" dir="ltr" data-testid="reports-payment-donut">
-        <ResponsiveContainer width="100%" height="100%">
-          <PieChart>
-            <Pie data={payments} dataKey="value" nameKey="name" innerRadius="46%" outerRadius="77%" paddingAngle={2}>
-              {payments.map((item, index) => <Cell key={item.name} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
-            </Pie>
-            <Tooltip formatter={(value: number) => money(Number(value))} />
-          </PieChart>
-        </ResponsiveContainer>
+      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2" data-testid="reports-payment-donut">
+        <div className="h-48 min-w-0" dir="ltr">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie data={payments} dataKey="value" nameKey="name" innerRadius="46%" outerRadius="77%" paddingAngle={2}>
+                {payments.map((item, index) => <Cell key={item.name} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
+              </Pie>
+              <Tooltip formatter={(value: number) => Number(value).toLocaleString(isAr ? 'ar-EG' : 'en-US')} />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="min-w-0 space-y-2">
+          {payments.map((item, index) => <div key={item.name} className="flex items-center justify-between gap-1 text-[11px]">
+            <span className="flex min-w-0 items-center gap-1 text-ui-text"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} /><span className="truncate">{item.name}</span></span>
+            <strong className="shrink-0 tabular-nums text-ui-text">{channelCount ? (item.value / channelCount * 100).toFixed(1) : '0'}%</strong>
+          </div>)}
+        </div>
       </div>
     );
     const data = id === 'time' ? series : id === 'branches' ? branches : [];
@@ -185,8 +209,28 @@ export function ReportsShowcase({
     ) : <p className="py-12 text-center text-xs text-ui-muted">{isAr ? 'لا توجد بيانات ضمن الفترة المختارة' : 'No data in the selected period'}</p>;
   };
 
+  const summaryCards = [
+    { id: 'average', ar: 'متوسط قيمة الطلب', en: 'Average order', value: current?.current.orders ? money(current.current.sales / current.current.orders) : current ? money(0) : null, tone: 'from-rose-50 to-pink-100/60 dark:from-rose-950/30 dark:to-ui-surface' },
+    { id: 'orders', ar: 'عدد الطلبات', en: 'Orders', value: current ? current.current.orders.toLocaleString(isAr ? 'ar-EG' : 'en-US') : null, tone: 'from-blue-50 to-blue-100/70 dark:from-blue-950/30 dark:to-ui-surface' },
+    { id: 'sales', ar: 'إجمالي المبيعات', en: 'Total sales', value: current && commonCurrency ? money(current.current.sales) : null, tone: 'from-emerald-50 to-green-100/70 dark:from-emerald-950/30 dark:to-ui-surface' },
+    { id: 'payments', ar: 'إجمالي التحصيل', en: 'Collected payments', value: current && commonCurrency ? money(current.current.payments) : null, tone: 'from-sky-50 to-blue-100/60 dark:from-sky-950/30 dark:to-ui-surface' },
+    { id: 'returns', ar: 'المرتجعات', en: 'Returns', value: current && commonCurrency ? money(current.current.returns) : null, tone: 'from-amber-50 to-orange-100/70 dark:from-amber-950/30 dark:to-ui-surface' },
+    { id: 'discounts', ar: 'الخصومات', en: 'Discounts', value: current && commonCurrency ? money(current.current.discounts) : null, tone: 'from-violet-50 to-purple-100/70 dark:from-violet-950/30 dark:to-ui-surface' },
+  ];
+
   return (
     <section data-testid="reports-visual-overview" className="space-y-3">
+      <div className="rounded-xl border border-[#d9ddec] bg-white p-3 shadow-sm dark:border-ui-border dark:bg-ui-surface" data-testid="reports-performance-summary">
+        <h2 className="mb-3 flex items-center gap-2 text-base font-black text-ui-text"><BarChart3 className="h-5 w-5 text-violet-600" />{isAr ? 'ملخص الأداء' : 'Performance summary'}</h2>
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-6">
+          {summaryCards.map((card) => (
+            <div key={card.id} className={`min-w-0 rounded-xl bg-gradient-to-br p-3 ${card.tone}`} data-testid={`overview-kpi-${card.id}`}>
+              <p className="text-xs font-bold text-ui-text">{isAr ? card.ar : card.en}</p>
+              <p className="mt-2 break-words text-lg font-black tabular-nums text-ui-text">{card.value ?? (loading ? (isAr ? 'جارٍ التحميل' : 'Loading') : (isAr ? 'غير متاح' : 'Unavailable'))}</p>
+            </div>
+          ))}
+        </div>
+      </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="inline-flex items-center gap-2 text-base font-black text-ui-text sm:text-lg">
           <BarChart3 className="h-5 w-5 text-ui-primary" />
@@ -231,8 +275,8 @@ export function ReportsShowcase({
         })}
       </div>
       <p className="text-xs text-ui-muted">
-        {isAr ? 'المخططات من نفس خدمة لقطة المبيعات المعتمدة في لوحة Premier. طرق الدفع تعرض المدفوعات، وأفضل الأصناف تعرض الكميات؛ ولا تُعرض إجماليات مجمعة لعملات مختلفة.'
-          : 'Charts reuse the Premier dashboard sales snapshot. Payments reflect tenders and top products reflect units; different currencies are never combined.'}
+        {isAr ? 'المخططات من نفس خدمة لقطة المبيعات المعتمدة في لوحة Premier. القنوات تعرض أعداد الطلبات، وأفضل الأصناف تعرض الكميات؛ ولا تُعرض إجماليات مجمعة لعملات مختلفة.'
+          : 'Charts reuse the Premier dashboard sales snapshot. Channels reflect order counts and top products reflect units; different currencies are never combined.'}
       </p>
     </section>
   );
