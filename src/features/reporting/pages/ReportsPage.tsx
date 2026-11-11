@@ -226,6 +226,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnl
   }
 
   useEffect(() => {
+    if (chartOnly) return;
     if (reportBranchIds.length === 0) {
       setOptions({ warehouses: [], cashiers: [], customers: [], suppliers: [], products: [], categories: [], tables: [], expenseCategories: [] });
       return;
@@ -260,7 +261,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnl
   }, [reportType, branchScope.scopeKey]);
 
   useEffect(() => {
-    if (reportType !== 'expenses' || reportBranchIds.length === 0) return;
+    if (chartOnly || reportType !== 'expenses' || reportBranchIds.length === 0) return;
     (async () => {
       const unique = await loadExpenseCategoryOptions(reportBranchIds);
       setOptions((prev) => ({ ...prev, expenseCategories: unique }));
@@ -1339,7 +1340,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnl
         ) : (
           <div className="h-48 w-full" dir="ltr" role="img" aria-label={lang === 'ar' ? 'رسم بياني من بيانات التقرير الفعلية' : 'Chart of actual report data'}>
             <ResponsiveContainer width="100%" height="100%">
-              {reportType === 'sales_by_payment' ? (
+              {reportType === 'sales_by_payment' && chartData.every((point) => point.value >= 0) ? (
                 <RechartsPieChart>
                   <Pie data={chartData.slice(0, 10)} dataKey="value" nameKey="name" innerRadius="47%" outerRadius="79%" paddingAngle={2}>
                     {chartData.slice(0, 10).map((row, index) => (
