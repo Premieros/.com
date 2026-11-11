@@ -28,7 +28,6 @@ AS $function$
 DECLARE
   v_shift public.shifts%ROWTYPE;
   v_expected numeric(14,2);
-  v_start timestamptz;
   v_now timestamptz := clock_timestamp();
 BEGIN
   IF p_branch_id IS NULL OR p_cutoff IS NULL THEN
@@ -37,8 +36,21 @@ BEGIN
 
   -- Prevent accidental backdating against stale historical daily-close queues.
   -- An overdue day requires explicit reconciliation before scheduling the runner.
+  IF p_cutoff > v_now THEN
+    RAISE EXCEPTION 'BUSINESS_DAY_NOT_FINISHED';
+  END IF;
   IF p_cutoff < v_now - interval '24 hours' THEN
     RAISE EXCEPTION 'HISTORICAL_SHIFT_CUTOFF_REQUIRES_REVIEW';
+  END IF;
+
+  -- A caller may not invent a different cutoff. Accept both same-day and
+  -- overnight business dates (10:00–02:00 ends on the next calendar date).
+  IF p_cutoff IS DISTINCT FROM private.business_day_fixed_cutoff(
+       p_branch_id,(p_cutoff AT TIME ZONE 'Africa/Cairo')::date)
+     AND p_cutoff IS DISTINCT FROM private.business_day_fixed_cutoff(
+       p_branch_id,(p_cutoff AT TIME ZONE 'Africa/Cairo')::date-1)
+  THEN
+    RAISE EXCEPTION 'SHIFT_CUTOFF_NOT_FROM_BRANCH_SETTINGS';
   END IF;
 
   IF NOT COALESCE((
@@ -62,7 +74,6 @@ BEGIN
     RETURN jsonb_build_object('closed',false,'reason','SHIFT_STARTED_AFTER_CUTOFF');
   END IF;
 
-  SELECT (p_cutoff AT TIME ZONE 'Africa/Cairo')::date INTO v_start;
   IF EXISTS(
     SELECT 1 FROM public.shift_operations op
     WHERE op.shift_id=v_shift.id AND op.created_at>=p_cutoff
