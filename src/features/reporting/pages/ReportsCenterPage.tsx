@@ -342,10 +342,10 @@ export function ReportsCenterPage() {
           {reportList}
         </aside>
         <main dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 space-y-4" data-testid="premier-reports-content">
-          {!requestedFinancial && canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis />}
           {(!requestedFinancial || isOverview) && (
             <ReportsLiveDashboard allowedReportTypes={allowedReportTypes} onSelectReport={selectOperational} />
           )}
+          {!requestedFinancial && canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis />}
           {requestedFinancial && canFinancial && allowedFinancialViews.length > 0 ? (
             <FinancialReportsPage hideViewPicker />
           ) : requestedType && permittedOperational.some((report) => report.key === activeReport) ? (
