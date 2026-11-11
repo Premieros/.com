@@ -67,9 +67,10 @@ interface ReportsPageProps {
   controlledFrom?: string;
   controlledTo?: string;
   onActionsReady?: (actions: ReportsPageActions | null) => void;
+  standalone?: boolean;
 }
 
-export function ReportsPage({ controlledReportType, onReportTypeChange, controlledFrom, controlledTo, onActionsReady }: ReportsPageProps = {}) {
+export function ReportsPage({ controlledReportType, onReportTypeChange, controlledFrom, controlledTo, onActionsReady, standalone = false }: ReportsPageProps = {}) {
   /* REPORT-BRANCH-AUDIT-2026 */
   const { t, lang } = useLanguage();
   const can = useCan();
@@ -103,6 +104,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   const [reportFailureReason, setReportFailureReason] = useState<'permission' | 'source' | null>(null);
   const [filters, setFilters] = useState<ReportFilters>({});
   const [filtersDirty, setFiltersDirty] = useState(false);
+  const [detailFiltersOpen, setDetailFiltersOpen] = useState(false);
   const [queryVersion, setQueryVersion] = useState(0);
   const [options, setOptions] = useState<{
     warehouses: { id: string; name: string }[];
@@ -1386,6 +1388,17 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         </div>
       )}
 
+      <div className="relative mb-3"> 
+      {standalone && <div className="flex items-center justify-between gap-2">
+        <span className="text-xs text-ui-muted">{lang === 'ar' ? 'النتائج الكاملة متاحة أدناه. غيّر الفلاتر الإضافية عند الحاجة.' : 'Complete results appear below. Adjust additional filters if needed.'}</span>
+        <button type="button" data-testid="toggle-detail-filters"
+          aria-expanded={detailFiltersOpen} onClick={() => setDetailFiltersOpen((open) => !open)}
+          className="rounded-lg border border-ui-border bg-ui-surface px-3 py-2 text-xs font-bold text-ui-text">
+          {lang === 'ar' ? 'الفلاتر والتخصيص' : 'Filters & customization'}
+        </button>
+      </div>}
+      {(!standalone || detailFiltersOpen) && (
+        <div data-testid="detail-filters-popup" className={standalone ? 'absolute end-0 top-full z-30 mt-2 max-h-[70vh] w-[min(90vw,680px)] overflow-y-auto rounded-xl border border-ui-border bg-ui-surface p-3 shadow-xl' : ''}>
       <CustomReportBar
         savedReports={savedReports}
         currentReportType={reportType}
@@ -1426,12 +1439,16 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         financialTypes={canFinancial ? financialTypes : []}
         canFinancial={canFinancial}
         onFinancialSelect={(key) => navigate(`/financial-reports?view=${key}&from=${from}&to=${to}`)}
-        reportTypes={reportTypes}
-        onReportTypeChange={handleReportTypeSelect}
+        reportTypes={standalone ? [] : reportTypes}
+        onReportTypeChange={standalone ? undefined : handleReportTypeSelect}
         onRunReport={runReport}
         loading={loading}
         pendingChanges={filtersDirty}
       />
+
+        </div>
+      )}
+      </div>
 
       {/* Reuse the existing report loader's series; never compute a second
           financial truth from a partial table/page or unrelated SQL. */}

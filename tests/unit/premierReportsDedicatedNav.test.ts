@@ -9,6 +9,8 @@ const center = read('src/features/reporting/pages/ReportsCenterPage.tsx');
 const detail = read('src/features/reporting/pages/ReportsPage.tsx');
 const showcase = read('src/features/reporting/components/ReportsShowcase.tsx');
 const kpis = read('src/features/reporting/components/ReportsExecutiveKpis.tsx');
+const full = read('src/features/reporting/pages/ReportFullPage.tsx');
+const routes = read('src/app/routes.tsx');
 
 describe('Dedicated Reports Center navigation and reference-inspired UI', () => {
   it('adds the primary sidebar entry, protected by the existing reporting permissions and route', () => {
@@ -32,11 +34,13 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
   });
 
   it('retains current reporting engines and places the report directory on the visual left', () => {
-    expect(center).toContain('<FinancialReportsPage hideViewPicker />');
-    expect(center).toContain('<ReportsPage controlledReportType={activeReport}');
+    expect(full).toContain('<FinancialReportsPage hideViewPicker compactFilters />');
+    expect(full).toContain('<ReportsPage key={allowedReport.key}');
     expect(center).toContain('data-testid="premier-reports-directory"');
-    expect(center).toContain('lg:grid-cols-[236px_minmax(0,1fr)]');
-    expect(center).toContain('dir="ltr"');
+    expect(center).toContain('data-testid="toggle-reports-directory"');
+    expect(center).toContain('data-testid="reports-collapsible-directory"');
+    expect(center).toContain('className="relative min-w-0"');
+    expect(center).toContain('data-testid="premier-reports-content"');
     expect(center).toContain("dir={isAr ? 'rtl' : 'ltr'}");
     expect(center).toContain("report.permissions.every");
     expect(center).toContain('businessReportAllowed(runtime');
@@ -55,6 +59,8 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
     expect(showcase).toContain('data-testid="load-overview-charts"');
     expect(center).toContain('data-testid="apply-overview-dates"');
     expect(center).toContain('controlledFrom={dateRange.from}');
+    expect(center).toContain('data-testid="reports-filters-popup"');
+    expect(center).toContain('data-testid="reports-single-type-select"');
     expect(showcase).not.toContain("supabase.from(");
     expect(showcase).not.toMatch(/(?:579,300|66,550|4,892)/);
   });
@@ -71,10 +77,10 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
   });
 
   it('uses the existing detailed-report handlers for header actions', () => {
-    expect(center).toContain('onActionsReady={setReportActions}');
-    expect(center).toContain('reportActions?.exportExcel()');
-    expect(center).toContain('reportActions?.print()');
-    expect(center).toContain('reportActions?.save()');
+    expect(full).toContain('standalone />');
+    expect(routes).toContain('path="/reports/view"');
+    expect(detail).toContain('data-testid="toggle-detail-filters"');
+    expect(full).toContain('compactFilters />');
     expect(detail).toContain('exportExcel: handleExportExcel');
     expect(detail).toContain('print: handlePrint');
     expect(detail).toContain('save: handleSaveCustomReport');
