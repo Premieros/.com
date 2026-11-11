@@ -116,7 +116,7 @@ export function Layout({ children }: { children: ReactNode }) {
   const canOpenSettings = can('settings.manage');
 
   const showBackButton = location.pathname !== APP_ROUTES.dashboard;
-  const isReportsWorkspace = location.pathname === APP_ROUTES.reports;
+  const isReportsWorkspace = location.pathname === APP_ROUTES.reports || location.pathname === '/reports/view';
   const fullWidthContent = location.pathname === APP_ROUTES.dashboard || isReportsWorkspace;
 
   const visibleItems = useMemo(() => {
