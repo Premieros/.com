@@ -11,7 +11,7 @@ import { useCan } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { addIsoDays, businessDateISO } from '@/lib/businessTime';
 import { formatFinancialCurrency } from '@/lib/format';
-import { incomeMargin, type INCOME_KEYS } from '../incomeKpiIntegrity';
+import { incomeMargin, INCOME_KEYS } from '../incomeKpiIntegrity';
 import { assessIncomeReadiness, type IncomeReadiness } from '../incomeReadiness';
 import { requireFinancialReport } from '../services/requireFinancialReport';
 
