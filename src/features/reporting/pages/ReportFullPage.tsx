@@ -55,7 +55,7 @@ export function ReportFullPage() {
           {isAr ? 'الفترة المحددة غير صحيحة أو خارج نطاق الوصول المسموح.' : 'Invalid dates or history outside your allowed access.'}
         </p>
       ) : financialAllowed ? (
-        <FinancialReportsPage hideViewPicker />
+        <FinancialReportsPage hideViewPicker compactFilters />
       ) : !isFinancial && allowedReport ? (
         <ReportsPage key={allowedReport.key} controlledReportType={allowedReport.key as ReportType}
           controlledFrom={from} controlledTo={to} standalone />
