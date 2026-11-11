@@ -1,0 +1,49 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { describe, expect, it } from 'vitest';
+
+const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8');
+const menu = read('src/core/navigation/menu.config.ts');
+const layout = read('src/components/Layout.tsx');
+const center = read('src/features/reporting/pages/ReportsCenterPage.tsx');
+const showcase = read('src/features/reporting/components/ReportsShowcase.tsx');
+const kpis = read('src/features/reporting/components/ReportsExecutiveKpis.tsx');
+
+describe('Dedicated Reports Center navigation and reference-inspired UI', () => {
+  it('adds the primary sidebar entry, protected by the existing reporting permissions and route', () => {
+    expect(menu).toContain("id: 'reports', route: APP_ROUTES.reports, icon: 'reports'");
+    expect(menu).toContain("label: { ar: 'مركز التقارير', en: 'Reports Center' }");
+    expect(menu).toContain("permissionsAny: ['reports.view', 'reports.financial'], group: 'main'");
+    expect(layout).toContain('data-testid={`nav-item-${item.id}`}');
+    expect(layout).toContain('location.pathname === APP_ROUTES.reports');
+  });
+
+  it('retains current reporting engines and places the report directory on the visual left', () => {
+    expect(center).toContain('<FinancialReportsPage hideViewPicker />');
+    expect(center).toContain('<ReportsPage controlledReportType={activeReport}');
+    expect(center).toContain('data-testid="premier-reports-directory"');
+    expect(center).toContain('lg:grid-cols-[236px_minmax(0,1fr)]');
+    expect(center).toContain('dir="ltr"');
+    expect(center).toContain("dir={isAr ? 'rtl' : 'ltr'}");
+    expect(center).toContain("report.permissions.every");
+    expect(center).toContain('businessReportAllowed(runtime');
+    expect(center).toContain('useBranchScope()');
+  });
+
+  it('only shows quick-entry report panels allowed by the existing registry', () => {
+    expect(center).toContain('allowedReportTypes={allowedReportTypes}');
+    expect(center).toContain('onSelectReport={selectOperational}');
+    expect(showcase).toContain('SHORTCUTS.filter((shortcut) => allowedReportTypes.has(shortcut.key))');
+    expect(showcase).toContain('data-testid={`report-shortcut-${shortcut.key}`}');
+    expect(showcase).not.toContain("supabase.from(");
+    expect(showcase).not.toMatch(/(?:579,300|66,550|4,892)/);
+  });
+
+  it('preserves the existing income statement KPI completeness workflow', () => {
+    expect(kpis).toContain('assessIncomeReadiness(');
+    expect(kpis).toContain('income-completion-checklist');
+    expect(kpis).toContain('income-branch-values');
+    expect(kpis).toContain('يلزم استكمال البيانات');
+    expect(kpis).toContain('bg-gradient-to-br');
+  });
+});
