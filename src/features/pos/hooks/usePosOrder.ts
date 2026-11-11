@@ -340,6 +340,7 @@ export function usePosOrder(input: UsePosOrderInput) {
       if (!preview || (!previousAttempt && !isCurrentSettlementPreview(preview))) return false;
 
       const invoiceNumber = previousAttempt?.payload.p_invoice_number || await nextInvoiceNumber();
+      if (!previousAttempt && !isCurrentSettlementPreview(preview)) return false;
       const paidAmountToUse = base.paymentMethod === 'credit' ? 0 : (base.paidAmount || preview.total);
       const payload: ProcessSalePayload = previousAttempt?.payload ?? {
         p_client_operation_key: createSaleOperationKey(),
