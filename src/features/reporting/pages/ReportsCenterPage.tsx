@@ -366,8 +366,8 @@ export function ReportsCenterPage() {
                 <Zap className="h-5 w-5 text-amber-500" aria-hidden="true" />
                 <h2 className="text-sm font-black text-ui-text">{isAr ? 'تقارير سريعة' : 'Quick reports'}</h2>
               </div>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-6">
-                {permittedOperational.slice(0, 6).map((report) => (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-9">
+                {permittedOperational.slice(0, 9).map((report) => (
                   <button key={report.key} type="button" onClick={() => selectOperational(report.key)}
                     className="flex min-w-0 flex-col items-center gap-2 rounded-xl border border-ui-border bg-ui-page-alt p-3 text-center text-xs font-bold text-ui-text transition hover:border-ui-primary hover:text-ui-primary">
                     <FileBarChart className="h-5 w-5 text-ui-primary" aria-hidden="true" />
