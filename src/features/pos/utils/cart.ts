@@ -51,6 +51,7 @@ export function orderItemsToCart(items: OrderItem[], products: Product[]): CartI
   for (const p of products) prodMap[p.id] = p;
   return items
     .map((i) => ({
+      order_item_id: i.id,
       product: prodMap[i.product_id || ''],
       unit_name: i.unit_name,
       quantity: Number(i.quantity),
