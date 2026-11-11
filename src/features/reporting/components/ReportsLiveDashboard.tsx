@@ -4,7 +4,6 @@ import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip,
   PieChart, Pie, Cell, BarChart, Bar,
 } from 'recharts';
-import { reporting } from '@/api';
 import { useBranchScope } from '@/lib/branchScope';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useLanguage } from '@/context/LanguageContext';
@@ -12,7 +11,6 @@ import { reportDateRangeUtc, businessDateISO, addIsoDays } from '@/lib/businessT
 import { loadSalesReportRows } from '../services/reportCoreLoaders';
 import { loadSalesByProductItems } from '../services/reportInventoryLoaders';
 import { netSaleAmount, netSaleItemQuantity, netSaleItemRevenue, allocateSaleNetRevenue } from '../numericIntegrity';
-import { requireFinancialReport } from '../services/requireFinancialReport';
 import { useSettings } from '@/context/SettingsContext';
 import { useCan } from '@/lib/permissions';
 import type { ReportType } from '../reportFilters';
@@ -20,13 +18,14 @@ import { formatFinancialCurrency } from '@/lib/format';
 
 type Point = { name: string; value: number };
 type ProductPoint = { name: string; quantity: number; sales: number };
+type BranchPoint = Point & { currency: string | null };
 type Overview = {
   amount: number;
   invoiceCount: number;
   refundAmount: number;
   trend: Point[];
-  branches: Point[];
-  payments: Point[] | null;
+  branches: BranchPoint[];
+  channels: Point[] | null;
   products: ProductPoint[] | null;
   warnings: string[];
   currency: string | null;
@@ -96,6 +95,7 @@ export function ReportsLiveDashboard({
         const inScope = sales.filter(s => ids.includes(String(s.branch_id || '')));
         const amounts = new Map<string, number>();
         const byBranch = new Map<string, number>();
+        const byOrderType = new Map<string, number>();
         let refunds = 0;
         let total = 0;
         for (const sale of inScope) {
@@ -105,6 +105,8 @@ export function ReportsLiveDashboard({
           amounts.set(date, (amounts.get(date) || 0) + net);
           const id = String(sale.branch_id);
           byBranch.set(id, (byBranch.get(id) || 0) + net);
+          const orderType = String(sale.order_type || 'other');
+          byOrderType.set(orderType, (byOrderType.get(orderType) || 0) + net);
           const refund = Number(sale.refunded_amount);
           if (Number.isFinite(refund) && refund > 0) refunds += refund;
         }
@@ -115,29 +117,19 @@ export function ReportsLiveDashboard({
           ? 'أكمل التالي: راجع عملات الفروع. لا يمكن اعتماد إجمالي مالي موحّد لعملات مختلفة أو ناقصة.'
           : 'Complete the following: check branch currencies. A unified total cannot combine mixed or unknown currencies.');
 
-        let payments: Point[] | null = null;
-        if (allowedReportTypes.has('sales_by_payment')) {
-          try {
-            const responses = await Promise.all(ids.map(id => reporting.getSalesByPaymentReport({
-              p_branch_id: id, p_from: startIso, p_to: endExclusiveIso,
-              p_payment_method: null, p_order_type: null, p_warehouse_id: null, p_cashier_id: null, p_status: null,
-            })));
-            const paymentMap = new Map<string, number>();
-            responses.forEach((response, index) => {
-              const raw = requireFinancialReport(response, 'sales_by_payment', ids[index]);
-              if (!Array.isArray(raw.rows) || !raw.summary) throw Error('INCOMPLETE_PAYMENTS');
-              for (const item of raw.rows as Record<string, unknown>[]) {
-                const value = Number(item.sales_total);
-                if (!Number.isFinite(value)) throw Error('INCOMPLETE_PAYMENTS');
-                const key = String(item.method || 'other');
-                paymentMap.set(key, (paymentMap.get(key) || 0) + value);
-              }
-            });
-            payments = [...paymentMap].map(([name, value]) => ({ name, value })).sort((a, b) => b.value - a.value);
-          } catch {
-            warnings.push(ar ? 'أكمل التالي: راجع مصدر توزيع طرق الدفع ثم أعد التحميل.' : 'Complete the following: check payment distribution source then refresh.');
-          }
-        }
+        // The reference image shows order channels (dine-in/takeaway/delivery).
+        // These figures come from the exact authorized sales rows already loaded.
+        // Never consolidate different currencies into one channel pie.
+        const orderTypeLabels: Record<string, string> = ar ? {
+          dine_in: 'داخل المطعم', takeaway: 'استلام', delivery: 'توصيل',
+          drive_thru: 'السيارات', online: 'إلكترونية', other: 'أخرى',
+        } : {
+          dine_in: 'Dine-in', takeaway: 'Takeaway', delivery: 'Delivery',
+          drive_thru: 'Drive-through', online: 'Online', other: 'Other',
+        };
+        const channels: Point[] | null = currency ? [...byOrderType].map(([type, value]) => ({
+          name: orderTypeLabels[type] || type, value,
+        })).sort((a, b) => b.value - a.value) : null;
 
         let products: ProductPoint[] | null = null;
         if (allowedReportTypes.has('sales_by_product')) {
@@ -173,8 +165,8 @@ export function ReportsLiveDashboard({
         setData({
           amount: total, invoiceCount: inScope.length, refundAmount: refunds, currency,
           trend: [...amounts].sort(([a], [b]) => a.localeCompare(b)).map(([name, value]) => ({ name: name.slice(5), value })),
-          branches: [...byBranch].map(([id, value]) => ({ name: branchNames.get(id) || id, value })).sort((a, b) => b.value - a.value),
-          payments, products, warnings,
+          branches: [...byBranch].map(([id, value]) => ({ name: branchNames.get(id) || id, value, currency: effectiveSettings(id)?.currency || null })).sort((a, b) => b.value - a.value),
+          channels, products, warnings,
         });
       } catch {
         if (!cancelled) setError(ar
@@ -232,10 +224,10 @@ export function ReportsLiveDashboard({
           {data?.trend.length ? <div className="h-56" dir="ltr"><ResponsiveContainer width="100%" height="100%"><AreaChart data={data.trend}><defs><linearGradient id="salesOverviewGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#8649ec" stopOpacity={0.4}/><stop offset="100%" stopColor="#8649ec" stopOpacity={0.02}/></linearGradient></defs><CartesianGrid strokeDasharray="3 3" opacity={0.2}/><XAxis dataKey="name" tick={{fontSize:10}}/><YAxis tick={{fontSize:10}}/><Tooltip/><Area type="monotone" dataKey="value" stroke="#8649ec" strokeWidth={2.5} fill="url(#salesOverviewGradient)"/></AreaChart></ResponsiveContainer></div> : renderUnavailable('trend')}
         </article>
         <article className="min-w-0 rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm" data-testid="overview-payment-mix">
-          <button className="mb-3 w-full text-start text-sm font-black text-ui-text hover:text-ui-primary" type="button" onClick={() => drill('sales_by_payment')}>{ar ? 'توزيع المبيعات حسب قنوات الدفع ↗' : 'Payment channel mix ↗'}</button>
-          {data?.payments?.length ? <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2">
-            <div className="h-56" dir="ltr"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={data.payments} innerRadius="54%" outerRadius="81%" dataKey="value" nameKey="name" paddingAngle={2}>{data.payments.map((p,i) => <Cell key={p.name} fill={COLORS[i % COLORS.length]}/>)}</Pie><Tooltip/></PieChart></ResponsiveContainer></div>
-            <div className="space-y-2">{data.payments.map((p,i) => <div key={p.name} className="flex items-center gap-2 text-xs"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{background:COLORS[i%COLORS.length]}}/><span className="min-w-0 flex-1 truncate text-ui-text">{p.name}</span><span className="font-bold tabular-nums">{money(p.value,data.currency,lang)}</span></div>)}</div>
+          <button className="mb-3 w-full text-start text-sm font-black text-ui-text hover:text-ui-primary" type="button" onClick={() => drill('sales')}>{ar ? 'توزيع المبيعات حسب قنوات الطلب ↗' : 'Sales by order channel ↗'}</button>
+          {data?.channels?.length ? <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2">
+            <div className="h-56" dir="ltr"><ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={data.channels} innerRadius="54%" outerRadius="81%" dataKey="value" nameKey="name" paddingAngle={2}>{data.channels.map((p,i) => <Cell key={p.name} fill={COLORS[i % COLORS.length]}/>)}</Pie><Tooltip/></PieChart></ResponsiveContainer></div>
+            <div className="space-y-2">{data.channels.map((p,i) => <div key={p.name} className="flex items-center gap-2 text-xs"><span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{background:COLORS[i%COLORS.length]}}/><span className="min-w-0 flex-1 truncate text-ui-text">{p.name}</span><span className="font-bold tabular-nums">{money(p.value,data.currency,lang)}</span></div>)}</div>
           </div> : renderUnavailable('payments')}
         </article>
         <article className="min-w-0 rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm" data-testid="overview-products">
@@ -244,7 +236,10 @@ export function ReportsLiveDashboard({
         </article>
         <article className="min-w-0 rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm" data-testid="overview-branches">
           <button className="mb-3 w-full text-start text-sm font-black text-ui-text hover:text-ui-primary" type="button" onClick={() => drill('sales')}>{ar ? 'المبيعات حسب الفروع ↗' : 'Sales by branch ↗'}</button>
-          {data?.branches.length ? <div className="h-56" dir="ltr"><ResponsiveContainer width="100%" height="100%"><BarChart data={data.branches} margin={{bottom:22}}><CartesianGrid strokeDasharray="3 3" opacity={0.2}/><XAxis dataKey="name" tick={{fontSize:10}} interval={0}/><YAxis tick={{fontSize:10}}/><Tooltip/><Bar dataKey="value" fill="#9c76e8" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></div> : renderUnavailable('branches')}
+          {data?.branches.length && data.currency
+            ? <div className="h-56" dir="ltr"><ResponsiveContainer width="100%" height="100%"><BarChart data={data.branches} margin={{bottom:22}}><CartesianGrid strokeDasharray="3 3" opacity={0.2}/><XAxis dataKey="name" tick={{fontSize:10}} interval={0}/><YAxis tick={{fontSize:10}}/><Tooltip/><Bar dataKey="value" fill="#9c76e8" radius={[5,5,0,0]}/></BarChart></ResponsiveContainer></div>
+            : data?.branches.length ? <div className="space-y-2">{data.branches.map((b) => <div className="flex justify-between gap-2 border-b border-ui-border p-2 text-xs" key={b.name}><span>{b.name}</span><span className="font-bold tabular-nums">{money(b.value, b.currency, lang)}{!b.currency && (ar ? ' (أكمل عملة الفرع)' : ' (currency required)')}</span></div>)}</div>
+              : renderUnavailable('branches')}
         </article>
       </div>
     </section>
