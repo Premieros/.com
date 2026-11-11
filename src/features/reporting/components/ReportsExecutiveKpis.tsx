@@ -194,7 +194,7 @@ export function ReportsExecutiveKpis({ controlledFrom, controlledTo, onVerifiedT
       {error && <p role="alert" className="mt-3 rounded-lg border border-ui-danger/30 bg-ui-danger-soft p-3 text-sm text-ui-danger">{error}</p>}
       <p className="mt-4 text-xs font-bold text-ui-muted">
         {total ? (isAr ? 'إجمالي مكتمل للفروع المختارة' : 'Complete total for selected branches')
-          : (isAr ? 'الإجمالي الموحّد غير مكتمل — القيم المتاحة لكل فرع بالأسفل' : 'Consolidated total incomplete — available branch figures below')}
+          : (isAr ? 'لا يمكن حساب الإجمالي بعد؛ راجع البنود الناقصة لكل فرع بالأسفل' : 'The combined total is not ready; review missing items for each branch below')}
       </p>
       <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
         {METRICS.map((metric, index) => (
@@ -235,10 +235,12 @@ export function ReportsExecutiveKpis({ controlledFrom, controlledTo, onVerifiedT
                   <li key={`${issue.branchId}-${index}`}>
                     <strong>{issue.branchName}:</strong>{' '}
                     {issue.missing.map((field) =>
-                      field === 'currency_mismatch' ? (isAr ? 'راجع اختلاف عملة الفروع، ولا يتم جمع عملات مختلفة' : 'Resolve different branch currencies before consolidation')
-                        : field === 'currency' ? (isAr ? 'حدد عملة الفرع في الإعدادات' : 'Set the branch currency')
-                          : field === 'report_unavailable' ? (isAr ? 'راجع قيود قائمة الدخل أو اتصال التقرير ثم أعد التحميل' : 'Review income statement records or report connection, then reload')
-                            : isAr ? LABELS[field as IncomeField]?.ar || field : LABELS[field as IncomeField]?.en || field
+                      field === 'currency_mismatch' ? (isAr ? 'عملة هذا الفرع مختلفة عن فرع آخر محدد؛ اختر فروعًا بعملة واحدة أو راجع إعدادات العملات' : 'This branch uses a different currency; choose matching branches or review currency settings')
+                        : field === 'currency' ? (isAr ? 'عملة الفرع غير محددة؛ افتح إعدادات الفرع وحدد عملته' : 'Branch currency is missing; set it in branch settings')
+                          : field === 'report_unavailable' ? (isAr ? 'تعذّر قراءة قائمة دخل هذا الفرع؛ أعد التحميل، وإذا تكرر الأمر أبلغ مسؤول النظام باسم الفرع' : 'The income statement for this branch could not load; retry and contact your administrator if it persists')
+                            : (isAr
+                              ? `راجع بيان «${LABELS[field as IncomeField]?.ar || 'غير مكتمل'}» في قائمة دخل هذا الفرع واستكمل بياناته`
+                              : `Review the missing “${LABELS[field as IncomeField]?.en || 'income item'}” in this branch's income statement`)
                     ).join(isAr ? '، ' : ', ')}
                   </li>
                 ))}
@@ -278,7 +280,7 @@ export function ReportsExecutiveKpis({ controlledFrom, controlledTo, onVerifiedT
             </div>
           )}
           <button type="button" className="mt-3 text-xs font-bold text-ui-primary hover:underline"
-            onClick={() => navigate(`/reports?section=financial&view=income&from=${current?.from}&to=${current?.to}`)}>
+            onClick={() => navigate(`/reports/view?section=financial&view=income&from=${current?.from}&to=${current?.to}`)}>
             {isAr ? 'فتح قائمة الدخل لاستكمال أو مراجعة البيانات' : 'Open income statement to complete or review the data'}
           </button>
         </>
