@@ -86,5 +86,9 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
     expect(kpis).toContain('income-branch-values');
     expect(kpis).toContain('يلزم استكمال البيانات');
     expect(kpis).toContain('bg-gradient-to-br');
+    expect(center).toContain('onVerifiedTotal={setVerifiedIncome}');
+    expect(showcase).toContain('verifiedIncome: IncomeKpiVerified | null');
+    expect(showcase).toContain('comparableIncome.cogs');
+    expect(showcase).toContain('comparableIncome.net_income');
   });
 });
