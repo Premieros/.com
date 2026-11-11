@@ -68,6 +68,8 @@ export function StockCountsPage() {
   const [rejectReason, setRejectReason] = useState('');
   const countExcelInputRef = useRef<HTMLInputElement>(null);
   const [excelBusy, setExcelBusy] = useState(false);
+  const excelScopeRef = useRef({ branchId: form.branch_id, warehouseId: form.warehouse_id });
+  excelScopeRef.current = { branchId: form.branch_id, warehouseId: form.warehouse_id };
 
   const statusOptions = [
     { key: 'draft', label: t('countStatusDraft') },
@@ -202,6 +204,10 @@ export function StockCountsPage() {
       }
       if (parsed.lines.length === 0) {
         show(isAr ? 'لم يُدخل الملف أي كميات فعلية. املأ عمود الكمية الفعلية ثم أعد رفعه.' : 'The file has no counted quantities. Fill in Counted Quantity and try again.', 'error');
+        return;
+      }
+      if (excelScopeRef.current.branchId !== form.branch_id || excelScopeRef.current.warehouseId !== form.warehouse_id) {
+        show(isAr ? 'تغير الفرع أو المخزن أثناء رفع الملف. اختر النطاق الحالي ثم أعد الاستيراد.' : 'Branch or warehouse changed while importing. Select the current scope and import again.', 'error');
         return;
       }
       setFormItems(parsed.lines);
