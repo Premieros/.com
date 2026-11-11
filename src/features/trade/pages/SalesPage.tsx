@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Trash2, FileText, Edit2, RotateCcw, Eye, Printer } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
@@ -54,10 +55,14 @@ interface SaleRow {
 
 export function SalesPage() {
   const { t, lang } = useLanguage();
+  const [searchParams] = useSearchParams();
+  const requestedSaleId = searchParams.get('saleId');
+  const [sourceLookup, setSourceLookup] = useState<'idle' | 'loading' | 'found' | 'unavailable'>('idle');
   const { show } = useToast();
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
   const can = useCan();
+  const canViewSales = can('sales.view');
   const { rows: items, loading, error, total, hasMore, loadMore, loadingMore, refresh: reloadSales } = usePaginatedRows<SaleRow>({
     table: 'sales',
     select: 'id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))',
@@ -275,6 +280,57 @@ export function SalesPage() {
       notes: sale.notes || '',
     });
   };
+
+  // Follow only exact sale IDs from report rows. The same sale detail projection,
+  // RLS and permitted branch scope used by this page apply to direct URLs.
+  // Do not allow an arbitrary URL to override a tenant's branch selection.
+  useEffect(() => {
+    if (!requestedSaleId) {
+      setSourceLookup('idle');
+      return;
+    }
+    setViewSale(null);
+    if (branchScope.loading) return;
+    if (!/^[\\da-f]{8}-[\\da-f]{4}-[1-8][\\da-f]{3}-[89ab][\\da-f]{3}-[\\da-f]{12}$/i.test(requestedSaleId)
+        || !canViewSales || branchScope.selectedBranchIds.length === 0) {
+      setSourceLookup('unavailable');
+      return;
+    }
+    let cancelled = false;
+    setSourceLookup('loading');
+    (async () => {
+      const { data, error: lookupError } = await supabase.from('sales')
+        .select('id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))')
+        .eq('id', requestedSaleId)
+        .in('branch_id', branchScope.selectedBranchIds)
+        .eq('is_archived', false)
+        .maybeSingle();
+      if (cancelled) return;
+      if (lookupError || !data) {
+        setSourceLookup('unavailable');
+        return;
+      }
+      // PostgREST runtime resolves these many-to-one joins to objects.
+      // Generated relationship typing may describe arrays; normalize both forms.
+      const mapped = data as unknown as SaleRow;
+      const sale: SaleRow = {
+        ...mapped,
+        customer: Array.isArray(mapped.customer) ? (mapped.customer[0] ?? null) : mapped.customer,
+        source_order: Array.isArray(mapped.source_order) ? (mapped.source_order[0] ?? null) : mapped.source_order,
+      };
+      setViewSale(sale);
+      setEditForm({
+        customer_id: sale.customer_id || '',
+        payment_method: sale.payment_method,
+        status: sale.status,
+        notes: sale.notes || '',
+      });
+      setSourceLookup('found');
+    })();
+    return () => { cancelled = true; };
+    // Branch scope identity and permission control source resolution.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedSaleId, branchScope.scopeKey, branchScope.loading, canViewSales]);
 
   const openRefund = (sale: SaleRow) => {
     setRefundSale(sale);
@@ -632,6 +688,19 @@ export function SalesPage() {
         </>
       } />
 
+      {requestedSaleId && (
+        <div role={sourceLookup === 'unavailable' ? 'alert' : 'status'}
+          className="mb-3 rounded-xl border border-ui-border bg-ui-page-alt px-4 py-3 text-xs text-ui-muted"
+          data-testid="source-sale-lookup">
+          {sourceLookup === 'loading'
+            ? (isAr ? 'جارٍ فتح الفاتورة الأصلية من الفرع المصرح به...' : 'Opening original sale from your authorized branch...')
+            : sourceLookup === 'unavailable'
+              ? (isAr ? 'الفاتورة غير متاحة في نطاق فروعك أو صلاحياتك الحالية.' : 'This sale is unavailable within your current permissions and branch scope.')
+              : sourceLookup === 'found'
+                ? (isAr ? 'تم تحميل الفاتورة الأصلية وفق الصلاحيات الحالية.' : 'Original sale loaded within your current permissions.')
+                : null}
+        </div>
+      )}
       <DesignPanel testId="sales-search-panel">
         <DesignSearch value={search} onChange={setSearch} label={t('search')}
           placeholder={isAr ? 'بحث برقم الفاتورة أو رقم الطلب أو اسم العميل...' : 'Search by invoice number, order number or customer...'} testId="sales-search" />
