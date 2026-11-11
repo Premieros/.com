@@ -350,11 +350,11 @@ export function ReportsCenterPage() {
               onSelectReport={selectOperational}
             />
           )}
-          {requestedFinancial && canFinancial && allowedFinancialViews.length > 0 ? (
+          {!isOverview && requestedFinancial && canFinancial && allowedFinancialViews.length > 0 ? (
             <FinancialReportsPage hideViewPicker />
-          ) : permittedOperational.some((report) => report.key === activeReport) ? (
+          ) : !isOverview && permittedOperational.some((report) => report.key === activeReport) ? (
             <ReportsPage controlledReportType={activeReport} onReportTypeChange={selectOperational} />
-          ) : (
+          ) : !isOverview && (
             <div className="rounded-xl border border-ui-border bg-ui-surface px-6 py-12 text-center text-sm text-ui-muted">
               {isAr ? 'اختر تقريرًا مسموحًا لك لعرض بياناته الحقيقية' : 'Select an authorized report to view live data'}
               {isAr ? <ArrowLeft className="mx-auto mt-4 h-5 w-5" /> : <ArrowRight className="mx-auto mt-4 h-5 w-5" />}
