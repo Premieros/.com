@@ -14,9 +14,11 @@ import { formatFinancialCurrency } from '@/lib/format';
 import { incomeMargin, INCOME_KEYS } from '../incomeKpiIntegrity';
 import { assessIncomeReadiness, type IncomeReadiness } from '../incomeReadiness';
 import { requireFinancialReport } from '../services/requireFinancialReport';
+import type { IncomeStatementResult } from '@/lib/types';
 
 type IncomeField = typeof INCOME_KEYS[number];
 type Snapshot = { readiness: IncomeReadiness; scopeKey: string; from: string; to: string };
+export type IncomeKpiVerified = { values: IncomeStatementResult; currency: string; scopeKey: string; from: string; to: string };
 
 const METRICS: Array<{ key: IncomeField; ar: string; en: string }> = [
   { key: 'revenue', ar: 'إجمالي الإيرادات', en: 'Gross revenue' },
@@ -41,7 +43,7 @@ function validDate(value: string): boolean {
     && new Date(`${value}T12:00:00Z`).toISOString().slice(0, 10) === value;
 }
 
-export function ReportsExecutiveKpis({ controlledFrom, controlledTo }: { controlledFrom?: string; controlledTo?: string } = {}) {
+export function ReportsExecutiveKpis({ controlledFrom, controlledTo, onVerifiedTotal }: { controlledFrom?: string; controlledTo?: string; onVerifiedTotal?: (value: IncomeKpiVerified | null) => void } = {}) {
   const { lang } = useLanguage();
   const isAr = lang === 'ar';
   const can = useCan();
@@ -135,13 +137,20 @@ export function ReportsExecutiveKpis({ controlledFrom, controlledTo }: { control
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [authorized, branchScope.scopeKey, from, to]);
 
-  if (!authorized) return null;
-
   const current = snapshot?.scopeKey === branchScope.scopeKey && snapshot.from === from && snapshot.to === to
     ? snapshot : null;
   const readiness = current?.readiness;
   const total = readiness?.total;
   const missingLabel = isAr ? 'يلزم استكمال البيانات' : 'Needs completion';
+
+  useEffect(() => {
+    if (!onVerifiedTotal) return;
+    onVerifiedTotal(authorized && readiness?.total && readiness.currency
+      ? { values: readiness.total, currency: readiness.currency, scopeKey: branchScope.scopeKey, from, to }
+      : null);
+  }, [onVerifiedTotal, authorized, readiness, branchScope.scopeKey, from, to]);
+
+  if (!authorized) return null;
 
   return (
     <section className="rounded-xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm sm:p-5"
