@@ -187,6 +187,13 @@ export function ReportsCenterPage() {
     () => new Set(permittedOperational.map((report) => report.key)),
     [permittedOperational],
   );
+  const quickPriority: ReportType[] = [
+    'sales', 'detailed_invoices', 'purchases', 'inventory', 'profit',
+    'recipe_costs', 'production_waste', 'returns', 'financial_reconciliation',
+  ];
+  const quickReports = quickPriority
+    .map((key) => permittedOperational.find((report) => report.key === key))
+    .filter((report): report is (typeof permittedOperational)[number] => Boolean(report));
   const isOverview = !requestedType && !requestedFinancial;
 
   const currentName = requestedFinancial
@@ -312,6 +319,13 @@ export function ReportsCenterPage() {
               <RefreshCw className="h-3.5 w-3.5" />
               {isAr ? 'تطبيق الفترة' : 'Apply period'}
             </button>
+            {isOverview && permittedOperational.length > 0 && (
+              <button type="button" onClick={() => selectOperational(initialOperational)}
+                data-testid="create-custom-report"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-violet-700 px-3 text-xs font-bold text-white hover:bg-violet-800">
+                <Plus className="h-4 w-4" />{isAr ? 'تقرير مخصص' : 'Custom report'}
+              </button>
+            )}
             {!isOverview && !requestedFinancial && (
               <div className="flex flex-wrap items-center gap-2" data-testid="reports-header-actions">
                 {can('reports.export') && <button type="button" disabled={!reportActions?.canExport}
@@ -429,7 +443,7 @@ export function ReportsCenterPage() {
                 <h2 className="text-sm font-black text-ui-text">{isAr ? 'تقارير سريعة' : 'Quick reports'}</h2>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-9">
-                {permittedOperational.slice(0, 9).map((report) => (
+                {quickReports.map((report) => (
                   <button key={report.key} type="button" onClick={() => selectOperational(report.key)}
                     className="flex min-w-0 flex-col items-center gap-2 rounded-xl border border-ui-border bg-ui-page-alt p-3 text-center text-xs font-bold text-ui-text transition hover:border-ui-primary hover:text-ui-primary">
                     <FileBarChart className="h-5 w-5 text-ui-primary" aria-hidden="true" />
