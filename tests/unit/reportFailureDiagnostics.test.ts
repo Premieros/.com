@@ -50,11 +50,15 @@ describe('report failures preserve source diagnostics safely', () => {
   it('keeps customer messages free of raw technical fields in report JSX', () => {
     const page = readFileSync(resolve(process.cwd(), 'src/features/reporting/pages/ReportsPage.tsx'), 'utf8');
     const kpis = readFileSync(resolve(process.cwd(), 'src/features/reporting/components/ReportsExecutiveKpis.tsx'), 'utf8');
+    const financial = readFileSync(resolve(process.cwd(), 'src/features/accounting/pages/FinancialReportsPage.tsx'), 'utf8');
     expect(page).toContain('describeReportFailure(reportFailure');
     expect(page).not.toContain('رمز الخطأ:');
     expect(page).toContain('retry-failed-report');
     expect(kpis).toContain('راجع بيان');
     expect(kpis).toContain('/reports/view?section=financial');
+    expect(financial).toContain('describeReportFailure(reportFailure');
+    expect(financial).toContain('retry-financial-report');
+    expect(financial).not.toContain('رمز الخطأ:');
   });
 
   it('never exposes a foreign branch identifier', () => {
