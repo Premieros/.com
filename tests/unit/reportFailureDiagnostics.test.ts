@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { classifyReportFailure } from '@/features/reporting/reportFailure';
 
@@ -5,6 +7,11 @@ const first = '11111111-1111-4111-8111-111111111111';
 const second = '22222222-2222-4222-8222-222222222222';
 
 describe('report failures preserve source diagnostics safely', () => {
+  it('uses an explicit FK for the real sales warehouse embed', () => {
+    const loader = readFileSync(resolve(process.cwd(), 'src/features/reporting/services/reportCoreLoaders.ts'), 'utf8');
+    expect(loader).toContain('warehouse:warehouses!sales_warehouse_id_fkey(name)');
+    expect(loader).not.toContain('warehouse:warehouses(name)');
+  });
   it('classifies native authorization errors', () => {
     expect(classifyReportFailure({ code: '42501', message: 'permission denied' }, [first]))
       .toEqual({ kind: 'permission', code: '42501', branchId: null });
