@@ -98,7 +98,7 @@ export function ReportsCenterPage() {
   const initialOperational =
     requestedType && permittedOperational.some((report) => report.key === requestedType)
       ? requestedType
-      : permittedOperational[0]?.key || 'sales';
+      : permittedOperational.find((report) => report.key === 'sales_by_payment')?.key || permittedOperational[0]?.key || 'sales';
 
   const [activeReport, setActiveReport] = useState<ReportType>(initialOperational);
 
