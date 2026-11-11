@@ -6,6 +6,7 @@ const read = (path: string) => readFileSync(resolve(process.cwd(), path), 'utf8'
 const menu = read('src/core/navigation/menu.config.ts');
 const layout = read('src/components/Layout.tsx');
 const center = read('src/features/reporting/pages/ReportsCenterPage.tsx');
+const detail = read('src/features/reporting/pages/ReportsPage.tsx');
 const showcase = read('src/features/reporting/components/ReportsShowcase.tsx');
 const kpis = read('src/features/reporting/components/ReportsExecutiveKpis.tsx');
 
@@ -56,6 +57,16 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
     expect(center).toContain('controlledFrom={dateRange.from}');
     expect(showcase).not.toContain("supabase.from(");
     expect(showcase).not.toMatch(/(?:579,300|66,550|4,892)/);
+  });
+
+  it('uses the existing detailed-report handlers for header actions', () => {
+    expect(center).toContain('onActionsReady={setReportActions}');
+    expect(center).toContain('reportActions?.exportExcel()');
+    expect(center).toContain('reportActions?.print()');
+    expect(center).toContain('reportActions?.save()');
+    expect(detail).toContain('exportExcel: handleExportExcel');
+    expect(detail).toContain('print: handlePrint');
+    expect(detail).toContain('save: handleSaveCustomReport');
   });
 
   it('preserves the existing income statement KPI completeness workflow', () => {
