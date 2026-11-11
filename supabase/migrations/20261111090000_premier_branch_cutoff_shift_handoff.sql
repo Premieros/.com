@@ -41,6 +41,14 @@ BEGIN
     RAISE EXCEPTION 'HISTORICAL_SHIFT_CUTOFF_REQUIRES_REVIEW';
   END IF;
 
+  IF NOT COALESCE((
+    SELECT bs.auto_close_shift_at_day_end
+    FROM public.branch_settings bs
+    WHERE bs.branch_id=p_branch_id AND bs.business_day_mode='fixed_time'
+  ),false) THEN
+    RAISE EXCEPTION 'AUTO_CLOSE_DISABLED_BY_BRANCH_SETTINGS';
+  END IF;
+
   PERFORM pg_advisory_xact_lock(hashtext(p_branch_id::text)::bigint);
   SELECT * INTO v_shift FROM public.shifts s
   WHERE s.branch_id=p_branch_id AND s.status='open'
