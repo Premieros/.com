@@ -45,8 +45,9 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
   it('only shows quick-entry report panels allowed by the existing registry', () => {
     expect(center).toContain('allowedReportTypes={allowedReportTypes}');
     expect(center).toContain('onSelectReport={selectOperational}');
-    expect(showcase).toContain('SHORTCUTS.filter((shortcut) => allowedReportTypes.has(shortcut.key))');
-    expect(showcase).toContain('data-testid={`report-shortcut-${shortcut.key}`}');
+    expect(showcase).toContain('TILES.filter((tile) => allowedReportTypes.has(tile.key))');
+    expect(showcase).toContain('data-testid={`report-shortcut-${tile.key}`}');
+    expect(showcase).toContain('Actual chart available in report');
     expect(showcase).not.toContain("supabase.from(");
     expect(showcase).not.toMatch(/(?:579,300|66,550|4,892)/);
   });
