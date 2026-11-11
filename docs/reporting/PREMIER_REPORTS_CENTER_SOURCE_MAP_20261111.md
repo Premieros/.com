@@ -27,6 +27,13 @@ Every report is further subject to organization module visibility, branch scope 
 - Existing operational report detail filters/tables/summary/column-picker/csv/xlsx/print/saved-config remain in place and are not re-created.
 - Graph added to four existing reports using their **already loaded `chartData`**, with an explicit label that these are existing returned groups/records and not independently computed totals. The center does not introduce new queries or tables.
 
+## Iteration 2 — authorized report table interactions
+
+- Operational report detail tables now support **search within the already authorized rows, natural-column sorting and 10/25/50/100-row visual pages**, on mobile and desktop. The presentation helper `reportTablePresentation.ts` does not issue a network request or recompute financial data.
+- Existing CSV/XLSX and print use the **same search/sort results** rather than only the currently visible page. When a local search is active, XLSX omits the original report-wide financial total row to avoid presenting a mathematically incompatible filtered subtotal. The authoritative report-wide total remains visible in the existing report filter/summary area with an explicit scope disclaimer.
+- Unit tests cover negative transactions, Arabic search, natural invoice sorting, missing values, page bounds, and preservation of input rows.
+- **Caution:** This is **presentation pagination** of records already loaded by existing report services, not a claim of backend/server paging. Some legacy loaders still call `fetchAllReportRows` to exhaust their authorized result range in batches. Converting those to server-backed page/count endpoints must not be attempted without retaining report-wide financial correctness and export completeness.
+
 ## Not yet implemented / intentionally not misrepresented
 - A unified multi-report executive KPI panel (net profit, inventory valuation, COGS, net sales, returns and comparisons) **requires auditing exact source definitions and completeness before showing numeric cards**. It has not been asserted as available. Existing report totals appear where authoritative source already supports them.
 - Full advanced report-builder with SQL-free custom aggregations, arbitrary column widths, all cross-module deep links, automated email schedules, all specialized restaurant/HR/production reports, unusual trend detection, and AI analysis **not implemented**. Existing saved custom report preferences are retained.
