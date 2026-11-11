@@ -3,7 +3,7 @@ import { Search, ChevronDown, ChevronUp, BarChart3, Star, LayoutGrid, ArrowLeft,
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ReportsPage, type ReportsPageActions } from './ReportsPage';
 import { FinancialReportsPage } from '@/features/accounting/pages/FinancialReportsPage';
-import { ReportsExecutiveKpis } from '../components/ReportsExecutiveKpis';
+import { ReportsExecutiveKpis, type IncomeKpiVerified } from '../components/ReportsExecutiveKpis';
 import { ReportsShowcase } from '../components/ReportsShowcase';
 import { useCan, type Permission } from '@/lib/permissions';
 import { useBranchScope } from '@/lib/branchScope';
@@ -39,13 +39,6 @@ function loadFavorites(): string[] {
   } catch { return []; }
 }
 
-const LEGACY_HIDDEN_REPORTS = new Set<ReportType>([
-  'component_consumption',
-  'recipe_costs',
-  'top_consumed_components',
-  'top_consumed_products',
-]);
-
 const FINANCIAL_REPORTS: Array<{ key: FinancialView; ar: string; en: string }> = [
   { key: 'treasury_statement', ar: 'كشف حساب بنك / خزنة', en: 'Bank / Treasury Statement' },
   { key: 'inventory_movement', ar: 'حركة صنف', en: 'Item Movement' },
@@ -70,6 +63,7 @@ export function ReportsCenterPage() {
   const [periodError, setPeriodError] = useState(false);
   const [overviewRun, setOverviewRun] = useState(0);
   const [reportActions, setReportActions] = useState<ReportsPageActions | null>(null);
+  const [verifiedIncome, setVerifiedIncome] = useState<IncomeKpiVerified | null>(null);
   const { lang } = useLanguage();
   const { runtime } = useOrganizationModules();
   const location = useLocation();
@@ -97,8 +91,7 @@ export function ReportsCenterPage() {
 
   const permittedOperational = useMemo(
     () => REPORT_REGISTRY.filter((report) =>
-      !LEGACY_HIDDEN_REPORTS.has(report.key)
-      && report.permissions.every((permission) => can(permission as Permission))
+      report.permissions.every((permission) => can(permission as Permission))
       && businessReportAllowed(runtime, report.key, report.category)
     ),
     [can, runtime],
@@ -194,6 +187,13 @@ export function ReportsCenterPage() {
     () => new Set(permittedOperational.map((report) => report.key)),
     [permittedOperational],
   );
+  const quickPriority: ReportType[] = [
+    'sales', 'detailed_invoices', 'purchases', 'inventory', 'profit',
+    'recipe_costs', 'production_waste', 'returns', 'financial_reconciliation',
+  ];
+  const quickReports = quickPriority
+    .map((key) => permittedOperational.find((report) => report.key === key))
+    .filter((report): report is (typeof permittedOperational)[number] => Boolean(report));
   const isOverview = !requestedType && !requestedFinancial;
 
   const currentName = requestedFinancial
@@ -203,7 +203,7 @@ export function ReportsCenterPage() {
 
   const isAr = lang === 'ar';
   const reportList = (
-    <div className="overflow-hidden rounded-2xl border border-ui-border bg-ui-surface shadow-ui-sm" data-testid="premier-reports-directory">
+    <div className="overflow-hidden rounded-xl border border-[#d9ddec] bg-white shadow-sm dark:border-ui-border dark:bg-ui-surface" data-testid="premier-reports-directory">
       <div className="border-b border-ui-border bg-gradient-to-l from-violet-50/80 to-ui-surface p-3 dark:from-violet-950/20 dark:to-ui-surface">
         <div className="mb-3 flex items-center justify-between gap-2">
           <span className="text-sm font-black text-ui-text">{isAr ? 'المفضلة والتقارير' : 'Favorites & reports'}</span>
@@ -287,9 +287,9 @@ export function ReportsCenterPage() {
   );
 
   return (
-    <section className="space-y-4" dir={isAr ? 'rtl' : 'ltr'} data-testid="unified-reports-center">
-      <header className="overflow-hidden rounded-2xl border border-ui-border bg-ui-surface shadow-ui-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4 p-4 sm:p-6">
+    <section className="space-y-3" dir={isAr ? 'rtl' : 'ltr'} data-testid="unified-reports-center">
+      <header className="overflow-hidden rounded-xl border border-[#d9ddec] bg-white shadow-sm dark:border-ui-border dark:bg-ui-surface">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4">
           <div className="flex min-w-0 items-start gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ui-primary/10 text-ui-primary">
               <BarChart3 className="h-6 w-6" />
@@ -319,6 +319,13 @@ export function ReportsCenterPage() {
               <RefreshCw className="h-3.5 w-3.5" />
               {isAr ? 'تطبيق الفترة' : 'Apply period'}
             </button>
+            {isOverview && permittedOperational.length > 0 && (
+              <button type="button" onClick={() => selectOperational(initialOperational)}
+                data-testid="create-custom-report"
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-violet-700 px-3 text-xs font-bold text-white hover:bg-violet-800">
+                <Plus className="h-4 w-4" />{isAr ? 'تقرير مخصص' : 'Custom report'}
+              </button>
+            )}
             {!isOverview && !requestedFinancial && (
               <div className="flex flex-wrap items-center gap-2" data-testid="reports-header-actions">
                 {can('reports.export') && <button type="button" disabled={!reportActions?.canExport}
@@ -402,16 +409,16 @@ export function ReportsCenterPage() {
         {isAr ? 'الفترة غير صالحة أو خارج حدود تاريخ التقارير المسموح.' : 'Invalid period or outside authorized history.'}
       </p>}
       {showDirectory && <div className="lg:hidden">{reportList}</div>}
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[236px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)]" dir="ltr">
+      <div className="grid min-w-0 gap-3 lg:grid-cols-[236px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)]" dir="ltr">
         <aside dir={isAr ? 'rtl' : 'ltr'} className="hidden lg:sticky lg:top-3 lg:block lg:self-start">
           {reportList}
         </aside>
-        <main dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 space-y-4" data-testid="premier-reports-content">
-          {canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis controlledFrom={dateRange.from} controlledTo={dateRange.to} />}
+        <main dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 space-y-3" data-testid="premier-reports-content">
           {isOverview && (
             <ReportsShowcase
               isAr={isAr}
               allowedReportTypes={allowedReportTypes}
+              verifiedIncome={verifiedIncome?.scopeKey === branchScope.scopeKey && verifiedIncome.from === dateRange.from && verifiedIncome.to === dateRange.to ? verifiedIncome : null}
               hasAuthorizedBranches={branchScope.selectedBranchIds.length > 0}
               from={dateRange.from}
               to={dateRange.to}
@@ -436,7 +443,7 @@ export function ReportsCenterPage() {
                 <h2 className="text-sm font-black text-ui-text">{isAr ? 'تقارير سريعة' : 'Quick reports'}</h2>
               </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-9">
-                {permittedOperational.slice(0, 9).map((report) => (
+                {quickReports.map((report) => (
                   <button key={report.key} type="button" onClick={() => selectOperational(report.key)}
                     className="flex min-w-0 flex-col items-center gap-2 rounded-xl border border-ui-border bg-ui-page-alt p-3 text-center text-xs font-bold text-ui-text transition hover:border-ui-primary hover:text-ui-primary">
                     <FileBarChart className="h-5 w-5 text-ui-primary" aria-hidden="true" />
@@ -445,6 +452,9 @@ export function ReportsCenterPage() {
                 ))}
               </div>
             </section>
+          )}
+          {isOverview && canFinancial && businessFinancialViewAllowed(runtime, 'income') && (
+            <ReportsExecutiveKpis controlledFrom={dateRange.from} controlledTo={dateRange.to} onVerifiedTotal={setVerifiedIncome} />
           )}
         </main>
       </div>

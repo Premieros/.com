@@ -50,7 +50,7 @@ describe('Premier financial KPI source integrity', () => {
     expect(panel).toContain('income-branch-values');
     expect(panel).toContain('يلزم استكمال البيانات');
     expect(panel).toContain('readiness.issues');
-    expect(center).toContain('<ReportsExecutiveKpis controlledFrom={dateRange.from} controlledTo={dateRange.to} />');
+    expect(center).toContain('<ReportsExecutiveKpis controlledFrom={dateRange.from} controlledTo={dateRange.to} onVerifiedTotal={setVerifiedIncome} />');
     expect(panel).not.toContain("supabase.from('sales')");
   });
 });

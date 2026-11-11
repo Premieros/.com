@@ -100,6 +100,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   const [summary, setSummary] = useState({ total: 0, count: 0 });
   const [loading, setLoading] = useState(false);
   const [reportError, setReportError] = useState(false);
+  const [reportFailureReason, setReportFailureReason] = useState<'permission' | 'source' | null>(null);
   const [filters, setFilters] = useState<ReportFilters>({});
   const [filtersDirty, setFiltersDirty] = useState(false);
   const [queryVersion, setQueryVersion] = useState(0);
@@ -287,6 +288,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   async function loadReport() {
     setLoading(true);
     setReportError(false);
+    setReportFailureReason(null);
     try {
       const allowed = history.clampRange(from, to);
       if (allowed.from !== from) setFrom(allowed.from);
@@ -1121,8 +1123,10 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         setChartData(rows.slice(0, 10).map((row) => ({ name: String(row[lang === 'ar' ? 'المنتج' : 'Product']), value: Number(row[lang === 'ar' ? 'التكلفة الإجمالية' : 'Total Cost']) })));
         setSummary({ total: rows.reduce((sum, row) => sum + Number(row[lang === 'ar' ? 'التكلفة الإجمالية' : 'Total Cost'] || 0), 0), count: rows.length });
       }
-    } catch {
+    } catch (cause) {
       // Never expose prior-branch data or misleading partial financial totals.
+      const code = cause && typeof cause === 'object' && 'code' in cause ? String(cause.code) : '';
+      setReportFailureReason(['42501', 'PGRST301', 'PGRST302'].includes(code) ? 'permission' : 'source');
       setData([]);
       setChartData([]);
       setSummary({ total: 0, count: 0 });
@@ -1376,7 +1380,9 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
 
       {reportError && !loading && (
         <div role="alert" data-testid="reports-incomplete-error" className="mb-3 rounded-xl border border-ui-danger/30 bg-ui-danger-soft px-4 py-3 text-sm text-ui-danger">
-          {lang === 'ar' ? 'تعذر تحميل التقرير بالكامل لجميع الفروع المحددة. تم إخفاء البيانات الناقصة وإيقاف التصدير. حاول تشغيل التقرير مرة أخرى.' : 'The report could not be loaded completely for all selected branches. Incomplete data is hidden and export is disabled. Please run the report again.'}
+          {reportFailureReason === 'permission'
+            ? (lang === 'ar' ? 'لا تسمح صلاحيات الحساب الحالي بقراءة مصدر هذا التقرير. راجع صلاحيات التقرير والفروع ثم أعد المحاولة.' : 'This account cannot read the report source. Review report and branch permissions and retry.')
+            : (lang === 'ar' ? 'فشل مصدر التقرير أو تعذر تحميل جميع الفروع. لم تُعرض أرقام جزئية على أنها إجمالي صحيح. أعد المحاولة أو راجع إعدادات المصدر.' : 'The report source failed or one or more branches could not load. Partial numbers are never presented as a complete total. Retry or check the source.')}
         </div>
       )}
 
@@ -1485,7 +1491,9 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         ) : presentedRows.length === 0 ? (
           <div className="text-center py-12 text-ui-subtle text-sm">{data.length > 0
             ? (lang === 'ar' ? 'لا توجد نتائج مطابقة للبحث' : 'No matching rows')
-            : t('noData')}</div>
+            : reportError
+              ? (lang === 'ar' ? 'فشل تحميل التقرير — راجع رسالة الخطأ بالأعلى.' : 'Report failed — see the error above.')
+              : (lang === 'ar' ? `لا توجد سجلات فعلية لهذا التقرير في الفترة ${from} إلى ${to} ونطاق الفروع الحالي. جرّب توسيع الفترة أو تغيير الفرع.` : `No records exist for this report from ${from} to ${to} within the current branch scope. Try another period or branch.`)}</div>
         ) : (
           <div>
             <div data-testid="reports-mobile-results" className="space-y-2 sm:hidden">
