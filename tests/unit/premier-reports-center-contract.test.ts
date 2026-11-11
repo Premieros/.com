@@ -12,7 +12,7 @@ describe('Premier Reports Center: reuse, access and truthful presentation', () =
     expect(center).toContain('data-testid="reports-compact-toolbar"');
     expect(center).toContain('data-testid="unified-reports-center"');
     expect(full).toContain('<ReportsPage key={allowedReport.key}');
-    expect(full).toContain('<FinancialReportsPage hideViewPicker />');
+    expect(full).toContain('<FinancialReportsPage hideViewPicker compactFilters />');
     expect(routeSource).toContain('path="/reports/view"');
     expect(center).toContain('navigate(`/reports/view?type=${target}&from=${draftFrom}&to=${draftTo}`');
     expect(center).toContain('data-testid="toggle-reports-filters"');
