@@ -58,7 +58,7 @@ export function ReportFullPage() {
         <FinancialReportsPage hideViewPicker />
       ) : !isFinancial && allowedReport ? (
         <ReportsPage key={allowedReport.key} controlledReportType={allowedReport.key as ReportType}
-          controlledFrom={from} controlledTo={to} />
+          controlledFrom={from} controlledTo={to} standalone />
       ) : (
         <p role="alert" className="rounded-xl border border-ui-border bg-ui-surface p-5 text-sm text-ui-muted">
           {isAr ? 'التقرير غير متاح لهذه الصلاحيات أو نوع النشاط.' : 'Report unavailable for your permissions or business type.'}
