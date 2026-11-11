@@ -55,6 +55,7 @@ const ExpensesPage = lazy(() => import('../features/trade/pages/ExpensesPage').t
 const SalesPage = lazy(() => import('../features/trade/pages/SalesPage').then(m => ({ default: m.SalesPage })));
 const ShiftsPage = lazy(() => import('../features/trade/pages/ShiftsPage').then(m => ({ default: m.ShiftsPage })));
 const ReportsCenterPage = lazy(() => import('../features/reporting/pages/ReportsCenterPage').then(m => ({ default: m.ReportsCenterPage })));
+const ReportFullPage = lazy(() => import('../features/reporting/pages/ReportFullPage').then(m => ({ default: m.ReportFullPage })));
 const AccountsPage = lazy(() => import('../features/accounting/pages/AccountsPage').then(m => ({ default: m.AccountsPage })));
 const OpeningBalancesPage = lazy(() => import('../features/accounting/pages/OpeningBalancesPage').then(m => ({ default: m.OpeningBalancesPage })));
 const EmployeeReceivablesPage = lazy(() => import('../features/accounting/pages/EmployeeReceivablesPage').then(m => ({ default: m.EmployeeReceivablesPage })));
@@ -207,6 +208,7 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.sales} element={<ProtectedRoute permission="sales.view"><SalesPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.shifts} element={<ProtectedRoute permission="shifts.view"><ShiftsPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.reports} element={<ProtectedRoute permissionsAny={["reports.view", "reports.financial"]}><ReportsCenterPage /></ProtectedRoute>} />
+        <Route path="/reports/view" element={<ProtectedRoute permissionsAny={["reports.view", "reports.financial"]}><ReportFullPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.financialReports} element={<ProtectedRoute permission="reports.financial"><ReportsCenterPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.accounting} element={<ProtectedRoute permission="reports.financial"><Navigate to={APP_ROUTES.financialReports} replace /></ProtectedRoute>} />
         <Route path={APP_ROUTES.accounts} element={<ProtectedRoute permission="accounts.view"><AccountsPage /></ProtectedRoute>} />
