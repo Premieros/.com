@@ -14,6 +14,12 @@ describe('authoritative quantity transfer snapshots', () => {
   expect(transferLineIsSaved(after[0], row)).toBe(true);
   expect(applyItemTransferToCart(after, { ...result, replayed: true })).toEqual(after);
  });
+ it('does not erase cart rows when the server response has no authoritative snapshot', () => {
+  const before = [cart('a'), cart('b', 9), cart(undefined, 4)];
+  expect(applyItemTransferToCart(before, { ...result, snapshot: undefined })).toBe(before);
+  expect(applyItemTransferToCart(before, { ...result, success: false })).toBe(before);
+  expect(applyItemTransferToCart(before, { ...result, quantity_transfers: undefined })).toBe(before);
+ });
  it('removes only the transferred persisted ID when the server source is empty', () => {
   const r = { ...result, snapshot: { ...result.snapshot!, orderItems: [] } };
   expect(applyItemTransferToCart([cart('a'), cart('b'), cart()], r).map(i => i.order_item_id)).toEqual(['b', undefined]);
