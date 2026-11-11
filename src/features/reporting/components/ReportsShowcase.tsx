@@ -62,12 +62,14 @@ export function ReportsShowcase({
   onSelectReport,
   from,
   to,
+  hasAuthorizedBranches,
 }: {
   isAr: boolean;
   allowedReportTypes: ReadonlySet<ReportType>;
   onSelectReport: (type: ReportType) => void;
   from: string;
   to: string;
+  hasAuthorizedBranches: boolean;
 }) {
   const [chartRun, setChartRun] = useState(0);
   const tiles = TILES.filter((tile) => allowedReportTypes.has(tile.key));
@@ -88,9 +90,9 @@ export function ReportsShowcase({
         <p className="text-xs text-ui-muted">{isAr
           ? 'الرسوم تعتمد على نفس محركات التقارير الحالية، وتُحمَّل عند الطلب لتقليل ضغط قاعدة البيانات.'
           : 'Charts reuse existing report loaders and are loaded on demand.'}</p>
-        <button type="button" onClick={() => setChartRun((value) => value + 1)}
+        <button type="button" onClick={() => setChartRun((value) => value + 1)} disabled={!hasAuthorizedBranches}
           data-testid="load-overview-charts"
-          className="inline-flex items-center gap-2 rounded-lg bg-ui-primary px-3 py-2 text-xs font-bold text-ui-primary-fg">
+          className="inline-flex items-center gap-2 rounded-lg bg-ui-primary px-3 py-2 text-xs font-bold text-ui-primary-fg disabled:opacity-50">
           <RefreshCw className="h-4 w-4" />
           {chartRun ? (isAr ? 'تحديث الرسوم' : 'Refresh charts') : (isAr ? 'عرض الرسوم الفعلية' : 'Load real charts')}
         </button>
@@ -114,7 +116,7 @@ export function ReportsShowcase({
                 <ArrowUpLeft className="h-4 w-4 shrink-0 text-ui-muted group-hover:text-ui-primary" aria-hidden="true" />
               </div>
               <div className="my-4 w-full flex-1 rounded-xl border border-ui-border bg-ui-page-alt/30 px-2 py-3">
-                {chartRun > 0 ? (
+                {chartRun > 0 && hasAuthorizedBranches ? (
                   <ReportsPage key={`${tile.kind}-${chartRun}`} controlledReportType={tile.key} chartOnly chartMode={tile.kind === 'bars' ? 'branch' : 'normal'} controlledFrom={from} controlledTo={to} />
                 ) : (
                   <div className="flex min-h-44 flex-col items-center justify-center text-center">
