@@ -10,6 +10,8 @@ describe('authoritative quantity transfer snapshots', () => {
  it('retains exact IDs and unsaved edits on other same-product rows, and replay cannot subtract twice', () => {
   const before = [cart('a'), cart('b', 9), cart(undefined, 4)]; const after = applyItemTransferToCart(before, result);
   expect(after.map(i => [i.order_item_id, i.quantity])).toEqual([['a', 2], ['b', 9], [undefined, 4]]);
+  expect(after[0].order_item_id).toBe('a');
+  expect(transferLineIsSaved(after[0], row)).toBe(true);
   expect(applyItemTransferToCart(after, { ...result, replayed: true })).toEqual(after);
  });
  it('removes only the transferred persisted ID when the server source is empty', () => {
