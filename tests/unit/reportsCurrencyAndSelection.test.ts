@@ -19,11 +19,13 @@ describe('reports currency and detail selection', () => {
 
   it('renders selected operational and financial report name in detail route', () => {
     const detail = readFileSync(resolve(process.cwd(), 'src/features/reporting/pages/ReportFullPage.tsx'), 'utf8');
+    const report = readFileSync(resolve(process.cwd(), 'src/features/reporting/pages/ReportsPage.tsx'), 'utf8');
     const hub = readFileSync(resolve(process.cwd(), 'src/features/reporting/pages/ReportsCenterPage.tsx'), 'utf8');
     expect(detail).toContain('selectedReportTitle');
     expect(detail).toContain('allowedReport?.title');
     expect(detail).toContain('financialNames[financialView]');
     expect(detail).toContain('controlledReportType={allowedReport.key as ReportType}');
+    expect(report).toContain('reportTypes.filter((item) => item.key === reportType)');
     expect(hub).toContain('navigate(`/reports/view?type=${target}&from=${draftFrom}&to=${draftTo}`)');
     expect(hub).toContain('setPendingReport(event.target.value)');
   });
