@@ -1,4 +1,4 @@
-import { BarChart3, ChartNoAxesCombined, Layers3, ShoppingBasket, Trophy, ArrowUpLeft } from 'lucide-react';
+import { BarChart3, TrendingUp, Layers3, ShoppingBasket, Trophy, ArrowUpLeft } from 'lucide-react';
 import type { ReportType } from '../reportFilters';
 
 type Shortcut = {
@@ -38,7 +38,7 @@ const SHORTCUTS: Shortcut[] = [
 ];
 
 const ICONS = {
-  line: ChartNoAxesCombined,
+  line: TrendingUp,
   donut: Layers3,
   ranking: Trophy,
   bars: BarChart3,
