@@ -41,7 +41,7 @@ function validDate(value: string): boolean {
     && new Date(`${value}T12:00:00Z`).toISOString().slice(0, 10) === value;
 }
 
-export function ReportsExecutiveKpis() {
+export function ReportsExecutiveKpis({ controlledFrom, controlledTo }: { controlledFrom?: string; controlledTo?: string } = {}) {
   const { lang } = useLanguage();
   const isAr = lang === 'ar';
   const can = useCan();
@@ -50,8 +50,8 @@ export function ReportsExecutiveKpis() {
   const { effectiveSettings } = useSettings();
   const history = useHistoryAccess();
   const navigate = useNavigate();
-  const [from, setFrom] = useState(() => addIsoDays(businessDateISO(), -29));
-  const [to, setTo] = useState(() => businessDateISO());
+  const [from, setFrom] = useState(() => controlledFrom || addIsoDays(businessDateISO(), -29));
+  const [to, setTo] = useState(() => controlledTo || businessDateISO());
   const [snapshot, setSnapshot] = useState<Snapshot | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -65,6 +65,14 @@ export function ReportsExecutiveKpis() {
     setError(null);
     setLoading(false);
   }, [branchScope.scopeKey, authorized]);
+
+  useEffect(() => {
+    if (!controlledFrom || !controlledTo) return;
+    generation.current += 1;
+    setSnapshot(null);
+    setFrom(controlledFrom);
+    setTo(controlledTo);
+  }, [controlledFrom, controlledTo]);
 
   if (!authorized) return null;
 
@@ -149,16 +157,16 @@ export function ReportsExecutiveKpis() {
         </span>
       </div>
       <div className="mt-4 flex flex-wrap items-end gap-3">
-        <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-ui-muted sm:max-w-44">
+        {!controlledFrom && <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-ui-muted sm:max-w-44">
           {isAr ? 'من تاريخ' : 'From'}
           <input type="date" value={from} onChange={(event) => { setFrom(event.target.value); setSnapshot(null); }}
             className="h-10 rounded-lg border border-ui-border bg-ui-page-alt px-2 text-sm text-ui-text" />
-        </label>
-        <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-ui-muted sm:max-w-44">
+        </label>}
+        {!controlledTo && <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs text-ui-muted sm:max-w-44">
           {isAr ? 'إلى تاريخ' : 'To'}
           <input type="date" value={to} onChange={(event) => { setTo(event.target.value); setSnapshot(null); }}
             className="h-10 rounded-lg border border-ui-border bg-ui-page-alt px-2 text-sm text-ui-text" />
-        </label>
+        </label>}
         <button type="button" onClick={() => void run()} disabled={loading || branchScope.selectedBranchIds.length === 0}
           className="inline-flex h-10 items-center gap-2 rounded-lg bg-ui-primary px-4 text-sm font-bold text-ui-primary-fg disabled:opacity-50"
           data-testid="run-income-kpis">
