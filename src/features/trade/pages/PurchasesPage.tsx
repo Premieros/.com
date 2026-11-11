@@ -10,6 +10,7 @@ import { useBranchScope } from '@/lib/branchScope';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useToast } from '@/components/Toast';
 import { purchaseReturnFailureMessage } from '@/features/trade/utils/purchaseReturnErrors';
+import { convertPurchaseLineUnit } from '../services/purchasePriceUnits';
 import { DesignSurface, DesignPageHeader, DesignSearch, DesignPanel, DesignPagination } from '@/components/design';
 import { DataTable, type Column } from '@/components/DataTable';
 import { Button } from '@/components/Button';
@@ -200,6 +201,20 @@ export function PurchasesPage() {
 
   const addLine = () => setLineItems([...lineItems, { ...EMPTY_LINE }]);
   const updateLine = (i: number, field: keyof PurchaseFormItem, value: string | number) => setLineItems(lineItems.map((l, idx) => idx === i ? { ...l, [field]: value } : l));
+  const changePurchaseUnit = (index: number, nextUnit: string) => {
+    const line = lineItems[index];
+    if (!line || line.line_type !== 'raw') return;
+    const converted = convertPurchaseLineUnit(line, nextUnit);
+    if (!converted) {
+      show(lang === 'ar'
+        ? 'لا يمكن تحويل هذه الوحدة تلقائيًا. اختر وحدة متوافقة مع الخامة أو راجع الوحدة والسعر قبل الحفظ.'
+        : 'This unit cannot be converted automatically. Choose a compatible unit or review the unit and price before saving.',
+      'error');
+      return;
+    }
+    setLineItems(current => current.map((item, idx) => idx === index && item === line
+      ? { ...item, ...converted } : item));
+  };
   const removeLine = (i: number) => setLineItems(lineItems.filter((_, idx) => idx !== i));
 
   const rawUnitName = (id: string) => {
@@ -728,7 +743,7 @@ export function PurchasesPage() {
                   {l.line_type === 'raw' ? (
                     <select
                       value={l.unit_name}
-                      onChange={(e) => updateLine(i, 'unit_name', e.target.value)}
+                      onChange={(e) => changePurchaseUnit(i, e.target.value)}
                       className="col-span-2 rounded-md border border-ui-border bg-ui-surface px-2 py-1.5 text-sm"
                       title={`${lang === 'ar' ? 'وحدة الشراء' : 'Purchase unit'} · ${lang === 'ar' ? 'وحدة التخزين' : 'Stock unit'}: ${rawUnitName(l.raw_material_id)}`}
                     >
@@ -737,8 +752,8 @@ export function PurchasesPage() {
                   ) : (
                     <input value={l.unit_name} onChange={(e) => updateLine(i, 'unit_name', e.target.value)} className="col-span-2 rounded-md border border-ui-border bg-ui-surface px-2 py-1.5 text-sm" placeholder={lang === 'ar' ? 'الوحدة' : 'Unit'} />
                   )}
-                  <input type="number" placeholder={t('quantity')} value={l.quantity || ''} onChange={(e) => updateLine(i, 'quantity', parseFloat(e.target.value) || 0)} className="col-span-1 rounded-md border border-ui-border bg-ui-surface px-2 py-1.5 text-sm" />
-                  <input type="number" placeholder={t('cost')} step="0.01" value={l.unit_cost || ''} onChange={(e) => updateLine(i, 'unit_cost', parseFloat(e.target.value) || 0)} className="col-span-2 rounded-md border border-ui-border bg-ui-surface px-2 py-1.5 text-sm" />
+                  <input type="number" placeholder={t('quantity')} step="any" min="0" value={l.quantity || ''} onChange={(e) => updateLine(i, 'quantity', parseFloat(e.target.value) || 0)} className="col-span-1 rounded-md border border-ui-border bg-ui-surface px-2 py-1.5 text-sm" />
+                  <input type="number" placeholder={t('cost')} step="any" min="0" value={l.unit_cost || ''} onChange={(e) => updateLine(i, 'unit_cost', parseFloat(e.target.value) || 0)} className="col-span-2 rounded-md border border-ui-border bg-ui-surface px-2 py-1.5 text-sm" />
                   <span className="col-span-1 text-sm text-ui-muted text-end">{formatCurrency(l.quantity * l.unit_cost, currency, lang)}</span>
                   <button onClick={() => removeLine(i)} className="col-span-1 p-1.5 text-ui-danger hover:bg-ui-danger-soft rounded-md"><Trash2 className="w-4 h-4" /></button>
                 </div>
@@ -746,6 +761,11 @@ export function PurchasesPage() {
             </div>
           </div>
 
+          <p className="text-xs text-ui-muted" data-testid="purchase-unit-conversion-hint">
+            {lang === 'ar'
+              ? 'عند تغيير وحدة شراء الخامة (كيلو/جرام أو لتر/مل)، يتم تعديل الكمية وسعر الوحدة معًا مع الحفاظ على قيمة البند. الوحدات غير المتوافقة لا تتحول تلقائيًا.'
+              : 'Changing raw-material purchase units (kg/g or L/mL) adjusts quantity and unit price together while preserving the line total. Incompatible units are not converted automatically.'}
+          </p>
           <div className="flex justify-between items-center pt-2 border-t border-ui-border">
             <span className="text-lg font-bold">{t('total')}: {formatCurrency(subtotal, currency, lang)}</span>
             <div className="flex gap-2">

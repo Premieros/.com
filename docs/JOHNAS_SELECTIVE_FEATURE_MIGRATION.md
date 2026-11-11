@@ -36,3 +36,10 @@
 
 ## Current batch
 First verified feature: Excel-assisted stock count drafts. The Excel upload prepares rows in the existing form; writing stock still requires the original Premier count workflow and permissions.
+
+## Current batch 2 — purchasing unit conversion
+- Confirmed difference: Johna's recalculates the unit price for kg/g and L/mL changes; Premier's invoice editor previously changed only the unit label, leaving the price unchanged.
+- Adaptation: changing the raw-material purchasing unit adjusts **both quantity and unit price** to preserve the physical amount and original line total. This is safer than copying the legacy price-only handler.
+- No implicit conversion for missing, arbitrary or incompatible units. A clear Arabic/English message explains what needs manual review.
+- Existing Premier purchase authorization, save, stock and accounting posting paths remain unchanged.
+- Regression tests cover reversible conversion, incompatible units and unchanged invoice totals.
