@@ -90,6 +90,8 @@ describeDisposable('Premier branch-configured cutoff and open-order shift handof
     const email = `ci-cutoff-safety-${tag}@ci.invalid`;
     await client.query('BEGIN');
     try {
+      await client.query(`INSERT INTO public.roles(role,name_ar,name_en,permissions,scope,is_active)
+        VALUES('super_admin','مدير النظام','Super Admin','[]'::jsonb,'global',true) ON CONFLICT(role) DO NOTHING`);
       await client.query('INSERT INTO public.organizations(id,name,slug) VALUES($1,$2,$3)',
         [org,'CI Cutoff Safety',`ci-cutoff-safe-${tag}`]);
       await client.query('INSERT INTO public.branches(id,name,organization_id) VALUES($1,$2,$3)',
