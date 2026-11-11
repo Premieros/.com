@@ -47,7 +47,10 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
     expect(center).toContain('onSelectReport={selectOperational}');
     expect(showcase).toContain('TILES.filter((tile) => allowedReportTypes.has(tile.key))');
     expect(showcase).toContain('data-testid={`report-shortcut-${tile.key}`}');
-    expect(showcase).toContain('Actual chart available in report');
+    expect(showcase).toContain('chartOnly controlledFrom={from} controlledTo={to}');
+    expect(showcase).toContain('data-testid="load-overview-charts"');
+    expect(center).toContain('data-testid="apply-overview-dates"');
+    expect(center).toContain('controlledFrom={dateRange.from}');
     expect(showcase).not.toContain("supabase.from(");
     expect(showcase).not.toMatch(/(?:579,300|66,550|4,892)/);
   });
