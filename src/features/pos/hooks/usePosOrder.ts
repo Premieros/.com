@@ -7,7 +7,8 @@ import { cartToItems, type ItemPayload } from '../utils/cart';
 import { nextInvoiceNumber, processSaleForOrder, fetchBranchWarehouseId, createSaleOperationKey, type ProcessSalePayload } from '../services/payment';
 import { getPinnedSaleWarehouse } from '@/core/offline/warehouseBinding';
 import { refreshVerifiedWarehouseStock } from '@/core/repositories/warehouseSnapshotRefresh';
-import { fetchOrderSettlementPreview, type OrderSettlementPreview } from '../services/settlementPreview';
+import type { OrderSettlementPreview } from '../services/settlementPreview';
+import { useScopedSettlementPreview } from './useScopedSettlementPreview';
 import { APPROVED_FIXED_THERMAL_WIDTH_MM, buildReceiptFixedTemplate, buildReceiptHtml, buildReceiptThermalText, enqueueAutomaticReceiptPrint, openPrintWindow, type ReceiptData } from '../utils/printing';
 import { enqueueCloudOpenOrderPrint } from '../services/cloudPrint';
 import { ORDER_TYPE_KEY } from '../utils/orderTypes';
@@ -47,7 +48,7 @@ export function usePosOrder(input: UsePosOrderInput) {
   // Never mint a fresh key merely because a local IndexedDB response was lost.
   const pendingOfflineOperationKeyRef = useRef<string | null>(null);
   const pendingLinkedCheckoutRef = useRef<{ orderId: string; branchId: string; payload: ProcessSalePayload; preview: OrderSettlementPreview } | null>(null);
-  const [settlementPreview, setSettlementPreview] = useState<OrderSettlementPreview | null>(null);
+  const { preview: settlementPreview, load: loadScopedSettlementPreview, clear: clearSettlementPreview, isCurrent: isCurrentSettlementPreview } = useScopedSettlementPreview(base.activeOrderId, input.branchId);
   const [settlementReceipt, setSettlementReceipt] = useState<ReceiptData | null>(null);
   const [settlementReceiptSaleId, setSettlementReceiptSaleId] = useState<string | null>(null);
 
@@ -180,15 +181,16 @@ export function usePosOrder(input: UsePosOrderInput) {
     if (!base.activeOrderId) return null;
     if (saveSnapshot && !(await saveOpenOrderSnapshot())) return null;
 
-    const { preview, error } = await fetchOrderSettlementPreview(base.activeOrderId);
+    const { preview, error } = await loadScopedSettlementPreview();
+    if (!preview && !error) return null; // superseded by a different order/branch
     if (error || !preview?.has_payable_items) {
-      show(error || (isAr ? 'لا توجد أصناف مرسلة للمطبخ جاهزة للتحصيل' : 'No sent kitchen items are ready for settlement'), 'error');
+      show(error === 'SETTLEMENT_PREVIEW_SCOPE_MISMATCH'
+        ? (isAr ? 'تغير الطلب أو الفرع أثناء تجهيز الحساب. أعد فتح التحصيل للطلب الحالي.' : 'Order or branch changed while preparing payment. Reopen checkout for the current order.')
+        : (error || (isAr ? 'لا توجد أصناف مرسلة للمطبخ جاهزة للتحصيل' : 'No sent kitchen items are ready for settlement')), 'error');
       return null;
     }
-
-    setSettlementPreview(preview);
     return preview;
-  }, [base.activeOrderId, isAr, saveOpenOrderSnapshot, show]);
+  }, [base.activeOrderId, isAr, loadScopedSettlementPreview, saveOpenOrderSnapshot, show]);
 
   const transferOrderToTable = useCallback(async (
     targetOrderId: string,
@@ -226,7 +228,7 @@ export function usePosOrder(input: UsePosOrderInput) {
 
   const setCheckoutOpen = useCallback((open: boolean) => {
     if (!open) {
-      setSettlementPreview(null);
+      clearSettlementPreview();
       base.setCheckoutOpen(false);
       return;
     }
@@ -238,11 +240,11 @@ export function usePosOrder(input: UsePosOrderInput) {
 
     void (async () => {
       const preview = await loadSettlementPreview(false);
-      if (!preview) return;
+      if (!preview || !isCurrentSettlementPreview(preview)) return;
       base.setPaidAmount(base.paymentMethod === 'credit' ? 0 : preview.total);
       base.setCheckoutOpen(true);
     })();
-  }, [base, loadSettlementPreview]);
+  }, [base, clearSettlementPreview, isCurrentSettlementPreview, loadSettlementPreview]);
 
   const completeSale = useCallback(async (): Promise<boolean> => {
     const explicitlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
@@ -334,10 +336,11 @@ export function usePosOrder(input: UsePosOrderInput) {
         show(isAr ? 'عملية تحصيل أخرى لم يتأكد مصيرها بعد. تحقق من الفاتورة أولًا.' : 'An earlier settlement is unresolved. Verify its invoice first.', 'error');
         return false;
       }
-      const preview = previousAttempt?.preview || settlementPreview || await loadSettlementPreview(false);
-      if (!preview) return false;
+      const preview = previousAttempt?.preview || await loadSettlementPreview(false);
+      if (!preview || (!previousAttempt && !isCurrentSettlementPreview(preview))) return false;
 
       const invoiceNumber = previousAttempt?.payload.p_invoice_number || await nextInvoiceNumber();
+      if (!previousAttempt && !isCurrentSettlementPreview(preview)) return false;
       const paidAmountToUse = base.paymentMethod === 'credit' ? 0 : (base.paidAmount || preview.total);
       const payload: ProcessSalePayload = previousAttempt?.payload ?? {
         p_client_operation_key: createSaleOperationKey(),
@@ -380,7 +383,7 @@ export function usePosOrder(input: UsePosOrderInput) {
       const receipt = buildSettlementReceipt(preview, invoiceNumber, paidAmountToUse, extended.payments || []);
       setSettlementReceipt(receipt);
       setSettlementReceiptSaleId(extended.sale_id || null);
-      setSettlementPreview(null);
+      clearSettlementPreview();
       base.setCheckoutOpen(false);
       base.setPaidAmount(0);
 
@@ -419,7 +422,7 @@ export function usePosOrder(input: UsePosOrderInput) {
       settlementLockRef.current = false;
       setOfflineCompleting(false);
     }
-  }, [base, buildSettlementReceipt, input.activeShift?.id, input.branchId, input.effSettings, isAr, lang, loadSettlementPreview, offlineCompleting, settlementPreview, show, t]);
+  }, [base, buildSettlementReceipt, clearSettlementPreview, input.activeShift?.id, input.branchId, input.effSettings, isAr, isCurrentSettlementPreview, lang, loadSettlementPreview, offlineCompleting, show, t]);
 
   const printReceipt = useCallback(async () => {
     if (!input.effSettings) return;
@@ -437,7 +440,7 @@ export function usePosOrder(input: UsePosOrderInput) {
     const preview = await loadSettlementPreview(false);
     // An open order must never fall back to a receipt from an earlier
     // completed sale when its current authoritative preview is unavailable.
-    if (!preview) return;
+    if (!preview || !isCurrentSettlementPreview(preview)) return;
 
     const receipt = buildSettlementReceipt(preview, base.activeOrderNumber || `ORDER-${Date.now()}`, 0);
     receipt.isOpenOrder = true;
@@ -463,7 +466,7 @@ export function usePosOrder(input: UsePosOrderInput) {
       return;
     }
     show(isAr ? 'تم إرسال الحساب إلى محطة طباعة الكاشير.' : 'Open check queued to the cashier print station.', 'success');
-  }, [base, buildSettlementReceipt, input.effSettings, isAr, lang, loadSettlementPreview, settlementReceipt]);
+  }, [base, buildSettlementReceipt, input.effSettings, isAr, isCurrentSettlementPreview, lang, loadSettlementPreview, settlementReceipt]);
 
   const settlementTotals = base.checkoutOpen && base.activeOrderId && settlementPreview
     ? {
