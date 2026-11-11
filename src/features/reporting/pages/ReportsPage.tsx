@@ -26,7 +26,7 @@ import type { SavedReportConfig } from '../useCustomReports';
 import { CustomReportBar } from '../CustomReportBar';
 import { ReportFilterBar } from '../ReportFilterBar';
 import { loadExpenseCategoryOptions, loadReportFilterOptions } from '../services/reportFilterOptions';
-import { classifyReportFailure, type ReportFailure } from '../reportFailure';
+import { classifyReportFailure, describeReportFailure, type ReportFailure } from '../reportFailure';
 import { loadExpenseReportRows, loadPurchaseReportRows, loadSalesReportRows } from '../services/reportCoreLoaders';
 import { loadCashierPerformanceRows, loadDetailedInvoiceRows, loadReturnRows, loadSalesByEmployeeRows } from '../services/reportSalesLoaders';
 import { loadComponentConsumptionRows, loadInventoryBatchRows, loadLowStockSources, loadSalesByProductItems, loadTopConsumedComponentRows, loadTopConsumedProductItems, loadWasteRows } from '../services/reportInventoryLoaders';
@@ -1385,22 +1385,13 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
       {reportError && !loading && (
         <div role="alert" data-testid="reports-incomplete-error" className="mb-3 rounded-xl border border-ui-danger/30 bg-ui-danger-soft px-4 py-3 text-sm text-ui-danger">
           <div className="space-y-2">
-            <p className="font-bold">
-              {reportFailure?.kind === 'permission'
-                ? (lang === 'ar' ? 'تم رفض الوصول إلى أحد مصادر هذا التقرير. تحقق من صلاحيات المستخدم والفروع.' : 'Access to a report source was denied. Check user and branch permissions.')
-                : reportFailure?.kind === 'schema'
-                  ? (lang === 'ar' ? 'يوجد اختلاف بين بنية قاعدة البيانات واستعلام التقرير. يحتاج المصدر إلى إصلاح.' : 'The report query does not match the database schema. This source needs repair.')
-                  : reportFailure?.kind === 'timeout'
-                    ? (lang === 'ar' ? 'انتهت مهلة جلب التقرير. قلّص الفترة أو نطاق الفروع ثم أعد المحاولة.' : 'Report loading timed out. Try a smaller period or branch scope.')
-                    : (lang === 'ar' ? 'تعذر تحميل جميع بيانات التقرير. لم تُعرض نتائج جزئية على أنها إجمالي صحيح.' : 'The complete report could not be loaded. Partial results are not shown as a full total.')}
-            </p>
+            <p className="font-bold">{describeReportFailure(reportFailure, lang === 'ar' ? 'ar' : 'en').title}</p>
+            <p className="text-xs leading-relaxed">{describeReportFailure(reportFailure, lang === 'ar' ? 'ar' : 'en').action}</p>
             {reportFailure?.branchId && <p className="text-xs">
-              {lang === 'ar' ? 'الفرع المتأثر: ' : 'Affected branch: '}{branchNameById(reportFailure.branchId)}
+              {lang === 'ar' ? 'الفرع الذي تعذّر تحميل بياناته: ' : 'Branch whose data could not be loaded: '}
+              <strong>{branchNameById(reportFailure.branchId)}</strong>
             </p>}
-            <p className="text-xs">
-              {lang === 'ar' ? 'التقرير: ' : 'Report: '}{reportType}
-              {reportFailure?.code ? ` · ${lang === 'ar' ? 'رمز الخطأ:' : 'Error code:'} ${reportFailure.code}` : ''}
-            </p>
+            <p className="text-xs">{lang === 'ar' ? 'لن نعرض إجماليًا غير مكتمل حتى تتوفر نتائج جميع الفروع المختارة.' : 'No incomplete grand total will be shown while selected branches are missing.'}</p>
             <button type="button" onClick={() => setQueryVersion((v) => v + 1)}
               data-testid="retry-failed-report"
               className="rounded-lg border border-current px-3 py-1.5 text-xs font-bold">

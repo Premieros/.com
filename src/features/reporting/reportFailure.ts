@@ -23,3 +23,32 @@ export function classifyReportFailure(cause: unknown, allowedBranchIds: readonly
   else if (code && ['57014', 'PGRST003'].includes(code)) kind = 'timeout';
   return { kind, code, branchId };
 }
+
+/**
+ * User-facing guidance. Technical codes stay in diagnostics and are never
+ * presented as steps the business user is expected to understand.
+ */
+export function describeReportFailure(
+  failure: Pick<ReportFailure, 'kind'> | null,
+  lang: 'ar' | 'en',
+): { title: string; action: string } {
+  const ar = lang === 'ar';
+  switch (failure?.kind) {
+    case 'permission':
+      return ar
+        ? { title: 'ليست لديك صلاحية الاطلاع على بيانات هذا التقرير في الفروع المختارة.', action: 'اختر فرعًا لديك صلاحية الوصول إليه، أو اطلب من مدير النظام مراجعة صلاحياتك لهذا التقرير.' }
+        : { title: 'You cannot view this report for the selected branches.', action: 'Choose a branch you can access, or ask your administrator to check your report permissions.' };
+    case 'timeout':
+      return ar
+        ? { title: 'استغرق تجهيز التقرير وقتًا أطول من المسموح.', action: 'اختر فترة أقصر أو فرعًا واحدًا، ثم اضغط «إعادة تحميل التقرير».' }
+        : { title: 'This report took too long to prepare.', action: 'Choose a shorter date range or a single branch, then select Retry report.' };
+    case 'schema':
+      return ar
+        ? { title: 'هذا التقرير غير متاح حاليًا بسبب مشكلة في إعداد التقرير بالنظام.', action: 'لا تحتاج إلى تعديل بيانات المبيعات أو المخزون. أبلغ مسؤول النظام باسم التقرير لإصلاحه.' }
+        : { title: 'This report is currently unavailable due to a problem with its setup.', action: 'Do not change sales or inventory data. Contact your system administrator and provide the report name.' };
+    default:
+      return ar
+        ? { title: 'لم نتمكن من إحضار جميع نتائج التقرير الآن.', action: 'اضغط «إعادة تحميل التقرير». إذا تكرر الأمر، أبلغ مسؤول النظام باسم التقرير والفرع المتأثر.' }
+        : { title: 'We could not retrieve all results for this report.', action: 'Select Retry report. If it happens again, tell your administrator the report name and affected branch.' };
+  }
+}

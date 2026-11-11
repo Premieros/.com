@@ -1,3 +1,4 @@
+import { classifyReportFailure, describeReportFailure, type ReportFailure } from '@/features/reporting/reportFailure';
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Scale, BookOpen, TrendingUp, PieChart, Clock, Download, BadgeCheck, BadgeAlert, Landmark, ArrowLeftRight, Receipt, WalletCards, PackageSearch } from 'lucide-react';
@@ -60,6 +61,7 @@ export function FinancialReportsPage({ hideViewPicker = false, compactFilters = 
   const [to, setTo] = useState(() => history.clampRange(searchParams.get('from'), searchParams.get('to') || todayISO()).to);
   const [loading, setLoading] = useState(false);
   const [reportError, setReportError] = useState(false);
+  const [reportFailure, setReportFailure] = useState<ReportFailure | null>(null);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const { effectiveSettings } = useSettings();
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
@@ -205,6 +207,7 @@ export function FinancialReportsPage({ hideViewPicker = false, compactFilters = 
 
     setLoading(true);
     setReportError(false);
+    setReportFailure(null);
     try {
       const allowed = history.clampRange(from, to);
       if (allowed.from !== from) setFrom(allowed.from);
@@ -347,7 +350,8 @@ export function FinancialReportsPage({ hideViewPicker = false, compactFilters = 
         });
         setPartyStmt(requireFinancialReport(result, 'party_statement', effectiveBranchFilter || '') as PartyStatementResult);
       }
-    } catch {
+    } catch (cause) {
+      setReportFailure(classifyReportFailure(cause, summaryBranchIds));
       setReportError(true);
     } finally {
       setLoading(false);
@@ -659,7 +663,21 @@ export function FinancialReportsPage({ hideViewPicker = false, compactFilters = 
       </div>
 
       {reportError && !loading && (
-        <DesignPanel testId="financial-reports-error"><div role="alert" className="rounded-xl border border-ui-danger/30 bg-ui-danger-soft p-4 text-ui-danger text-sm">{isAr ? 'تعذر تحميل جميع بيانات التقرير للفروع المحددة. لن تُعرض أو تُصدَّر أرقام مالية ناقصة. أعد المحاولة.' : 'Could not load the financial report for every selected branch. Incomplete totals are hidden and cannot be exported. Please retry.'}</div></DesignPanel>
+        <DesignPanel testId="financial-reports-error">
+          <div role="alert" className="space-y-2 rounded-xl border border-ui-danger/30 bg-ui-danger-soft p-4 text-sm text-ui-danger">
+            <p className="font-bold">{describeReportFailure(reportFailure, isAr ? 'ar' : 'en').title}</p>
+            <p>{describeReportFailure(reportFailure, isAr ? 'ar' : 'en').action}</p>
+            {reportFailure?.branchId && <p>
+              {isAr ? 'الفرع الذي تعذّر تحميل بياناته: ' : 'Branch whose data could not be loaded: '}
+              <strong>{branchName(reportFailure.branchId)}</strong>
+            </p>}
+            <p className="text-xs">{isAr ? 'لن تُعرض أو تُصدَّر مجاميع مالية غير مكتملة.' : 'Incomplete financial totals will not be shown or exported.'}</p>
+            <button type="button" onClick={() => void load()} data-testid="retry-financial-report"
+              className="rounded-lg border border-current px-3 py-1.5 text-xs font-bold">
+              {isAr ? 'إعادة تحميل التقرير' : 'Retry report'}
+            </button>
+          </div>
+        </DesignPanel>
       )}
       {loading ? (
         <DesignPanel testId="financial-reports-loading"><div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" /></div></DesignPanel>
