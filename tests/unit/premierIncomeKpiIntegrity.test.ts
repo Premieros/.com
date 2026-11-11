@@ -44,7 +44,11 @@ describe('Premier financial KPI source integrity', () => {
     expect(panel).toContain("businessFinancialViewAllowed(runtime, 'income')");
     expect(panel).toContain('branchScope.selectedBranchIds');
     expect(panel).toContain('generation.current');
-    expect(panel).toContain("throw new Error('INCOMPATIBLE_CURRENCIES')");
+    expect(panel).toContain('assessIncomeReadiness(');
+    expect(panel).toContain('income-completion-checklist');
+    expect(panel).toContain('income-branch-values');
+    expect(panel).toContain('يلزم استكمال البيانات');
+    expect(panel).toContain('readiness.issues');
     expect(center).toContain('<ReportsExecutiveKpis />');
     expect(panel).not.toContain("supabase.from('sales')");
   });
