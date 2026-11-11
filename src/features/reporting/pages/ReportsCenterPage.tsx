@@ -355,7 +355,7 @@ export function ReportsCenterPage() {
               {isAr ? 'اختر تقريرًا مسموحًا لك لعرض بياناته الحقيقية' : 'Select an authorized report to view live data'}
               {isAr ? <ArrowLeft className="mx-auto mt-4 h-5 w-5" /> : <ArrowRight className="mx-auto mt-4 h-5 w-5" />}
             </div>
-          )}
+          ) : null}
         </main>
       </div>
       {permittedOperational.length > 0 && (
