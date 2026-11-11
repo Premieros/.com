@@ -45,10 +45,12 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
   it('only shows quick-entry report panels allowed by the existing registry', () => {
     expect(center).toContain('allowedReportTypes={allowedReportTypes}');
     expect(center).toContain('onSelectReport={selectOperational}');
-    expect(showcase).toContain('TILES.filter((tile) => allowedReportTypes.has(tile.key))');
-    expect(showcase).toContain('data-testid={`report-shortcut-${tile.kind}`}');
-    expect(showcase).toContain("chartMode={tile.kind === 'bars' ? 'branch' : 'normal'}");
-    expect(showcase).toContain('controlledFrom={from} controlledTo={to}');
+    expect(showcase).toContain('PANELS.filter((panel) => allowedReportTypes.has(panel.report))');
+    expect(showcase).toContain('data-testid={`report-shortcut-${panel.id}`}');
+    expect(showcase).toContain('loadDashboardSalesSnapshot({');
+    expect(showcase).toContain("can('dashboard.view')");
+    expect(showcase).toContain("granularity: 'day'");
+    expect(showcase).toContain('hasAuthorizedBranches');
     expect(showcase).toContain('data-testid="load-overview-charts"');
     expect(center).toContain('data-testid="apply-overview-dates"');
     expect(center).toContain('controlledFrom={dateRange.from}');
