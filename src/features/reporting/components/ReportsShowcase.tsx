@@ -1,4 +1,6 @@
-import { BarChart3, TrendingUp, Layers3, Trophy, ArrowUpLeft, ExternalLink, Store, LineChart } from 'lucide-react';
+import { useState } from 'react';
+import { BarChart3, TrendingUp, Layers3, Trophy, ArrowUpLeft, ExternalLink, Store, LineChart, RefreshCw } from 'lucide-react';
+import { ReportsPage } from '../pages/ReportsPage';
 import type { ReportType } from '../reportFilters';
 
 type Tile = {
@@ -21,10 +23,10 @@ const TILES: Tile[] = [
   },
   {
     key: 'sales',
-    ar: 'المبيعات حسب الفترة',
-    en: 'Sales over time',
-    descriptionAr: 'اتجاه المبيعات للفترة والفروع المختارة داخل التقرير الفعلي.',
-    descriptionEn: 'Sales trend for the selected period and authorized branches.',
+    ar: 'أحدث فواتير المبيعات',
+    en: 'Recent sales invoices',
+    descriptionAr: 'قيم أحدث عشر فواتير مسجلة في التقرير المعتمد، وليست إجمالي المبيعات اليومي.',
+    descriptionEn: 'Values of the ten most recent invoices; not a daily sales total.',
     kind: 'line',
   },
   {
@@ -58,11 +60,16 @@ export function ReportsShowcase({
   isAr,
   allowedReportTypes,
   onSelectReport,
+  from,
+  to,
 }: {
   isAr: boolean;
   allowedReportTypes: ReadonlySet<ReportType>;
   onSelectReport: (type: ReportType) => void;
+  from: string;
+  to: string;
 }) {
+  const [chartRun, setChartRun] = useState(0);
   const tiles = TILES.filter((tile) => allowedReportTypes.has(tile.key));
   if (!tiles.length) return null;
 
@@ -77,17 +84,25 @@ export function ReportsShowcase({
           {isAr ? 'البيانات من التقارير المعتمدة' : 'Source-backed reports'}
         </span>
       </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-ui-border bg-ui-page-alt px-3 py-2">
+        <p className="text-xs text-ui-muted">{isAr
+          ? 'الرسوم تعتمد على نفس محركات التقارير الحالية، وتُحمَّل عند الطلب لتقليل ضغط قاعدة البيانات.'
+          : 'Charts reuse existing report loaders and are loaded on demand.'}</p>
+        <button type="button" onClick={() => setChartRun((value) => value + 1)}
+          data-testid="load-overview-charts"
+          className="inline-flex items-center gap-2 rounded-lg bg-ui-primary px-3 py-2 text-xs font-bold text-ui-primary-fg">
+          <RefreshCw className="h-4 w-4" />
+          {chartRun ? (isAr ? 'تحديث الرسوم' : 'Refresh charts') : (isAr ? 'عرض الرسوم الفعلية' : 'Load real charts')}
+        </button>
+      </div>
       <div className="grid gap-3 md:grid-cols-2">
         {tiles.map((tile) => {
           const Icon = ICONS[tile.kind];
           return (
-            <button
-              type="button"
+            <div
               key={tile.key}
-              onClick={() => onSelectReport(tile.key)}
               data-testid={`report-shortcut-${tile.key}`}
               className="group flex min-h-[220px] flex-col rounded-2xl border border-ui-border bg-ui-surface p-4 text-start shadow-ui-sm transition hover:border-ui-primary hover:shadow-ui-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-primary"
-              aria-label={isAr ? `فتح التقرير الفعلي: ${tile.ar}` : `Open actual report: ${tile.en}`}
             >
               <div className="flex w-full items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-2">
@@ -98,20 +113,28 @@ export function ReportsShowcase({
                 </div>
                 <ArrowUpLeft className="h-4 w-4 shrink-0 text-ui-muted group-hover:text-ui-primary" aria-hidden="true" />
               </div>
-              <div className="my-4 flex w-full flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-ui-border bg-ui-page-alt/50 px-4 py-5 text-center">
-                <TrendingUp className="mb-2 h-7 w-7 text-ui-primary/70" aria-hidden="true" />
-                <p className="text-xs font-bold text-ui-text">
-                  {isAr ? 'المخطط الفعلي متاح داخل التقرير' : 'Actual chart available in report'}
-                </p>
-                <p className="mt-1 max-w-xs text-xs leading-5 text-ui-muted">
+              <div className="my-4 w-full flex-1 rounded-xl border border-ui-border bg-ui-page-alt/30 px-2 py-3">
+                {chartRun > 0 ? (
+                  <ReportsPage key={`${tile.key}-${chartRun}`} controlledReportType={tile.key} chartOnly controlledFrom={from} controlledTo={to} />
+                ) : (
+                  <div className="flex min-h-44 flex-col items-center justify-center text-center">
+                    <TrendingUp className="mb-2 h-7 w-7 text-ui-primary/70" aria-hidden="true" />
+                    <p className="text-xs font-bold text-ui-text">
+                      {isAr ? 'اضغط عرض الرسوم الفعلية لتحميل البيانات' : 'Load the actual report charts'}
+                    </p>
+                  </div>
+                )}
+                <p className="mt-2 text-center text-[11px] leading-5 text-ui-muted">
                   {isAr ? tile.descriptionAr : tile.descriptionEn}
                 </p>
               </div>
-              <span className="inline-flex items-center gap-1.5 text-xs font-extrabold text-ui-primary">
+              <button type="button" onClick={() => onSelectReport(tile.key)}
+                className="inline-flex items-center gap-1.5 self-start rounded-lg px-2 py-1 text-xs font-extrabold text-ui-primary hover:bg-ui-primary-soft"
+                aria-label={isAr ? `فتح التقرير الفعلي: ${tile.ar}` : `Open actual report: ${tile.en}`}>
                 <ExternalLink className="h-4 w-4" />
-                {isAr ? 'فتح البيانات والرسوم الفعلية' : 'Open actual data and charts'}
-              </span>
-            </button>
+                {isAr ? 'فتح تفاصيل التقرير' : 'Open report details'}
+              </button>
+            </div>
           );
         })}
       </div>
