@@ -40,4 +40,10 @@
 
 The live inspection did **not** change production data, close shifts, clear orders, modify branch settings, seed starting balances, fabricate opening ledger entries, alter permissions or activate a new job. These require scoped decisions and verified source-of-truth amounts. Existing cron job is already active; no second job was created.
 
+## Owner scope update — all existing and future branches
+
+The owner confirms the planned live-operation scope is **all existing branches plus newly created branches**, not only Smouha and Cleopatra. A new proposed migration `20261111100000_new_branch_fixed_day_defaults.sql` makes **newly created branches** default to fixed `10:00`–`02:00` Cairo time with automatic shift close enabled; managers may customize those settings per branch. **This migration exists in the draft PR only; it has not been deployed to production.**
+
+Existing branches retain their independent 08:00-based or 00:00-based configured schedules, and the owner must verify those settings before real sales. No existing branch setting or trial accounting data should be rewritten as part of simply extending go-live scope to all branches.
+
 **Go-live decision:** **CONDITIONAL / NOT CERTIFIED** for all branches as a whole. Smouha has no old open shift and is the strongest candidate; Cleopatra and ASD have explicit cutover blockers. Maintain hard safety gates rather than interpret 'trial data' as permission to destroy or silently rewrite financial provenance.
