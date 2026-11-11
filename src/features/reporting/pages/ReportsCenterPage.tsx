@@ -39,13 +39,6 @@ function loadFavorites(): string[] {
   } catch { return []; }
 }
 
-const LEGACY_HIDDEN_REPORTS = new Set<ReportType>([
-  'component_consumption',
-  'recipe_costs',
-  'top_consumed_components',
-  'top_consumed_products',
-]);
-
 const FINANCIAL_REPORTS: Array<{ key: FinancialView; ar: string; en: string }> = [
   { key: 'treasury_statement', ar: 'كشف حساب بنك / خزنة', en: 'Bank / Treasury Statement' },
   { key: 'inventory_movement', ar: 'حركة صنف', en: 'Item Movement' },
@@ -97,8 +90,7 @@ export function ReportsCenterPage() {
 
   const permittedOperational = useMemo(
     () => REPORT_REGISTRY.filter((report) =>
-      !LEGACY_HIDDEN_REPORTS.has(report.key)
-      && report.permissions.every((permission) => can(permission as Permission))
+      report.permissions.every((permission) => can(permission as Permission))
       && businessReportAllowed(runtime, report.key, report.category)
     ),
     [can, runtime],
@@ -203,7 +195,7 @@ export function ReportsCenterPage() {
 
   const isAr = lang === 'ar';
   const reportList = (
-    <div className="overflow-hidden rounded-2xl border border-ui-border bg-ui-surface shadow-ui-sm" data-testid="premier-reports-directory">
+    <div className="overflow-hidden rounded-xl border border-[#d9ddec] bg-white shadow-sm dark:border-ui-border dark:bg-ui-surface" data-testid="premier-reports-directory">
       <div className="border-b border-ui-border bg-gradient-to-l from-violet-50/80 to-ui-surface p-3 dark:from-violet-950/20 dark:to-ui-surface">
         <div className="mb-3 flex items-center justify-between gap-2">
           <span className="text-sm font-black text-ui-text">{isAr ? 'المفضلة والتقارير' : 'Favorites & reports'}</span>
@@ -287,9 +279,9 @@ export function ReportsCenterPage() {
   );
 
   return (
-    <section className="space-y-4" dir={isAr ? 'rtl' : 'ltr'} data-testid="unified-reports-center">
-      <header className="overflow-hidden rounded-2xl border border-ui-border bg-ui-surface shadow-ui-sm">
-        <div className="flex flex-wrap items-start justify-between gap-4 p-4 sm:p-6">
+    <section className="space-y-3" dir={isAr ? 'rtl' : 'ltr'} data-testid="unified-reports-center">
+      <header className="overflow-hidden rounded-xl border border-[#d9ddec] bg-white shadow-sm dark:border-ui-border dark:bg-ui-surface">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-3 sm:p-4">
           <div className="flex min-w-0 items-start gap-3">
             <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-ui-primary/10 text-ui-primary">
               <BarChart3 className="h-6 w-6" />
@@ -402,11 +394,11 @@ export function ReportsCenterPage() {
         {isAr ? 'الفترة غير صالحة أو خارج حدود تاريخ التقارير المسموح.' : 'Invalid period or outside authorized history.'}
       </p>}
       {showDirectory && <div className="lg:hidden">{reportList}</div>}
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[236px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)]" dir="ltr">
+      <div className="grid min-w-0 gap-3 lg:grid-cols-[236px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)]" dir="ltr">
         <aside dir={isAr ? 'rtl' : 'ltr'} className="hidden lg:sticky lg:top-3 lg:block lg:self-start">
           {reportList}
         </aside>
-        <main dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 space-y-4" data-testid="premier-reports-content">
+        <main dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 space-y-3" data-testid="premier-reports-content">
           {canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis controlledFrom={dateRange.from} controlledTo={dateRange.to} />}
           {isOverview && (
             <ReportsShowcase
