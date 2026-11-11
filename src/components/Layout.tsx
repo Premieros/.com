@@ -343,7 +343,7 @@ export function Layout({ children }: { children: ReactNode }) {
             if (!items.length) return null;
             return (
               <section key={group} data-testid={`nav-group-${group}`} className="mb-2">
-                <button data-testid={`nav-group-toggle-${group}`} type="button" onClick={() => setCollapsed((v) => ({ ...v, [group]: !v[group] }))} className={`flex min-h-9 w-full items-center justify-between rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition ${'text-ui-subtle hover:bg-ui-page-alt hover:text-ui-text'}`}>
+                <button data-testid={`nav-group-toggle-${group}`} type="button" onClick={() => setCollapsed((v) => ({ ...v, [group]: !v[group] }))} className={`flex min-h-9 w-full items-center justify-between rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition text-ui-subtle hover:bg-ui-page-alt hover:text-ui-text`}>
                   <span>{businessGroupLabel(runtime, group, ar ? 'ar' : 'en', MENU_GROUPS[group][ar ? 'ar' : 'en'])}</span>
                   <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-150 ${collapsed[group] ? 'rotate-90' : ''}`} />
                 </button>
