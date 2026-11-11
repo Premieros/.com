@@ -45,7 +45,18 @@ describeDisposable('Premier branch-configured cutoff and open-order shift handof
       await client.query(`INSERT INTO public.orders(id,branch_id,order_number,status,payment_status,order_type,subtotal,total)
         VALUES($1,$2,$3,'open','unpaid','takeaway',40,40)`, [order, branch, `CI-${tag}`]);
 
-      const cutoff = new Date(Date.now() - 60_000).toISOString();
+      // Keep the public 10:00–02:00 policy assertion above. For a safe
+      // transactional execution test, set this fixture's cutoff to one minute
+      // ago; no wall-clock sleeps or production dates are involved.
+      const cutoffClock = await client.query<{ cutoff: Date; end_time: string }>(`
+        SELECT ((date_trunc('minute', clock_timestamp() AT TIME ZONE 'Africa/Cairo')
+                  - interval '1 minute') AT TIME ZONE 'Africa/Cairo') AS cutoff,
+               to_char((date_trunc('minute', clock_timestamp() AT TIME ZONE 'Africa/Cairo')
+                  - interval '1 minute')::time,'HH24:MI') AS end_time`);
+      await client.query(`UPDATE public.branch_settings
+        SET business_day_start='00:00', business_day_end=$2
+        WHERE branch_id=$1`, [branch, cutoffClock.rows[0].end_time]);
+      const cutoff = new Date(cutoffClock.rows[0].cutoff).toISOString();
       const closed = await client.query<{ result: { closed: boolean; shift_id: string; actual: null } }>(
         'SELECT private.close_shift_at_business_day_cutoff($1,$2) result', [branch, cutoff]);
       expect(closed.rows[0].result.closed).toBe(true);
@@ -108,7 +119,18 @@ describeDisposable('Premier branch-configured cutoff and open-order shift handof
       await client.query("SELECT set_config('app.register_branch','off',true)");
       await client.query(`INSERT INTO public.shifts(id,branch_id,cashier_id,status,opened_at,opening_amount)
         VALUES($1,$2,$3,'open',now()-interval '20 minutes',0)`, [shift,branch,user]);
-      const cutoff = new Date(Date.now() - 60_000).toISOString();
+      // Keep the public 10:00–02:00 policy assertion above. For a safe
+      // transactional execution test, set this fixture's cutoff to one minute
+      // ago; no wall-clock sleeps or production dates are involved.
+      const cutoffClock = await client.query<{ cutoff: Date; end_time: string }>(`
+        SELECT ((date_trunc('minute', clock_timestamp() AT TIME ZONE 'Africa/Cairo')
+                  - interval '1 minute') AT TIME ZONE 'Africa/Cairo') AS cutoff,
+               to_char((date_trunc('minute', clock_timestamp() AT TIME ZONE 'Africa/Cairo')
+                  - interval '1 minute')::time,'HH24:MI') AS end_time`);
+      await client.query(`UPDATE public.branch_settings
+        SET business_day_start='00:00', business_day_end=$2
+        WHERE branch_id=$1`, [branch, cutoffClock.rows[0].end_time]);
+      const cutoff = new Date(cutoffClock.rows[0].cutoff).toISOString();
 
       await client.query('SAVEPOINT disabled_case');
       await expect(client.query('SELECT private.close_shift_at_business_day_cutoff($1,$2)', [branch,cutoff]))
