@@ -38,7 +38,7 @@ describe('Premier financial KPI source integrity', () => {
     const panel = readFileSync(resolve(process.cwd(), 'src/features/reporting/components/ReportsExecutiveKpis.tsx'), 'utf8');
     const center = readFileSync(resolve(process.cwd(), 'src/features/reporting/pages/ReportsCenterPage.tsx'), 'utf8');
     expect(panel).toContain('reporting.getIncomeStatement(');
-    expect(panel).toContain('requireFinancialReport(result');
+    expect(panel).toContain('requireFinancialReport(response');
     expect(panel).toContain('aggregateIncomeStatements(');
     expect(panel).toContain("can('reports.financial')");
     expect(panel).toContain("businessFinancialViewAllowed(runtime, 'income')");
