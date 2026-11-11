@@ -9,6 +9,7 @@ import { useSettings } from '@/context/SettingsContext';
 import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { formatFinancialCurrency } from '@/lib/format';
+import { canonicalReportCurrency, sharedReportCurrency } from '../reportCurrency';
 import { reportDateRangeUtc } from '@/lib/businessTime';
 import type { ReportType } from '../reportFilters';
 import type { IncomeKpiVerified } from './ReportsExecutiveKpis';
@@ -51,9 +52,8 @@ export function ReportsShowcase({
   const canReadSnapshot = can('dashboard.view') || can('reports.view');
   const panels = PANELS.filter((panel) => allowedReportTypes.has(panel.report));
   const branchIds = branchScope.selectedBranchIds;
-  const currencyCodes = branchIds.map((id) => effectiveSettings(id)?.currency || '');
-  const commonCurrency = currencyCodes.length === branchIds.length && currencyCodes.every((code) => code && code === currencyCodes[0])
-    ? currencyCodes[0] : null;
+  const currencyCodes = branchIds.map((id) => effectiveSettings(id)?.currency);
+  const commonCurrency = sharedReportCurrency(currencyCodes);
   const current = loaded?.scopeKey === branchScope.scopeKey && loaded.from === from && loaded.to === to
     ? loaded.snapshot : null;
   const money = (value: number) => commonCurrency
@@ -210,7 +210,7 @@ export function ReportsShowcase({
     ) : <p className="py-12 text-center text-xs text-ui-muted">{isAr ? 'لا توجد بيانات ضمن الفترة المختارة' : 'No data in the selected period'}</p>;
   };
 
-  const comparableIncome = verifiedIncome && commonCurrency && verifiedIncome.currency === commonCurrency
+  const comparableIncome = verifiedIncome && commonCurrency && canonicalReportCurrency(verifiedIncome.currency) === commonCurrency
     ? verifiedIncome.values : null;
   const margin = comparableIncome && comparableIncome.net_revenue > 0
     ? comparableIncome.net_income / comparableIncome.net_revenue * 100 : null;
