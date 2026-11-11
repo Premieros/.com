@@ -27,7 +27,7 @@ export function applyItemTransferToCart(cart: CartItem[], result: PosItemTransfe
   return cart.flatMap((item) => {
     if (!item.order_item_id || !affected.has(item.order_item_id)) return [item];
     const row = rows.get(item.order_item_id);
-    return row ? orderItemsToCart([row], [item.product]) : [];
+    return row ? orderItemsToCart([row], [item.product]).map((saved) => ({ ...saved, order_item_id: row.id })) : [];
   });
 }
 
