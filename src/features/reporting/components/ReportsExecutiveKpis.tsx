@@ -224,11 +224,11 @@ export function ReportsExecutiveKpis() {
                     <th scope="row" className="p-2 text-start font-bold">{item.branchName}</th>
                     {METRICS.map((metric) => (
                       <td key={metric.key} className="p-2 tabular-nums">
-                        {item.values[metric.key] !== undefined && item.currency
-                          ? formatFinancialCurrency(item.values[metric.key], item.currency, lang)
-                          : <span className="font-semibold text-ui-muted">{item.values[metric.key] !== undefined
-                            ? (isAr ? 'العملة غير محددة' : 'Currency missing')
-                            : missingLabel}</span>}
+                        {item.values[metric.key] !== undefined
+                          ? item.currency
+                            ? formatFinancialCurrency(item.values[metric.key], item.currency, lang)
+                            : `${item.values[metric.key]?.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${isAr ? '(العملة غير محددة)' : '(currency missing)'}`
+                          : <span className="font-semibold text-ui-muted">{missingLabel}</span>}
                       </td>
                     ))}
                   </tr>
