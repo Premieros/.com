@@ -4,6 +4,7 @@ import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ReportsPage } from './ReportsPage';
 import { FinancialReportsPage } from '@/features/accounting/pages/FinancialReportsPage';
 import { ReportsExecutiveKpis } from '../components/ReportsExecutiveKpis';
+import { ReportsShowcase } from '../components/ReportsShowcase';
 import { useCan, type Permission } from '@/lib/permissions';
 import { useBranchScope } from '@/lib/branchScope';
 import { useLanguage } from '@/context/LanguageContext';
@@ -162,6 +163,12 @@ export function ReportsCenterPage() {
     navigate(`/reports?section=financial&view=${view}`, { replace: true });
   }, [navigate]);
 
+  const allowedReportTypes = useMemo(
+    () => new Set(permittedOperational.map((report) => report.key)),
+    [permittedOperational],
+  );
+  const isOverview = !requestedType && !requestedFinancial;
+
   const currentName = requestedFinancial
     ? allowedFinancialViews.find((report) => report.key === activeFinancialView)
     : permittedOperational.find((report) => report.key === activeReport);
@@ -169,8 +176,12 @@ export function ReportsCenterPage() {
 
   const isAr = lang === 'ar';
   const reportList = (
-    <div className="overflow-hidden rounded-xl border border-ui-border bg-ui-surface shadow-ui-sm" data-testid="premier-reports-directory">
-      <div className="border-b border-ui-border p-3">
+    <div className="overflow-hidden rounded-2xl border border-ui-border bg-ui-surface shadow-ui-sm" data-testid="premier-reports-directory">
+      <div className="border-b border-ui-border bg-gradient-to-l from-violet-50/80 to-ui-surface p-3 dark:from-violet-950/20 dark:to-ui-surface">
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <span className="text-sm font-black text-ui-text">{isAr ? 'المفضلة والتقارير' : 'Favorites & reports'}</span>
+          <Star className="h-5 w-5 text-amber-500" aria-hidden="true" />
+        </div>
         <label className="relative block">
           <Search className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ui-muted" />
           <span className="sr-only">{isAr ? 'ابحث عن تقرير' : 'Search reports'}</span>
@@ -257,10 +268,10 @@ export function ReportsCenterPage() {
               <BarChart3 className="h-6 w-6" />
             </div>
             <div>
-              <p className="text-xs font-extrabold tracking-wide text-ui-primary">PREMIER OS</p>
-              <h1 className="text-xl font-black text-ui-text sm:text-2xl">Premier Reports Center</h1>
+              <p className="text-xs font-extrabold tracking-wide text-ui-primary">PREMIER POS & ERP</p>
+              <h1 className="text-xl font-black text-ui-text sm:text-2xl">{isAr ? 'مركز التقارير' : 'Premier Reports Center'}</h1>
               <p className="mt-1 text-xs text-ui-muted">
-                {isAr ? 'تقارير المبيعات والتكاليف والمخزون والحسابات من مصادر النظام المعتمدة' : 'Sales, costing, inventory and finance from Premier’s existing sources'}
+                {isAr ? 'رؤية شاملة لأداء المطعم وإدارة الأعمال من مصادر Premier الفعلية' : 'A unified view of restaurant and business performance from Premier’s real sources'}
               </p>
             </div>
           </div>
@@ -327,11 +338,18 @@ export function ReportsCenterPage() {
       </header>
       {canFinancial && businessFinancialViewAllowed(runtime, 'income') && <ReportsExecutiveKpis />}
       {showDirectory && <div className="lg:hidden">{reportList}</div>}
-      <div className="grid min-w-0 gap-4 lg:grid-cols-[300px_minmax(0,1fr)]">
-        <aside className="hidden lg:sticky lg:top-3 lg:block lg:self-start">
+      <div className="grid min-w-0 gap-4 lg:grid-cols-[236px_minmax(0,1fr)] xl:grid-cols-[270px_minmax(0,1fr)]" dir="ltr">
+        <aside dir={isAr ? 'rtl' : 'ltr'} className="hidden lg:sticky lg:top-3 lg:block lg:self-start">
           {reportList}
         </aside>
-        <main className="min-w-0" data-testid="premier-reports-content">
+        <main dir={isAr ? 'rtl' : 'ltr'} className="min-w-0 space-y-4" data-testid="premier-reports-content">
+          {isOverview && (
+            <ReportsShowcase
+              isAr={isAr}
+              allowedReportTypes={allowedReportTypes}
+              onSelectReport={selectOperational}
+            />
+          )}
           {requestedFinancial && canFinancial && allowedFinancialViews.length > 0 ? (
             <FinancialReportsPage hideViewPicker />
           ) : permittedOperational.some((report) => report.key === activeReport) ? (
