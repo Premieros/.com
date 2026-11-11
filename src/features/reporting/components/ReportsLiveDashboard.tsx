@@ -16,6 +16,7 @@ import { requireFinancialReport } from '../services/requireFinancialReport';
 import { useSettings } from '@/context/SettingsContext';
 import { useCan } from '@/lib/permissions';
 import type { ReportType } from '../reportFilters';
+import { formatFinancialCurrency } from '@/lib/format';
 
 type Point = { name: string; value: number };
 type ProductPoint = { name: string; quantity: number; sales: number };
@@ -32,11 +33,10 @@ type Overview = {
 };
 const COLORS = ['#793df0', '#3884f6', '#28c9a0', '#ffa431', '#ed7198', '#a2a4b4'];
 
-function money(n: number, currency: string | null, lang: string) {
-  return new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-US', {
-    style: currency ? 'currency' : 'decimal',
-    ...(currency ? { currency } : { maximumFractionDigits: 2 }),
-  }).format(n);
+function money(n: number, currency: string | null, lang: 'ar' | 'en') {
+  return currency
+    ? formatFinancialCurrency(n, currency, lang)
+    : n.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 function validDate(value: string) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value)
