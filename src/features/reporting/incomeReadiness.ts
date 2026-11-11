@@ -56,7 +56,7 @@ export function assessIncomeReadiness(input: ReadonlyArray<IncomeBranchInput>): 
   const currencies = branches.map((item) => item.currency);
   const currencyMismatch = currencies.some((value) => !value) || new Set(currencies).size !== 1;
   const issues = branches.flatMap((item) => {
-    const missing = [...item.missing];
+    const missing: string[] = [...item.missing];
     if (!item.currency) missing.push('currency');
     if (item.fetchFailed) missing.push('report_unavailable');
     return missing.length ? [{ branchId: item.branchId, branchName: item.branchName, missing }] : [];
