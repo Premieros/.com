@@ -80,9 +80,9 @@ export function SettingsControlCenterPage() {
         low_stock_threshold: row?.low_stock_threshold ?? null,
         allow_negative_stock: row?.allow_negative_stock,
         business_day_mode: row?.business_day_mode ?? 'fixed_time',
-        business_day_start: row?.business_day_start ?? '00:00',
-        business_day_end: row?.business_day_end ?? '00:00',
-        auto_close_shift_at_day_end: row?.auto_close_shift_at_day_end ?? false,
+        business_day_start: row?.business_day_start ?? '10:00',
+        business_day_end: row?.business_day_end ?? '02:00',
+        auto_close_shift_at_day_end: row?.auto_close_shift_at_day_end ?? true,
         manual_transfer_enabled: row?.manual_transfer_enabled ?? false,
         instapay_handle: row?.instapay_handle ?? '',
         bank_transfer_details: row?.bank_transfer_details ?? '',
@@ -397,8 +397,8 @@ export function SettingsControlCenterPage() {
                     </span>
                     <span className="mt-1 block text-sm text-ui-muted">
                       {isAr
-                        ? 'يعمل فقط إذا لم توجد أي طلبات مفتوحة أو معلقة. إذا وُجدت طلبات، يبقى الشفت مفتوحًا حتى يغلقها المستخدم.'
-                        : 'Runs only when no open or held orders remain. Otherwise the shift stays open until the user resolves all orders.'}
+                        ? 'عند نهاية اليوم حسب توقيت الفرع تُغلق الوردية مع بقاء الطلبات المفتوحة والمعلقة كما هي. عند تحصيلها لاحقًا يجب فتح وردية جديدة؛ لا يتم تسجيل إيراد تلقائي.'
+                        : 'At the configured branch cutoff, the shift closes while open/held orders remain unchanged. A new shift must be opened before later payment; no sale is posted automatically.'}
                     </span>
                   </span>
                 </label>
