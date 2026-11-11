@@ -19,6 +19,9 @@ describe('Premier Reports Center: reuse, access and truthful presentation', () =
     expect(center).toContain('report.permissions.every');
     expect(center).toContain('businessReportAllowed(runtime');
     expect(center).toContain('businessFinancialViewAllowed(runtime');
+    expect(center).toContain('useBranchScope()');
+    expect(center).toContain('branchScope.setAllBranches(true)');
+    expect(center).toContain('branchScope.setSelectedBranchIds([event.target.value])');
     expect(center).toContain("can('reports.financial')");
     expect(center).not.toContain('from(\'sales\')');
   });
