@@ -11,6 +11,7 @@ import { useCan } from '@/lib/permissions';
 import { formatFinancialCurrency } from '@/lib/format';
 import { reportDateRangeUtc } from '@/lib/businessTime';
 import type { ReportType } from '../reportFilters';
+import type { IncomeKpiVerified } from './ReportsExecutiveKpis';
 
 type Panel = {
   id: 'payment' | 'time' | 'branches' | 'products';
@@ -29,7 +30,7 @@ const PIE_COLORS = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#636
 type Loaded = { snapshot: DashboardSalesSnapshot; scopeKey: string; from: string; to: string };
 
 export function ReportsShowcase({
-  isAr, allowedReportTypes, onSelectReport, from, to, hasAuthorizedBranches,
+  isAr, allowedReportTypes, onSelectReport, from, to, hasAuthorizedBranches, verifiedIncome,
 }: {
   isAr: boolean;
   allowedReportTypes: ReadonlySet<ReportType>;
@@ -37,6 +38,7 @@ export function ReportsShowcase({
   from: string;
   to: string;
   hasAuthorizedBranches: boolean;
+  verifiedIncome: IncomeKpiVerified | null;
 }) {
   const branchScope = useBranchScope();
   const can = useCan();
@@ -204,13 +206,20 @@ export function ReportsShowcase({
     ) : <p className="py-12 text-center text-xs text-ui-muted">{isAr ? 'لا توجد بيانات ضمن الفترة المختارة' : 'No data in the selected period'}</p>;
   };
 
+  const comparableIncome = verifiedIncome && commonCurrency && verifiedIncome.currency === commonCurrency
+    ? verifiedIncome.values : null;
+  const margin = comparableIncome && comparableIncome.net_revenue > 0
+    ? comparableIncome.net_income / comparableIncome.net_revenue * 100 : null;
+  const accountingNotice = isAr
+    ? 'القيم المحاسبية تُعرض فقط عند اكتمال قائمة الدخل لجميع الفروع المختارة وتوافق عملاتها.'
+    : 'Accounting values display only after all selected branch income statements are complete and currencies match.';
   const summaryCards = [
     { id: 'average', ar: 'متوسط قيمة الطلب', en: 'Average order', value: current && commonCurrency ? money(current.current.orders > 0 ? current.current.sales / current.current.orders : 0) : null, tone: 'from-rose-50 to-pink-100/60 dark:from-rose-950/30 dark:to-ui-surface' },
     { id: 'orders', ar: 'عدد الطلبات', en: 'Orders', value: current ? current.current.orders.toLocaleString(isAr ? 'ar-EG' : 'en-US') : null, tone: 'from-blue-50 to-blue-100/70 dark:from-blue-950/30 dark:to-ui-surface' },
     { id: 'sales', ar: 'إجمالي المبيعات', en: 'Total sales', value: current && commonCurrency ? money(current.current.sales) : null, tone: 'from-emerald-50 to-green-100/70 dark:from-emerald-950/30 dark:to-ui-surface' },
-    { id: 'payments', ar: 'إجمالي التحصيل', en: 'Collected payments', value: current && commonCurrency ? money(current.current.payments) : null, tone: 'from-sky-50 to-blue-100/60 dark:from-sky-950/30 dark:to-ui-surface' },
-    { id: 'returns', ar: 'المرتجعات', en: 'Returns', value: current && commonCurrency ? money(current.current.returns) : null, tone: 'from-amber-50 to-orange-100/70 dark:from-amber-950/30 dark:to-ui-surface' },
-    { id: 'discounts', ar: 'الخصومات', en: 'Discounts', value: current && commonCurrency ? money(current.current.discounts) : null, tone: 'from-violet-50 to-purple-100/70 dark:from-violet-950/30 dark:to-ui-surface' },
+    { id: 'cogs', ar: 'تكلفة المواد (COGS)', en: 'Cost of goods sold', value: comparableIncome ? money(comparableIncome.cogs) : null, tone: 'from-sky-50 to-blue-100/60 dark:from-sky-950/30 dark:to-ui-surface' },
+    { id: 'margin', ar: 'معدل الربح الصافي', en: 'Net profit margin', value: margin === null ? null : `${margin.toFixed(1)}%`, tone: 'from-amber-50 to-orange-100/70 dark:from-amber-950/30 dark:to-ui-surface' },
+    { id: 'net', ar: 'الربح الصافي', en: 'Net profit', value: comparableIncome ? money(comparableIncome.net_income) : null, tone: 'from-violet-50 to-purple-100/70 dark:from-violet-950/30 dark:to-ui-surface' },
   ];
 
   return (
@@ -225,6 +234,7 @@ export function ReportsShowcase({
             </div>
           ))}
         </div>
+        {!comparableIncome && <p className="mt-2 text-xs text-ui-muted">{accountingNotice}</p>}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="inline-flex items-center gap-2 text-base font-black text-ui-text sm:text-lg">
