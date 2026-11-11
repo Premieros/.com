@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { Download, TrendingUp, ShoppingCart, Receipt, Package, BarChart3, CreditCard, Users, List, Layers, AlertTriangle, FileDown, Printer, UserCheck, RotateCcw, Trash2 } from 'lucide-react';
 import { costing, reporting, supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -68,7 +69,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
   const [to, setTo] = useState(todayISO());
   const [period, setPeriod] = useState<PeriodKey>('custom');
   const [data, setData] = useState<Record<string, unknown>[]>([]);
-  const [, setChartData] = useState<{ name: string; value: number }[]>([]);
+  const [chartData, setChartData] = useState<{ name: string; value: number }[]>([]);
   const [summary, setSummary] = useState({ total: 0, count: 0 });
   const [loading, setLoading] = useState(false);
   const [reportError, setReportError] = useState(false);
@@ -1339,6 +1340,31 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
         loading={loading}
         pendingChanges={filtersDirty}
       />
+
+      {/* Reuse the existing report loader's series; never compute a second
+          financial truth from a partial table/page or unrelated SQL. */}
+      {['sales_by_payment', 'sales_by_product', 'sales_by_employee', 'cashier_performance'].includes(reportType)
+        && !loading && !reportError && chartData.length > 0 && (
+        <section className="mb-3 rounded-xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm" aria-label={lang === 'ar' ? 'رسم بياني للتقرير' : 'Report chart'} data-testid="premier-report-chart">
+          <div className="mb-3">
+            <h3 className="text-sm font-bold text-ui-text">{lang === 'ar' ? 'تحليل بصري من نفس بيانات التقرير' : 'Chart from the same report source'}</h3>
+            <p className="mt-1 text-xs text-ui-muted">{lang === 'ar'
+              ? 'يعرض السجلات/التجميعات التي يعيدها مصدر التقرير الحالي فقط، وليس إجماليًا مستقلًا.'
+              : 'Displays the records or groups returned by this report source, not an independent total.'}</p>
+          </div>
+          <div className="h-60 w-full" dir="ltr">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsBarChart data={chartData.slice(0, 12)} margin={{ top: 8, right: 8, left: 0, bottom: 16 }}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
+                <XAxis dataKey="name" interval={0} tick={{ fontSize: 10 }} tickFormatter={(value: string) => String(value).slice(0, 12)} />
+                <YAxis tick={{ fontSize: 10 }} width={48} />
+                <Tooltip formatter={(value: number) => [value.toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US'), lang === 'ar' ? 'القيمة' : 'Value']} />
+                <Bar dataKey="value" fill="var(--ui-primary, #2563eb)" radius={[4, 4, 0, 0]} />
+              </RechartsBarChart>
+            </ResponsiveContainer>
+          </div>
+        </section>
+      )}
 
       <Card className="p-4 border-ui-border bg-ui-surface shadow-ui">
         {loading ? (
