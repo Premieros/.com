@@ -20,6 +20,8 @@ describe('Premier stock-count Excel selective feature integration', () => {
     expect(page).toContain('branchScope.selectedBranchSet.has(form.branch_id)');
     expect(page).toContain('w.id === form.warehouse_id && w.branch_id === form.branch_id');
     expect(page).toContain('setForm({ ...form, warehouse_id: e.target.value }); resetCreateLines();');
+    expect(page).toContain('excelScopeRef.current.branchId !== form.branch_id');
+    expect(page).toContain('excelScopeRef.current.warehouseId !== form.warehouse_id');
     expect(page).toContain("form.count_type === 'full'");
   });
 
