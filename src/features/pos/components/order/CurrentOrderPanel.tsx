@@ -17,6 +17,8 @@ import type { CartItem, Customer, DiningTable, OrderItem, OrderType } from '@/li
 import type { KitchenSendItem } from '../../types';
 import { computeSentState } from '../../utils/sentState';
 import { cartLineKey, orderItemLineKey } from '../../utils/cart';
+import { transferLineIsSaved } from '../../utils/itemTransfer';
+import type { PosItemTransferResult } from '../../types';
 import { formatClockTime, timeAgo } from '../../utils/timeAgo';
 import { deriveCartStage } from '../../utils/orderStage';
 import { ORDER_TYPES } from '../../utils/orderTypes';
@@ -64,6 +66,7 @@ interface CurrentOrderPanelProps {
   onDiscountAmountChange: (v: number) => void;
   onUpdateQty: (lineKey: string, delta: number) => void;
   onSetQty: (lineKey: string, qty: number) => void;
+  onItemsTransferred?: (result: PosItemTransferResult) => void;
   onRemove: (lineKey: string) => void;
   onClear: () => void;
   onSetItemDiscount: (lineKey: string, discount: number) => void;
@@ -108,6 +111,7 @@ export function CurrentOrderPanel({
   onDiscountTypeChange,
   onDiscountAmountChange,
   onUpdateQty,
+  onItemsTransferred,
   onRemove,
   onAddItem,
   onConfigureItem,
@@ -142,7 +146,7 @@ export function CurrentOrderPanel({
   const selectedItem = selectedItems.length === 1 ? selectedItems[0] : null;
   const selectedSent = selectedItem ? sentState[cartLineKey(selectedItem)] : null;
   const selectedMatches = selectedItem
-    ? orderItems.filter((row) => orderItemLineKey(row) === cartLineKey(selectedItem))
+    ? orderItems.filter((row) => selectedItem.order_item_id ? row.id === selectedItem.order_item_id : orderItemLineKey(row) === cartLineKey(selectedItem))
     : [];
   const selectedCanSplit = perms.canSplitOrder && !!activeOrderId && !!selectedItem && (selectedSent?.sentQty || 0) === 0 && selectedMatches.length === 1;
   const selectedSentQty = selectedSent?.sentQty || 0;
@@ -153,12 +157,12 @@ export function CurrentOrderPanel({
       : canDeleteItem);
   const selectedTransferLines = useMemo<TransferItemLine[]>(() => selectedItems.flatMap((item) => {
     const lineKey = cartLineKey(item);
-    const matches = orderItems.filter((row) => orderItemLineKey(row) === lineKey);
-    if (matches.length !== 1) return [];
-    return [{ item, orderItemId: matches[0].id }];
+    const matches = orderItems.filter((row) => item.order_item_id ? row.id === item.order_item_id : orderItemLineKey(row) === lineKey);
+    if (matches.length !== 1 || !transferLineIsSaved(item, matches[0])) return [];
+    return [{ item, orderItemId: matches[0].id, saved: matches[0] }];
   }), [selectedItems, orderItems]);
   const selectedCanTransfer =
-    perms.canTransferOrder &&
+    perms.canTransferOrder && !!onItemsTransferred &&
     orderType === 'dine_in' &&
     !!activeOrderId &&
     !!activeTable &&
@@ -166,7 +170,7 @@ export function CurrentOrderPanel({
     selectedTransferLines.length === selectedItems.length;
 
   const splitLineKey = splitItem ? cartLineKey(splitItem) : null;
-  const splitOrderItemMatches = splitLineKey ? orderItems.filter((row) => orderItemLineKey(row) === splitLineKey) : [];
+  const splitOrderItemMatches = splitItem ? orderItems.filter((row) => splitItem.order_item_id ? row.id === splitItem.order_item_id : orderItemLineKey(row) === splitLineKey) : [];
   const splitOrderItemId = splitOrderItemMatches.length === 1 ? splitOrderItemMatches[0].id : null;
 
   const applyCompletedSplit = (quantity: number) => {
@@ -193,8 +197,8 @@ export function CurrentOrderPanel({
 
     setSelectedLineKeys(new Set());
   };
-  const handleCompletedMultiTransfer = () => {
-    selectedItems.forEach((item) => onRemove(cartLineKey(item)));
+  const handleCompletedMultiTransfer = (result: PosItemTransferResult) => {
+    onItemsTransferred?.(result);
     setSelectedLineKeys(new Set());
     setTransferItemsOpen(false);
   };
