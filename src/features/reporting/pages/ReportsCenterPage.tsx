@@ -321,17 +321,17 @@ export function ReportsCenterPage() {
             </button>
             {!isOverview && !requestedFinancial && (
               <div className="flex flex-wrap items-center gap-2" data-testid="reports-header-actions">
-                {can('reports.export') && <button type="button" disabled={!reportActions}
+                {can('reports.export') && <button type="button" disabled={!reportActions?.canExport}
                   onClick={() => reportActions?.exportExcel()}
                   className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border bg-ui-surface px-3 text-xs font-bold text-ui-text disabled:opacity-50">
                   <Download className="h-4 w-4" />{isAr ? 'تصدير' : 'Export'}
                 </button>}
-                {can('reports.print') && <button type="button" disabled={!reportActions}
+                {can('reports.print') && <button type="button" disabled={!reportActions?.canPrint}
                   onClick={() => reportActions?.print()}
                   className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border bg-ui-surface px-3 text-xs font-bold text-ui-text disabled:opacity-50">
                   <Printer className="h-4 w-4" />{isAr ? 'طباعة' : 'Print'}
                 </button>}
-                <button type="button" disabled={!reportActions}
+                <button type="button" disabled={!reportActions?.canSave}
                   onClick={() => reportActions?.save()}
                   className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border bg-ui-surface px-3 text-xs font-bold text-ui-text disabled:opacity-50">
                   <Plus className="h-4 w-4" />{isAr ? 'حفظ تقرير مخصص' : 'Save custom report'}
