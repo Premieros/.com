@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ResponsiveContainer, BarChart as RechartsBarChart, LineChart as RechartsLineChart, PieChart as RechartsPieChart, Pie, Cell, Line, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { Download, TrendingUp, ShoppingCart, Receipt, Package, BarChart3, CreditCard, Users, List, Layers, AlertTriangle, FileDown, Printer, UserCheck, RotateCcw, Trash2 } from 'lucide-react';
@@ -120,8 +120,11 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnl
     }
   }, [controlledReportType, onReportTypeChange]);
 
+  const lastControlledRange = useRef({ from: controlledFrom, to: controlledTo });
   useEffect(() => {
     if (!controlledFrom || !controlledTo) return;
+    if (lastControlledRange.current.from === controlledFrom && lastControlledRange.current.to === controlledTo) return;
+    lastControlledRange.current = { from: controlledFrom, to: controlledTo };
     setFrom(controlledFrom);
     setTo(controlledTo);
     setQueryVersion((version) => version + 1);
