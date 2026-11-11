@@ -30,11 +30,11 @@ const TILES: Tile[] = [
     kind: 'line',
   },
   {
-    key: 'sales_by_employee',
-    ar: 'أداء المبيعات حسب الموظف',
-    en: 'Sales performance by employee',
-    descriptionAr: 'مقارنة الأداء من بيانات الموظفين المصرح بعرضها.',
-    descriptionEn: 'Compare performance from authorized employee sales.',
+    key: 'sales',
+    ar: 'المبيعات حسب الفروع',
+    en: 'Sales by branch',
+    descriptionAr: 'تجميع صافي المبيعات المعتمد لكل فرع مصرح به، دون دمج العملات.',
+    descriptionEn: 'Existing net sales grouped per authorized branch without cross-currency total.',
     kind: 'bars',
   },
   {
@@ -100,8 +100,8 @@ export function ReportsShowcase({
           const Icon = ICONS[tile.kind];
           return (
             <div
-              key={tile.key}
-              data-testid={`report-shortcut-${tile.key}`}
+              key={tile.kind}
+              data-testid={`report-shortcut-${tile.kind}`}
               className="group flex min-h-[220px] flex-col rounded-2xl border border-ui-border bg-ui-surface p-4 text-start shadow-ui-sm transition hover:border-ui-primary hover:shadow-ui-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-ui-primary"
             >
               <div className="flex w-full items-center justify-between gap-3">
@@ -115,7 +115,7 @@ export function ReportsShowcase({
               </div>
               <div className="my-4 w-full flex-1 rounded-xl border border-ui-border bg-ui-page-alt/30 px-2 py-3">
                 {chartRun > 0 ? (
-                  <ReportsPage key={`${tile.key}-${chartRun}`} controlledReportType={tile.key} chartOnly controlledFrom={from} controlledTo={to} />
+                  <ReportsPage key={`${tile.kind}-${chartRun}`} controlledReportType={tile.key} chartOnly chartMode={tile.kind === 'bars' ? 'branch' : 'normal'} controlledFrom={from} controlledTo={to} />
                 ) : (
                   <div className="flex min-h-44 flex-col items-center justify-center text-center">
                     <TrendingUp className="mb-2 h-7 w-7 text-ui-primary/70" aria-hidden="true" />
