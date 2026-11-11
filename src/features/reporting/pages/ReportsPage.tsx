@@ -1331,10 +1331,12 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     print: handlePrint,
     save: handleSaveCustomReport,
   };
+  const canExportHeader = !loading && !reportError && can('reports.export');
+  const canPrintHeader = !loading && !reportError && can('reports.print');
   useEffect(() => {
     if (!onActionsReady) return;
-    const canExport = !loading && !reportError && can('reports.export');
-    const canPrint = !loading && !reportError && can('reports.print');
+    const canExport = canExportHeader;
+    const canPrint = canPrintHeader;
     const canSave = !loading && !reportError;
     const controls: ReportsPageActions = {
       canExport, canPrint, canSave,
@@ -1344,7 +1346,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     };
     onActionsReady(controls);
     return () => onActionsReady(null);
-  }, [onActionsReady, loading, reportError, can]);
+  }, [onActionsReady, loading, reportError, canExportHeader, canPrintHeader]);
 
   return (
     <div>
