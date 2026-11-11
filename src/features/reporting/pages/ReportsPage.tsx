@@ -56,9 +56,12 @@ type PeriodKey = 'custom' | 'today' | 'yesterday' | 'last7' | 'last30' | 'this_m
 interface ReportsPageProps {
   controlledReportType?: ReportType;
   onReportTypeChange?: (type: ReportType) => void;
+  chartOnly?: boolean;
+  controlledFrom?: string;
+  controlledTo?: string;
 }
 
-export function ReportsPage({ controlledReportType, onReportTypeChange }: ReportsPageProps = {}) {
+export function ReportsPage({ controlledReportType, onReportTypeChange, chartOnly = false, controlledFrom, controlledTo }: ReportsPageProps = {}) {
   /* REPORT-BRANCH-AUDIT-2026 */
   const { t, lang } = useLanguage();
   const can = useCan();
@@ -67,9 +70,9 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
   const reportBranchIds = branchScope.selectedBranchIds;
-  const [reportType, setReportType] = useState<ReportType>('sales');
-  const [from, setFrom] = useState(() => history.minDate || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
-  const [to, setTo] = useState(todayISO());
+  const [reportType, setReportType] = useState<ReportType>(controlledReportType || 'sales');
+  const [from, setFrom] = useState(() => controlledFrom || history.minDate || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => controlledTo || todayISO());
   const [period, setPeriod] = useState<PeriodKey>('custom');
   const [data, setData] = useState<Record<string, unknown>[]>([]);
   const [tableSearch, setTableSearch] = useState('');
@@ -116,6 +119,13 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
       });
     }
   }, [controlledReportType, onReportTypeChange]);
+
+  useEffect(() => {
+    if (!controlledFrom || !controlledTo) return;
+    setFrom(controlledFrom);
+    setTo(controlledTo);
+    setQueryVersion((version) => version + 1);
+  }, [controlledFrom, controlledTo]);
 
   const effectiveBranchFilter = reportBranchIds.length === 1 ? reportBranchIds[0] : null;
   const { branches } = useBranches();
@@ -1301,6 +1311,32 @@ export function ReportsPage({ controlledReportType, onReportTypeChange }: Report
     }));
     openPrintWindow({ title: reportLabel, subtitle: `${reportBranchLabel} — ${from} - ${to}`, headers, rows, lang: lang as 'ar' | 'en' });
   };
+
+  if (chartOnly) {
+    return (
+      <div data-testid={`premier-overview-chart-${reportType}`} className="min-w-0">
+        {loading ? (
+          <p role="status" className="py-12 text-center text-xs text-ui-muted">{lang === 'ar' ? 'جارٍ تحميل بيانات التقرير...' : 'Loading report data...'}</p>
+        ) : reportError ? (
+          <p role="alert" className="py-12 text-center text-xs text-ui-danger">{lang === 'ar' ? 'تعذر تحميل بيانات هذا التقرير كاملة.' : 'Complete report data could not be loaded.'}</p>
+        ) : chartData.length === 0 ? (
+          <p className="py-12 text-center text-xs text-ui-muted">{lang === 'ar' ? 'لا توجد بيانات ضمن الفترة والفروع المصرح بها.' : 'No data for the selected period and authorized branches.'}</p>
+        ) : (
+          <div className="h-48 w-full" dir="ltr" role="img" aria-label={lang === 'ar' ? 'رسم بياني من بيانات التقرير الفعلية' : 'Chart of actual report data'}>
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsBarChart data={chartData.slice(0, 10)} margin={{ top: 8, right: 8, left: 0, bottom: 16 }}>
+                <CartesianGrid strokeDasharray="3 3" opacity={0.2} />
+                <XAxis dataKey="name" interval={0} tick={{ fontSize: 9 }} tickFormatter={(value: string) => String(value).slice(0, 9)} />
+                <YAxis tick={{ fontSize: 10 }} width={46} />
+                <Tooltip formatter={(value: number) => [Number(value).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US'), lang === 'ar' ? 'القيمة' : 'Value']} />
+                <Bar dataKey="value" fill="var(--ui-primary, #2563eb)" radius={[4, 4, 0, 0]} />
+              </RechartsBarChart>
+            </ResponsiveContainer>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
