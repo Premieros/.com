@@ -1,7 +1,7 @@
 # Selective Johna's → Premier feature migration
 
 ## Scope and source protection
-- Read-only source: `Premieros/johna-s` (no commits, branches, database writes or deployments).
+- Read-only source: Johna's legacy source repository (read-only) (no commits, branches, database writes or deployments).
 - Target: `Premieros/.com`. Every change must be adapted to Premier's current React/TypeScript architecture, routes, Supabase schema, branch scopes, RLS, roles and reporting/costing engines.
 - A file missing by path is **only a candidate**, not proof that the feature is absent.
 - Migrate one cohesive feature at a time, with source comparison, runtime integration, regression tests, CI and a separate PR.
