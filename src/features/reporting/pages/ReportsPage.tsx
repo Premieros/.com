@@ -1461,7 +1461,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         financialTypes={canFinancial ? financialTypes : []}
         canFinancial={canFinancial}
         onFinancialSelect={(key) => navigate(`/financial-reports?view=${key}&from=${from}&to=${to}`)}
-        reportTypes={standalone ? [] : reportTypes}
+        reportTypes={standalone ? reportTypes.filter((item) => item.key === reportType) : reportTypes}
         onReportTypeChange={standalone ? undefined : handleReportTypeSelect}
         onRunReport={runReport}
         loading={loading}

@@ -29,6 +29,22 @@ export function ReportFullPage() {
     item.key === type && item.permissions.every((permission) => can(permission as Permission))
     && businessReportAllowed(runtime, item.key, item.category)
   );
+  const financialNames: Record<string, { ar: string; en: string }> = {
+    trial_balance: { ar: 'ميزان المراجعة', en: 'Trial Balance' },
+    ledger: { ar: 'دفتر الأستاذ', en: 'General Ledger' },
+    treasury_statement: { ar: 'كشف حساب بنك / خزنة', en: 'Bank / Treasury Statement' },
+    inventory_movement: { ar: 'حركة صنف', en: 'Item Movement' },
+    income: { ar: 'قائمة الدخل', en: 'Income Statement' },
+    balance_sheet: { ar: 'الميزانية', en: 'Balance Sheet' },
+    ar_aging: { ar: 'أعمار ديون العملاء', en: 'AR Aging' },
+    ap_aging: { ar: 'أعمار ديون الموردين', en: 'AP Aging' },
+    aging_summary: { ar: 'ملخص الذمم', en: 'Aging Summary' },
+    cash_flow: { ar: 'التدفقات النقدية', en: 'Cash Flow' },
+    party_statement: { ar: 'كشف حساب عميل / مورد', en: 'Party Statement' },
+  };
+  const selectedReportTitle = isFinancial && financialView
+    ? (isAr ? financialNames[financialView]?.ar : financialNames[financialView]?.en)
+    : (isAr ? allowedReport?.title : allowedReport?.titleEn);
   const financialAllowed = isFinancial && can('reports.financial') && financialView
     && businessFinancialViewAllowed(runtime, financialView);
   const validDates = /^\d{4}-\d{2}-\d{2}$/.test(from) && /^\d{4}-\d{2}-\d{2}$/.test(to)
@@ -41,8 +57,8 @@ export function ReportFullPage() {
         <div className="flex items-center gap-2">
           <FileBarChart className="h-5 w-5 text-ui-primary" />
           <div>
-            <h1 className="text-lg font-black text-ui-text">{isAr ? 'التقرير التفصيلي' : 'Detailed report'}</h1>
-            <p className="text-xs text-ui-muted">{from} — {to}</p>
+            <h1 className="text-lg font-black text-ui-text">{selectedReportTitle || (isAr ? 'التقرير التفصيلي' : 'Detailed report')}</h1>
+            <p className="text-xs text-ui-muted">{isAr ? 'التقرير التفصيلي' : 'Detailed report'} · {from} — {to}</p>
           </div>
         </div>
         <button type="button" onClick={() => navigate('/reports')}
