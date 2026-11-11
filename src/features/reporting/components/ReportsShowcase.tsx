@@ -69,7 +69,8 @@ export function ReportsShowcase({
   }, [branchScope.scopeKey, from, to, canReadSnapshot]);
 
   const load = async () => {
-    if (!canReadSnapshot || !hasAuthorizedBranches || loading) return;
+    // A scope change must start a fresh request even while an older request is loading.
+    if (!canReadSnapshot || !hasAuthorizedBranches) return;
     const version = ++generation.current;
     setLoading(true);
     setLoaded(null);
