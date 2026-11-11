@@ -22,6 +22,8 @@ export function transferLineIsSaved(item: CartItem, row: OrderItem): boolean {
 // Replace the exact affected IDs from the server; never subtract again on replay
 // or merge identical products. Unsaved edits on other lines remain untouched.
 export function applyItemTransferToCart(cart: CartItem[], result: PosItemTransferResult): CartItem[] {
+  // A missing authoritative snapshot must never be interpreted as an empty order.
+  if (!result.success || !result.snapshot || !result.quantity_transfers?.length) return cart;
   const affected = new Set(result.quantity_transfers?.map((move) => move.source_item_id) || []);
   const rows = new Map(result.snapshot?.orderItems.filter((row) => row.order_id === result.source_order_id).map((row) => [row.id, row]));
   return cart.flatMap((item) => {
