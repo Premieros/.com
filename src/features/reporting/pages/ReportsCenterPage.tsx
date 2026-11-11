@@ -64,9 +64,9 @@ export function ReportsCenterPage() {
   const can = useCan();
   const branchScope = useBranchScope();
   const history = useHistoryAccess();
-  const [draftFrom, setDraftFrom] = useState(() => addIsoDays(businessDateISO(), -29));
+  const [draftFrom, setDraftFrom] = useState(() => addIsoDays(businessDateISO(), -6));
   const [draftTo, setDraftTo] = useState(() => businessDateISO());
-  const [dateRange, setDateRange] = useState(() => ({ from: addIsoDays(businessDateISO(), -29), to: businessDateISO() }));
+  const [dateRange, setDateRange] = useState(() => ({ from: addIsoDays(businessDateISO(), -6), to: businessDateISO() }));
   const [periodError, setPeriodError] = useState(false);
   const [overviewRun, setOverviewRun] = useState(0);
   const { lang } = useLanguage();
