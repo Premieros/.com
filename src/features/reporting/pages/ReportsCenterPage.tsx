@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Search, ChevronDown, ChevronUp, BarChart3, Star, LayoutGrid, ArrowLeft, ArrowRight, ShieldCheck, Zap, FileBarChart, CalendarDays, RefreshCw } from 'lucide-react';
+import { Search, ChevronDown, ChevronUp, BarChart3, Star, LayoutGrid, ArrowLeft, ArrowRight, ShieldCheck, Zap, FileBarChart, CalendarDays, RefreshCw, Download, Printer, Plus } from 'lucide-react';
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { ReportsPage } from './ReportsPage';
+import { ReportsPage, type ReportsPageActions } from './ReportsPage';
 import { FinancialReportsPage } from '@/features/accounting/pages/FinancialReportsPage';
 import { ReportsExecutiveKpis } from '../components/ReportsExecutiveKpis';
 import { ReportsShowcase } from '../components/ReportsShowcase';
@@ -69,6 +69,7 @@ export function ReportsCenterPage() {
   const [dateRange, setDateRange] = useState(() => ({ from: addIsoDays(businessDateISO(), -6), to: businessDateISO() }));
   const [periodError, setPeriodError] = useState(false);
   const [overviewRun, setOverviewRun] = useState(0);
+  const [reportActions, setReportActions] = useState<ReportsPageActions | null>(null);
   const { lang } = useLanguage();
   const { runtime } = useOrganizationModules();
   const location = useLocation();
@@ -318,6 +319,25 @@ export function ReportsCenterPage() {
               <RefreshCw className="h-3.5 w-3.5" />
               {isAr ? 'تطبيق الفترة' : 'Apply period'}
             </button>
+            {!isOverview && !requestedFinancial && (
+              <div className="flex flex-wrap items-center gap-2" data-testid="reports-header-actions">
+                {can('reports.export') && <button type="button" disabled={!reportActions}
+                  onClick={() => reportActions?.exportExcel()}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border bg-ui-surface px-3 text-xs font-bold text-ui-text disabled:opacity-50">
+                  <Download className="h-4 w-4" />{isAr ? 'تصدير' : 'Export'}
+                </button>}
+                {can('reports.print') && <button type="button" disabled={!reportActions}
+                  onClick={() => reportActions?.print()}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border bg-ui-surface px-3 text-xs font-bold text-ui-text disabled:opacity-50">
+                  <Printer className="h-4 w-4" />{isAr ? 'طباعة' : 'Print'}
+                </button>}
+                <button type="button" disabled={!reportActions}
+                  onClick={() => reportActions?.save()}
+                  className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border bg-ui-surface px-3 text-xs font-bold text-ui-text disabled:opacity-50">
+                  <Plus className="h-4 w-4" />{isAr ? 'حفظ تقرير مخصص' : 'Save custom report'}
+                </button>
+              </div>
+            )}
             <label className="flex min-w-[180px] flex-col gap-1 text-xs font-semibold text-ui-muted">
               {isAr ? 'نطاق الفروع' : 'Branch scope'}
               <select
@@ -402,7 +422,7 @@ export function ReportsCenterPage() {
           {!isOverview && requestedFinancial && canFinancial && allowedFinancialViews.length > 0 ? (
             <FinancialReportsPage hideViewPicker />
           ) : !isOverview && permittedOperational.some((report) => report.key === activeReport) ? (
-            <ReportsPage controlledReportType={activeReport} onReportTypeChange={selectOperational} controlledFrom={dateRange.from} controlledTo={dateRange.to} />
+            <ReportsPage controlledReportType={activeReport} onReportTypeChange={selectOperational} controlledFrom={dateRange.from} controlledTo={dateRange.to} onActionsReady={setReportActions} />
           ) : !isOverview && (
             <div className="rounded-xl border border-ui-border bg-ui-surface px-6 py-12 text-center text-sm text-ui-muted">
               {isAr ? 'اختر تقريرًا مسموحًا لك لعرض بياناته الحقيقية' : 'Select an authorized report to view live data'}
