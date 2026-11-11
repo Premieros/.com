@@ -59,6 +59,17 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
     expect(showcase).not.toMatch(/(?:579,300|66,550|4,892)/);
   });
 
+  it('loads actual dashboard and accounting results on entry, never showing sample numbers', () => {
+    expect(showcase).toContain('data-testid="reports-performance-summary"');
+    expect(showcase).toContain('data-testid={`overview-kpi-${card.id}`}');
+    expect(showcase).toContain('void load();');
+    expect(showcase).toContain('current?.orderTypes');
+    expect(showcase).toContain('reports-top-products-data');
+    expect(showcase).toContain('if (error) return');
+    expect(center).not.toContain('LEGACY_HIDDEN_REPORTS');
+    expect(kpis).toContain('void run();');
+  });
+
   it('uses the existing detailed-report handlers for header actions', () => {
     expect(center).toContain('onActionsReady={setReportActions}');
     expect(center).toContain('reportActions?.exportExcel()');
