@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { ClipboardCheck, Plus, Eye, Send, CheckCircle2, XCircle, CheckCheck, Trash2 } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { ClipboardCheck, Plus, Eye, Send, CheckCircle2, XCircle, CheckCheck, Trash2, Download, Upload } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -16,6 +16,9 @@ import { Modal } from '@/components/Modal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { formatNumber, formatDateTime } from '@/lib/format';
 import { logAudit } from '@/lib/audit';
+import { exportToExcelAdvanced, importFromExcel } from '@/lib/excel';
+import { loadStockCountExcelSnapshot } from '../services/stockCountExcelSnapshot';
+import { buildStockCountExcelRows, parseStockCountExcelRows, stockCountExcelColumns } from '../utils/stockCountExcel';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
 import type { StockCount, StockCountItem, Branch, Warehouse, Product, RawMaterial } from '@/lib/types';
 
@@ -63,6 +66,8 @@ export function StockCountsPage() {
   const [editLines, setEditLines] = useState<EditLine[]>([]);
   const [confirmTarget, setConfirmTarget] = useState<{ count: StockCount; action: 'submit' | 'approve' | 'reject' | 'apply' } | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const countExcelInputRef = useRef<HTMLInputElement>(null);
+  const [excelBusy, setExcelBusy] = useState(false);
 
   const statusOptions = [
     { key: 'draft', label: t('countStatusDraft') },
@@ -86,7 +91,7 @@ export function StockCountsPage() {
       supabase.from('branches').select('*').eq('is_active', true).order('name'),
       supabase.from('warehouses').select('*').eq('is_active', true).order('name'),
       supabase.from('products').select('*').eq('is_active', true).order('name'),
-      supabase.from('raw_materials').select('*').eq('is_active', true).order('name'),
+      supabase.from('raw_materials').select('*, unit:measurement_units!raw_materials_unit_id_fkey(*)').eq('is_active', true).order('name'),
     ]);
     setBranches((br.data as Branch[]) || []);
     setWarehouses((wh.data as Warehouse[]) || []);
@@ -131,6 +136,84 @@ export function StockCountsPage() {
   const addFormItem = () => setFormItems([...formItems, { item_id: '', counted_quantity: '', reason: '' }]);
   const updateFormItem = (idx: number, field: keyof CreateLine, value: string) => setFormItems(formItems.map((l, i) => i === idx ? { ...l, [field]: value } : l));
   const removeFormItem = (idx: number) => setFormItems(formItems.filter((_, i) => i !== idx));
+
+  const exportCountExcel = async () => {
+    if (!form.branch_id || !form.warehouse_id || !branchScope.selectedBranchSet.has(form.branch_id)) {
+      show(isAr ? 'اختر فرعًا مسموحًا ومخزنًا قبل تنزيل نموذج الجرد.' : 'Choose an authorized branch and warehouse before exporting.', 'error');
+      return;
+    }
+    if (!warehouses.some((w) => w.id === form.warehouse_id && w.branch_id === form.branch_id)) {
+      show(isAr ? 'المخزن لا يتبع الفرع المحدد.' : 'The warehouse does not belong to the selected branch.', 'error');
+      return;
+    }
+    setExcelBusy(true);
+    try {
+      const snapshot = await loadStockCountExcelSnapshot(form.branch_id, form.warehouse_id);
+      const columns = stockCountExcelColumns(isAr);
+      const branchName = branches.find((b) => b.id === form.branch_id)?.name || form.branch_id;
+      const warehouseName = warehouses.find((w) => w.id === form.warehouse_id)?.name || form.warehouse_id;
+      await exportToExcelAdvanced({
+        data: buildStockCountExcelRows({
+          materials: formRawMaterials,
+          snapshot,
+          branchId: form.branch_id,
+          warehouseId: form.warehouse_id,
+          isAr,
+        }),
+        filename: `stock-count-${branchName}-${warehouseName}-${new Date().toISOString().slice(0, 10)}`,
+        sheetName: isAr ? 'جرد الخامات' : 'Raw Material Count',
+        columns: [columns.rawMaterialId, columns.code, columns.name, columns.systemQuantity,
+          columns.countedQuantity, columns.reason, columns.branchId, columns.warehouseId],
+      });
+    } catch {
+      show(isAr ? 'تعذر تنزيل نموذج الجرد. راجع صلاحية عرض المخزن ثم أعد المحاولة.' : 'Could not export the count sheet. Check warehouse access and retry.', 'error');
+    } finally {
+      setExcelBusy(false);
+    }
+  };
+
+  const importCountExcel = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file) return;
+    if (!form.branch_id || !form.warehouse_id || !branchScope.selectedBranchSet.has(form.branch_id)) {
+      show(isAr ? 'اختر الفرع والمخزن المسموح بهما قبل رفع الملف.' : 'Select an authorized branch and warehouse before importing.', 'error');
+      return;
+    }
+    if (!warehouses.some((w) => w.id === form.warehouse_id && w.branch_id === form.branch_id)) {
+      show(isAr ? 'المخزن لا يتبع الفرع المحدد.' : 'The warehouse does not belong to the selected branch.', 'error');
+      return;
+    }
+    setExcelBusy(true);
+    try {
+      const rows = await importFromExcel(file);
+      const parsed = parseStockCountExcelRows({
+        rows,
+        materials: formRawMaterials,
+        branchId: form.branch_id,
+        warehouseId: form.warehouse_id,
+        requireComplete: form.count_type === 'full',
+        isAr,
+      });
+      if (parsed.errors.length > 0) {
+        show(parsed.errors.slice(0, 5).join('\n') + (parsed.errors.length > 5
+          ? (isAr ? `\nو${parsed.errors.length - 5} أخطاء أخرى` : `\nand ${parsed.errors.length - 5} more errors`) : ''), 'error');
+        return;
+      }
+      if (parsed.lines.length === 0) {
+        show(isAr ? 'لم يُدخل الملف أي كميات فعلية. املأ عمود الكمية الفعلية ثم أعد رفعه.' : 'The file has no counted quantities. Fill in Counted Quantity and try again.', 'error');
+        return;
+      }
+      setFormItems(parsed.lines);
+      show(isAr
+        ? `تم تحميل ${parsed.lines.length} خامة إلى مسودة الجرد فقط. لا يتغير المخزون إلا بعد الحفظ والإرسال والاعتماد والتطبيق.`
+        : `Loaded ${parsed.lines.length} items into the draft. Stock changes only after save, submit, approve and apply.`, 'success');
+    } catch {
+      show(isAr ? 'تعذر قراءة ملف الجرد. استخدم نموذج Excel المُنزّل من نفس الفرع والمخزن.' : 'Could not read the count file. Use the exported template for the same branch and warehouse.', 'error');
+    } finally {
+      setExcelBusy(false);
+    }
+  };
 
   const createCount = async () => {
     if (!form.branch_id || !form.warehouse_id) { show(t('required') + ': ' + t('branch') + ' / ' + t('warehouse'), 'error'); return; }
@@ -246,8 +329,27 @@ export function StockCountsPage() {
       <DesignPanel testId="stock-counts-table-panel"><DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} /><DesignPagination loaded={counts.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} /></DesignPanel>
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={t('newStockCount')} size="lg"><div className="space-y-4">
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3"><Select label={t('branch')} value={form.branch_id} onChange={(e) => { const nextBranchId = e.target.value; const branchWarehouses = warehouses.filter((w) => w.branch_id === nextBranchId); setForm({ ...form, branch_id: nextBranchId, warehouse_id: branchWarehouses.length === 1 ? branchWarehouses[0].id : '' }); resetCreateLines(); }}><option value="">{t('branch')}</option>{visibleBranches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}</Select><Select label={t('warehouse')} value={form.warehouse_id} onChange={(e) => setForm({ ...form, warehouse_id: e.target.value })}><option value="">{t('warehouse')}</option>{warehouses.filter((w) => !form.branch_id || w.branch_id === form.branch_id).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</Select><Select label={t('countType')} value={form.count_type} onChange={(e) => setForm({ ...form, count_type: e.target.value })}>{typeOptions.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}</Select></div>
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3"><Select label={t('branch')} value={form.branch_id} onChange={(e) => { const nextBranchId = e.target.value; const branchWarehouses = warehouses.filter((w) => w.branch_id === nextBranchId); setForm({ ...form, branch_id: nextBranchId, warehouse_id: branchWarehouses.length === 1 ? branchWarehouses[0].id : '' }); resetCreateLines(); }}><option value="">{t('branch')}</option>{visibleBranches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}</Select><Select label={t('warehouse')} value={form.warehouse_id} onChange={(e) => { setForm({ ...form, warehouse_id: e.target.value }); resetCreateLines(); }}><option value="">{t('warehouse')}</option>{warehouses.filter((w) => !form.branch_id || w.branch_id === form.branch_id).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</Select><Select label={t('countType')} value={form.count_type} onChange={(e) => setForm({ ...form, count_type: e.target.value })}>{typeOptions.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}</Select></div>
         <p className="text-xs text-ui-subtle">{isAr ? 'الجرد يطبق على الخامة داخل المخزن المحدد، وليس على رصيد منتج جاهز.' : 'The count applies to the raw material in the selected warehouse, not to finished-product stock.'}</p>
+        <div className="rounded-lg border border-ui-border bg-ui-page-alt/40 p-3" data-testid="stock-count-excel-tools">
+          <div className="flex flex-wrap items-center gap-2">
+            <input ref={countExcelInputRef} type="file" accept=".xlsx,.xls" className="hidden"
+              onChange={importCountExcel} data-testid="stock-count-excel-input" />
+            <Button variant="outline" size="sm" onClick={exportCountExcel}
+              disabled={excelBusy || !form.branch_id || !form.warehouse_id}>
+              <Download className="h-4 w-4" /> {isAr ? 'تنزيل نموذج الجرد Excel' : 'Export Count Excel'}
+            </Button>
+            <Button variant="outline" size="sm" onClick={() => countExcelInputRef.current?.click()}
+              disabled={excelBusy || !form.branch_id || !form.warehouse_id}>
+              <Upload className="h-4 w-4" /> {isAr ? 'استيراد الكميات من Excel' : 'Import Count Excel'}
+            </Button>
+          </div>
+          <p className="mt-2 text-xs text-ui-subtle">
+            {isAr
+              ? 'اختر الفرع والمخزن ثم نزّل النموذج وأدخل الكميات الفعلية. الاستيراد يملأ المسودة فقط ولا يغيّر الرصيد حتى الحفظ والإرسال والاعتماد والتطبيق.'
+              : 'Choose branch and warehouse, export the template and fill counted quantities. Import edits the draft only; stock changes after save, submit, approve and apply.'}
+          </p>
+        </div>
         <Input label={t('notes')} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} placeholder={isAr ? 'ملاحظات اختيارية' : 'Optional notes'} />
         <div><div className="flex items-center justify-between mb-2"><p className="text-sm font-medium text-ui-muted">{t('countItems')}</p><Button variant="outline" size="sm" onClick={addFormItem}><Plus className="w-4 h-4" /> {t('addCountItem')}</Button></div><div className="space-y-2">{formItems.map((l, idx) => <div key={idx} className="grid grid-cols-12 gap-2 items-end"><div className="col-span-6"><Select label={idx === 0 ? (isAr ? 'الخامة' : 'Raw material') : undefined} value={l.item_id} onChange={(e) => updateFormItem(idx, 'item_id', e.target.value)}><option value="">{isAr ? 'اختر الخامة' : 'Choose raw material'}</option>{createChoices.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</Select></div><div className="col-span-3"><Input label={idx === 0 ? t('countedQuantity') : undefined} type="number" step="0.0001" value={l.counted_quantity} onChange={(e) => updateFormItem(idx, 'counted_quantity', e.target.value)} placeholder="0" /></div><div className="col-span-2"><Input label={idx === 0 ? t('reason') : undefined} value={l.reason} onChange={(e) => updateFormItem(idx, 'reason', e.target.value)} placeholder={isAr ? 'سبب' : 'Reason'} /></div><div className="col-span-1 flex justify-end"><button onClick={() => removeFormItem(idx)} className="p-2 rounded-md hover:bg-ui-danger-soft text-ui-danger"><Trash2 className="w-4 h-4" /></button></div></div>)}</div></div>
         <div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setCreateOpen(false)}>{t('cancel')}</Button><Button onClick={createCount}>{t('save')}</Button></div>
