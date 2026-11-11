@@ -88,10 +88,11 @@ export function ReportsCenterPage() {
   );
 
   const initialOperational = permittedOperational.find((report) => report.key === 'sales_by_payment')?.key || permittedOperational[0]?.key || '';
-  useEffect(() => { if (!pendingReport && initialOperational) setPendingReport(initialOperational); }, [pendingReport, initialOperational]);
 
   const canFinancial = can('reports.financial');
   const allowedFinancialViews = FINANCIAL_REPORTS.filter((report) => businessFinancialViewAllowed(runtime, report.key));
+  const defaultReport = initialOperational || (canFinancial && allowedFinancialViews.length > 0 ? `financial:${allowedFinancialViews[0].key}` : '');
+  useEffect(() => { if (!pendingReport && defaultReport) setPendingReport(defaultReport); }, [pendingReport, defaultReport]);
 
   const filteredOperational = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -144,7 +145,7 @@ export function ReportsCenterPage() {
     setPeriodError(false);
     setDateRange({ from: draftFrom, to: draftTo });
     setOverviewRun((value) => value + 1);
-    const target = pendingReport || initialOperational;
+    const target = pendingReport || defaultReport;
     if (target.startsWith('financial:')) {
       const view = target.slice('financial:'.length);
       if (canFinancial && allowedFinancialViews.some((entry) => entry.key === view)) {
@@ -284,7 +285,7 @@ export function ReportsCenterPage() {
               className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border px-3 text-xs font-bold text-ui-text">
               <LayoutGrid className="h-4 w-4" />{isAr ? 'أنواع التقارير' : 'Report types'}
             </button>
-            <button type="button" onClick={applyOverviewDates} data-testid="apply-overview-dates"
+            <button type="button" onClick={applyOverviewDates} disabled={!defaultReport} data-testid="apply-overview-dates"
               className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-ui-primary px-4 text-xs font-bold text-ui-primary-fg">
               {isAr ? 'عرض التقرير التفصيلي' : 'View detailed report'}
             </button>
@@ -299,7 +300,7 @@ export function ReportsCenterPage() {
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted sm:col-span-2">
               {isAr ? 'نوع التقرير' : 'Report type'}
-              <select data-testid="reports-single-type-select" value={pendingReport || initialOperational}
+              <select data-testid="reports-single-type-select" value={pendingReport || defaultReport}
                 onChange={(event) => setPendingReport(event.target.value)}
                 className="h-10 w-full rounded-lg border border-ui-border bg-ui-page-alt px-2 text-xs font-bold text-ui-text">
                 <optgroup label={isAr ? 'التقارير التشغيلية' : 'Operational'}>
