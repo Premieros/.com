@@ -26,11 +26,6 @@ const PANELS: Panel[] = [
   { id: 'products', report: 'sales_by_product', ar: 'الأصناف الأكثر مبيعًا (بالكمية)', en: 'Top products (units)', icon: Trophy },
 ];
 const PIE_COLORS = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#6366f1'];
-const PAYMENT_LABELS: Record<string, { ar: string; en: string }> = {
-  cash: { ar: 'نقدي', en: 'Cash' }, card: { ar: 'بطاقة', en: 'Card' },
-  transfer: { ar: 'تحويل', en: 'Transfer' }, credit: { ar: 'آجل', en: 'Credit' },
-  other: { ar: 'أخرى', en: 'Other' },
-};
 type Loaded = { snapshot: DashboardSalesSnapshot; scopeKey: string; from: string; to: string };
 
 export function ReportsShowcase({
