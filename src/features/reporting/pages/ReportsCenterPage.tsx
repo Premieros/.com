@@ -70,7 +70,6 @@ export function ReportsCenterPage() {
   const [showDirectory, setShowDirectory] = useState(false);
   const [pendingReport, setPendingReport] = useState<string>('');
   const [filtersOpen, setFiltersOpen] = useState(false);
-  useEffect(() => { if (!pendingReport && initialOperational) setPendingReport(initialOperational); }, [pendingReport, initialOperational]);
   const toggleFavorite = useCallback((key: string) => {
     setFavorites((previous) => {
       const next = previous.includes(key) ? previous.filter((item) => item !== key) : [...previous, key];
@@ -89,6 +88,7 @@ export function ReportsCenterPage() {
   );
 
   const initialOperational = permittedOperational.find((report) => report.key === 'sales_by_payment')?.key || permittedOperational[0]?.key || '';
+  useEffect(() => { if (!pendingReport && initialOperational) setPendingReport(initialOperational); }, [pendingReport, initialOperational]);
 
   const canFinancial = can('reports.financial');
   const allowedFinancialViews = FINANCIAL_REPORTS.filter((report) => businessFinancialViewAllowed(runtime, report.key));
@@ -336,7 +336,7 @@ export function ReportsCenterPage() {
             {isAr ? 'تحديث الملخص المجمع' : 'Refresh summary'}
           </button>
         </div>}
-      </header>eader>
+      </header>
       {periodError && <p role="alert" className="rounded-lg border border-ui-danger/30 bg-ui-danger-soft px-4 py-2 text-xs text-ui-danger">
         {isAr ? 'الفترة غير صالحة أو خارج حدود تاريخ التقارير المسموح.' : 'Invalid period or outside authorized history.'}
       </p>}
