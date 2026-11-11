@@ -26,7 +26,7 @@ export async function loadSalesReportRows(args: {
 }): Promise<Record<string, unknown>[]> {
   let q = supabase
     .from('sales')
-    .select('id, branch_id, invoice_number, subtotal, discount_amount, tax_amount, total, paid_amount, refunded_amount, payment_method, order_type, status, created_at, customer:customers(name), cashier:users!fk_sales_cashier(full_name,email), warehouse:warehouses(name)')
+    .select('id, branch_id, invoice_number, subtotal, discount_amount, tax_amount, total, paid_amount, refunded_amount, payment_method, order_type, status, created_at, customer:customers(name), cashier:users!fk_sales_cashier(full_name,email), warehouse:warehouses!sales_warehouse_id_fkey(name)')
     .gte('created_at', args.fromTs)
     .lt('created_at', args.toExclusiveTs)
     .order('created_at', { ascending: false });
