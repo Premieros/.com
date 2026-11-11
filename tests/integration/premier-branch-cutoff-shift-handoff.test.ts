@@ -160,4 +160,66 @@ describeDisposable('Premier branch-configured cutoff and open-order shift handof
       await client.query('ROLLBACK');
     }
   });
+
+  it('blocks admin normal and split settlement of a carried order with no active shift before financial writes', async () => {
+    const org = randomUUID(), branch = randomUUID(), user = randomUUID(), order = randomUUID();
+    const tag = randomUUID().slice(0, 10);
+    const email = `ci-carry-admin-${tag}@ci.invalid`;
+    await client.query('BEGIN');
+    try {
+      await client.query(`INSERT INTO public.roles(role,name_ar,name_en,permissions,scope,is_active)
+        VALUES('super_admin','مدير النظام','Super Admin','[]'::jsonb,'global',true)
+        ON CONFLICT(role) DO NOTHING`);
+      await client.query('INSERT INTO public.organizations(id,name,slug) VALUES($1,$2,$3)',
+        [org,'CI Carryover Admin',`ci-carry-${tag}`]);
+      await client.query('INSERT INTO public.branches(id,name,organization_id) VALUES($1,$2,$3)',
+        [branch,'CI Carryover Admin Branch',org]);
+      await client.query('INSERT INTO auth.users(id,email,created_at,updated_at) VALUES($1,$2,now(),now())',
+        [user,email]);
+      await client.query("SELECT set_config('app.register_branch','on',true)");
+      await client.query(`INSERT INTO public.users(id,email,full_name,role,branch_id,is_active)
+        VALUES($1,$2,'CI Carryover Admin','super_admin',$3,true)`, [user,email,branch]);
+      await client.query("SELECT set_config('app.user_id',$1,true),set_config('app.jwt',$2,true),set_config('app.register_branch','off',true)",
+        [user,JSON.stringify({sub:user,role:'authenticated'})]);
+      await client.query(`INSERT INTO public.orders(id,branch_id,order_number,status,payment_status,order_type,subtotal,total)
+        VALUES($1,$2,$3,'open','unpaid','takeaway',2,2)`, [order,branch,`CI-CARRY-${tag}`]);
+
+      const check = await client.query<{ can_pay: boolean }>(
+        "SELECT public.can_permission('pos.payment.take') AS can_pay");
+      expect(check.rows[0].can_pay).toBe(true);
+
+      const normal = await client.query<{ result: { success: boolean; error: string } }>(`
+        SELECT public.process_sale(
+          p_invoice_number => $1, p_branch_id => $2, p_warehouse_id => NULL,
+          p_customer_id => NULL, p_salesperson_id => $3,
+          p_subtotal => 2, p_discount_amount => 0, p_discount_type => 'amount',
+          p_tax_amount => 0, p_bonus_amount => 0, p_total => 2, p_paid_amount => 2,
+          p_payment_method => 'cash', p_status => 'completed',
+          p_items => '[]'::jsonb, p_shift_id => NULL, p_order_id => $4
+        ) AS result`, [`CI-NORMAL-${tag}`,branch,user,order]);
+      expect(normal.rows[0].result).toMatchObject({ success:false,error:'NO_OPEN_SHIFT' });
+
+      const split = await client.query<{ result: { success: boolean; error: string } }>(`
+        SELECT public.process_sale_split(
+          p_invoice_number => $1, p_branch_id => $2, p_warehouse_id => NULL,
+          p_customer_id => NULL, p_salesperson_id => $3,
+          p_subtotal => 2, p_discount_amount => 0, p_discount_type => 'amount',
+          p_tax_amount => 0, p_bonus_amount => 0, p_total => 2,
+          p_payments => '[{"payment_method":"cash","amount":1},{"payment_method":"card","amount":1}]'::jsonb,
+          p_status => 'completed', p_items => '[]'::jsonb, p_shift_id => NULL, p_order_id => $4
+        ) AS result`, [`CI-SPLIT-${tag}`,branch,user,order]);
+      expect(split.rows[0].result).toMatchObject({ success:false,error:'NO_OPEN_SHIFT' });
+
+      const unchanged = await client.query<{ status: string; payment_status: string; sales: string; journal: string }>(`
+        SELECT o.status,o.payment_status,
+          (SELECT count(*)::text FROM public.sales s WHERE s.source_order_id=o.id) sales,
+          (SELECT count(*)::text FROM public.journal_entries j WHERE j.branch_id=o.branch_id) journal
+        FROM public.orders o WHERE o.id=$1`, [order]);
+      expect(unchanged.rows[0]).toMatchObject({
+        status:'open',payment_status:'unpaid',sales:'0',journal:'0'
+      });
+    } finally {
+      await client.query('ROLLBACK');
+    }
+  });
 });
