@@ -1,45 +1,58 @@
-# POS partial item transfers — release blocked pending compatibility/security audit
+# POS partial item transfers — audited candidate, release approval required
 
-**Status: BLOCKED / NOT DEPLOYABLE.** This PR is a candidate only. Do not merge or apply the SQL to Premier production.
+**Do not merge, deploy, or apply this migration to production without explicit approval.**
+Production was queried only for routine definitions/ownership/ACLs. No schema or business data was changed.
 
-## Verified baseline
-- Premier production currently exposes the 3-argument `transfer_order_items_to_table(uuid,uuid[],uuid)` RPC; no 4-argument quantity-transfer overload. Verified by read-only database introspection.
-- The Johna's source's own feature document `docs/PARTIAL_ITEM_TRANSFER_20261024.md` explicitly marks partial quantity transfer **BLOCKED**, with no production migration, merge or deployment authorized.
-- Porting the UI alone would break the existing transfer flow because its 4-argument RPC is unavailable.
-- Source migration is ~75 KB and **overrides several POS ownership, kitchen send, sent-item, pricing, and permission guard functions**. Successful compilation would not establish safety against later Premier-specific permission and inventory migrations.
+## CI and SQL fixes
 
-## Candidate implementation (never run against production as part of review)
-- Exact persisted-line equality (including quantity, product, unit, price, discount, bonus, notes and modifiers) before enabling transfer.
-- Quantity input per selected saved line and immutable expected-line evidence.
-- Stable operation UUID across retry of an unknown outcome; no optimistic partial cart subtraction.
-- Server-authoritative source/target/table/KDS snapshot reconciliation and preservation of unrelated unsaved lines.
-- Additive transfer event lineage only; no inventory re-consumption or kitchen resend.
-- Production schema/data/permissions untouched; source repository is read only.
+- Head `1d7f195` failed both CI workflows because its test imported nonexistent `./db` and `./rls` helpers. The test now supplies a rollback-only fixture and authenticated-role executor; missing DB configuration/auth stub fails instead of skipping.
+- Removed the copied `_capture_kitchen_ingredient_prices` replacement: Premier has no such routine. The canonical kitchen core writes frozen snapshots; splitting copies them without current recipe/price lookups.
+- Rebased guards on Premier's actual definitions, retaining default-table bootstrap, authorized tenant purge, ownership, pricing, action-specific permissions and RLS. Removed unrelated quick-create/KDS permission changes copied from the source.
+- Retained fail-closed source-body hashes and existing owner, ACL, search path and security mode. New helpers are SECURITY INVOKER with no authenticated/anon execution grants.
+- Private transaction/backend-bound context prevents client-set session settings from authorizing split exceptions.
+- November's `premier_kitchen_send_item_order_fk` remains validated and immediate by default. Transfer defers this exact FK while moving both parents, then forces validation before returning. No constraint, trigger, RLS policy or test was disabled by this fix.
 
-## Mandatory gates before release
-1. Replace the copied migration's broad trigger/function overrides with an **audited Premier-native diff**. Confirm current production function definitions, owner/ACL, trigger order, and security invoker/definer modes remain intact. Never bypass source-drift guards.
-2. Ensure compatibility with all Premier migrations after October 2026, including November permission-first, composite branch FK, shift settlement, stock accounting and printing safeguards.
-3. Exact-head TypeScript, lint, tests, build, and complete isolated PostgreSQL migration replay must all pass.
-4. In isolated database, verify sent and unsent partial moves, KDS sent/served snapshots, frozen costs, modifier price preservation, payment restrictions, rollback on conflict, concurrent source changes, permission boundaries and idempotent replay.
-5. Full-row transfer RPC must continue to work for existing clients.
-6. Stage an **audited disable/rollback** action that preserves transfer lineage for already committed movements; never delete lineage or rewrite historical business records.
-7. Obtain explicit production release approval for the reviewed migration and matching frontend before applying the migration to Premier's production DB. Verify function signatures and permission sources immediately before release.
+## Production baseline rechecked read-only, 2026-11-12 Cairo
 
-## Important
-GitHub CI may be queued; absence of test failure is not a pass. There is no authorization to edit Johna's or to manufacture sale/stock data for test transactions in production.
+These normalized **function-body** MD5s supersede the older diagnostic hashes previously listed here; they match the full disposable canonical replay. They are not hashes of complete `pg_get_functiondef` strings.
 
-## Read-only Premier production function baseline (2026-11-11)
-Verified directly from the currently connected Premier Supabase project, without data writes:
+| Routine | Body MD5 |
+|---|---|
+| `transfer_order_items_to_table(uuid,uuid[],uuid)` | `b0c4df0d8f3fba4bbf64c5b032b46084` |
+| `guard_pos_operator_ownership()` | `b711286cb96b9959ae40e8ab4c7a39ec` |
+| `guard_kitchen_send_operator_ownership()` | `df85fed351dae369b9baec70d5b36fac` |
+| `guard_sent_order_item_mutation()` | `da5c7d97d3f7767e31d9c11d7df646b0` |
+| `enforce_pos_permission_mutation()` | `bb52b53d857550c900cf8664214dfb78` |
+| `_reprice_order_item()` | `3753587c8bd3ebff1469df445a7f1e02` |
+| `_restore_kitchen_inventory_for_void(uuid,uuid,numeric)` | `01ae49ef4245574df2fa9b41f82e6e34` |
+| `_restore_refund_hybrid_inventory(uuid,uuid,uuid,numeric,uuid,uuid,text)` | `0511c763a9243024d58571b34dcaedfb` |
 
-| Routine | Exact arguments | Security mode | Definition MD5 (audit reference only) |
-|---|---|---|---|
-| transfer_order_items_to_table | uuid, uuid[], uuid | SECURITY DEFINER | `1771e6316b3ae68627d362090c3ff1d4` |
-| guard_pos_operator_ownership | none | SECURITY DEFINER | `493e1be94be8a4ff6ee322dbdca370c4` |
-| guard_kitchen_send_operator_ownership | none | SECURITY DEFINER | `83c523bcd19573abc7bf6686e39a9fea` |
-| guard_sent_order_item_mutation | none | SECURITY DEFINER | `e03bb3a524ed6a542442a7326ea0726a` |
-| enforce_pos_permission_mutation | none | SECURITY DEFINER | `2c3c0814e1987308b210f289b955c784` |
-| _reprice_order_item | none | SECURITY DEFINER | `3de734b13ece6baff879c66f7c0e0637` |
+All listed routines are postgres-owned SECURITY DEFINER with `search_path=public, pg_temp`. Existing guard/helper ACLs allow postgres/service_role only; the three-argument transfer additionally allows authenticated. Production has no four-argument quantity overload. No release was performed.
 
-The checked functions are owned by `postgres`, have `search_path=public, pg_temp`, and their ACLs are restricted to `postgres, service_role` except the existing 3-argument transfer RPC, which also allows `authenticated`. The exact **four-argument JSON transfer overload is not present** in production. These hashes are diagnostic baselines, not blanket permission to replace functions. Re-read definitions, ownership and ACLs before any approved release.
+## Local execution evidence
 
-Because the source SQL overrides existing functions without proven equivalence to these Premier definitions, **the copied 75 KB migration remains unapproved**. A future revision must explicitly preserve each security check introduced in Premier's later migrations, and the source's own documented release gate must be satisfied.
+Node 22.23.4, npm 10.9.9, PostgreSQL 16.15; owned loopback DB on port 55432, fresh `premier_pr170_final`.
+
+- Canonical replay: **606 applied, 0 skipped**, auth stub separately. All five pinned historical CI compatibility tests passed; no source-drift guard was bypassed.
+- Same schema verification/fixtures as `verify-main.yml`, including its pre-existing CI-only subscription/branch fixtures, which were not changed.
+- Unit/components: **271 tests in 50 files passed**.
+- Integration/security: **112 tests in 31 files passed**.
+- Typecheck (application and tests), API contract/project identity, lint and production build passed locally. Lint has 39 existing warnings and no errors.
+- Both Chromium smoke/offline-shell tests passed. Exact-head GitHub CI remains the final verification gate.
+
+The 11 partial-transfer integration cases cover sent/unsent/served splits, frozen price/cost/rounding conservation, replay/conflict/stale evidence, permissions/foreign branches, paid orders, invalid quantities, old clients, concurrent branch commands, ACL/owner/FK invariants and the actual disable script.
+
+The connected cycle receives 10 raw units, sends four through the real kitchen RPC (stock 6), transfers one, queues a thermal customer check once despite retry, and collects both orders with 15% tax (total 85.10). Stock stays 6; transfer and collection add no inventory ledger entries. Printing proof covers queue/payload/frontend contracts, not physical paper output on a production printer.
+
+## Disable and rollback
+
+`scripts/db/rollback/pos_partial_transfer_disable_REVIEW_ONLY.sql` disables **new** quantity commands through a private control row. It retains split rows, frozen snapshots, inventory effects, lineage/audit, and old three-argument transfers. Already-committed operations still resolve their idempotent result while disabled. The integration test executes the script within rollback-only fixtures.
+
+Never roll back by deleting lineage, rewriting historical quantities, removing guards or replaying sales. Production use or re-enable requires approval.
+
+## Release gates
+
+1. Exact-head GitHub CI must pass, including DB and Chromium jobs.
+2. Obtain explicit approval for reviewed SQL and matching frontend release.
+3. Immediately before approved release, recheck function-body hashes, owners/ACLs, constraints and project identity; abort on drift.
+4. Apply approved schema before publishing the matching frontend; verify RPC and agreed printer behavior under that separate approval.

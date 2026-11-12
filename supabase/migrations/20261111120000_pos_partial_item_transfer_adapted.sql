@@ -1,6 +1,11 @@
 BEGIN;
 SET LOCAL lock_timeout='2s';
 SET LOCAL statement_timeout='15s';
+-- The November parent-pair FK must validate after both the item and its send
+-- have moved. It remains immediate for every ordinary statement and is never
+-- disabled or dropped; the transfer explicitly validates it before returning.
+ALTER TABLE public.order_kitchen_sends
+ ALTER CONSTRAINT premier_kitchen_send_item_order_fk DEFERRABLE INITIALLY IMMEDIATE;
 -- Additive lineage only: no historical row backfill or inventory movement.
 ALTER TABLE public.order_kitchen_inventory_events ADD COLUMN transfer_origin_event_id uuid;
 COMMENT ON COLUMN public.order_kitchen_inventory_events.transfer_origin_event_id IS 'Original consumption event retained by a quantity transfer; used only to restore legacy unit consumption sources.';
@@ -17,13 +22,31 @@ RETURNS jsonb LANGUAGE sql IMMUTABLE SECURITY INVOKER SET search_path=public,pg_
 $$;
 REVOKE ALL ON FUNCTION public._pos_transfer_snapshot_part(jsonb,numeric,numeric,boolean) FROM PUBLIC,anon,authenticated;
 
+-- Client-set GUCs are not authority. Only the revoked split helper, reached
+-- through the authorized canonical command, can create this transaction token.
+CREATE TABLE private.pos_partial_transfer_context (
+ backend_pid integer NOT NULL,
+ transaction_id bigint NOT NULL,
+ context jsonb NOT NULL,
+ PRIMARY KEY (backend_pid,transaction_id)
+);
+REVOKE ALL ON private.pos_partial_transfer_context FROM PUBLIC,anon,authenticated,service_role;
+CREATE TABLE private.pos_partial_transfer_control (
+ singleton boolean PRIMARY KEY DEFAULT true CHECK (singleton),
+ enabled boolean NOT NULL
+);
+INSERT INTO private.pos_partial_transfer_control(singleton,enabled) VALUES(true,true);
+REVOKE ALL ON private.pos_partial_transfer_control FROM PUBLIC,anon,authenticated,service_role;
+
 -- Not an authority by itself: called from existing guards, which additionally
 -- validate exact row changes and the allocated send/event quantities.
 CREATE FUNCTION public._pos_partial_transfer_context(p_order_id uuid,p_item_id uuid)
 RETURNS jsonb LANGUAGE plpgsql STABLE SECURITY INVOKER SET search_path=public,pg_temp AS $$
 DECLARE c jsonb;
 BEGIN
- c:=NULLIF(current_setting('app.pos_item_quantity_transfer_state',true),'')::jsonb;
+ SELECT context INTO c FROM private.pos_partial_transfer_context
+ WHERE backend_pid=pg_backend_pid() AND transaction_id=txid_current();
+ IF c IS DISTINCT FROM NULLIF(current_setting('app.pos_item_quantity_transfer_state',true),'')::jsonb THEN RETURN NULL; END IF;
  IF c IS NULL OR auth.uid() IS NULL OR c->>'actor_id' IS DISTINCT FROM auth.uid()::text
    OR NOT public.can_permission('pos.order.transfer')
    OR p_order_id IS DISTINCT FROM (c->>'source_order_id')::uuid
@@ -73,6 +96,7 @@ BEGIN
    'source_item_id',i.id,'new_item_id',n,'source_quantity',i.quantity,'quantity',p_take,
    'discount',moved_discount,'bonus',moved_bonus,'total',moved_total,'sent_quantity',sent_take);
  PERFORM set_config('app.pos_item_quantity_transfer_state',ctx::text,true);
+ INSERT INTO private.pos_partial_transfer_context VALUES(pg_backend_pid(),txid_current(),ctx);
  INSERT INTO public.order_items(id,order_id,product_id,unit_name,quantity,unit_price,discount_amount,bonus_quantity,total,notes,created_at,modifier_option_ids,modifiers_snapshot)
  VALUES(n,p_order,i.product_id,i.unit_name,p_take,i.unit_price,moved_discount,moved_bonus,moved_total,i.notes,i.created_at,i.modifier_option_ids,i.modifiers_snapshot);
  remaining:=sent_take;
@@ -121,6 +145,7 @@ BEGIN
  UPDATE public.order_items SET quantity=quantity-p_take,discount_amount=discount_amount-moved_discount,
   bonus_quantity=bonus_quantity-moved_bonus,total=total-moved_total WHERE id=i.id;
  PERFORM set_config('app.pos_item_quantity_transfer_state','',true);
+ DELETE FROM private.pos_partial_transfer_context WHERE backend_pid=pg_backend_pid() AND transaction_id=txid_current();
  RETURN n;
 END $$;
 REVOKE ALL ON FUNCTION public._pos_split_transfer_line(uuid,uuid,numeric,uuid) FROM PUBLIC,anon,authenticated;
@@ -150,110 +175,7 @@ END $$;
 REVOKE ALL ON FUNCTION public.transfer_order_items_to_table(uuid,uuid[],uuid,jsonb) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.transfer_order_items_to_table(uuid,uuid[],uuid,jsonb) TO authenticated,service_role;
 
-DO $guard$ BEGIN IF (SELECT md5(replace(prosrc,chr(13),'')) FROM pg_proc WHERE oid='public._capture_kitchen_ingredient_prices()'::regprocedure) NOT IN ('4c958bda8fe9cdcc2079662e556a9d2f') THEN RAISE EXCEPTION 'PARTIAL_TRANSFER_SOURCE_DRIFT:_capture_kitchen_ingredient_prices'; END IF; END $guard$;
-CREATE OR REPLACE FUNCTION public._capture_kitchen_ingredient_prices()
- RETURNS trigger
- LANGUAGE plpgsql
- SET search_path TO 'public', 'pg_temp'
-AS $function$
-DECLARE
-  v_transfer_source public.order_kitchen_inventory_events%ROWTYPE;
-  v_transfer_context jsonb;
-  v_raw_ids uuid[];
-  v_prices jsonb := '{}'::jsonb;
-  v_component jsonb;
-  v_price jsonb;
-  v_components jsonb := '[]'::jsonb;
-  v_unit_cost numeric;
-  v_quantity numeric;
-  v_lookup_failed boolean := false;
-BEGIN
-  IF NEW.transfer_origin_event_id IS NOT NULL THEN
-    v_transfer_context:=public._pos_partial_transfer_context(NEW.order_id,NEW.order_item_id);
-    SELECT * INTO v_transfer_source FROM public.order_kitchen_inventory_events
-      WHERE id=NULLIF(current_setting('app.pos_item_transfer_snapshot_source_event',true),'')::uuid;
-    IF v_transfer_context IS NULL OR v_transfer_source.id IS NULL
-      OR v_transfer_source.order_id IS DISTINCT FROM NEW.order_id
-      OR v_transfer_source.order_item_id IS DISTINCT FROM (v_transfer_context->>'source_item_id')::uuid
-      OR NEW.order_item_id IS DISTINCT FROM (v_transfer_context->>'new_item_id')::uuid
-      OR v_transfer_source.settled_sale_id IS NOT NULL OR NEW.settled_sale_id IS NOT NULL
-      OR NEW.sent_quantity<=0 OR NEW.sent_quantity>v_transfer_source.sent_quantity-v_transfer_source.voided_quantity
-      OR NEW.voided_quantity<>0 OR NEW.branch_id IS DISTINCT FROM v_transfer_source.branch_id
-      OR NEW.warehouse_id IS DISTINCT FROM v_transfer_source.warehouse_id
-      OR NEW.created_by IS DISTINCT FROM v_transfer_source.created_by OR NEW.created_at IS DISTINCT FROM v_transfer_source.created_at
-      OR NEW.kitchen_send_id IS DISTINCT FROM v_transfer_source.kitchen_send_id
-      OR NEW.snapshot_version IS DISTINCT FROM v_transfer_source.snapshot_version
-      OR NEW.transfer_origin_event_id IS DISTINCT FROM COALESCE(v_transfer_source.transfer_origin_event_id,v_transfer_source.id)
-      OR NEW.total_cost IS DISTINCT FROM round(v_transfer_source.total_cost*NEW.sent_quantity/v_transfer_source.sent_quantity,6)
-      OR NEW.component_snapshot IS DISTINCT FROM public._pos_transfer_snapshot_part(v_transfer_source.component_snapshot,NEW.sent_quantity,v_transfer_source.sent_quantity)
-      THEN RAISE EXCEPTION 'TRANSFER_SNAPSHOT_PROVENANCE_INVALID'; END IF;
-    RETURN NEW;
-  END IF;
-
-  IF NEW.snapshot_version < 2
-     OR jsonb_typeof(NEW.component_snapshot) IS DISTINCT FROM 'array'
-     OR jsonb_array_length(NEW.component_snapshot) = 0 THEN
-    RETURN NEW;
-  END IF;
-
-  SELECT array_agg(DISTINCT (component->>'raw_material_id')::uuid)
-    INTO v_raw_ids
-  FROM jsonb_array_elements(NEW.component_snapshot) component
-  WHERE component ? 'raw_material_id';
-
-  BEGIN
-    -- Bounded approved sources at this exact send time. Trigger remains paused.
-    -- Do not use inventory averages, FIFO batch costs, or default-cost guesses.
-    SELECT COALESCE(jsonb_object_agg(
-      p.raw_material_id::text,
-      jsonb_build_object('unit_cost',p.unit_cost, 'price_source',p.price_source, 'priced_at',p.priced_at)
-    ), '{}'::jsonb)
-    INTO v_prices
-    FROM public._kitchen_approved_price_candidate(NEW.branch_id, v_raw_ids, COALESCE(NEW.created_at, now())) p
-    WHERE p.unit_cost > 0
-      AND p.price_source IN ('purchase','pricing','stock_count')
-      AND p.priced_at IS NOT NULL
-      AND p.priced_at <= COALESCE(NEW.created_at, now());
-  EXCEPTION WHEN OTHERS THEN
-    -- A pricing lookup failure cannot break checkout, kitchen dispatch or stock.
-    -- Missing prices remain NULL, never zero and never today's retrospective price.
-    v_lookup_failed := true;
-    v_prices := '{}'::jsonb;
-    RAISE LOG 'kitchen_price_snapshot_lookup_failed event % SQLSTATE %', NEW.id, SQLSTATE;
-  END;
-
-  FOR v_component IN SELECT value FROM jsonb_array_elements(NEW.component_snapshot)
-  LOOP
-    v_price := v_prices -> (v_component->>'raw_material_id');
-    v_quantity := NULLIF(v_component->>'quantity','')::numeric;
-    v_unit_cost := NULLIF(v_price->>'unit_cost','')::numeric;
-    IF v_unit_cost IS NULL OR v_unit_cost <= 0 OR v_quantity IS NULL OR v_quantity <= 0 THEN
-      v_components := v_components || jsonb_build_array(
-        v_component || jsonb_build_object(
-          'unit_cost',NULL,
-          'extended_cost',NULL,
-          'price_source',CASE WHEN v_lookup_failed THEN 'lookup_failed' ELSE 'unpriced' END,
-          'priced_at',NULL,
-          'price_captured_at',COALESCE(NEW.created_at,now())
-        )
-      );
-    ELSE
-      v_components := v_components || jsonb_build_array(
-        v_component || jsonb_build_object(
-          'unit_cost',v_unit_cost,
-          'extended_cost',round(v_quantity*v_unit_cost,6),
-          'price_source',v_price->>'price_source',
-          'priced_at',v_price->>'priced_at',
-          'price_captured_at',COALESCE(NEW.created_at,now())
-        )
-      );
-    END IF;
-  END LOOP;
-
-  NEW.component_snapshot := v_components;
-  RETURN NEW;
-END;
-$function$;
+-- Premier snapshots are written by the canonical kitchen core; no pricing trigger replacement.
 DO $guard$ BEGIN IF (SELECT md5(replace(prosrc,chr(13),'')) FROM pg_proc WHERE oid='public.guard_kitchen_send_operator_ownership()'::regprocedure) NOT IN ('df85fed351dae369b9baec70d5b36fac') THEN RAISE EXCEPTION 'PARTIAL_TRANSFER_SOURCE_DRIFT:guard_kitchen_send_operator_ownership'; END IF; END $guard$;
 CREATE OR REPLACE FUNCTION public.guard_kitchen_send_operator_ownership()
  RETURNS trigger
@@ -361,7 +283,7 @@ BEGIN
   RETURN NEW;
 END;
 $function$;
-DO $guard$ BEGIN IF (SELECT md5(replace(prosrc,chr(13),'')) FROM pg_proc WHERE oid='public.guard_pos_operator_ownership()'::regprocedure) NOT IN ('42c828d6844819ca69e808910cbd2f30') THEN RAISE EXCEPTION 'PARTIAL_TRANSFER_SOURCE_DRIFT:guard_pos_operator_ownership'; END IF; END $guard$;
+DO $guard$ BEGIN IF (SELECT md5(replace(prosrc,chr(13),'')) FROM pg_proc WHERE oid='public.guard_pos_operator_ownership()'::regprocedure) NOT IN ('b711286cb96b9959ae40e8ab4c7a39ec') THEN RAISE EXCEPTION 'PARTIAL_TRANSFER_SOURCE_DRIFT:guard_pos_operator_ownership'; END IF; END $guard$;
 CREATE OR REPLACE FUNCTION public.guard_pos_operator_ownership()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -389,6 +311,18 @@ DECLARE
   v_pos_action_context boolean:=false;
   v_partial jsonb;
 BEGIN
+  -- Only permit canonical default dining-table provisioning during a newly
+  -- registered anonymous tenant's branch bootstrap. All regular POS actions
+  -- remain subject to an authenticated operator and permission checks.
+  IF TG_TABLE_NAME='dining_tables' AND TG_OP IN ('INSERT','UPDATE') THEN
+    IF v_uid IS NULL AND current_setting('app.register_branch',true)='on'
+       AND NEW.name ~ '^Table (0[1-9]|[1-4][0-9]|50)$'
+       AND EXISTS (SELECT 1 FROM public.dining_areas a
+                   WHERE a.id=NEW.area_id AND a.branch_id=NEW.branch_id AND a.is_default)
+       AND NOT EXISTS (SELECT 1 FROM public.users u WHERE u.branch_id=NEW.branch_id)
+    THEN RETURN NEW; END IF;
+  END IF;
+
   IF v_is_service_role OR v_is_db_admin THEN
     IF TG_OP='DELETE' THEN RETURN OLD; END IF;
     RETURN NEW;
@@ -607,7 +541,7 @@ BEGIN
   RETURN NEW;
 END;
 $function$;
-DO $guard$ BEGIN IF (SELECT md5(replace(prosrc,chr(13),'')) FROM pg_proc WHERE oid='public.guard_sent_order_item_mutation()'::regprocedure) NOT IN ('22549f23df980dcf9345d277d483da9a') THEN RAISE EXCEPTION 'PARTIAL_TRANSFER_SOURCE_DRIFT:guard_sent_order_item_mutation'; END IF; END $guard$;
+DO $guard$ BEGIN IF (SELECT md5(replace(prosrc,chr(13),'')) FROM pg_proc WHERE oid='public.guard_sent_order_item_mutation()'::regprocedure) NOT IN ('da5c7d97d3f7767e31d9c11d7df646b0') THEN RAISE EXCEPTION 'PARTIAL_TRANSFER_SOURCE_DRIFT:guard_sent_order_item_mutation'; END IF; END $guard$;
 CREATE OR REPLACE FUNCTION public.guard_sent_order_item_mutation()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -621,7 +555,11 @@ DECLARE
   v_internal boolean := COALESCE(current_setting('app.approved_sent_item_void', true), '') = '1';
   v_pending_event_quantity numeric(14,6) := 0;
 BEGIN
-  SELECT
+  IF TG_OP='DELETE' AND EXISTS (
+    SELECT 1 FROM public.orders o WHERE o.id=OLD.order_id
+      AND private.authorized_full_tenant_purge_branch(o.branch_id)
+  ) THEN RETURN OLD; END IF;
+    SELECT
     EXISTS(
       SELECT 1
       FROM public.order_kitchen_sends s
@@ -766,6 +704,11 @@ BEGIN
         OR v_previous.details->>'transfer_request_hash' IS DISTINCT FROM v_request_hash THEN RETURN jsonb_build_object('success',false,'error','TRANSFER_OPERATION_CONFLICT'); END IF;
       RETURN (v_previous.details->'result')||jsonb_build_object('replayed',true,'snapshot',public._pos_transfer_pair_snapshot(p_order_id,(v_previous.details->>'target_order_id')::uuid));
     END IF;
+  END IF;
+  -- A disabled rollout must still resolve an already committed ambiguous
+  -- command through the idempotency record above. Only new commands are blocked.
+  IF v_request IS NOT NULL AND NOT COALESCE((SELECT enabled FROM private.pos_partial_transfer_control WHERE singleton),false) THEN
+    RETURN jsonb_build_object('success',false,'error','PARTIAL_TRANSFER_DISABLED');
   END IF;
   IF v_order.status NOT IN ('open','held') THEN RETURN jsonb_build_object('success',false,'error','ORDER_NOT_EDITABLE'); END IF;
 
@@ -930,6 +873,7 @@ BEGIN
   PERFORM set_config('app.pos_item_transfer_target_table_id',p_target_table_id::text,true);
   PERFORM set_config('app.pos_item_transfer_item_ids',array_to_string(v_item_ids,','),true);
 
+  SET CONSTRAINTS public.premier_kitchen_send_item_order_fk DEFERRED;
   UPDATE public.order_items
   SET order_id=v_target_order_id
   WHERE order_id=p_order_id AND id=ANY(v_item_ids);
@@ -941,6 +885,7 @@ BEGIN
   SET order_id=v_target_order_id
   WHERE order_item_id=ANY(v_item_ids)
     AND order_id=p_order_id;
+  SET CONSTRAINTS public.premier_kitchen_send_item_order_fk IMMEDIATE;
 
   UPDATE public.order_kitchen_inventory_events
   SET order_id=v_target_order_id
@@ -1112,7 +1057,7 @@ DO $lineage$
 DECLARE v_def text; v_body text;
 BEGIN
  SELECT pg_get_functiondef(oid),prosrc INTO v_def,v_body FROM pg_proc WHERE oid='public._restore_kitchen_inventory_for_void(uuid,uuid,numeric)'::regprocedure;
- IF md5(replace(v_body,chr(13),'')) NOT IN ('5fc946d3f2c10042d93926a9b23ead30','72da7142c0b1eff13aa7200a0a40230f') THEN RAISE EXCEPTION 'PARTIAL_TRANSFER_SOURCE_DRIFT:_restore_kitchen_inventory_for_void'; END IF;
+ IF md5(replace(v_body,chr(13),'')) NOT IN ('01ae49ef4245574df2fa9b41f82e6e34') THEN RAISE EXCEPTION 'PARTIAL_TRANSFER_SOURCE_DRIFT:_restore_kitchen_inventory_for_void'; END IF;
  IF (SELECT count(*) FROM regexp_matches(v_def,$needle$'kitchen_send',\s+v_event.id,\s+v_effect.target_id,$needle$,'g'))<>1 THEN RAISE EXCEPTION 'TRANSFER_LINEAGE_FRAGMENT_DRIFT'; END IF;
  EXECUTE regexp_replace(v_def,$needle$'kitchen_send',\s+v_event.id,\s+v_effect.target_id,$needle$,$replacement$'kitchen_send',
           COALESCE(v_event.transfer_origin_event_id,v_event.id),
@@ -1133,7 +1078,11 @@ CREATE OR REPLACE FUNCTION public._reprice_order_item()
  SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
-DECLARE v_partial jsonb; v_branch_id uuid; v_base_price numeric(14,2); v_mod jsonb;
+DECLARE
+  v_partial jsonb;
+  v_branch_id uuid;
+  v_base_price numeric(14,2);
+  v_mod jsonb;
 BEGIN
   IF TG_TABLE_NAME='order_items' AND TG_OP IN ('INSERT','UPDATE') THEN
     v_partial:=public._pos_partial_transfer_context(NEW.order_id,NEW.id);
@@ -1160,22 +1109,49 @@ BEGIN
     END IF;
   END IF;
 
-  SELECT o.branch_id INTO v_branch_id FROM public.orders o WHERE o.id=NEW.order_id;
-  IF v_branch_id IS NULL THEN RAISE EXCEPTION 'ORDER_NOT_FOUND'; END IF;
-  SELECT p.sale_price INTO v_base_price FROM public.products p WHERE p.id=NEW.product_id AND p.branch_id=v_branch_id AND p.is_active=true;
-  IF NOT FOUND THEN RAISE EXCEPTION 'PRODUCT_NOT_IN_BRANCH'; END IF;
-  IF NEW.quantity IS NULL OR NEW.quantity<=0 THEN RAISE EXCEPTION 'INVALID_QUANTITY'; END IF;
-  v_mod:=public.resolve_product_modifiers(NEW.product_id,v_branch_id,to_jsonb(COALESCE(NEW.modifier_option_ids,'{}'::uuid[])));
-  IF COALESCE((v_mod->>'success')::boolean,false) IS NOT TRUE THEN RAISE EXCEPTION 'MODIFIER_VALIDATION_FAILED: %',COALESCE(v_mod->>'error','unknown'); END IF;
-  NEW.modifiers_snapshot:=COALESCE(v_mod->'snapshot','[]'::jsonb);
-  NEW.unit_price:=ROUND(GREATEST(COALESCE(v_base_price,0)+COALESCE((v_mod->>'price_delta')::numeric,0),0),2);
-  NEW.discount_amount:=ROUND(LEAST(GREATEST(COALESCE(NEW.discount_amount,0),0),NEW.quantity*NEW.unit_price),2);
-  NEW.bonus_quantity:=GREATEST(COALESCE(NEW.bonus_quantity,0),0);
-  NEW.total:=ROUND(NEW.quantity*NEW.unit_price-NEW.discount_amount,2);
+  SELECT o.branch_id INTO v_branch_id
+  FROM public.orders o
+  WHERE o.id = NEW.order_id;
+  IF v_branch_id IS NULL THEN
+    RAISE EXCEPTION 'ORDER_NOT_FOUND';
+  END IF;
+
+  SELECT p.sale_price INTO v_base_price
+  FROM public.products p
+  WHERE p.id = NEW.product_id
+    AND p.branch_id = v_branch_id
+    AND p.is_active = true;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'PRODUCT_NOT_IN_BRANCH';
+  END IF;
+  IF NEW.quantity IS NULL OR NEW.quantity <= 0 THEN
+    RAISE EXCEPTION 'INVALID_QUANTITY';
+  END IF;
+
+  v_mod := public.resolve_product_modifiers(
+    NEW.product_id,
+    v_branch_id,
+    to_jsonb(COALESCE(NEW.modifier_option_ids, '{}'::uuid[]))
+  );
+  IF COALESCE((v_mod->>'success')::boolean, false) IS NOT TRUE THEN
+    RAISE EXCEPTION 'MODIFIER_VALIDATION_FAILED: %', COALESCE(v_mod->>'error', 'unknown');
+  END IF;
+
+  NEW.modifiers_snapshot := COALESCE(v_mod->'snapshot', '[]'::jsonb);
+  NEW.unit_price := ROUND(
+    GREATEST(COALESCE(v_base_price, 0) + COALESCE((v_mod->>'price_delta')::numeric, 0), 0),
+    2
+  );
+  NEW.discount_amount := ROUND(
+    LEAST(GREATEST(COALESCE(NEW.discount_amount, 0), 0), NEW.quantity * NEW.unit_price),
+    2
+  );
+  NEW.bonus_quantity := GREATEST(COALESCE(NEW.bonus_quantity, 0), 0);
+  NEW.total := ROUND(NEW.quantity * NEW.unit_price - NEW.discount_amount, 2);
   RETURN NEW;
 END;
 $function$;
-DO $guard$ BEGIN IF (SELECT md5(replace(prosrc,chr(13),'')) FROM pg_proc WHERE oid='public.enforce_pos_permission_mutation()'::regprocedure) NOT IN ('9e6234bbeda10d4e2546d8c5db1106be') THEN RAISE EXCEPTION 'PARTIAL_TRANSFER_SOURCE_DRIFT:enforce_pos_permission_mutation'; END IF; END $guard$;
+DO $guard$ BEGIN IF (SELECT md5(replace(prosrc,chr(13),'')) FROM pg_proc WHERE oid='public.enforce_pos_permission_mutation()'::regprocedure) NOT IN ('bb52b53d857550c900cf8664214dfb78') THEN RAISE EXCEPTION 'PARTIAL_TRANSFER_SOURCE_DRIFT:enforce_pos_permission_mutation'; END IF; END $guard$;
 CREATE OR REPLACE FUNCTION public.enforce_pos_permission_mutation()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -1183,13 +1159,13 @@ CREATE OR REPLACE FUNCTION public.enforce_pos_permission_mutation()
  SET search_path TO 'public', 'pg_temp'
 AS $function$
 DECLARE
+  v_partial jsonb;
   v_uid uuid := auth.uid();
   v_is_service_role boolean := COALESCE(current_setting('role', true), '') = 'service_role';
   v_print_only_mutation boolean := false;
   v_item_transfer_context boolean := false;
   v_sent_item_void_context boolean := false;
   v_pos_action_context boolean := false;
-  v_partial jsonb;
 BEGIN
   IF v_is_service_role OR v_uid IS NULL THEN
     IF TG_OP='DELETE' THEN RETURN OLD; END IF;
@@ -1276,7 +1252,7 @@ BEGIN
 
   IF TG_TABLE_NAME='orders' THEN
     IF TG_OP='INSERT' THEN
-      IF NOT public.can_permission('pos.order.create') AND NOT (public.can_permission('pos.order.quick_create') AND COALESCE(NEW.order_type='takeaway' AND NEW.table_id IS NULL AND NEW.status='open' AND (COALESCE(NEW.discount_amount,0)=0 OR public.can_permission('pos.discount')) AND NEW.cashier_id=auth.uid() AND public.user_may_access_branch(NEW.branch_id),false)) THEN RAISE EXCEPTION 'PERMISSION_DENIED:pos.order.create'; END IF;
+      IF NOT public.can_permission('pos.order.create') THEN RAISE EXCEPTION 'PERMISSION_DENIED:pos.order.create'; END IF;
       RETURN NEW;
     END IF;
     IF TG_OP='DELETE' THEN
@@ -1284,16 +1260,6 @@ BEGIN
       RETURN OLD;
     END IF;
 
-    IF pg_trigger_depth()>1
-       AND public.can_permission('pos.order.quick_create')
-       AND OLD.order_type='takeaway' AND OLD.table_id IS NULL
-       AND OLD.cashier_id=auth.uid() AND OLD.status='open'
-       AND OLD.created_at>=transaction_timestamp()
-       AND public.user_may_access_branch(OLD.branch_id)
-       AND (to_jsonb(NEW)-ARRAY['subtotal','discount_amount','tax_amount','total','updated_at']::text[])
-         = (to_jsonb(OLD)-ARRAY['subtotal','discount_amount','tax_amount','total','updated_at']::text[]) THEN
-      RETURN NEW;
-    END IF;
     v_print_only_mutation :=
       (NEW.print_status IS DISTINCT FROM OLD.print_status OR NEW.printed_at IS DISTINCT FROM OLD.printed_at)
       AND (to_jsonb(NEW)-ARRAY['print_status','printed_at','updated_at']::text[])
@@ -1321,13 +1287,9 @@ BEGIN
          AND NEW.kitchen_status='sent'
          AND public.can_permission('pos.send_kitchen')
          AND EXISTS(
-           SELECT 1 FROM public.order_kitchen_served_quantities baseline
-           WHERE baseline.order_id = OLD.id
-         )
-         AND EXISTS(
            SELECT 1
            FROM public.order_kitchen_sends s
-           LEFT JOIN public.order_kitchen_served_quantities ksb
+           JOIN public.order_kitchen_served_quantities ksb
              ON ksb.order_id = OLD.id
             AND ksb.order_item_id = s.order_item_id
            WHERE s.order_id = OLD.id
@@ -1336,17 +1298,6 @@ BEGIN
         RETURN NEW;
       END IF;
       IF NOT public.can_permission('pos.kds_update') THEN RAISE EXCEPTION 'PERMISSION_DENIED:pos.kds_update'; END IF;
-      RETURN NEW;
-    END IF;
-
-    -- A repeated authorized KDS status is still kitchen bookkeeping, not order editing.
-    -- Restrict the exception to this order's branch/station and kitchen fields.
-    IF NEW.kitchen_status IS NOT DISTINCT FROM OLD.kitchen_status
-       AND (to_jsonb(NEW)-ARRAY['kitchen_status','kitchen_sent_at','kitchen_ready_at','updated_at']::text[])
-         = (to_jsonb(OLD)-ARRAY['kitchen_status','kitchen_sent_at','kitchen_ready_at','updated_at']::text[])
-       AND public.can_permission('pos.kds_update')
-       AND public.user_may_access_branch(OLD.branch_id)
-       AND public.kds_order_in_user_station_scope(OLD.id) THEN
       RETURN NEW;
     END IF;
 
@@ -1420,7 +1371,7 @@ BEGIN
 
   IF TG_TABLE_NAME='order_items' THEN
     IF TG_OP='INSERT' THEN
-      IF NOT public.can_permission('pos.order.create') AND NOT public.can_permission('pos.order.edit') AND NOT (public.can_permission('pos.order.quick_create') AND (public.can_permission('pos.discount') OR (COALESCE(NEW.discount_amount,0)=0 AND COALESCE(NEW.bonus_quantity,0)=0)) AND EXISTS(SELECT 1 FROM public.orders qo WHERE qo.id=NEW.order_id AND qo.order_type='takeaway' AND qo.table_id IS NULL AND qo.cashier_id=auth.uid() AND qo.status='open' AND qo.created_at>=transaction_timestamp() AND public.user_may_access_branch(qo.branch_id))) THEN
+      IF NOT public.can_permission('pos.order.create') AND NOT public.can_permission('pos.order.edit') THEN
         RAISE EXCEPTION 'PERMISSION_DENIED:pos.order.edit';
       END IF;
       RETURN NEW;
