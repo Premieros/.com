@@ -805,6 +805,10 @@ export function PosWorkspacePage() {
       onDiscountAmountChange={pos.setDiscountAmount}
       onUpdateQty={pos.updateQty}
       onSetQty={pos.setQty}
+      onItemsTransferred={(result) => {
+        pos.applyItemsTransfer(result);
+        if (result.snapshot) live.applyTransferSnapshot(result.snapshot);
+      }}
       onRemove={pos.removeFromCart}
       onClear={pos.clearCart}
       onSetItemDiscount={pos.setItemDiscount}

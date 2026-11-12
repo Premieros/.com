@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import type { DiningTable, Order, OrderItem } from '@/lib/types';
 import { countActiveOrders } from '../utils/orderFilters';
 import { usePosRealtime } from './usePosRealtime';
-import type { OrderKitchenSend, PosRealtimeData } from '../types';
+import type { OrderKitchenSend, PosRealtimeData, PosItemTransferSnapshot } from '../types';
 
 export interface UseActiveOrdersResult {
   data: PosRealtimeData;
@@ -16,10 +16,11 @@ export interface UseActiveOrdersResult {
   sentOrderItemIds: Set<string>;
   loading: boolean;
   error: string;
+  applyTransferSnapshot: (snapshot: PosItemTransferSnapshot) => void;
 }
 
 export function useActiveOrders(branchId: string): UseActiveOrdersResult {
-  const { data, loading, error } = usePosRealtime(branchId);
+  const { data, loading, error, applyTransferSnapshot } = usePosRealtime(branchId);
 
   const itemsByOrder = useMemo(() => {
     const map: Record<string, OrderItem[]> = {};
@@ -57,5 +58,5 @@ export function useActiveOrders(branchId: string): UseActiveOrdersResult {
   }, [data.kitchenSends]);
   const sentOrderItemIds = useMemo(() => new Set(data.kitchenSends.map((k) => k.order_item_id)), [data.kitchenSends]);
 
-  return { data, orders, tables: data.tables, counts, ordersByTable, tableById, itemsByOrder, kitchenSendsByOrder, sentOrderItemIds, loading, error };
+  return { data, orders, tables: data.tables, counts, ordersByTable, tableById, itemsByOrder, kitchenSendsByOrder, sentOrderItemIds, loading, error, applyTransferSnapshot };
 }

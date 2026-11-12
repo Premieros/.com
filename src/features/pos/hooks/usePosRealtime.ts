@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchActiveOrders, EMPTY_POS_REALTIME } from '../services/posOrders';
 import { posRealtimeEventMatchesWatchedOrders, subscribePosRealtime } from '../services/posRealtime';
-import type { PosRealtimeData } from '../types';
+import type { PosRealtimeData, PosItemTransferSnapshot } from '../types';
+import { mergeItemTransferSnapshot } from '../utils/itemTransfer';
 
 export interface UsePosRealtimeResult {
   data: PosRealtimeData;
   loading: boolean;
   error: string;
+  applyTransferSnapshot: (snapshot: PosItemTransferSnapshot) => void;
 }
 
 export function usePosRealtime(branchId: string): UsePosRealtimeResult {
@@ -19,6 +21,7 @@ export function usePosRealtime(branchId: string): UsePosRealtimeResult {
   const loadCyclePromiseRef = useRef<Promise<void> | null>(null);
   const watchedOrderIdsRef = useRef<Set<string>>(new Set());
   const visibleItemIdsRef = useRef<Set<string>>(new Set());
+  const mutationRevisionRef = useRef(0);
 
   const load = useCallback((requestedBranch: string): Promise<void> => {
     if (!requestedBranch) return Promise.resolve();
@@ -38,8 +41,9 @@ export function usePosRealtime(branchId: string): UsePosRealtimeResult {
         while (targetBranch) {
           trailingRefreshRef.current = false;
           try {
+            const revision = mutationRevisionRef.current;
             const snapshot = await fetchActiveOrders(targetBranch);
-            if (activeBranchRef.current === targetBranch) {
+            if (activeBranchRef.current === targetBranch && revision === mutationRevisionRef.current) {
               watchedOrderIdsRef.current = new Set(snapshot.watchedOrderIds);
               visibleItemIdsRef.current = new Set(snapshot.orderItems.map((item) => item.id));
               setData(snapshot);
@@ -99,5 +103,16 @@ export function usePosRealtime(branchId: string): UsePosRealtimeResult {
     };
   }, [branchId, load]);
 
-  return { data, loading, error };
+  const applyTransferSnapshot = useCallback((snapshot: PosItemTransferSnapshot) => {
+    if (!snapshot.orders.length || snapshot.orders.some((order) => order.branch_id !== activeBranchRef.current)) return;
+    mutationRevisionRef.current += 1;
+    setData((current) => {
+      const next = mergeItemTransferSnapshot(current, snapshot, activeBranchRef.current);
+      watchedOrderIdsRef.current = new Set(next.watchedOrderIds);
+      visibleItemIdsRef.current = new Set(next.orderItems.map((item) => item.id));
+      return next;
+    });
+  }, []);
+
+  return { data, loading, error, applyTransferSnapshot };
 }

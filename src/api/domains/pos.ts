@@ -65,7 +65,7 @@ export const pos = {
   transferOrderItemToTable(p: { p_order_id: string; p_order_item_id: string; p_target_table_id: string }): ApiResult<RpcResult & { target_order_id?: string; target_order_number?: string; source_order_empty?: boolean; inventory_changed?: boolean; kds_changed?: boolean }> {
     return rpc('transfer_order_item_to_table', p);
   },
-  transferOrderItemsToTable(p: { p_order_id: string; p_order_item_ids: string[]; p_target_table_id: string }): ApiResult<RpcResult & { target_order_id?: string; target_order_number?: string; moved_item_count?: number; source_order_empty?: boolean; inventory_changed?: boolean; kds_changed?: boolean }> {
+  transferOrderItemsToTable(p: { p_order_id: string; p_order_item_ids: string[]; p_target_table_id: string; p_transfer: import('@/features/pos/types').PosItemTransferRequest }): ApiResult<import('@/features/pos/types').PosItemTransferResult> {
     return rpc('transfer_order_items_to_table', p);
   },
   performOrderAction(p: { p_action_type: PosStructuralAction; p_order_id: string; p_payload: Record<string, unknown>; p_reason: string }): ApiResult<PosStructuralActionResult> {

@@ -227,6 +227,8 @@ export interface ProductComponentInput {
 }
 
 export interface CartItem {
+  /** Persisted order line identity; unsaved cart lines omit it. */
+  order_item_id?: string;
   product: Product;
   unit_name: string;
   quantity: number;

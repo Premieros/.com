@@ -1463,7 +1463,8 @@
       "params": [
         "order_id",
         "order_item_ids",
-        "target_table_id"
+        "target_table_id",
+        "transfer"
       ]
     },
     {
