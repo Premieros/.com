@@ -7,7 +7,7 @@ import './mobile-layer-fix.css';
 
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
+    navigator.serviceWorker.register(new URL(`${import.meta.env.BASE_URL}sw.js`, document.baseURI)).catch((err) => {
       console.warn('[ServiceWorker] Registration failed:', err);
     });
   });

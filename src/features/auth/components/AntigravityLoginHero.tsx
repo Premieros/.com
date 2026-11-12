@@ -54,7 +54,7 @@ export function AntigravityLoginHero({ isAr }: Props) {
         {!reduceMotion && (
           <video
             className={'premier-motion-video ' + (videoReady ? 'premier-motion-video-ready' : '')}
-            src="/auth/premier-login-motion.mp4"
+            src={`${import.meta.env.BASE_URL}auth/premier-login-motion.mp4`}
             autoPlay
             muted
             loop
@@ -82,7 +82,7 @@ export function AntigravityLoginHero({ isAr }: Props) {
             <div className="premier-showcase-panels">
               {showcase.map((screen, index) => (
                 <div key={screen.src} className={'premier-showcase-card ' + (active === index ? 'is-active' : '')}>
-                  <img src={screen.src} alt="" decoding="async" loading={index === 0 ? 'eager' : 'lazy'} />
+                  <img src={`${import.meta.env.BASE_URL}${screen.src.slice(1)}`} alt="" decoding="async" loading={index === 0 ? 'eager' : 'lazy'} />
                   <span>{isAr ? screen.ar : screen.en}</span>
                 </div>
               ))}
