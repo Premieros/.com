@@ -41,6 +41,8 @@ jobs:
         run: node scripts/db/verify-project-references.js
 
       - run: npm run build
+        env:
+          VITE_BASE_PATH: './'
 
       - uses: actions/upload-pages-artifact@v3
         with:
