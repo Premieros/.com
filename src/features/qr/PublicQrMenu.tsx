@@ -39,6 +39,9 @@ export function PublicQrMenu({ token }: { token: string }) {
   const [retry, setRetry] = useState<Draft | null>(null);
   const lock = useRef(false);
   const storageKey = `premier_qr_pending_v1_${token}`;
+  // Each screen starts at its header, even after scrolling a long product list.
+  const detailId = detail?.id;
+  useEffect(() => { document.documentElement.scrollTop = 0; }, [detailId, page]);
   useEffect(() => {
     let alive = true;
     setMenu(null); setCart({}); setRetry(null); setError(''); setReceipt(''); setTable(''); setDetail(null); setPage('home');
