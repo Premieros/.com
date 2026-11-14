@@ -13,6 +13,7 @@ import { cartLineKey, cartToItems, orderItemLineKey, orderItemsToCart } from '..
 import { applyItemTransferToCart } from '../utils/itemTransfer';
 import { APPROVED_FIXED_THERMAL_WIDTH_MM, buildReceiptFixedTemplate, buildReceiptHtml, buildReceiptThermalText, enqueueAutomaticReceiptPrint, buildKitchenTicketHtml, openPrintWindow, ReceiptPrintApprovalError, type ReceiptData } from '../utils/printing';
 import { fetchOrderForWorkspace } from '../services/posOrders';
+import { qrError } from '@/features/qr/service';
 import { sendOrderToKitchen } from '../services/kitchen';
 import { enqueueCloudOpenOrderPrint } from '../services/cloudPrint';
 import { processSaleForOrder, nextInvoiceNumber, fetchBranchWarehouseId, createSaleOperationKey, type ProcessSalePayload } from '../services/payment';
@@ -83,6 +84,7 @@ export function usePosOrder(input: UsePosOrderInput) {
   const [completing, setCompleting] = useState(false);
   // Synchronous lock: React state alone does not block same-tick double submits.
   const mutationLockRef = useRef(false);
+  const qrRevision = useRef(0);
   const pendingCheckoutRef = useRef<{ fingerprint: string; payload: ProcessSalePayload } | null>(null);
   const [orderLoading, setOrderLoading] = useState(false);
   const [kitchenSending, setKitchenSending] = useState(false);
@@ -117,6 +119,7 @@ export function usePosOrder(input: UsePosOrderInput) {
 
   useEffect(() => {
     setActiveOrderId(orderId);
+    qrRevision.current = 0;
     setActiveTable(null);
     setCart(EMPTY_CART);
     setCustomerId('');
@@ -144,6 +147,7 @@ export function usePosOrder(input: UsePosOrderInput) {
           return;
         }
         setOrderType(order.order_type as OrderType);
+        qrRevision.current = Number(order.qr_revision || 0);
         setTableId(order.table_id);
         setActiveTable(table);
         setCustomerId(order.customer_id || '');
@@ -373,6 +377,7 @@ export function usePosOrder(input: UsePosOrderInput) {
   }, [isAr, performDetach]);
 
   const resumeTableOrder = useCallback((order: Order, items: OrderItem[], orderProducts: Product[], table: DiningTable) => {
+    qrRevision.current = Number(order.qr_revision || 0);
     setActiveOrderId(order.id);
     setActiveOrderNumber(order.order_number);
     setOrderType(order.order_type as OrderType);
@@ -639,6 +644,7 @@ export function usePosOrder(input: UsePosOrderInput) {
 
     if (activeOrderId) {
       const { data, error } = await api.floorPlan.updateOrder({
+        p_qr_revision: qrRevision.current,
         p_order_id: activeOrderId,
         p_order_type: binding.orderType,
         p_table_id: binding.tableId,
@@ -653,12 +659,13 @@ export function usePosOrder(input: UsePosOrderInput) {
         p_total: total,
         p_status: status,
       });
-      if (error) { show(error.message, 'error'); return { ok: false, orderId: null, orderNumber: null }; }
+      if (error) { show(error.message.includes('QR_') ? qrError(error) : error.message, 'error'); return { ok: false, orderId: null, orderNumber: null }; }
       const r = data as RpcResult | null;
       if (!r?.success) { show(r?.detail || r?.error || t('error'), 'error'); return { ok: false, orderId: null, orderNumber: null }; }
       return { ok: true, orderId: activeOrderId, orderNumber: activeOrderNumber };
     }
 
+    qrRevision.current = 0;
     const { data, error } = await api.floorPlan.createOrder({
       p_branch_id: branchId,
       p_order_type: binding.orderType,
@@ -1032,6 +1039,7 @@ export function usePosOrder(input: UsePosOrderInput) {
   const closeReceipt = useCallback(() => setReceiptSaleId(null), []);
 
   const resetWorkspace = useCallback(() => {
+    qrRevision.current = 0;
     setCart(EMPTY_CART);
     setCustomerId('');
     setOrderNotes('');
@@ -1063,6 +1071,7 @@ export function usePosOrder(input: UsePosOrderInput) {
     checkoutOpen, setCheckoutOpen,
     completing, orderLoading, kitchenSending, kitchenSentItems, kitchenDispatch,
     mutationLockRef,
+    qrRevision,
     lastReceipt, receiptSaleId, closeReceipt,
     subtotal, discountValue, taxAmount, total, change,
     effCurrency,

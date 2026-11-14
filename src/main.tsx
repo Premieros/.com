@@ -1,9 +1,11 @@
-import { StrictMode } from 'react';
+import { lazy, StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import App from './app/App';
+import { PublicQrMenu } from './features/qr/PublicQrMenu';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
 import './mobile-layer-fix.css';
+
+const App = lazy(() => import('./app/App'));
 
 if (typeof window !== 'undefined' && 'serviceWorker' in navigator && import.meta.env.PROD) {
   window.addEventListener('load', () => {
@@ -16,7 +18,9 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator && import.meta
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
-      <App />
+      {window.location.hash.startsWith('#/qr/')
+        ? <PublicQrMenu token={window.location.hash.slice(5)} />
+        : <Suspense fallback={<div role="status">جارٍ التحميل…</div>}><App /></Suspense>}
     </ErrorBoundary>
   </StrictMode>
 );

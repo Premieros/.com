@@ -47,6 +47,7 @@ import { useOrganizationModules } from '@/core/modules/OrganizationModulesContex
 import { resolvePosBusinessSurface } from '../businessSurface';
 import { useCan } from '@/lib/permissions';
 import { ManualPaymentApprovalsModal } from '../components/checkout/ManualPaymentApprovalsModal';
+import { QrInbox } from '@/features/qr/QrInbox';
 
 const EMPTY_POS_STOCK_MAP: Record<string, number> = {};
 
@@ -839,6 +840,7 @@ export function PosWorkspacePage() {
 
   return (
     <div data-testid="pos-workspace" className="flex h-[100dvh] flex-col overflow-hidden bg-ui-page text-ui-text">
+      <QrInbox key={effectiveBranch} branchId={effectiveBranch} readOnly />
       <PosTopBar
         surface={posSurface}
         panel={panel}

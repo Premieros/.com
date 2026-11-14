@@ -3,7 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const sql = fs.readFileSync(path.join(process.cwd(),
-  'scripts/db/candidates/pos_unsent_settlement_print_NOT_FOR_PRODUCTION.sql'), 'utf8');
+  'scripts/db/candidates/pos_unsent_settlement_print_NOT_FOR_PRODUCTION.sql'), 'utf8').replace(/\r\n/g, '\n');
 
 describe('Premier POS server guard candidate safety contract', () => {
   it('is explicitly staged, transaction-wrapped and locked to known function definitions', () => {
