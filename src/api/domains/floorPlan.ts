@@ -45,6 +45,7 @@ export const floorPlan = {
     // orders use a narrow wrapper that delegates to create_order and persists
     // their structured metadata atomically in the same database transaction.
     if (isServiceOrderType(p.p_order_type)) {
+      if (p_qr_revision) return qr.saveServiceOrder({ p_revision: p_qr_revision, p_payload: payload, p_details: getPendingServiceDetails() });
       const serviceDetails: OrderServiceDetails = getPendingServiceDetails() || {};
       return rpc<RpcResult & { order_id?: string; order_number?: string }>('create_service_order', {
         ...p,

@@ -113,6 +113,14 @@ describe('Phone check-in and private table visits on PostgreSQL', () => {
     await anon();const c=await scalar<Result>('select public.qr_guest_call($1,$2,$3,null,\'check\',\'\') result',[token,session,key]);expect((await track()).calls[0].id).toBe(c.id);
     await db.exec('RESET ROLE');const order=await scalar<Result>('select to_jsonb(o) result from public.orders o where id=$1',[a.order_id]);expect(order).toMatchObject({table_id:null,order_type:'delivery',service_details:{phone:'+201012345678',address:'عنوان توصيل تجريبي'}});
   });
+  it('saves delivery with the current QR revision and rejects a stale POS draft',async()=>{
+    await begin('delivery',null);const r=await place(session,key,null);const a=await approve(r.id,null);
+    const payload={p_order_id:a.order_id,p_order_type:'delivery',p_items:[{product_id:product,unit_name:'piece',quantity:2,unit_price:25,notes:''}],p_status:'held'};
+    const saved=await scalar('select public.qr_save_service_order(1,$1,null) result',[JSON.stringify(payload)]);expect(saved).toMatchObject({success:true});
+    const follow=await place(session,'50000000-0000-4000-8000-000000000002',null);await approve(follow.id,null);
+    await expect(scalar('select public.qr_save_service_order(1,$1,null) result',[JSON.stringify(payload)])).rejects.toThrow('QR_ORDER_REFRESH_REQUIRED');
+    expect((await track()).bills[0].items[0].quantity).toBe(4);
+  });
   it('restricts staff photo and recovery to the branch and ends visits manually',async()=>{
     const v=await begin();await place();await staff('20000000-0000-4000-8000-000000000002');await expect(scalar('select public.qr_guest_photo($1,false) result',[v.id])).rejects.toThrow();await expect(scalar('select public.qr_guest_reset_pin($1) result',[v.id])).rejects.toThrow();
     await staff();expect(await scalar<unknown[]>('select public.qr_guest_visits($1) result',[branch])).toHaveLength(1);await scalar('select public.qr_guest_end($1) result',[v.id]);expect((await track()).visit.closed).toBe(true);

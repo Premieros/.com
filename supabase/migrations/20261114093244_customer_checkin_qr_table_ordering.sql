@@ -69,6 +69,7 @@ LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
 DECLARE l qr_private.table_links;p qr_private.customer_profiles;v qr_private.visits;v_phone text;h text;
 BEGIN
  l:=qr_private.guest_scope(p_token,p_session);IF NOT qr_private.checkin_enabled(p_token) THEN RAISE EXCEPTION 'QR_DISABLED'; END IF;
+ IF NOT COALESCE((SELECT enabled FROM qr_private.branch_settings WHERE branch_id=l.branch_id),true) THEN RAISE EXCEPTION 'QR_DISABLED';END IF;
  v_phone:=qr_private.phone(p_phone);h:=encode(sha256(convert_to(p_session,'UTF8')),'hex');
  -- Serialize branch check-ins to bound image storage and concurrent phone claims.
  PERFORM pg_advisory_xact_lock(hashtextextended('qr_checkin:'||l.branch_id::text,0));
@@ -217,6 +218,7 @@ DECLARE v qr_private.visits;c qr_private.service_calls;l qr_private.table_links;
 BEGIN
  IF NOT qr_private.checkin_enabled(p_token) THEN RETURN qr_private.call_service_core(p_token,p_session,p_key,p_table,p_kind,p_note);END IF;
  v:=qr_private.visit(p_token,p_session);l:=qr_private.guest_scope(p_token,p_session);
+ IF NOT COALESCE((SELECT enabled FROM qr_private.branch_settings WHERE branch_id=v.branch_id),true) THEN RAISE EXCEPTION 'QR_DISABLED';END IF;
  PERFORM 1 FROM public.dining_tables WHERE id IN(l.table_id,v.table_id) ORDER BY id FOR UPDATE;
  SELECT * INTO v FROM qr_private.visits WHERE id=v.id FOR UPDATE;
  IF v.guest_hash<>encode(sha256(convert_to(p_session,'UTF8')),'hex') THEN RAISE EXCEPTION 'QR_CHECKIN_REQUIRED';END IF;
