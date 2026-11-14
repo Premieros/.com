@@ -45,7 +45,6 @@ export const floorPlan = {
     // orders use a narrow wrapper that delegates to create_order and persists
     // their structured metadata atomically in the same database transaction.
     if (isServiceOrderType(p.p_order_type)) {
-      if (p_qr_revision) return qr.saveServiceOrder({ p_revision: p_qr_revision, p_payload: payload, p_details: getPendingServiceDetails() });
       const serviceDetails: OrderServiceDetails = getPendingServiceDetails() || {};
       return rpc<RpcResult & { order_id?: string; order_number?: string }>('create_service_order', {
         ...p,
@@ -89,6 +88,7 @@ export const floorPlan = {
   }): ApiResult<RpcResult> {
     const { p_qr_revision, ...payload } = p;
     if (isServiceOrderType(p.p_order_type)) {
+      if (p_qr_revision) return qr.saveServiceOrder({ p_revision: p_qr_revision, p_payload: payload, p_details: getPendingServiceDetails() });
       // A resumed order normally has no in-memory draft. Passing NULL tells the
       // server wrapper to preserve and revalidate the service_details already
       // stored on that order instead of replacing them with an empty object.
