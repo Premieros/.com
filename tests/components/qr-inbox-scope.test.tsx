@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({ inbox: vi.fn(), decide: vi.fn(), navigate: vi.
 vi.mock('@/lib/permissions', () => ({ useCan: () => mocks.can }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.navigate }));
 vi.mock('@/features/qr/service', () => ({ qrInbox: mocks.inbox, qrDecide: mocks.decide, qrError: () => 'Unavailable' }));
-vi.mock('@/api/domains/qr', () => ({ qr: {handleCall: vi.fn(async()=>({error:null})), calls: vi.fn(async()=>({data:[]})), routing: vi.fn(async () => ({data:{tables:[{id:'t1',name:'Table A',busy:false},{id:'t2',name:'Table B',busy:false}],can_review:true}}))} }));
+vi.mock('@/api/domains/qr', () => ({ qr: {visits: vi.fn(async()=>({data:[],error:null})), photo: vi.fn(async()=>({data:"data:image/jpeg;base64,/9j/AAA",error:null})), handleCall: vi.fn(async()=>({error:null})), calls: vi.fn(async()=>({data:[]})), routing: vi.fn(async () => ({data:{tables:[{id:'t1',name:'Table A',busy:false},{id:'t2',name:'Table B',busy:false}],can_review:true}}))} }));
 import { QrInbox } from '@/features/qr/QrInbox';
 import { qr } from '@/api/domains/qr';
 
@@ -56,3 +56,4 @@ describe('QR inbox branch scope', () => {
     fireEvent.click(screen.getByRole('button',{name:'فتح حساب العميل المقبول'}));expect(mocks.navigate).toHaveBeenCalledWith('/pos/accepted-order',{state:{branchId:'a'}});
   });
 });
+

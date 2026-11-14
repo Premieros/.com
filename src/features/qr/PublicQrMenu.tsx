@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, ChevronLeft, ChevronRight, Heart, Search, SlidersHorizontal, ShoppingBag, Home, Grid2X2, MapPin, Plus, Minus, UtensilsCrossed, ReceiptText, Check } from 'lucide-react';
 import { ProductImage } from '@/features/catalog/components/ProductImage';
 import { qrPublic } from '@/api/domains/qrPublic';
-import type { QrAppearance, QrItem, QrProduct, QrTable } from './service';
+import type { GuestIdentity, QrAppearance, QrItem, QrProduct, QrTable } from './service';
 import { qrError } from './errors';
 import './customer-menu.css';
 import { useGuestVisit } from './useGuestVisit';
@@ -26,8 +26,12 @@ function FoodImage({ product, large = false }: { product: QrProduct; large?: boo
   return <ProductImage src={src} name={product.name} category={product.category_name}
     className={`customer-image-content${large ? ' customer-image-large' : ''}`} imgClassName="customer-full-image" />;
 }
-export function PublicQrMenu({ token }: { token: string }) {
-  const visit = useGuestVisit(token);
+export function PublicQrMenu({ token, identity, session, onClosed }: { token: string; identity?: GuestIdentity; session?: string; onClosed?: () => void }) {
+  const secure = !!identity;
+  const delivery = identity?.order_type === 'delivery';
+  const visit = useGuestVisit(token, secure, session);
+  const [recoveryCode, setRecoveryCode] = useState(() => { try { return sessionStorage.getItem(`premier_qr_pin_${session}`) || ''; } catch { return ''; } });
+  useEffect(() => { if (visit.tracking.visit?.closed) onClosed?.(); }, [visit.tracking.visit?.closed, onClosed]);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [cart, setCart] = useState<Record<string, QrItem>>({});
   const [table, setTable] = useState('');
@@ -73,36 +77,37 @@ export function PublicQrMenu({ token }: { token: string }) {
   }, [menu, detailId, page]);
   useEffect(() => {
     let alive = true;
-    setMenu(null); setCart({}); setRetry(null); setError(''); setReceipt(''); setTable(''); setDetail(null); setPage('home');
+    setMenu(null); setCart({}); setRetry(null); setError(''); setReceipt(''); setTable(identity?.table_id || ''); setDetail(null); setPage(identity?.has_request ? 'visit' : 'home');
     try {
       const stored: Draft = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
-      if (stored?.key && Array.isArray(stored.items)) {
+      if (stored?.key && Array.isArray(stored.items) && (!secure || stored.session === session)) {
         setRetry(stored); setTable(stored.table || ''); setPage('cart');
         setCart(Object.fromEntries(stored.items.map(item => [item.product_id, item])));
       }
     } catch { /* Storage may be disabled. */ }
-    void qrPublic.menu({ p_token: token }).then(({ data, error: failure }) => {
+    void (secure ? qrPublic.guestMenu({ p_token: token, p_session: session! }) : qrPublic.menu({ p_token: token })).then(({ data, error: failure }) => {
       if (!alive) return;
       if (failure) setError(qrError(failure)); else setMenu(data);
     }).catch(failure => { if (alive) setError(qrError(failure)); });
     return () => { alive = false; };
-  }, [token, storageKey]);
+  }, [token, storageKey, identity, secure, session]);
   async function submit() {
-    if (lock.current || (!retry && !table)) return;
+    if (lock.current || (!retry && !table && !delivery)) return;
     lock.current = true; setBusy(true); setError('');
     const draft = retry || { key: crypto.randomUUID(), items: Object.values(cart).filter(i => i.quantity > 0), table, session: visit.session };
     // Old uncertain drafts remain on their original link's default table.
-    const selectedTable = draft.table || menu?.table_id || '';
+    const selectedTable = delivery ? '' : draft.table || menu?.table_id || '';
     setRetry({ ...draft, table: selectedTable });
     try {
       try { sessionStorage.setItem(storageKey, JSON.stringify({ ...draft, table: selectedTable })); } catch { /* In-memory fallback. */ }
       const payload = { p_token: token, p_key: draft.key, p_items: draft.items, p_table: selectedTable };
-      const { data, error: failure } = draft.session
+      const { data, error: failure } = secure ? await qrPublic.guestSubmit({ ...payload, p_table: delivery ? null : selectedTable, p_session: visit.session }) : draft.session
         ? await qrPublic.submit({ ...payload, p_session: draft.session })
         : await qrPublic.submitLegacy(payload);
       if (failure) throw failure;
       if (!data?.id) throw new Error('QR_EMPTY_RESPONSE');
       setReceipt(data.id);
+      if (data.recovery_code) { setRecoveryCode(data.recovery_code); try { sessionStorage.setItem(`premier_qr_pin_${session}`, data.recovery_code); } catch { /* Display remains in memory. */ } }
       setCart({}); setRetry(null);
       setPage('visit'); void visit.refresh();
       try { sessionStorage.removeItem(storageKey); } catch { /* No storage. */ }
@@ -141,9 +146,10 @@ export function PublicQrMenu({ token }: { token: string }) {
       </div><div className="customer-detail-action"><button className="customer-primary" disabled={disabled} onClick={addProduct}>أضف إلى السلة <span>{(detail.price * quantity).toFixed(2)} {currency}</span></button></div>
     </> : <>
       <header className="customer-header"><div className="customer-brand-icon">{appearance.logo_url ? <img src={appearance.logo_url} alt="شعار الفرع" /> : <UtensilsCrossed size={25} />}</div><div><h1>{appearance.brand_name || menu?.branch_name || 'أهلًا بك'}</h1><p><MapPin size={12} />{appearance.subtitle || 'اختياراتك المفضلة، على طاولتك'}</p></div><button className="customer-favorite" aria-label="عرض المفضلة" aria-pressed={onlyFavorites} onClick={() => { setOnlyFavorites(v => !v); setPage('home'); }}><Heart fill={onlyFavorites ? '#ff8a35' : 'none'} size={25} /></button></header>
-      <div className="customer-table"><label htmlFor="customer-table">اختر طاولتك</label><select id="customer-table" value={table} disabled={disabled || !!activeBill} onChange={e => setTable(e.target.value)}><option value="">اختر الطاولة</option>{menu?.tables?.map(t => <option key={t.id} value={t.id}>{t.name}{t.busy ? ' · مشغولة' : ''}</option>)}</select></div>
-      <p className="customer-table-hint">{menu?.tables?.find(t => t.id === table)?.busy ? 'هذه الطاولة مشغولة؛ سيؤكد الموظف طاولة بديلة معك.' : 'الموظف يؤكد الطاولة والطلب قبل التحضير.'}</p>
+      <div className="customer-table"><label htmlFor="customer-table">{delivery ? 'نوع الطلب' : secure ? 'طاولتك المعتمدة' : 'اختر طاولتك'}</label>{delivery ? <strong>توصيل</strong> : <select id="customer-table" value={table} disabled={secure || disabled || !!activeBill} onChange={e => setTable(e.target.value)}><option value="">اختر الطاولة</option>{menu?.tables?.map(t => <option key={t.id} value={t.id}>{t.name}{t.busy ? ' · مشغولة' : ''}</option>)}</select>}</div>
+      <p className="customer-table-hint">{secure ? delivery ? 'تابع طلب التوصيل وحسابه من زر طلبي.' : 'الطاولة مرتبطة بزيارتك؛ تغييرها يتم لدى الموظف فقط.' : menu?.tables?.find(t => t.id === table)?.busy ? 'هذه الطاولة مشغولة؛ سيؤكد الموظف طاولة بديلة معك.' : 'الموظف يؤكد الطاولة والطلب قبل التحضير.'}</p>
       {error && <p role="alert" className="customer-alert">{error}</p>}
+      {recoveryCode && <div className="customer-recovery" role="status"><strong>رمز استرجاع طلبك: <b dir="ltr">{recoveryCode}</b></strong><p>احتفظ به لفتح طلبك من جهاز جديد. لا تشاركه مع الآخرين. إذا نسيته اطلب رمزًا جديدًا من الموظف.</p></div>}
       {receipt && <div role="status" className="customer-receipt"><Check size={26} /><strong>وصل طلبك للموظف</strong><p>{receipt}</p><small>تابع حالة طلبك وحسابك من زر «طلبي».</small></div>}
       {page === 'home' ? <>
         <div className="customer-search"><Search size={21} /><input aria-label="ابحث في المنيو" placeholder="ابحث الآن" value={query} onChange={e => setQuery(e.target.value)} /><button aria-label="عرض كل التصنيفات" onClick={() => { setCategory(''); document.getElementById('customer-categories')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}><SlidersHorizontal size={20} /></button></div>
@@ -158,9 +164,9 @@ export function PublicQrMenu({ token }: { token: string }) {
         {menu && filtered.length === 0 && <p className="customer-empty">لا توجد أصناف للعرض حاليًا.</p>}
         <div className="customer-products">{filtered.map(p => <article key={p.id} className="customer-product"><button className="customer-product-open" aria-label={`تفاصيل ${p.name}`} onClick={() => openProduct(p)}><div className="customer-product-image"><FoodImage key={p.id} product={p} /></div><strong>{Number(p.price).toFixed(2)} <small>{currency}</small></strong><h3>{p.name}</h3><p>{p.category_name || 'منيو الفرع'}</p></button><button className="customer-add" aria-label={`إضافة ${p.name}`} disabled={disabled} onClick={() => openProduct(p)}>{cart[p.id]?.quantity ? <span>{cart[p.id].quantity} في السلة</span> : <Plus size={20} />}</button></article>)}</div>
         {!retry && <button className="customer-refresh" disabled={busy} onClick={() => window.location.reload()}>تحديث المنيو والأسعار</button>}
-      </> : page === 'visit' ? <GuestVisitPanel key={visit.session} token={token} session={visit.session} table={table} currency={currency} tracking={visit.tracking} error={visit.error} refresh={visit.refresh} newVisit={() => { if (!retry) { visit.newVisit(); setReceipt(''); setTable(''); } }} /> : <section className="customer-cart"><div className="customer-section-title"><h2>سلتك</h2><span>{count} أصناف</span></div>{items.length === 0 && !receipt && <div className="customer-empty"><ShoppingBag size={42} /><p>سلتك في انتظار اختياراتك</p><button onClick={() => setPage('home')}>استكشف المنيو</button></div>}{items.map(i => <article className="customer-cart-item" key={i.product_id}><strong>{menu?.products.find(p => p.id === i.product_id)?.name || i.name || 'صنف'}</strong><span>{(i.price * i.quantity).toFixed(2)} {currency}</span><label>الكمية<input aria-label={`كمية ${i.name || menu?.products.find(p => p.id === i.product_id)?.name}`} type="number" min="0" max="99" value={i.quantity} disabled={disabled} onChange={e => changeQuantity(i.product_id, Number(e.target.value))} /></label><label>ملاحظات<input maxLength={300} value={i.notes} disabled={disabled} onChange={e => setCart(c => ({ ...c, [i.product_id]: { ...c[i.product_id], notes: e.target.value } }))} /></label></article>)}
+      </> : page === 'visit' ? <GuestVisitPanel secure={secure} key={visit.session} token={token} session={visit.session} table={table} currency={currency} tracking={visit.tracking} error={visit.error} refresh={visit.refresh} newVisit={() => { if (!retry) { visit.newVisit(); setReceipt(''); setTable(''); } }} /> : <section className="customer-cart"><div className="customer-section-title"><h2>سلتك</h2><span>{count} أصناف</span></div>{items.length === 0 && !receipt && <div className="customer-empty"><ShoppingBag size={42} /><p>سلتك في انتظار اختياراتك</p><button onClick={() => setPage('home')}>استكشف المنيو</button></div>}{items.map(i => <article className="customer-cart-item" key={i.product_id}><strong>{menu?.products.find(p => p.id === i.product_id)?.name || i.name || 'صنف'}</strong><span>{(i.price * i.quantity).toFixed(2)} {currency}</span><label>الكمية<input aria-label={`كمية ${i.name || menu?.products.find(p => p.id === i.product_id)?.name}`} type="number" min="0" max="99" value={i.quantity} disabled={disabled} onChange={e => changeQuantity(i.product_id, Number(e.target.value))} /></label><label>ملاحظات<input maxLength={300} value={i.notes} disabled={disabled} onChange={e => setCart(c => ({ ...c, [i.product_id]: { ...c[i.product_id], notes: e.target.value } }))} /></label></article>)}
         <div className="customer-total"><span>إجمالي الأصناف</span><strong>{total.toFixed(2)} {currency}</strong></div><p className="customer-table-hint">الضرائب حسب فاتورة الفرع · الدفع لدى الموظف</p>
-        <button className="customer-primary" disabled={busy || (!retry && (!items.length || !table))} onClick={() => void submit()}>{busy ? 'جارٍ الإرسال…' : retry ? 'إعادة إرسال نفس الطلب بأمان' : 'إرسال الطلب للموظف'}</button>
+        <button className="customer-primary" disabled={busy || (!retry && (!items.length || (!table && !delivery)))} onClick={() => void submit()}>{busy ? 'جارٍ الإرسال…' : retry ? 'إعادة إرسال نفس الطلب بأمان' : 'إرسال الطلب للموظف'}</button>
         {retry && <p className="customer-alert">نتيجة الطلب السابق غير مؤكدة. أعد إرساله بنفس الرقم لتجنب التكرار.</p>}
       </section>}
       <nav className="customer-bottom" aria-label="تصفح المنيو"><button aria-label="طلبي وحسابي" className={page === 'visit' ? 'is-active' : ''} onClick={() => setPage('visit')}><ReceiptText size={19} />طلبي</button><button className={page === 'home' ? 'is-active' : ''} onClick={() => setPage('home')}><Home size={19} />الرئيسية</button><button onClick={() => { setPage('home'); setTimeout(() => document.getElementById('customer-categories')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0); }}><Grid2X2 size={19} />التصنيفات</button><button className={page === 'cart' ? 'is-active' : ''} onClick={() => setPage('cart')}><ShoppingBag size={19} />السلة</button><button className="customer-cart-bubble" aria-label={`فتح السلة، ${count} أصناف`} onClick={() => setPage('cart')}><ShoppingBag size={22} />{count > 0 && <b>{count}</b>}</button></nav>

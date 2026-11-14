@@ -28,7 +28,7 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
     if (!settings) return;
     setBusy(true); setMessage('');
     try {
-      const { error } = await qr.saveSettings({ p_branch: branchId, p_enabled: settings.enabled, p_appearance: settings.appearance, p_roles: settings.reviewer_roles });
+      const { error } = await qr.saveSettings({ p_branch: branchId, p_enabled: settings.enabled, p_appearance: settings.appearance, p_roles: settings.reviewer_roles, p_checkin: !!settings.checkin_enabled });
       if (error) throw error;
       setMessage('تم حفظ إعدادات طلبات العملاء لهذا الفرع فقط.');
     } catch (failure) { setMessage(qrError(failure)); } finally { setBusy(false); }
@@ -39,7 +39,7 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
     {message && <p role="status" className="rounded border p-3">{message}</p>}
     {!settings ? <p>جارٍ تحميل إعدادات الفرع…</p> : <>
       <label className="flex gap-2"><input type="checkbox" disabled={busy} checked={settings.enabled} onChange={e => setSettings(s => s && ({ ...s, enabled: e.target.checked }))} />تفعيل استقبال طلبات العملاء</label>
-      <div className="grid gap-4 sm:grid-cols-2">{([
+      <label className="flex gap-2"><input type="checkbox" disabled={busy} checked={!!settings.checkin_enabled} onChange={e => setSettings(s => s && ({ ...s, checkin_enabled: e.target.checked }))} />الدخول بالهاتف ورمز استرجاع الطلب وصورة الطاولة</label><p className="text-sm text-ui-subtle">صورة الطاولة يراجعها الموظف؛ إغلاق الحساب ينهي دخول الزيارة. التوصيل متاح من خارج المكان.</p><div className="grid gap-4 sm:grid-cols-2">{([
         ['brand_name','اسم المنيو'], ['subtitle','وصف قصير أسفل الاسم'], ['logo_url','رابط الشعار (https)'], ['banner_text','نص البنر'], ['banner_image_url','رابط صورة البنر (https)'],
       ] as const).map(([key,label]) => <label key={key} className="space-y-2 text-sm"><span>{label}</span><input className="block w-full rounded-xl border border-ui-border bg-ui-bg p-3" maxLength={key.includes('url') ? 1500 : 160} type={key.includes('url') ? 'url' : 'text'} value={settings.appearance[key] || ''} disabled={busy} onChange={e => setSettings(s => s && ({ ...s, appearance: { ...s.appearance, [key]: e.target.value } }))} /></label>)}</div>
       <fieldset className="space-y-3 rounded-xl border border-ui-border p-4"><legend className="px-2 font-bold">من يعتمد طلبات العملاء؟</legend>

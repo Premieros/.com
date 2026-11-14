@@ -43,13 +43,42 @@ before(async () => {
   await admin.query(readFileSync('supabase/migrations/20261114013903_customer_experience_qr_table_ordering.sql','utf8'));
   await admin.query('CREATE TABLE public.sales(id uuid PRIMARY KEY,branch_id uuid,source_order_id uuid,paid_amount numeric,refunded_amount numeric)');
   await admin.query(readFileSync('supabase/migrations/20261114023132_guest_tracking_qr_table_ordering.sql','utf8'));
+  await admin.query(readFileSync('supabase/migrations/20260909225500_pos_service_order_details.sql','utf8'));
+  await admin.query(readFileSync('supabase/migrations/20261114093244_customer_checkin_qr_table_ordering.sql','utf8'));
 });
 beforeEach(async () => {
   await a.query('ROLLBACK'); await b.query('ROLLBACK');
   await admin.query('TRUNCATE qr_private.service_calls,qr_private.requests,qr_private.table_links,qr_private.menu_products,public.orders,public.order_items,public.order_kitchen_sends CASCADE');
   await staff(a); await staff(b);
   await a.query('select public.qr_configure($1,$2)',[branch,[product]]);
+  await a.query('select public.qr_save_customer_settings($1,true,$2,$3,false)',[branch,{},[]]);
   token = await scalar(a,'select public.qr_rotate($1,true) result',[table]);
+});
+
+async function checkedDelivery() {
+  await staff(a); await a.query('select public.qr_save_customer_settings($1,true,$2,$3,true)',[branch,{},[]]);
+  await guest(a); await guest(b);
+  await scalar(a,'select public.qr_guest_begin($1,$2,$3,$4,$5,null,null,$6) result',[token,'a'.repeat(64),'01012345678','Test Guest','delivery','Test delivery address']);
+}
+test('checked-in delivery submission and acceptance remain idempotent under concurrent retries',async()=>{
+  await checkedDelivery();await a.query('BEGIN');
+  const first=await scalar(a,'select public.qr_guest_place($1,$2,$3,$4,null) result',[token,'a'.repeat(64),key,items]);
+  const retry=scalar(b,'select public.qr_guest_place($1,$2,$3,$4,null) result',[token,'a'.repeat(64),key,items]);
+  await waiting(b);await a.query('COMMIT');assert.equal((await retry).id,first.id);
+  await staff(a);await staff(b);await a.query('BEGIN');
+  const accepted=await scalar(a,'select public.qr_review($1,true,null) result',[first.id]);
+  const next=scalar(b,'select public.qr_review($1,true,null) result',[first.id]);
+  await waiting(b);await a.query('COMMIT');assert.equal((await next).order_id,accepted.order_id);
+  assert.equal(await scalar(admin,'select count(*)::int result from public.orders'),1);
+});
+test('concurrent wrong PIN attempts persist and stop at the three-attempt lock',async()=>{
+  await checkedDelivery();const first=await scalar(a,'select public.qr_guest_place($1,$2,$3,$4,null) result',[token,'a'.repeat(64),key,items]);
+  const wrong=first.recovery_code==='00'?'01':'00';await a.query('BEGIN');
+  await scalar(a,'select public.qr_guest_resume($1,$2,$3,$4) result',[token,'b'.repeat(64),'01012345678',wrong]);
+  const next=scalar(b,'select public.qr_guest_resume($1,$2,$3,$4) result',[token,'c'.repeat(64),'01012345678',wrong]);
+  await waiting(b);await a.query('COMMIT');assert.equal((await next).error,'QR_PIN_INVALID');
+  assert.equal((await scalar(b,'select public.qr_guest_resume($1,$2,$3,$4) result',[token,'c'.repeat(64),'01012345678',wrong])).error,'QR_PIN_LOCKED');
+  assert.equal((await scalar(b,'select public.qr_guest_resume($1,$2,$3,$4) result',[token,'c'.repeat(64),'01012345678',first.recovery_code])).error,'QR_PIN_LOCKED');
 });
 after(async () => { await a.query('ROLLBACK'); await b.query('ROLLBACK'); await Promise.all([a.end(),b.end(),admin.end()]); });
 

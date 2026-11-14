@@ -841,7 +841,7 @@ export function PosWorkspacePage() {
   return (
     <div data-testid="pos-workspace" className="flex h-[100dvh] flex-col overflow-hidden bg-ui-page text-ui-text">
       <PosTopBar
-        customerOrders={<QrInbox key={effectiveBranch} branchId={effectiveBranch} header workspaceTableId={pos.tableId || pos.activeTable?.id} navigationBlocked={pos.cart.length > 0 || pos.orderLoading || pos.checkoutOpen} />}
+        customerOrders={<QrInbox key={effectiveBranch} branchId={effectiveBranch} header workspaceOrderId={pos.activeOrderId} workspaceTableId={pos.tableId || pos.activeTable?.id} navigationBlocked={pos.cart.length > 0 || pos.orderLoading || pos.checkoutOpen} />}
         surface={posSurface}
         panel={panel}
         onPanel={(p) => {

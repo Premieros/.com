@@ -1,5 +1,22 @@
 export function qrError(error: unknown): string {
   const message = typeof error === 'object' && error && 'message' in error ? String(error.message) : '';
+  const checkinErrors: Record<string, string> = {
+    QR_PHONE_INVALID: 'أدخل رقم هاتف صحيحًا، مع كود البلد للأرقام خارج مصر.',
+    QR_NAME_REQUIRED: 'اكتب اسمك من حرفين إلى ١٠٠ حرف.',
+    QR_ADDRESS_REQUIRED: 'اكتب عنوان التوصيل بوضوح.',
+    QR_PHOTO_REQUIRED: 'صوّر رقم الطاولة بكاميرا الهاتف أولًا.',
+    QR_PHOTO_REVIEW_REQUIRED: 'يجب عرض صورة الطاولة وتأكيدها قبل قبول الطلب.',
+    QR_TABLE_LOCKED: 'الطاولة مرتبطة بالزيارة. تواصل مع الموظف لتغييرها.',
+    QR_PIN_REQUIRED: 'لديك زيارة مفتوحة. ارجع لرقم الهاتف وأدخل رمز استرجاع الطلب.',
+    QR_PIN_INVALID: 'رمز الاسترجاع غير صحيح. لديك ٣ محاولات فقط قبل القفل.',
+    QR_PIN_LOCKED: 'توقف الاسترجاع بعد ٣ محاولات خاطئة. اطلب من الموظف رمزًا جديدًا.',
+    QR_CHECKIN_REQUIRED: 'سجّل الدخول برقم هاتفك أولًا، أو أعد فتح رابط المنيو.',
+    QR_VISIT_CLOSED: 'انتهت هذه الزيارة ولم يعد الدخول إليها متاحًا.',
+    QR_VISIT_PENDING: 'تتاح الخدمة بعد اعتماد الموظف لطلبك الأول.',
+    QR_WAIT_FOR_APPROVAL: 'طلبك الأول عند الموظف. انتظر اعتماده قبل إرسال أصناف إضافية.',
+    QR_RETRY: 'تغيّرت الطاولة أثناء التحقق. حاول مجددًا.',
+  };
+  for (const [code, text] of Object.entries(checkinErrors)) if (message.includes(code)) return text;
   if (message.includes('QR_NO_ACTIVE_BILL')) return 'طلب الشيك متاح بعد اعتماد طلبك وفتح حسابك.';
   if (message.includes('QR_SESSION_EXPIRED')) return 'انتهت مدة متابعة هذه الزيارة. ابدأ زيارة جديدة.';
   if (message.includes('QR_SESSION_CONFLICT')) return 'لا يمكن ربط الطلب بزيارة مختلفة. تواصل مع الموظف.';

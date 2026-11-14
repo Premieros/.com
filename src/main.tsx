@@ -1,6 +1,6 @@
 import { lazy, StrictMode, Suspense } from 'react';
 import { createRoot } from 'react-dom/client';
-import { PublicQrMenu } from './features/qr/PublicQrMenu';
+import { GuestEntryGate } from './features/qr/GuestEntryGate';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
 import './mobile-layer-fix.css';
@@ -19,7 +19,7 @@ createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ErrorBoundary>
       {window.location.hash.startsWith('#/qr/')
-        ? <PublicQrMenu token={window.location.hash.slice(5)} />
+        ? <GuestEntryGate key={window.location.hash.slice(5)} token={window.location.hash.slice(5)} />
         : <Suspense fallback={<div role="status">جارٍ التحميل…</div>}><App /></Suspense>}
     </ErrorBoundary>
   </StrictMode>
