@@ -62,7 +62,7 @@ BEGIN
  l:=qr_private.guest_scope(p_token,p_session); SELECT * INTO p FROM qr_private.customer_profiles WHERE branch_id=l.branch_id AND phone=qr_private.phone(p_phone);
  SELECT * INTO v FROM qr_private.visits WHERE profile_id=p.id AND status IN('pending','active') AND expires_at>now();
  IF v.guest_hash=encode(sha256(convert_to(p_session,'UTF8')),'hex') AND v.generation=l.generation THEN RETURN jsonb_build_object('registered',true,'visit',qr_private.visit_view(v)); END IF;
- RETURN jsonb_build_object('registered',p.id IS NOT NULL,'needs_pin',v.id IS NOT NULL,'pin_set',v.pin_hash IS NOT NULL);
+ RETURN jsonb_build_object('registered',p.id IS NOT NULL,'needs_pin',v.id IS NOT NULL AND EXISTS(SELECT 1 FROM qr_private.requests WHERE visit_id=v.id),'pin_set',v.pin_hash IS NOT NULL);
 END $$;
 CREATE FUNCTION qr_private.begin_visit(p_token text,p_session text,p_phone text,p_name text,p_type text,p_table uuid,p_photo text,p_address text) RETURNS jsonb
 LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
@@ -92,6 +92,12 @@ BEGIN
   INSERT INTO qr_private.customer_profiles(branch_id,phone,name) VALUES(l.branch_id,v_phone,trim(p_name)) RETURNING * INTO p;
  END IF;
  UPDATE qr_private.visits SET status='closed',closed_at=now(),photo_data=NULL WHERE profile_id=p.id AND status IN('pending','active') AND expires_at<=now();
+ -- An abandoned menu with no submitted request is not an active customer order.
+ -- Recheck after locking the visit, so a concurrent first submission cannot be adopted.
+ SELECT * INTO v FROM qr_private.visits WHERE profile_id=p.id AND status IN('pending','active') FOR UPDATE;
+ IF v.status='pending' AND NOT EXISTS(SELECT 1 FROM qr_private.requests WHERE visit_id=v.id) THEN
+  UPDATE qr_private.visits SET status='closed',closed_at=now(),photo_data=NULL WHERE id=v.id;
+ END IF;
  IF EXISTS(SELECT 1 FROM qr_private.visits WHERE profile_id=p.id AND status IN('pending','active')) THEN RAISE EXCEPTION 'QR_PIN_REQUIRED'; END IF;
  IF (SELECT count(*) FROM qr_private.visits WHERE branch_id=l.branch_id AND created_at>now()-interval '1 minute')>=30 THEN RAISE EXCEPTION 'QR_RATE_LIMITED';END IF;
  INSERT INTO qr_private.visits(branch_id,generation,profile_id,guest_hash,origin_table_id,order_type,table_id,address,photo_data)

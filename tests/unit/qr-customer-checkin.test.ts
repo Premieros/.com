@@ -82,10 +82,16 @@ describe('Phone check-in and private table visits on PostgreSQL', () => {
     await expect(scalar('select public.qr_menu($1) result',[token])).rejects.toThrow('QR_CHECKIN_REQUIRED');
     await expect(scalar('select public.qr_submit($1,$2,$3) result',[token,key,JSON.stringify([item])])).rejects.toThrow('QR_CHECKIN_REQUIRED');
     await expect(scalar('select public.qr_place($1,$2,$3,$4,$5) result',[token,session,key,JSON.stringify([item]),table])).rejects.toThrow('QR_CHECKIN_REQUIRED');
-    expect(await scalar('select public.qr_guest_lookup($1,$2,$3) result',[token,other,phone])).toMatchObject({registered:true,needs_pin:true});
+    expect(await scalar('select public.qr_guest_lookup($1,$2,$3) result',[token,other,phone])).toMatchObject({registered:true,needs_pin:false});
     expect((await track(other)).bills).toEqual([]);await expect(place(other)).rejects.toThrow('QR_CHECKIN_REQUIRED');
     await expect(db.query('select * from qr_private.visits')).rejects.toThrow(/permission denied/);
     await expect(db.query('select qr_private.new_pin($1)',[v.id])).rejects.toThrow(/permission denied/);
+  });
+  it('does not require a PIN for an abandoned menu before any request is submitted',async()=>{
+    const old=await begin();const next=await begin('delivery',null,other);
+    expect(next.id).not.toBe(old.id);expect((await track(session)).visit.closed).toBe(true);
+    const r=await place(other,key,null);expect(r.recovery_code).toMatch(/^\d{2}$/);
+    await anon();expect(await scalar('select public.qr_guest_lookup($1,$2,$3) result',[token,session,phone])).toMatchObject({registered:true,needs_pin:true,pin_set:true});
   });
   it('binds photos and tables, requires staff verification, verifies prices and preserves idempotency',async()=>{
     await anon();await expect(scalar('select public.qr_guest_begin($1,$2,$3,$4,\'dine_in\',$5,null,null) result',[token,session,phone,'عميل',table])).rejects.toThrow('QR_PHOTO_REQUIRED');
