@@ -13,8 +13,10 @@ export function QrManagement({ branchId, tables }: { branchId: string; tables: D
   const [link, setLink] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
   useEffect(() => {
     let alive = true;
+    setLoading(true);
     setSelected([]); setImage(''); setLink(''); setTableId(''); setProducts([]); setMessage('');
     void Promise.all([
       supabase.from('products').select('id,name,sale_price').eq('branch_id', branchId).eq('is_active', true).order('name'),
@@ -22,7 +24,7 @@ export function QrManagement({ branchId, tables }: { branchId: string; tables: D
     ]).then(([catalog, config]) => {
       if (!alive) return;
       if (catalog.error || config.error) setMessage(qrError(catalog.error || config.error));
-      else { setProducts(catalog.data || []); setSelected(config.data || []); }
+      else { setProducts(catalog.data || []); setSelected(config.data || []); setLoading(false); }
     });
     return () => { alive = false; };
   }, [branchId]);
@@ -53,7 +55,7 @@ export function QrManagement({ branchId, tables }: { branchId: string; tables: D
     <div className="my-3 grid max-h-60 gap-2 overflow-auto sm:grid-cols-2">{products.map(p => <label key={p.id}>
       <input type="checkbox" checked={selected.includes(p.id)} disabled={busy} onChange={e => setSelected(ids => e.target.checked ? [...ids, p.id] : ids.filter(id => id !== p.id))} /> {p.name} · {Number(p.sale_price).toFixed(2)}
     </label>)}</div>
-    <button disabled={busy} className="rounded border p-2" onClick={() => void saveMenu()}>نشر الأصناف المحددة</button>
+    <button disabled={busy || loading} className="rounded border p-2" onClick={() => void saveMenu()}>نشر الأصناف المحددة</button>
     <label className="my-3 block">الطاولة <select value={tableId} disabled={busy} className="rounded border p-2" onChange={e => { setTableId(e.target.value); setImage(''); setLink(''); }}>
       <option value="">اختر طاولة</option>{tables.filter(t => t.branch_id === branchId).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
     </select></label>

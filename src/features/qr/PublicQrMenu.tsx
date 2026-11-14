@@ -15,10 +15,13 @@ export function PublicQrMenu({ token }: { token: string }) {
   const storageKey = `premier_qr_pending_v1_${token}`;
   useEffect(() => {
     let alive = true;
-    setMenu(null); setCart({}); setError(''); setReceipt('');
+    setMenu(null); setCart({}); setRetry(null); setError(''); setReceipt('');
     try {
       const stored: Draft = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
-      if (stored?.key && Array.isArray(stored.items)) setRetry(stored);
+      if (stored?.key && Array.isArray(stored.items)) {
+        setRetry(stored);
+        setCart(Object.fromEntries(stored.items.map(item => [item.product_id, item])));
+      }
     } catch { /* Storage may be disabled; retries still work in memory. */ }
     void qrPublic.menu({ p_token: token }).then(({ data, error: failure }) => {
       if (!alive) return;

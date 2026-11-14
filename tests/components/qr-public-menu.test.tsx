@@ -36,6 +36,7 @@ describe('public QR mobile order intake', () => {
     await screen.findByRole('alert');
     const first = mocks.rpc.mock.calls.find(([name]) => name === 'qr_submit')?.[1];
     rendered.unmount(); render(<PublicQrMenu token={token} />); await screen.findByText('Table A');
+    expect(screen.getByLabelText('كمية Tea')).toHaveValue(2);
     fireEvent.click(screen.getByRole('button', { name: 'إعادة إرسال نفس الطلب بأمان' }));
     await waitFor(() => expect(mocks.rpc.mock.calls.filter(([name]) => name === 'qr_submit')).toHaveLength(2));
     expect(mocks.rpc.mock.calls.filter(([name]) => name === 'qr_submit')[1][1]).toEqual(first);

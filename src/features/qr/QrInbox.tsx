@@ -12,6 +12,8 @@ export function QrInbox({ branchId, readOnly = false }: { branchId: string; read
   const [open, setOpen] = useState(false);
   const scope = useRef(branchId); scope.current = branchId;
   const lock = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; }; }, []);
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
@@ -31,10 +33,10 @@ export function QrInbox({ branchId, readOnly = false }: { branchId: string; read
     const branch = branchId;
     try {
       const result = await qrDecide(request.id, accept);
-      if (scope.current !== branch) return;
+      if (!mounted.current || scope.current !== branch) return;
       setRequests(rows => rows.filter(r => r.id !== request.id)); setError('');
       if (result.order_id) navigate(`/pos/${result.order_id}`, { state: { branchId: branch } });
-    } catch (failure) { if (scope.current === branch) setError(qrError(failure)); }
+    } catch (failure) { if (mounted.current && scope.current === branch) setError(qrError(failure)); }
     finally { lock.current = false; setBusy(false); }
   }
   if (!branchId || !can('pos.view')) return null;
