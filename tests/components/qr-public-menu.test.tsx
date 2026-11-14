@@ -8,7 +8,7 @@ const menu = { table_name: 'Table A', table_id: 't1', branch_name: 'Our Cafe', c
 
 describe('public QR mobile order intake', () => {
   beforeEach(() => {
-    cleanup(); window.sessionStorage.clear(); mocks.rpc.mockReset();
+    cleanup(); window.sessionStorage.clear(); window.localStorage.clear(); mocks.rpc.mockReset();
     mocks.rpc.mockImplementation((name: string) => Promise.resolve(name === 'qr_menu' ? { data: menu, error: null } : { data: { id: 'r1', status: 'pending' }, error: null }));
   });
   it('uses a nonpersistent anonymous client and renders the table without login', async () => {
@@ -16,6 +16,18 @@ describe('public QR mobile order intake', () => {
     expect(await screen.findByText('Table A')).toBeInTheDocument();
     expect(mocks.create.mock.calls[0][2]).toEqual({ auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     expect(screen.queryByText('Login')).not.toBeInTheDocument();
+  });
+  it('restores the private visit after reload and shows its pending request', async () => {
+    const tracking = { requests: [{ id: 'own-request', status: 'pending', items: [], created_at: '2026-11-14T00:00:00Z', requested_table: 'Table A' }], bills: [], calls: [] };
+    mocks.rpc.mockImplementation((name: string) => Promise.resolve({ data: name === 'qr_menu' ? menu : tracking }));
+    const view = render(<PublicQrMenu token={token} />); await screen.findByText('Table A');
+    fireEvent.click(screen.getByRole('button', { name: 'طلبي وحسابي' }));
+    await screen.findByText('بانتظار اعتماد الموظف');
+    const firstSecret = mocks.rpc.mock.calls.find(([name]) => name === 'qr_track')?.[1].p_session;
+    expect(firstSecret).toMatch(/^[a-f0-9]{64}$/);
+    view.unmount(); render(<PublicQrMenu token={token} />); await screen.findByText('Table A');
+    fireEvent.click(screen.getByRole('button', { name: 'طلبي وحسابي' })); await screen.findByText('بانتظار اعتماد الموظف');
+    expect(mocks.rpc.mock.calls.filter(([name]) => name === 'qr_track').slice(-1)[0]?.[1].p_session).toBe(firstSecret);
   });
   it('uses the catalog sprite frame instead of enlarging the entire sheet, and preserves full photos', async () => {
     mocks.rpc.mockResolvedValue({ data: { ...menu, products: [
@@ -53,10 +65,10 @@ describe('public QR mobile order intake', () => {
     fireEvent.click(screen.getByRole('button', {name:/فتح السلة/}));
     const send = screen.getByRole('button', { name: 'إرسال الطلب للموظف' });
     fireEvent.click(send); fireEvent.click(send);
-    expect(mocks.rpc.mock.calls.filter(([name]) => name === 'qr_submit_selected')).toHaveLength(1);
-    expect(mocks.rpc.mock.calls.find(([name]) => name === 'qr_submit_selected')?.[1].p_table).toBe('t2');
+    expect(mocks.rpc.mock.calls.filter(([name]) => name === 'qr_place')).toHaveLength(1);
+    expect(mocks.rpc.mock.calls.find(([name]) => name === 'qr_place')?.[1].p_table).toBe('t2');
     resolve({ data: { id: 'r1', status: 'pending' }, error: null });
-    expect(await screen.findByText(/بانتظار موافقة الموظف/)).toBeInTheDocument();
+    expect(await screen.findByText(/وصل طلبك للموظف/)).toBeInTheDocument();
   });
   it('reuses the same payload and request key after an ambiguous network failure and reload', async () => {
     mocks.rpc.mockImplementation((name: string) => Promise.resolve(name === 'qr_menu' ? { data: menu } : { error: { message: 'Network disconnected' } }));
@@ -68,12 +80,12 @@ describe('public QR mobile order intake', () => {
     fireEvent.click(screen.getByRole('button', {name:/فتح السلة/}));
     fireEvent.click(screen.getByRole('button', { name: 'إرسال الطلب للموظف' }));
     await screen.findByRole('alert');
-    const first = mocks.rpc.mock.calls.find(([name]) => name === 'qr_submit_selected')?.[1];
+    const first = mocks.rpc.mock.calls.find(([name]) => name === 'qr_place')?.[1];
     rendered.unmount(); render(<PublicQrMenu token={token} />); await screen.findByText('Table A');
     expect(screen.getByLabelText('كمية Tea')).toHaveValue(2);
     fireEvent.click(screen.getByRole('button', { name: 'إعادة إرسال نفس الطلب بأمان' }));
-    await waitFor(() => expect(mocks.rpc.mock.calls.filter(([name]) => name === 'qr_submit_selected')).toHaveLength(2));
-    expect(mocks.rpc.mock.calls.filter(([name]) => name === 'qr_submit_selected')[1][1]).toEqual(first);
+    await waitFor(() => expect(mocks.rpc.mock.calls.filter(([name]) => name === 'qr_place')).toHaveLength(2));
+    expect(mocks.rpc.mock.calls.filter(([name]) => name === 'qr_place')[1][1]).toEqual(first);
     expect(screen.getByLabelText('كمية Tea')).toBeDisabled();
   });
 });

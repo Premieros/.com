@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-14T01:44:21.424Z",
+  "generated_at": "2026-11-14T02:37:25.581Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -1160,6 +1160,23 @@
       ]
     },
     {
+      "name": "qr_call_service",
+      "params": [
+        "key",
+        "kind",
+        "note",
+        "session",
+        "table",
+        "token"
+      ]
+    },
+    {
+      "name": "qr_calls",
+      "params": [
+        "branch"
+      ]
+    },
+    {
       "name": "qr_configuration",
       "params": [
         "branch"
@@ -1180,6 +1197,13 @@
       ]
     },
     {
+      "name": "qr_handle_call",
+      "params": [
+        "id",
+        "status"
+      ]
+    },
+    {
       "name": "qr_inbox",
       "params": [
         "branch"
@@ -1188,6 +1212,16 @@
     {
       "name": "qr_menu",
       "params": [
+        "token"
+      ]
+    },
+    {
+      "name": "qr_place",
+      "params": [
+        "items",
+        "key",
+        "session",
+        "table",
         "token"
       ]
     },
@@ -1240,6 +1274,13 @@
         "items",
         "key",
         "table",
+        "token"
+      ]
+    },
+    {
+      "name": "qr_track",
+      "params": [
+        "session",
         "token"
       ]
     },

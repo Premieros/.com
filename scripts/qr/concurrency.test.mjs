@@ -41,10 +41,12 @@ before(async () => {
   await admin.query(readFileSync('supabase/migrations/20261114001719_premier_qr_table_ordering.sql','utf8'));
   await admin.query(`ALTER TABLE public.users ADD COLUMN role text DEFAULT 'cashier'; ALTER TABLE public.products ADD COLUMN image_url text, ADD COLUMN category_id uuid; CREATE TABLE public.categories(id uuid,name text,branch_id uuid); CREATE TABLE public.branch_settings(branch_id uuid,currency text); INSERT INTO public.dining_tables(id,branch_id,name) VALUES ('30000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000001','Table B');`);
   await admin.query(readFileSync('supabase/migrations/20261114013903_customer_experience_qr_table_ordering.sql','utf8'));
+  await admin.query('CREATE TABLE public.sales(id uuid PRIMARY KEY,branch_id uuid,source_order_id uuid,paid_amount numeric,refunded_amount numeric)');
+  await admin.query(readFileSync('supabase/migrations/20261114023132_guest_tracking_qr_table_ordering.sql','utf8'));
 });
 beforeEach(async () => {
   await a.query('ROLLBACK'); await b.query('ROLLBACK');
-  await admin.query('TRUNCATE qr_private.requests,qr_private.table_links,qr_private.menu_products,public.orders,public.order_items,public.order_kitchen_sends CASCADE');
+  await admin.query('TRUNCATE qr_private.service_calls,qr_private.requests,qr_private.table_links,qr_private.menu_products,public.orders,public.order_items,public.order_kitchen_sends CASCADE');
   await staff(a); await staff(b);
   await a.query('select public.qr_configure($1,$2)',[branch,[product]]);
   token = await scalar(a,'select public.qr_rotate($1,true) result',[table]);
@@ -100,4 +102,18 @@ test('two pending guests cannot claim the same alternative table',async()=>{
   await waiting(b);await a.query('COMMIT');await assert.rejects(second,/QR_TABLE_BUSY/);
   assert.equal(await scalar(admin,'select count(*)::int result from public.orders'),1);
   assert.equal(await scalar(admin,"select status result from qr_private.requests where id=$1",[next.id]),'pending');
+});
+
+test('two simultaneous service calls for one visit create one pending notification',async()=>{
+  const session='a'.repeat(64);await guest(a);await guest(b);await a.query('BEGIN');
+  const first=await scalar(a,'select public.qr_call_service($1,$2,$3,$4,$5,$6) result',[token,session,key,table,'service','Help']);
+  const second=scalar(b,'select public.qr_call_service($1,$2,$3,$4,$5,$6) result',[token,session,'50000000-0000-4000-8000-000000000002',table,'service','Help']);
+  await waiting(b);await a.query('COMMIT');assert.equal((await second).id,first.id);assert.equal(await scalar(admin,'select count(*)::int result from qr_private.service_calls'),1);
+});
+test('a second device cannot adopt a simultaneous request key',async()=>{
+  await guest(a);await guest(b);await a.query('BEGIN');
+  await scalar(a,'select public.qr_place($1,$2,$3,$4,$5) result',[token,'a'.repeat(64),key,items,table]);
+  const second=scalar(b,'select public.qr_place($1,$2,$3,$4,$5) result',[token,'b'.repeat(64),key,items,table]);second.catch(()=>{});
+  await waiting(b);await a.query('COMMIT');await assert.rejects(second,/QR_SESSION_CONFLICT/);
+  const privateView=await scalar(b,'select public.qr_track($1,$2) result',[token,'b'.repeat(64)]);assert.deepEqual(privateView,{requests:[],bills:[],calls:[]});
 });
