@@ -13,7 +13,7 @@ export function GuestVisitPanel({ token, session, table, currency, tracking, err
 }) {
  const [note,setNote]=useState('');const [busy,setBusy]=useState(false);const [message,setMessage]=useState('');const [failure,setFailure]=useState('');
  const lock=useRef(false);const pending=useRef<CallDraft|null>(null);
- const active=tracking.bills.find(b=>['open','held'].includes(b.status));
+ const active=[...tracking.bills].reverse().find(b=>['open','held'].includes(b.status));
  const money=(n:number)=>`${Number(n||0).toFixed(2)} ${currency}`;
  async function requestService(kind:'service'|'check') {
   if(lock.current)return;lock.current=true;setBusy(true);setFailure('');setMessage('');

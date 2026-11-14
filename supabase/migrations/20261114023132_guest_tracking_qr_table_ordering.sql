@@ -121,7 +121,7 @@ DECLARE result jsonb;
 BEGIN
  PERFORM qr_private.require_staff(p_branch,'pos.view');
  SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY x.created_at),'[]') INTO result FROM (
-  SELECT c.id,c.kind,c.note,c.status,c.created_at,d.name table_name FROM qr_private.service_calls c JOIN public.dining_tables d ON d.id=c.table_id
+  SELECT c.id,c.kind,c.note,c.status,c.created_at,c.order_id,d.name table_name FROM qr_private.service_calls c JOIN public.dining_tables d ON d.id=c.table_id
   WHERE c.branch_id=p_branch AND c.status<>'done' AND c.created_at>now()-interval '24 hours' ORDER BY c.created_at LIMIT 200
  ) x;
  RETURN result;
@@ -183,4 +183,21 @@ REVOKE ALL ON FUNCTION qr_private.guest_scope(text,text),qr_private.place(text,t
 GRANT EXECUTE ON FUNCTION qr_private.place(text,text,uuid,jsonb,uuid),qr_private.track(text,text),qr_private.call_service(text,text,uuid,uuid,text,text),
  public.qr_place(text,text,uuid,jsonb,uuid),public.qr_track(text,text),public.qr_call_service(text,text,uuid,uuid,text,text) TO anon,authenticated;
 GRANT EXECUTE ON FUNCTION qr_private.calls(uuid),qr_private.handle_call(uuid,text),public.qr_calls(uuid),public.qr_handle_call(uuid,text) TO authenticated;
+CREATE OR REPLACE FUNCTION qr_private.inbox(p_branch uuid) RETURNS jsonb
+LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $$
+DECLARE result jsonb;
+BEGIN
+ PERFORM qr_private.require_staff(p_branch,'pos.view');
+ SELECT COALESCE(jsonb_agg(to_jsonb(x) ORDER BY x.created_at),'[]') INTO result FROM (
+  SELECT r.id,r.table_id,d.name table_name,r.items,r.created_at,
+   (SELECT o.table_id FROM public.orders o WHERE o.branch_id=r.branch_id AND o.status IN('open','held')
+    AND EXISTS(SELECT 1 FROM public.order_items oi WHERE oi.order_id=o.id AND oi.quantity>0)
+    AND r.guest_hash IS NOT NULL AND EXISTS(SELECT 1 FROM qr_private.requests prior WHERE prior.order_id=o.id AND prior.status='accepted'
+      AND prior.branch_id=r.branch_id AND prior.generation=r.generation AND prior.guest_hash=r.guest_hash AND prior.created_at>now()-interval '24 hours')
+    ORDER BY o.created_at DESC LIMIT 1) own_active_table_id
+  FROM qr_private.requests r JOIN public.dining_tables d ON d.id=r.table_id WHERE r.branch_id=p_branch AND r.status='pending'
+  ORDER BY r.created_at LIMIT 200
+ ) x;
+ RETURN result;
+END $$;
 COMMIT;

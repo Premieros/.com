@@ -52,7 +52,7 @@ export function PublicQrMenu({ token }: { token: string }) {
   // Each screen starts at its header, even after scrolling a long product list.
   const detailId = detail?.id;
   useEffect(() => { document.documentElement.scrollTop = 0; }, [detailId, page]);
-  const activeBill = visit.tracking.bills.find(b => ['open', 'held'].includes(b.status));
+  const activeBill = [...visit.tracking.bills].reverse().find(b => ['open', 'held'].includes(b.status));
   useEffect(() => { if (activeBill?.table_id) setTable(activeBill.table_id); }, [activeBill?.table_id]);
   useEffect(() => {
     const node = categoriesRef.current;

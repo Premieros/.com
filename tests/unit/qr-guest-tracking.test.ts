@@ -99,7 +99,9 @@ describe('Private guest tracking, billing and table service on PostgreSQL', () =
   });
   it('accepts follow-ups into the same visit bill, while another device cannot join it',async()=>{
     const first=await place();const accepted=await decide(first.id);
-    const own=await place(session,'50000000-0000-4000-8000-000000000002');expect((await decide(own.id)).order_id).toBe(accepted.order_id);
+    const own=await place(session,'50000000-0000-4000-8000-000000000002');
+    await staff();expect(await scalar('select public.qr_inbox($1)->0->>\'own_active_table_id\' result',[branch])).toBe(table);
+    expect((await decide(own.id)).order_id).toBe(accepted.order_id);
     const other=await place(stranger,'50000000-0000-4000-8000-000000000003');await expect(decide(other.id)).rejects.toThrow('QR_TABLE_BUSY');
     const view=await track();expect(view.bills).toHaveLength(1);expect(view.bills[0].items[0].quantity).toBe(4);expect(view.bills[0].total).toBe(114);
   });
