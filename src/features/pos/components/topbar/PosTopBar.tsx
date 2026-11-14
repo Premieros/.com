@@ -36,6 +36,7 @@ interface PosTopBarProps {
   onOpenShiftModal?: () => void;
   canReviewManualPayments?: boolean;
   onReviewManualPayments?: () => void;
+  customerOrders?: React.ReactNode;
 }
 
 export function PosTopBar({
@@ -53,6 +54,7 @@ export function PosTopBar({
   onOpenShiftModal,
   canReviewManualPayments = false,
   onReviewManualPayments,
+  customerOrders,
 }: PosTopBarProps) {
   const { t, lang } = useLanguage();
   const { theme, toggleTheme } = useTheme();
@@ -142,6 +144,7 @@ export function PosTopBar({
             <span className="hidden sm:inline">{isAr ? surface.newSaleLabel.ar : surface.newSaleLabel.en}</span>
           </button>
         )}
+        {customerOrders}
       </div>
 
       <div className="flex-1" />

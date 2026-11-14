@@ -42,4 +42,17 @@ describe('QR inbox branch scope', () => {
     fireEvent.click(screen.getByRole('button',{name:'تم تنفيذ الطلب'}));await waitFor(()=>expect(screen.getByRole('status')).toHaveTextContent('0 شيك وخدمة'));
     expect(mocks.navigate).not.toHaveBeenCalled();
   });
+  it('accepts from the POS header without discarding a cart and opens the bill only after the workspace is saved', async () => {
+    mocks.inbox.mockResolvedValue([{id:'request',table_id:'t1',own_active_table_id:'t1',table_name:'Table A',items:[],created_at:'2026-11-14T00:00:00Z'}]);
+    mocks.decide.mockResolvedValue({order_id:'accepted-order',status:'accepted'});
+    const view=render(<QrInbox branchId="a" header navigationBlocked workspaceTableId="t1"/>);
+    await waitFor(()=>expect(screen.getByRole('status')).toHaveTextContent('1'));
+    fireEvent.click(screen.getByRole('button',{name:'طلبات العملاء: 1'}));
+    expect(screen.getByRole('button',{name:'قبول طلب العميل'})).toBeDisabled();
+    view.rerender(<QrInbox branchId="a" header navigationBlocked workspaceTableId="t2"/>);
+    fireEvent.click(screen.getByRole('button',{name:'قبول طلب العميل'}));await screen.findByText('تم قبول طلب العميل.');
+    expect(mocks.navigate).not.toHaveBeenCalled();expect(screen.getByRole('button',{name:'فتح حساب العميل المقبول'})).toBeDisabled();
+    view.rerender(<QrInbox branchId="a" header navigationBlocked={false}/>);
+    fireEvent.click(screen.getByRole('button',{name:'فتح حساب العميل المقبول'}));expect(mocks.navigate).toHaveBeenCalledWith('/pos/accepted-order',{state:{branchId:'a'}});
+  });
 });

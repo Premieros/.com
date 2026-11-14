@@ -20,7 +20,6 @@ import { Modal } from '@/components/Modal';
 import { formatCurrency, formatDateTime } from '@/lib/format';
 import type { DiningArea, DiningTable, Order, OrderType, RpcResult } from '@/lib/types';
 import { useActiveOrders } from '../hooks/useActiveOrders';
-import { QrInbox } from '@/features/qr/QrInbox';
 import { QrManagement } from '@/features/qr/QrManagement';
 import { TableFloorPlan } from '../components/floor/TableFloorPlan';
 import { STATUS_STYLES } from '../utils/orderTypes';
@@ -411,7 +410,6 @@ export function ActiveOrdersPage() {
 
   return (
     <DesignSurface testId="active-orders-page" className="space-y-6">
-      <QrInbox key={effectiveBranch} branchId={effectiveBranch} />
       {canManage && effectiveBranch && <QrManagement key={effectiveBranch} branchId={effectiveBranch} tables={tables} />}
       <DesignPageHeader
         title={t('activeOrders')}
