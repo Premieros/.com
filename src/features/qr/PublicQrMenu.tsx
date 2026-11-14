@@ -1,12 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, ChevronLeft, ChevronRight, Heart, Search, SlidersHorizontal, ShoppingBag, Home, Grid2X2, MapPin, Plus, Minus, UtensilsCrossed, Check } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Heart, Search, SlidersHorizontal, ShoppingBag, Home, Grid2X2, MapPin, Plus, Minus, UtensilsCrossed, ReceiptText, Check } from 'lucide-react';
 import { ProductImage } from '@/features/catalog/components/ProductImage';
 import { qrPublic } from '@/api/domains/qrPublic';
 import type { QrAppearance, QrItem, QrProduct, QrTable } from './service';
 import { qrError } from './errors';
 import './customer-menu.css';
+import { useGuestVisit } from './useGuestVisit';
+import { GuestVisitPanel } from './GuestVisitPanel';
 
-interface Draft { key: string; items: QrItem[]; table: string }
+interface Draft { key: string; items: QrItem[]; table: string; session?: string }
 interface Menu { table_name: string; table_id: string; branch_name: string; currency: string; appearance?: QrAppearance; tables: QrTable[]; products: QrProduct[] }
 function foodSymbol(name: string) {
   if (/coffee|قهو|كافي|espresso|latte/i.test(name)) return '☕';
@@ -25,6 +27,7 @@ function FoodImage({ product, large = false }: { product: QrProduct; large?: boo
     className={`customer-image-content${large ? ' customer-image-large' : ''}`} imgClassName="customer-full-image" />;
 }
 export function PublicQrMenu({ token }: { token: string }) {
+  const visit = useGuestVisit(token);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [cart, setCart] = useState<Record<string, QrItem>>({});
   const [table, setTable] = useState('');
@@ -33,7 +36,7 @@ export function PublicQrMenu({ token }: { token: string }) {
   const [detail, setDetail] = useState<QrProduct | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState('');
-  const [page, setPage] = useState<'home' | 'cart'>('home');
+  const [page, setPage] = useState<'home' | 'cart' | 'visit'>('home');
   const [favorites, setFavorites] = useState<string[]>([]);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [error, setError] = useState('');
@@ -49,6 +52,8 @@ export function PublicQrMenu({ token }: { token: string }) {
   // Each screen starts at its header, even after scrolling a long product list.
   const detailId = detail?.id;
   useEffect(() => { document.documentElement.scrollTop = 0; }, [detailId, page]);
+  const activeBill = visit.tracking.bills.find(b => ['open', 'held'].includes(b.status));
+  useEffect(() => { if (activeBill?.table_id) setTable(activeBill.table_id); }, [activeBill?.table_id]);
   useEffect(() => {
     const node = categoriesRef.current;
     if (!node) return;
@@ -85,22 +90,26 @@ export function PublicQrMenu({ token }: { token: string }) {
   async function submit() {
     if (lock.current || (!retry && !table)) return;
     lock.current = true; setBusy(true); setError('');
-    const draft = retry || { key: crypto.randomUUID(), items: Object.values(cart).filter(i => i.quantity > 0), table };
+    const draft = retry || { key: crypto.randomUUID(), items: Object.values(cart).filter(i => i.quantity > 0), table, session: visit.session };
     // Old uncertain drafts remain on their original link's default table.
     const selectedTable = draft.table || menu?.table_id || '';
     setRetry({ ...draft, table: selectedTable });
     try {
       try { sessionStorage.setItem(storageKey, JSON.stringify({ ...draft, table: selectedTable })); } catch { /* In-memory fallback. */ }
-      const { data, error: failure } = await qrPublic.submit({ p_token: token, p_key: draft.key, p_items: draft.items, p_table: selectedTable });
+      const payload = { p_token: token, p_key: draft.key, p_items: draft.items, p_table: selectedTable };
+      const { data, error: failure } = draft.session
+        ? await qrPublic.submit({ ...payload, p_session: draft.session })
+        : await qrPublic.submitLegacy(payload);
       if (failure) throw failure;
       if (!data?.id) throw new Error('QR_EMPTY_RESPONSE');
-      setReceipt(`${data.id} — ${data.status === 'pending' ? 'بانتظار موافقة الموظف' : data.status === 'accepted' ? 'تم اعتماد الطلب' : 'تم رفض الطلب'}`);
+      setReceipt(data.id);
       setCart({}); setRetry(null);
+      setPage('visit'); void visit.refresh();
       try { sessionStorage.removeItem(storageKey); } catch { /* No storage. */ }
     } catch (failure) {
       setError(qrError(failure));
       const message = typeof failure === 'object' && failure && 'message' in failure ? String(failure.message) : '';
-      if (/QR_(PRICE_CHANGED|PRODUCT_UNAVAILABLE|INVALID_ITEMS|RATE_LIMITED|LINK_INVALID|TABLE_INVALID|DISABLED)/.test(message)) {
+      if (/QR_(PRICE_CHANGED|PRODUCT_UNAVAILABLE|INVALID_ITEMS|RATE_LIMITED|LINK_INVALID|TABLE_INVALID|DISABLED|SESSION_EXPIRED)/.test(message)) {
         setRetry(null);
         try { sessionStorage.removeItem(storageKey); } catch { /* No storage. */ }
       }
@@ -132,10 +141,10 @@ export function PublicQrMenu({ token }: { token: string }) {
       </div><div className="customer-detail-action"><button className="customer-primary" disabled={disabled} onClick={addProduct}>أضف إلى السلة <span>{(detail.price * quantity).toFixed(2)} {currency}</span></button></div>
     </> : <>
       <header className="customer-header"><div className="customer-brand-icon">{appearance.logo_url ? <img src={appearance.logo_url} alt="شعار الفرع" /> : <UtensilsCrossed size={25} />}</div><div><h1>{appearance.brand_name || menu?.branch_name || 'أهلًا بك'}</h1><p><MapPin size={12} />{appearance.subtitle || 'اختياراتك المفضلة، على طاولتك'}</p></div><button className="customer-favorite" aria-label="عرض المفضلة" aria-pressed={onlyFavorites} onClick={() => { setOnlyFavorites(v => !v); setPage('home'); }}><Heart fill={onlyFavorites ? '#ff8a35' : 'none'} size={25} /></button></header>
-      <div className="customer-table"><label htmlFor="customer-table">اختر طاولتك</label><select id="customer-table" value={table} disabled={disabled} onChange={e => setTable(e.target.value)}><option value="">اختر الطاولة</option>{menu?.tables?.map(t => <option key={t.id} value={t.id}>{t.name}{t.busy ? ' · مشغولة' : ''}</option>)}</select></div>
+      <div className="customer-table"><label htmlFor="customer-table">اختر طاولتك</label><select id="customer-table" value={table} disabled={disabled || !!activeBill} onChange={e => setTable(e.target.value)}><option value="">اختر الطاولة</option>{menu?.tables?.map(t => <option key={t.id} value={t.id}>{t.name}{t.busy ? ' · مشغولة' : ''}</option>)}</select></div>
       <p className="customer-table-hint">{menu?.tables?.find(t => t.id === table)?.busy ? 'هذه الطاولة مشغولة؛ سيؤكد الموظف طاولة بديلة معك.' : 'الموظف يؤكد الطاولة والطلب قبل التحضير.'}</p>
       {error && <p role="alert" className="customer-alert">{error}</p>}
-      {receipt && <div role="status" className="customer-receipt"><Check size={26} /><strong>وصل طلبك للموظف</strong><p>{receipt}</p><small>سيؤكد الموظف الطاولة معك قبل اعتماد الطلب.</small></div>}
+      {receipt && <div role="status" className="customer-receipt"><Check size={26} /><strong>وصل طلبك للموظف</strong><p>{receipt}</p><small>تابع حالة طلبك وحسابك من زر «طلبي».</small></div>}
       {page === 'home' ? <>
         <div className="customer-search"><Search size={21} /><input aria-label="ابحث في المنيو" placeholder="ابحث الآن" value={query} onChange={e => setQuery(e.target.value)} /><button aria-label="عرض كل التصنيفات" onClick={() => { setCategory(''); document.getElementById('customer-categories')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}><SlidersHorizontal size={20} /></button></div>
         {!query && !onlyFavorites && <div className="customer-promos"><div className="customer-promo-main"><div><span>طازج ولذيذ</span><h2>{appearance.banner_text || 'كل اللي بتحبه،\nفي طلب واحد'}</h2><small>اختر وجبتك واستمتع بوقتك</small></div>{appearance.banner_image_url ? <img src={appearance.banner_image_url} alt="اختيارات الفرع" /> : <span aria-hidden="true" className="customer-promo-food">{foodSymbol(categories[0]?.name || 'burger')}</span>}</div><div className="customer-promo-side" aria-hidden="true">☕<span>لحظتك الحلوة</span></div></div>}
@@ -149,12 +158,12 @@ export function PublicQrMenu({ token }: { token: string }) {
         {menu && filtered.length === 0 && <p className="customer-empty">لا توجد أصناف للعرض حاليًا.</p>}
         <div className="customer-products">{filtered.map(p => <article key={p.id} className="customer-product"><button className="customer-product-open" aria-label={`تفاصيل ${p.name}`} onClick={() => openProduct(p)}><div className="customer-product-image"><FoodImage key={p.id} product={p} /></div><strong>{Number(p.price).toFixed(2)} <small>{currency}</small></strong><h3>{p.name}</h3><p>{p.category_name || 'منيو الفرع'}</p></button><button className="customer-add" aria-label={`إضافة ${p.name}`} disabled={disabled} onClick={() => openProduct(p)}>{cart[p.id]?.quantity ? <span>{cart[p.id].quantity} في السلة</span> : <Plus size={20} />}</button></article>)}</div>
         {!retry && <button className="customer-refresh" disabled={busy} onClick={() => window.location.reload()}>تحديث المنيو والأسعار</button>}
-      </> : <section className="customer-cart"><div className="customer-section-title"><h2>سلتك</h2><span>{count} أصناف</span></div>{items.length === 0 && !receipt && <div className="customer-empty"><ShoppingBag size={42} /><p>سلتك في انتظار اختياراتك</p><button onClick={() => setPage('home')}>استكشف المنيو</button></div>}{items.map(i => <article className="customer-cart-item" key={i.product_id}><strong>{menu?.products.find(p => p.id === i.product_id)?.name || i.name || 'صنف'}</strong><span>{(i.price * i.quantity).toFixed(2)} {currency}</span><label>الكمية<input aria-label={`كمية ${i.name || menu?.products.find(p => p.id === i.product_id)?.name}`} type="number" min="0" max="99" value={i.quantity} disabled={disabled} onChange={e => changeQuantity(i.product_id, Number(e.target.value))} /></label><label>ملاحظات<input maxLength={300} value={i.notes} disabled={disabled} onChange={e => setCart(c => ({ ...c, [i.product_id]: { ...c[i.product_id], notes: e.target.value } }))} /></label></article>)}
+      </> : page === 'visit' ? <GuestVisitPanel key={visit.session} token={token} session={visit.session} table={table} currency={currency} tracking={visit.tracking} error={visit.error} refresh={visit.refresh} newVisit={() => { if (!retry) { visit.newVisit(); setReceipt(''); setTable(''); } }} /> : <section className="customer-cart"><div className="customer-section-title"><h2>سلتك</h2><span>{count} أصناف</span></div>{items.length === 0 && !receipt && <div className="customer-empty"><ShoppingBag size={42} /><p>سلتك في انتظار اختياراتك</p><button onClick={() => setPage('home')}>استكشف المنيو</button></div>}{items.map(i => <article className="customer-cart-item" key={i.product_id}><strong>{menu?.products.find(p => p.id === i.product_id)?.name || i.name || 'صنف'}</strong><span>{(i.price * i.quantity).toFixed(2)} {currency}</span><label>الكمية<input aria-label={`كمية ${i.name || menu?.products.find(p => p.id === i.product_id)?.name}`} type="number" min="0" max="99" value={i.quantity} disabled={disabled} onChange={e => changeQuantity(i.product_id, Number(e.target.value))} /></label><label>ملاحظات<input maxLength={300} value={i.notes} disabled={disabled} onChange={e => setCart(c => ({ ...c, [i.product_id]: { ...c[i.product_id], notes: e.target.value } }))} /></label></article>)}
         <div className="customer-total"><span>إجمالي الأصناف</span><strong>{total.toFixed(2)} {currency}</strong></div><p className="customer-table-hint">الضرائب حسب فاتورة الفرع · الدفع لدى الموظف</p>
         <button className="customer-primary" disabled={busy || (!retry && (!items.length || !table))} onClick={() => void submit()}>{busy ? 'جارٍ الإرسال…' : retry ? 'إعادة إرسال نفس الطلب بأمان' : 'إرسال الطلب للموظف'}</button>
         {retry && <p className="customer-alert">نتيجة الطلب السابق غير مؤكدة. أعد إرساله بنفس الرقم لتجنب التكرار.</p>}
       </section>}
-      <nav className="customer-bottom" aria-label="تصفح المنيو"><button className={page === 'home' ? 'is-active' : ''} onClick={() => setPage('home')}><Home size={19} />الرئيسية</button><button onClick={() => { setPage('home'); setTimeout(() => document.getElementById('customer-categories')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0); }}><Grid2X2 size={19} />التصنيفات</button><button className={page === 'cart' ? 'is-active' : ''} onClick={() => setPage('cart')}><ShoppingBag size={19} />السلة</button><button className="customer-cart-bubble" aria-label={`فتح السلة، ${count} أصناف`} onClick={() => setPage('cart')}><ShoppingBag size={22} />{count > 0 && <b>{count}</b>}</button></nav>
+      <nav className="customer-bottom" aria-label="تصفح المنيو"><button aria-label="طلبي وحسابي" className={page === 'visit' ? 'is-active' : ''} onClick={() => setPage('visit')}><ReceiptText size={19} />طلبي</button><button className={page === 'home' ? 'is-active' : ''} onClick={() => setPage('home')}><Home size={19} />الرئيسية</button><button onClick={() => { setPage('home'); setTimeout(() => document.getElementById('customer-categories')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 0); }}><Grid2X2 size={19} />التصنيفات</button><button className={page === 'cart' ? 'is-active' : ''} onClick={() => setPage('cart')}><ShoppingBag size={19} />السلة</button><button className="customer-cart-bubble" aria-label={`فتح السلة، ${count} أصناف`} onClick={() => setPage('cart')}><ShoppingBag size={22} />{count > 0 && <b>{count}</b>}</button></nav>
     </>}
   </main>;
 }

@@ -1,6 +1,8 @@
 import { rpc } from '../rpc';
 
 export const qr = {
+  calls(p: { p_branch: string }) { return rpc<import('@/features/qr/service').ServiceCall[]>('qr_calls', p); },
+  handleCall(p: { p_id: string; p_status: string }) { return rpc('qr_handle_call', p); },
   routing(p: { p_branch: string }) { return rpc<{ tables: import('@/features/qr/service').QrTable[]; can_review: boolean }>('qr_routing', p); },
   settings(p: { p_branch: string }) { return rpc<import('@/features/qr/service').QrSettings>('qr_settings', p); },
   saveSettings(p: { p_branch: string; p_enabled: boolean; p_appearance: import('@/features/qr/service').QrAppearance; p_roles: string[] }) { return rpc('qr_save_settings', p); },

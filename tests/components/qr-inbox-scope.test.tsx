@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({ inbox: vi.fn(), decide: vi.fn(), navigate: vi.
 vi.mock('@/lib/permissions', () => ({ useCan: () => mocks.can }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.navigate }));
 vi.mock('@/features/qr/service', () => ({ qrInbox: mocks.inbox, qrDecide: mocks.decide, qrError: () => 'Unavailable' }));
-vi.mock('@/api/domains/qr', () => ({ qr: {routing: vi.fn(async () => ({data:{tables:[{id:'t1',name:'Table A',busy:false},{id:'t2',name:'Table B',busy:false}],can_review:true}}))} }));
+vi.mock('@/api/domains/qr', () => ({ qr: {calls: vi.fn(async()=>({data:[]})), routing: vi.fn(async () => ({data:{tables:[{id:'t1',name:'Table A',busy:false},{id:'t2',name:'Table B',busy:false}],can_review:true}}))} }));
 import { QrInbox } from '@/features/qr/QrInbox';
 
 describe('QR inbox branch scope', () => {

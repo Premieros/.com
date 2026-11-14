@@ -2,13 +2,14 @@ import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCan } from '@/lib/permissions';
 import { qr } from '@/api/domains/qr';
-import type { QrTable } from './service';
+import type { QrTable, ServiceCall } from './service';
 import { qrDecide, qrError, qrInbox, type QrRequest } from './service';
 
 export function QrInbox({ branchId, readOnly = false }: { branchId: string; readOnly?: boolean }) {
   const can = useCan();
   const navigate = useNavigate();
   const [requests, setRequests] = useState<QrRequest[]>([]);
+  const [calls, setCalls] = useState<ServiceCall[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState(false);
@@ -22,13 +23,13 @@ export function QrInbox({ branchId, readOnly = false }: { branchId: string; read
   useEffect(() => {
     let alive = true;
     let timer: ReturnType<typeof setTimeout>;
-    setRequests([]); setError(''); setOpen(false); setTables([]); setAssignments({}); setCanReview(false);
+    setRequests([]); setCalls([]); setError(''); setOpen(false); setTables([]); setAssignments({}); setCanReview(false);
     if (!branchId || !can('pos.view')) return;
     async function poll() {
       try {
-        const [rows, routing] = await Promise.all([qrInbox(branchId), qr.routing({ p_branch: branchId })]);
-        if (routing.error) throw routing.error;
-        if (alive) { setRequests(rows); setTables(routing.data?.tables || []); setCanReview(!!routing.data?.can_review); setError(''); }
+        const [rows, routing, service] = await Promise.all([qrInbox(branchId), qr.routing({ p_branch: branchId }), qr.calls({ p_branch: branchId })]);
+        if (routing.error || service.error) throw routing.error || service.error;
+        if (alive) { setRequests(rows); setCalls(service.data || []); setTables(routing.data?.tables || []); setCanReview(!!routing.data?.can_review); setError(''); }
       }
       catch (failure) { if (alive) setError(qrError(failure)); }
       finally { if (alive) timer = setTimeout(() => void poll(), 5000); }
@@ -48,13 +49,30 @@ export function QrInbox({ branchId, readOnly = false }: { branchId: string; read
     } catch (failure) { if (mounted.current && scope.current === branch) setError(qrError(failure)); }
     finally { lock.current = false; setBusy(false); }
   }
+  async function handleService(id: string, status: string) {
+    if (lock.current) return;
+    lock.current = true; setBusy(true); const branch = branchId;
+    try {
+      const { error: failure } = await qr.handleCall({ p_id: id, p_status: status });
+      if (failure) throw failure;
+      if (!mounted.current || scope.current !== branch) return;
+      setCalls(rows => status === 'done' ? rows.filter(r => r.id !== id) : rows.map(r => r.id === id ? { ...r, status: 'acknowledged' } : r)); setError('');
+    } catch (failure) { if (mounted.current && scope.current === branch) setError(qrError(failure)); }
+    finally { lock.current = false; setBusy(false); }
+  }
   if (!branchId || !can('pos.view')) return null;
   return <section dir="rtl" className="shrink-0 rounded border border-ui-border bg-ui-surface p-3">
     <button onClick={() => setOpen(v => !v)} aria-expanded={open} className="font-bold">
-      طلبات QR · <span role="status" aria-live="polite">{requests.length} بانتظار القبول</span>
+      طلبات QR · <span role="status" aria-live="polite">{requests.length} طلبات · {calls.length} شيك وخدمة</span>
     </button>
     {error && <p role="alert" className="text-ui-danger">{error}</p>}
     {open && <div className="max-h-72 overflow-auto">
+      {calls.map(c => <article key={c.id} className="my-3 rounded border border-orange-300 bg-orange-50 p-3 text-slate-900">
+        <h3 className="font-bold">{c.kind === 'check' ? 'طلب شيك' : 'طلب خدمة'} · {c.table_name}</h3><p>{c.note}</p>
+        <p className="text-sm">{c.status === 'acknowledged' ? 'تم إبلاغ العميل باستلام الطلب' : 'طلب جديد من العميل'}</p>
+        {canReview && <div className="mt-2 flex gap-4">{c.status === 'open' && <button disabled={busy} className="rounded border px-3 py-2" onClick={() => void handleService(c.id, 'acknowledged')}>استلام طلب الخدمة</button>}
+          <button disabled={busy} className="rounded bg-orange-700 px-3 py-2 text-white" onClick={() => void handleService(c.id, 'done')}>تم تنفيذ الطلب</button></div>}
+      </article>)}
       {readOnly && <p>افتح شاشة الطاولات لقبول الطلبات بعد حفظ طلبك الحالي.</p>}
       {requests.map(r => <article key={r.id} className="my-3 rounded border p-3">
         <h3 className="font-bold">اختيار العميل: {r.table_name} · {new Date(r.created_at).toLocaleTimeString()}</h3>

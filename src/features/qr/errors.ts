@@ -1,5 +1,8 @@
 export function qrError(error: unknown): string {
   const message = typeof error === 'object' && error && 'message' in error ? String(error.message) : '';
+  if (message.includes('QR_NO_ACTIVE_BILL')) return 'طلب الشيك متاح بعد اعتماد طلبك وفتح حسابك.';
+  if (message.includes('QR_SESSION_EXPIRED')) return 'انتهت مدة متابعة هذه الزيارة. ابدأ زيارة جديدة.';
+  if (message.includes('QR_SESSION_CONFLICT')) return 'لا يمكن ربط الطلب بزيارة مختلفة. تواصل مع الموظف.';
   if (message.includes('QR_TABLE_BUSY')) return 'الطاولة أصبحت مشغولة. اختر طاولة متاحة ثم اعتمد الطلب.';
   if (message.includes('QR_TABLE_INVALID')) return 'اختر طاولة متاحة من نفس الفرع.';
   if (message.includes('QR_DISABLED')) return 'طلبات العملاء متوقفة مؤقتًا لهذا الفرع. يرجى التواصل مع الموظف.';

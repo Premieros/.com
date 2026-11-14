@@ -61,3 +61,17 @@ Before production approval, verify on a full staging copy: two staff browsers, b
 The PR is intentionally a draft. Publishing menu products and issuing codes are explicit staff actions after migration and frontend review. There is no production migration/deployment workflow in this feature.
 
 For a frontend rollback, disable the table links first. QR-touched orders require the guarded save path, so retain the new frontend until those orders are closed, or review a database rollback that restores the original canonical function definitions and removes their revision guards. Do not drop request history or reset revisions to force an old cart through. Retain accepted request history for idempotency and audit.
+
+## Guest tracking, bill and service requests (2026-11-14)
+
+The `guest_tracking_qr_table_ordering` migration adds a device-owned visit capability. The public client creates a random 64-character secret and keeps it in its own browser storage for up to 24 hours. Only its SHA256 hash is stored with requests. A printed menu token, table ID or request ID alone cannot read a bill. Public tracking projects only the current visit's requests, accepted order IDs, public line prices/totals, preparation/payment states and its service-call states; staff/customer identity and internal notes are excluded.
+
+Tracking follows the immutable accepted order ID, never the next bill at the same table. Rotating/revoking the printed link revokes tracking through it. Old requests without a visit hash remain untrackable; old ambiguous submission drafts retain their original legacy submission path instead of being adopted by a different visit. New visits expire after 24 hours. Customers can explicitly start another visit after outstanding work is complete.
+
+A subsequent request from the same capability can be accepted into that visit's existing active bill using the canonical POS item merge/pricing and QR revision guard. A different device cannot join an occupied table bill. Normal POS ownership/branch permissions still apply, and the approver can assign a vacant alternative.
+
+The bill uses authoritative `orders` totals and payment/refund sums from linked `sales` (including canonical kitchen-settlement linkage). It distinguishes newly accepted unsent items from existing kitchen progress. It does not collect payment. The check button asks staff for a check; printing, payment and final settlement remain native POS operations.
+
+Service requests can be sent after selecting a table. Check requests require this visit's accepted active bill. For an active bill, the server routes both kinds to its actual assigned table. Bounded notes, ordered table locks, rate limits, payload-bound idempotency and one open call per visit/table/kind prevent duplicate or flooded notifications. Staff see calls in the branch QR inbox, acknowledge receipt, then mark done; the guest sees both transitions. These actions do not navigate away from an unsaved POS cart.
+
+Rollout order: apply the additive migration after review and passing isolated PostgreSQL/concurrency checks, then publish the client. No existing private-table API grants or RLS policies are broadened. Reverting the client can leave these additive tables/columns in place. Never discard requests or financial data as rollback.
