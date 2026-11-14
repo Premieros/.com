@@ -39,6 +39,8 @@ before(async () => {
     CREATE TRIGGER permission BEFORE INSERT OR UPDATE OR DELETE ON public.orders FOR EACH ROW EXECUTE FUNCTION public.enforce_pos_permission_mutation();
     CREATE TRIGGER permission BEFORE INSERT OR UPDATE OR DELETE ON public.order_items FOR EACH ROW EXECUTE FUNCTION public.enforce_pos_permission_mutation();`);
   await admin.query(readFileSync('supabase/migrations/20261114001719_premier_qr_table_ordering.sql','utf8'));
+  await admin.query(`ALTER TABLE public.users ADD COLUMN role text DEFAULT 'cashier'; ALTER TABLE public.products ADD COLUMN image_url text, ADD COLUMN category_id uuid; CREATE TABLE public.categories(id uuid,name text,branch_id uuid); CREATE TABLE public.branch_settings(branch_id uuid,currency text); INSERT INTO public.dining_tables(id,branch_id,name) VALUES ('30000000-0000-4000-8000-000000000002','10000000-0000-4000-8000-000000000001','Table B');`);
+  await admin.query(readFileSync('supabase/migrations/20261114013903_customer_experience_qr_table_ordering.sql','utf8'));
 });
 beforeEach(async () => {
   await a.query('ROLLBACK'); await b.query('ROLLBACK');
@@ -73,9 +75,29 @@ test('native POS creation and QR acceptance serialize on the same table', async 
   const created = await scalar(a,'select public.create_order(p_branch_id=>$1,p_table_id=>$2,p_items=>$3) result',[branch,table,items]);
   assert.equal(created.success,true);
   const accepted = scalar(b,'select public.qr_decide($1,true) result',[pending.id]);
+  accepted.catch(() => {});
   await waiting(b); await a.query('COMMIT');
-  assert.equal((await accepted).order_id,created.order_id);
+  await assert.rejects(accepted,/QR_TABLE_BUSY/);
   assert.equal(await scalar(admin,'select count(*)::int result from public.orders'),1);
   assert.equal(await scalar(admin,'select count(*)::int result from public.order_items'),1);
-  assert.equal(await scalar(admin,'select quantity::int result from public.order_items'),4);
+  assert.equal(await scalar(admin,'select quantity::int result from public.order_items'),2);
+});
+
+test('same key cannot choose two tables concurrently',async()=>{
+  const other='30000000-0000-4000-8000-000000000002';
+  await guest(a);await guest(b);await a.query('BEGIN');
+  await scalar(a,'select public.qr_submit_selected($1,$2,$3,$4) result',[token,key,items,table]);
+  const conflict=scalar(b,'select public.qr_submit_selected($1,$2,$3,$4) result',[token,key,items,other]);conflict.catch(()=>{});
+  await waiting(b);await a.query('COMMIT');await assert.rejects(conflict,/QR_IDEMPOTENCY_CONFLICT/);
+  assert.equal(await scalar(admin,'select count(*)::int result from qr_private.requests'),1);
+});
+test('two pending guests cannot claim the same alternative table',async()=>{
+  const other='30000000-0000-4000-8000-000000000002';
+  await guest(a);const first=await scalar(a,'select public.qr_submit($1,$2,$3) result',[token,key,items]);
+  const next=await scalar(a,'select public.qr_submit($1,$2,$3) result',[token,'50000000-0000-4000-8000-000000000002',items]);
+  await staff(a);await a.query('BEGIN');await scalar(a,'select public.qr_review($1,true,$2) result',[first.id,other]);
+  const second=scalar(b,'select public.qr_review($1,true,$2) result',[next.id,other]);second.catch(()=>{});
+  await waiting(b);await a.query('COMMIT');await assert.rejects(second,/QR_TABLE_BUSY/);
+  assert.equal(await scalar(admin,'select count(*)::int result from public.orders'),1);
+  assert.equal(await scalar(admin,"select status result from qr_private.requests where id=$1",[next.id]),'pending');
 });
