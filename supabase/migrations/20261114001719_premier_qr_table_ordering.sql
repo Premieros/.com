@@ -6,27 +6,28 @@ REVOKE ALL ON SCHEMA qr_private FROM PUBLIC;
 GRANT USAGE ON SCHEMA qr_private TO anon, authenticated;
 
 CREATE TABLE qr_private.table_links (
-  table_id uuid PRIMARY KEY REFERENCES public.dining_tables(id),
-  branch_id uuid NOT NULL REFERENCES public.branches(id),
+  table_id uuid PRIMARY KEY REFERENCES public.dining_tables(id) ON DELETE CASCADE,
+  branch_id uuid NOT NULL REFERENCES public.branches(id) ON DELETE CASCADE,
   token_hash text NOT NULL UNIQUE,
   enabled boolean NOT NULL DEFAULT true,
   generation uuid NOT NULL DEFAULT gen_random_uuid()
 );
 CREATE TABLE qr_private.menu_products (
-  product_id uuid PRIMARY KEY REFERENCES public.products(id),
-  branch_id uuid NOT NULL REFERENCES public.branches(id)
+  product_id uuid PRIMARY KEY REFERENCES public.products(id) ON DELETE CASCADE,
+  branch_id uuid NOT NULL REFERENCES public.branches(id) ON DELETE CASCADE
 );
 CREATE TABLE qr_private.requests (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  table_id uuid NOT NULL REFERENCES public.dining_tables(id),
-  branch_id uuid NOT NULL REFERENCES public.branches(id),
+  table_id uuid NOT NULL REFERENCES public.dining_tables(id) ON DELETE CASCADE,
+  branch_id uuid NOT NULL REFERENCES public.branches(id) ON DELETE CASCADE,
   generation uuid NOT NULL,
   request_key uuid NOT NULL,
   payload jsonb NOT NULL,
   items jsonb NOT NULL,
   status text NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','accepted','rejected')),
-  order_id uuid REFERENCES public.orders(id),
-  target_order_id uuid REFERENCES public.orders(id),
+  order_id uuid REFERENCES public.orders(id) ON DELETE SET NULL,
+  -- Historical session identity deliberately survives order deletion: never rebind a pending request.
+  target_order_id uuid,
   decided_by uuid,
   created_at timestamptz NOT NULL DEFAULT now(),
   decided_at timestamptz,
@@ -34,6 +35,7 @@ CREATE TABLE qr_private.requests (
 );
 CREATE INDEX qr_requests_inbox ON qr_private.requests(branch_id, created_at) WHERE status='pending';
 CREATE INDEX qr_requests_rate ON qr_private.requests(table_id, created_at);
+CREATE INDEX qr_requests_pending_table ON qr_private.requests(table_id) WHERE status='pending';
 ALTER TABLE public.orders ADD COLUMN qr_revision bigint NOT NULL DEFAULT 0;
 ALTER TABLE qr_private.table_links ENABLE ROW LEVEL SECURITY;
 ALTER TABLE qr_private.menu_products ENABLE ROW LEVEL SECURITY;

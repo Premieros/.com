@@ -180,4 +180,15 @@ describe('QR migration on isolated PostgreSQL with deployed order functions and 
     expect(await scalar('select sent_quantity::int result from public.order_kitchen_sends')).toBe(2);
     expect(await scalar('select count(*)::int result from public.order_kitchen_inventory_events')).toBe(0);
   });
+  it('does not block deletion of a vacant table with pending QR metadata', async () => {
+    await submit();
+    await db.exec('RESET ROLE');
+    await db.query('delete from public.dining_tables where id=$1', [table]);
+    expect(await scalar('select count(*)::int result from qr_private.requests')).toBe(0);
+    expect(await scalar('select count(*)::int result from qr_private.table_links')).toBe(0);
+    await anon();
+    await expect(db.query('select public.qr_menu($1)', [token])).rejects.toThrow('QR_LINK_INVALID');
+    await db.exec('RESET ROLE');
+    await db.query("insert into public.dining_tables(id,branch_id,name) values($1,$2,'Table A')", [table, branch]);
+  });
 });
