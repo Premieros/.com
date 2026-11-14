@@ -42,8 +42,10 @@ describe('QR migration on isolated PostgreSQL with deployed order functions and 
     await db.exec(sqlFile('tests/fixtures/qr-base.sql'));
     await db.exec(sqlFile('tests/fixtures/qr-deployed-order-functions.sql'));
     await db.exec(sqlFile('tests/fixtures/qr-deployed-triggers.sql'));
+    await db.exec(sqlFile('tests/fixtures/qr-deployed-sent-pricing.sql'));
     await db.exec(`
-      CREATE TRIGGER pricing BEFORE INSERT OR UPDATE ON public.order_items FOR EACH ROW EXECUTE FUNCTION public._price_order_item_modifiers();
+      CREATE TRIGGER pricing BEFORE INSERT OR UPDATE ON public.order_items FOR EACH ROW EXECUTE FUNCTION public._reprice_order_item();
+      CREATE TRIGGER sent_guard BEFORE UPDATE OR DELETE ON public.order_items FOR EACH ROW EXECUTE FUNCTION public.guard_sent_order_item_mutation();
       CREATE TRIGGER totals AFTER INSERT OR UPDATE OR DELETE ON public.order_items FOR EACH ROW EXECUTE FUNCTION public._sync_order_totals_from_items();
       CREATE TRIGGER ownership BEFORE INSERT OR UPDATE OR DELETE ON public.orders FOR EACH ROW EXECUTE FUNCTION public.guard_pos_operator_ownership();
       CREATE TRIGGER ownership BEFORE INSERT OR UPDATE OR DELETE ON public.order_items FOR EACH ROW EXECUTE FUNCTION public.guard_pos_operator_ownership();
@@ -164,5 +166,18 @@ describe('QR migration on isolated PostgreSQL with deployed order functions and 
     await decide(pending.id);
     await db.exec('RESET ROLE');
     expect(await scalar('select total::float result from public.orders where id=$1', [accepted.order_id])).toBe(108.3);
+  });
+  it('adds only an unsent quantity delta to a previously sent matching line', async () => {
+    const first = await submit(); const accepted = await decide(first.id);
+    await db.exec('RESET ROLE');
+    const originalId = await scalar<string>('select id result from public.order_items');
+    await db.query('insert into public.order_kitchen_sends(order_id,order_item_id,sent_quantity) values($1,$2,2)', [accepted.order_id, originalId]);
+    const pending = await submit([item], '50000000-0000-4000-8000-000000000002');
+    await decide(pending.id);
+    await db.exec('RESET ROLE');
+    expect(await scalar('select id result from public.order_items')).toBe(originalId);
+    expect(await scalar('select quantity::int result from public.order_items')).toBe(4);
+    expect(await scalar('select sent_quantity::int result from public.order_kitchen_sends')).toBe(2);
+    expect(await scalar('select count(*)::int result from public.order_kitchen_inventory_events')).toBe(0);
   });
 });

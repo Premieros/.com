@@ -30,8 +30,9 @@ async function waiting(c) {
 }
 before(async () => {
   await Promise.all([a.connect(),b.connect(),admin.connect()]);
-  for (const path of ['tests/fixtures/qr-base.sql','tests/fixtures/qr-deployed-order-functions.sql','tests/fixtures/qr-deployed-triggers.sql']) await admin.query(readFileSync(path,'utf8'));
-  await admin.query(`CREATE TRIGGER pricing BEFORE INSERT OR UPDATE ON public.order_items FOR EACH ROW EXECUTE FUNCTION public._price_order_item_modifiers();
+  for (const path of ['tests/fixtures/qr-base.sql','tests/fixtures/qr-deployed-order-functions.sql','tests/fixtures/qr-deployed-triggers.sql','tests/fixtures/qr-deployed-sent-pricing.sql']) await admin.query(readFileSync(path,'utf8'));
+  await admin.query(`CREATE TRIGGER pricing BEFORE INSERT OR UPDATE ON public.order_items FOR EACH ROW EXECUTE FUNCTION public._reprice_order_item();
+    CREATE TRIGGER sent_guard BEFORE UPDATE OR DELETE ON public.order_items FOR EACH ROW EXECUTE FUNCTION public.guard_sent_order_item_mutation();
     CREATE TRIGGER totals AFTER INSERT OR UPDATE OR DELETE ON public.order_items FOR EACH ROW EXECUTE FUNCTION public._sync_order_totals_from_items();
     CREATE TRIGGER ownership BEFORE INSERT OR UPDATE OR DELETE ON public.orders FOR EACH ROW EXECUTE FUNCTION public.guard_pos_operator_ownership();
     CREATE TRIGGER ownership BEFORE INSERT OR UPDATE OR DELETE ON public.order_items FOR EACH ROW EXECUTE FUNCTION public.guard_pos_operator_ownership();

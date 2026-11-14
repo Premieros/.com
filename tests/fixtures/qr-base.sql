@@ -1,6 +1,8 @@
 -- Minimal isolated ERP dependency fixture, never used with a hosted database.
 CREATE ROLE anon; CREATE ROLE authenticated; CREATE ROLE service_role;
 CREATE SCHEMA auth;
+CREATE SCHEMA private;
+CREATE FUNCTION private.authorized_full_tenant_purge_branch(uuid) RETURNS boolean LANGUAGE sql AS $$ SELECT false $$;
 CREATE FUNCTION auth.uid() RETURNS uuid LANGUAGE sql STABLE AS $$ SELECT nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
 GRANT USAGE ON SCHEMA auth TO anon,authenticated;
 GRANT EXECUTE ON FUNCTION auth.uid() TO anon,authenticated;
@@ -20,7 +22,7 @@ CREATE TABLE public.order_items(id uuid PRIMARY KEY DEFAULT gen_random_uuid(),or
   modifiers_snapshot jsonb DEFAULT '[]',created_at timestamptz DEFAULT now());
 CREATE TABLE public.order_kitchen_sends(order_id uuid,order_item_id uuid,sent_quantity numeric DEFAULT 0);
 CREATE TABLE public.order_kitchen_served_quantities(order_id uuid,order_item_id uuid,served_quantity numeric);
-CREATE TABLE public.order_kitchen_inventory_events(order_id uuid,order_item_id uuid,sent_quantity numeric,voided_quantity numeric);
+CREATE TABLE public.order_kitchen_inventory_events(order_id uuid,order_item_id uuid,sent_quantity numeric,voided_quantity numeric,settled_sale_id uuid);
 CREATE TABLE public.product_modifier_groups(id uuid PRIMARY KEY,branch_id uuid,is_active boolean,min_selections integer);
 CREATE TABLE public.product_modifier_group_products(group_id uuid,product_id uuid,branch_id uuid);
 CREATE FUNCTION public.can_permission(p text) RETURNS boolean LANGUAGE sql SECURITY DEFINER AS $$ SELECT COALESCE((SELECT p=ANY(permissions) FROM public.users WHERE id=auth.uid() AND is_active),false) $$;
