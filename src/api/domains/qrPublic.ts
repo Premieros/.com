@@ -1,0 +1,12 @@
+import { createClient } from '@supabase/supabase-js';
+import type { QrItem } from '@/features/qr/service';
+
+// This module has no dependency on the staff client or authentication providers.
+const client = createClient(import.meta.env.VITE_SUPABASE_URL || 'https://placeholder-project.supabase.co',
+  import.meta.env.VITE_SUPABASE_ANON_KEY || 'placeholder-anon-key-for-build',
+  { auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+const rpc = client.rpc.bind(client);
+export const qrPublic = {
+  menu(p: { p_token: string }) { return rpc('qr_menu', p); },
+  submit(p: { p_token: string; p_key: string; p_items: QrItem[] }) { return rpc('qr_submit', p); },
+};

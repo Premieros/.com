@@ -58,6 +58,7 @@ export interface OrderCashierSummary {
 }
 
 export interface Order {
+  qr_revision?: number;
   id: string;
   order_number: string;
   branch_id: string;

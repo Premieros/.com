@@ -153,6 +153,7 @@ export function usePosOrder(input: UsePosOrderInput) {
       activeTableId: base.activeTable?.id ?? null,
     });
     const { data, error } = await api.floorPlan.updateOrder({
+      p_qr_revision: base.qrRevision.current,
       p_order_id: base.activeOrderId,
       p_order_type: binding.orderType,
       p_table_id: binding.tableId,

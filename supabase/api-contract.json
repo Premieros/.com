@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-05T04:51:10.857Z",
+  "generated_at": "2026-11-14T00:32:39.404Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -1160,6 +1160,60 @@
       ]
     },
     {
+      "name": "qr_configuration",
+      "params": [
+        "branch"
+      ]
+    },
+    {
+      "name": "qr_configure",
+      "params": [
+        "branch",
+        "products"
+      ]
+    },
+    {
+      "name": "qr_decide",
+      "params": [
+        "accept",
+        "id"
+      ]
+    },
+    {
+      "name": "qr_inbox",
+      "params": [
+        "branch"
+      ]
+    },
+    {
+      "name": "qr_menu",
+      "params": [
+        "token"
+      ]
+    },
+    {
+      "name": "qr_rotate",
+      "params": [
+        "enabled",
+        "table"
+      ]
+    },
+    {
+      "name": "qr_save_order",
+      "params": [
+        "payload",
+        "revision"
+      ]
+    },
+    {
+      "name": "qr_submit",
+      "params": [
+        "items",
+        "key",
+        "token"
+      ]
+    },
+    {
       "name": "receive_employee_credit_payment",
       "params": [
         "amount",
@@ -1496,24 +1550,6 @@
       "params": [
         "historical_percent",
         "recent_days"
-      ]
-    },
-    {
-      "name": "update_order",
-      "params": [
-        "customer_id",
-        "discount_amount",
-        "discount_type",
-        "guest_count",
-        "items",
-        "notes",
-        "order_id",
-        "order_type",
-        "status",
-        "subtotal",
-        "table_id",
-        "tax_amount",
-        "total"
       ]
     },
     {

@@ -1,0 +1,40 @@
+name: QR table ordering security
+on:
+  pull_request:
+    paths:
+      - 'src/features/qr/**'
+      - 'src/api/domains/qr*'
+      - 'supabase/migrations/*qr_table_ordering.sql'
+      - 'tests/fixtures/qr-*'
+      - 'tests/unit/qr-*'
+      - 'tests/components/qr-*'
+      - 'scripts/qr/**'
+      - '.github/workflows/qr-table-ordering.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  concurrent-postgres:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: qr_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres -d qr_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: node --test scripts/qr/concurrency.test.mjs
+        env:
+          QR_TEST_DB_URL: postgres://postgres:postgres@127.0.0.1:5432/qr_test
