@@ -4,7 +4,7 @@ const mocks = vi.hoisted(() => ({ inbox: vi.fn(), decide: vi.fn(), navigate: vi.
 vi.mock('@/lib/permissions', () => ({ useCan: () => mocks.can }));
 vi.mock('react-router-dom', () => ({ useNavigate: () => mocks.navigate }));
 vi.mock('@/features/qr/service', () => ({ qrInbox: mocks.inbox, qrDecide: mocks.decide, qrError: () => 'Unavailable' }));
-vi.mock('@/api/domains/qr', () => ({ qr: {handleCall: vi.fn(async()=>({error:null})), calls: vi.fn(async()=>({data:[]})), routing: vi.fn(async () => ({data:{tables:[{id:'t1',name:'Table A',busy:false},{id:'t2',name:'Table B',busy:false}],can_review:true}}))} }));
+vi.mock('@/api/domains/qr', () => ({ qr: {visits: vi.fn(async()=>({data:[],error:null})), photo: vi.fn(async()=>({data:"data:image/jpeg;base64,/9j/AAA",error:null})), handleCall: vi.fn(async()=>({error:null})), calls: vi.fn(async()=>({data:[]})), routing: vi.fn(async () => ({data:{tables:[{id:'t1',name:'Table A',busy:false},{id:'t2',name:'Table B',busy:false}],can_review:true}}))} }));
 import { QrInbox } from '@/features/qr/QrInbox';
 import { qr } from '@/api/domains/qr';
 
@@ -55,4 +55,23 @@ describe('QR inbox branch scope', () => {
     view.rerender(<QrInbox branchId="a" header navigationBlocked={false}/>);
     fireEvent.click(screen.getByRole('button',{name:'فتح حساب العميل المقبول'}));expect(mocks.navigate).toHaveBeenCalledWith('/pos/accepted-order',{state:{branchId:'a'}});
   });
+  it('requires viewing and confirming the table photo before acceptance', async () => {
+    mocks.inbox.mockResolvedValue([{id:'request',visit_id:'visit',has_photo:true,photo_verified:false,table_id:'t1',table_name:'Table A',items:[],created_at:'2026-11-14T00:00:00Z'}]);
+    mocks.decide.mockResolvedValue({order_id:'order',status:'accepted'});
+    render(<QrInbox branchId="a" header/>);await screen.findByRole('button',{name:'طلبات العملاء: 1'});
+    fireEvent.click(screen.getByRole('button',{name:'طلبات العملاء: 1'}));expect(screen.getByRole('button',{name:'قبول طلب العميل'})).toBeDisabled();
+    fireEvent.click(screen.getByRole('button',{name:'عرض صورة رقم الطاولة'}));await screen.findByAltText('صورة رقم طاولة العميل');
+    fireEvent.click(screen.getByRole('button',{name:'تأكيد صورة الطاولة'}));await screen.findByText('تم تأكيد الصورة');
+    fireEvent.click(screen.getByRole('button',{name:'قبول طلب العميل'}));expect(mocks.decide).toHaveBeenCalledWith('request',true,'t1');
+  });
+  it('accepts delivery with no table and protects the currently edited delivery bill', async () => {
+    mocks.inbox.mockResolvedValue([{id:'delivery',order_type:'delivery',own_active_order_id:'own',table_id:null,table_name:'توصيل',items:[],created_at:'2026-11-14T00:00:00Z'}]);
+    mocks.decide.mockResolvedValue({order_id:'own',status:'accepted'});
+    const view=render(<QrInbox branchId="a" header navigationBlocked workspaceOrderId="own"/>);
+    fireEvent.click(await screen.findByRole('button',{name:'طلبات العملاء: 1'}));expect(screen.getByRole('button',{name:'قبول طلب العميل'})).toBeDisabled();
+    expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
+    view.rerender(<QrInbox branchId="a" header navigationBlocked={false} workspaceOrderId="own"/>);
+    fireEvent.click(screen.getByRole('button',{name:'قبول طلب العميل'}));expect(mocks.decide).toHaveBeenCalledWith('delivery',true,undefined);
+  });
 });
+

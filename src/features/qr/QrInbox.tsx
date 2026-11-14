@@ -5,15 +5,18 @@ import { qr } from '@/api/domains/qr';
 import type { QrTable, ServiceCall } from './service';
 import { qrDecide, qrError, qrInbox, type QrRequest } from './service';
 import { BellRing, Volume2, X } from 'lucide-react';
+import { StaffGuestVisits } from './StaffGuestVisits';
 import { useQrNotificationTone } from './useQrNotificationTone';
 
-export function QrInbox({ branchId, readOnly = false, header = false, navigationBlocked = false, workspaceTableId }: { branchId: string; readOnly?: boolean; header?: boolean; navigationBlocked?: boolean; workspaceTableId?: string | null }) {
+export function QrInbox({ branchId, readOnly = false, header = false, navigationBlocked = false, workspaceTableId, workspaceOrderId }: { branchId: string; readOnly?: boolean; header?: boolean; navigationBlocked?: boolean; workspaceTableId?: string | null; workspaceOrderId?: string | null }) {
   const can = useCan();
   const navigate = useNavigate();
   const [requests, setRequests] = useState<QrRequest[]>([]);
   const [calls, setCalls] = useState<ServiceCall[]>([]);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [photos, setPhotos] = useState<Record<string,string>>({});
+  const [verified, setVerified] = useState<string[]>([]);
   const [open, setOpen] = useState(false);
   const [tables, setTables] = useState<QrTable[]>([]);
   const [canReview, setCanReview] = useState(false);
@@ -49,7 +52,7 @@ export function QrInbox({ branchId, readOnly = false, header = false, navigation
     lock.current = true; setBusy(true);
     const branch = branchId;
     try {
-      const result = await qrDecide(request.id, accept, assignments[request.id] || request.own_active_table_id || request.table_id);
+      const result = await qrDecide(request.id, accept, request.order_type === 'delivery' ? undefined : assignments[request.id] || request.own_active_table_id || request.table_id || undefined);
       if (!mounted.current || scope.current !== branch) return;
       version.current++;
       setRequests(rows => rows.filter(r => r.id !== request.id)); setError('');
@@ -60,6 +63,15 @@ export function QrInbox({ branchId, readOnly = false, header = false, navigation
     } catch (failure) { if (mounted.current && scope.current === branch) setError(qrError(failure)); }
     finally { lock.current = false; setBusy(false); }
   }
+  async function inspectPhoto(r: QrRequest, verify = false) {
+    if (lock.current || !r.visit_id) return;
+    lock.current = true; setBusy(true); const branch = branchId;
+    try { const result = await qr.photo({ p_visit: r.visit_id, p_verify: verify }); if (result.error) throw result.error;
+      if (mounted.current && scope.current === branch) { if (result.data) setPhotos(p => ({ ...p, [r.id]: result.data! })); if (verify) setVerified(v => [...v,r.id]); setError(''); }
+    } catch (failure) { if (mounted.current && scope.current === branch) setError(qrError(failure)); }
+    finally { lock.current = false; setBusy(false); }
+  }
+  function unsafeWorkspace(r: QrRequest) { return header && navigationBlocked && (!!r.own_active_order_id && workspaceOrderId === r.own_active_order_id || r.order_type !== 'delivery' && !!workspaceTableId && workspaceTableId === (assignments[r.id] || r.own_active_table_id || r.table_id)); }
   async function handleService(id: string, status: string) {
     if (lock.current) return;
     lock.current = true; setBusy(true); const branch = branchId;
@@ -95,17 +107,20 @@ export function QrInbox({ branchId, readOnly = false, header = false, navigation
       </article>)}
       {readOnly && <p>افتح شاشة الطاولات لقبول الطلبات بعد حفظ طلبك الحالي.</p>}
       {requests.map(r => <article key={r.id} className="my-3 rounded border p-3">
-        <h3 className="font-bold">اختيار العميل: {r.table_name} · {new Date(r.created_at).toLocaleTimeString()}</h3>
+        <h3 className="font-bold">{r.order_type === 'delivery' ? 'طلب توصيل' : 'اختيار العميل:'} {r.order_type !== 'delivery' && r.table_name} · {new Date(r.created_at).toLocaleTimeString()}</h3>
+        <p className="my-2 text-sm">{r.customer_name} {r.customer_phone && <span dir="ltr">{r.customer_phone}</span>}</p>{r.delivery_address && <p className="my-2 text-sm">العنوان: {r.delivery_address}</p>}
+        {r.has_photo && <div className="my-2"><button className="rounded border p-2" disabled={busy} onClick={() => void inspectPhoto(r)}>عرض صورة رقم الطاولة</button>{photos[r.id] && <><img className="my-2 max-h-64 w-full rounded object-contain" src={photos[r.id]} alt="صورة رقم طاولة العميل" />{canReview && !r.photo_verified && !verified.includes(r.id) && <button className="rounded border p-2" disabled={busy} onClick={() => void inspectPhoto(r,true)}>تأكيد صورة الطاولة</button>}</>}{(r.photo_verified || verified.includes(r.id)) && <p className="text-sm text-green-700">تم تأكيد الصورة</p>}</div>}
         <ul>{r.items.map(i => <li key={i.product_id}>{i.quantity} × {i.name} · {Number(i.price).toFixed(2)} {i.notes && `— ${i.notes}`}</li>)}</ul>
-        {header && navigationBlocked && workspaceTableId === (assignments[r.id] || r.own_active_table_id || r.table_id) && <p className="my-2 text-sm text-ui-warning">احفظ أو علّق فاتورة هذه الطاولة أولًا قبل إضافة طلب العميل إليها.</p>}
-        {!readOnly && can('pos.order.edit') && canReview && <><label className="my-3 block">الطاولة المعتمدة <select aria-label={`الطاولة المعتمدة ${r.table_name}`} className="rounded border bg-ui-surface p-2" disabled={busy} value={assignments[r.id] || r.own_active_table_id || r.table_id} onChange={e => setAssignments(a => ({ ...a, [r.id]: e.target.value }))}>
-          {tables.map(t => <option key={t.id} value={t.id} disabled={t.busy && t.id !== r.own_active_table_id}>{t.name}{t.id === r.own_active_table_id ? ' · حساب العميل الحالي' : t.busy ? ' · مشغولة — اختر بديلًا' : ''}</option>)}
-        </select></label><div className="mt-2 flex gap-4">
-          <button disabled={busy || (header && navigationBlocked && workspaceTableId === (assignments[r.id] || r.own_active_table_id || r.table_id)) || !tables.some(t => t.id === (assignments[r.id] || r.own_active_table_id || r.table_id) && (!t.busy || t.id === r.own_active_table_id))} className="rounded bg-ui-primary px-4 py-2 text-white" onClick={() => void decide(r, true)}>{header ? 'قبول طلب العميل' : 'قبول وفتح الفاتورة'}</button>
+        {unsafeWorkspace(r) && <p className="my-2 text-sm text-ui-warning">احفظ أو علّق فاتورة هذه الطاولة أولًا قبل إضافة طلب العميل إليها.</p>}
+        {!readOnly && can('pos.order.edit') && canReview && <>{r.order_type !== 'delivery' && <label className="my-3 block">الطاولة المعتمدة <select aria-label={`الطاولة المعتمدة ${r.table_name}`} className="rounded border bg-ui-surface p-2" disabled={busy} value={assignments[r.id] || r.own_active_table_id || r.table_id || ''} onChange={e => setAssignments(a => ({ ...a, [r.id]: e.target.value }))}>
+          {tables.map(t => <option key={t.id} value={t.id} disabled={(t.busy && t.id !== r.own_active_table_id) || (!!r.own_active_table_id && t.id !== r.own_active_table_id)}>{t.name}{t.id === r.own_active_table_id ? ' · حساب العميل الحالي' : t.busy ? ' · مشغولة — اختر بديلًا' : ''}</option>)}
+        </select></label>}<div className="mt-2 flex gap-4">
+          <button disabled={busy || unsafeWorkspace(r) || (!!r.has_photo && !r.photo_verified && !verified.includes(r.id)) || (r.order_type !== 'delivery' && !tables.some(t => t.id === (assignments[r.id] || r.own_active_table_id || r.table_id) && (!t.busy || t.id === r.own_active_table_id)))} className="rounded bg-ui-primary px-4 py-2 text-white" onClick={() => void decide(r, true)}>{header ? 'قبول طلب العميل' : 'قبول وفتح الفاتورة'}</button>
           <button disabled={busy} onClick={() => void decide(r, false)}>رفض</button>
         </div></>}
         {!readOnly && !canReview && <p className="mt-2 text-sm text-ui-subtle">بانتظار اعتماد الموظف المخوّل لهذا الفرع.</p>}
       </article>)}
+      <StaffGuestVisits key={branchId} branchId={branchId} canReview={canReview && can('pos.order.edit')} />
     </div>}
   </section>;
 }

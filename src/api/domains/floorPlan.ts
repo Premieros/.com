@@ -88,6 +88,7 @@ export const floorPlan = {
   }): ApiResult<RpcResult> {
     const { p_qr_revision, ...payload } = p;
     if (isServiceOrderType(p.p_order_type)) {
+      if (p_qr_revision) return qr.saveServiceOrder({ p_revision: p_qr_revision, p_payload: payload, p_details: getPendingServiceDetails() });
       // A resumed order normally has no in-memory draft. Passing NULL tells the
       // server wrapper to preserve and revalidate the service_details already
       // stored on that order instead of replacing them with an empty object.

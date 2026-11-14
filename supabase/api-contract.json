@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-14T02:37:25.581Z",
+  "generated_at": "2026-11-14T10:16:36.611Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -1197,6 +1197,103 @@
       ]
     },
     {
+      "name": "qr_guest_begin",
+      "params": [
+        "address",
+        "name",
+        "phone",
+        "photo",
+        "session",
+        "table",
+        "token",
+        "type"
+      ]
+    },
+    {
+      "name": "qr_guest_call",
+      "params": [
+        "key",
+        "kind",
+        "note",
+        "session",
+        "table",
+        "token"
+      ]
+    },
+    {
+      "name": "qr_guest_end",
+      "params": [
+        "visit"
+      ]
+    },
+    {
+      "name": "qr_guest_entry",
+      "params": [
+        "session",
+        "token"
+      ]
+    },
+    {
+      "name": "qr_guest_lookup",
+      "params": [
+        "phone",
+        "session",
+        "token"
+      ]
+    },
+    {
+      "name": "qr_guest_menu",
+      "params": [
+        "session",
+        "token"
+      ]
+    },
+    {
+      "name": "qr_guest_photo",
+      "params": [
+        "verify",
+        "visit"
+      ]
+    },
+    {
+      "name": "qr_guest_place",
+      "params": [
+        "items",
+        "key",
+        "session",
+        "table",
+        "token"
+      ]
+    },
+    {
+      "name": "qr_guest_reset_pin",
+      "params": [
+        "visit"
+      ]
+    },
+    {
+      "name": "qr_guest_resume",
+      "params": [
+        "phone",
+        "pin",
+        "session",
+        "token"
+      ]
+    },
+    {
+      "name": "qr_guest_track",
+      "params": [
+        "session",
+        "token"
+      ]
+    },
+    {
+      "name": "qr_guest_visits",
+      "params": [
+        "branch"
+      ]
+    },
+    {
       "name": "qr_handle_call",
       "params": [
         "id",
@@ -1247,6 +1344,16 @@
       ]
     },
     {
+      "name": "qr_save_customer_settings",
+      "params": [
+        "appearance",
+        "branch",
+        "checkin",
+        "enabled",
+        "roles"
+      ]
+    },
+    {
       "name": "qr_save_order",
       "params": [
         "payload",
@@ -1254,12 +1361,11 @@
       ]
     },
     {
-      "name": "qr_save_settings",
+      "name": "qr_save_service_order",
       "params": [
-        "appearance",
-        "branch",
-        "enabled",
-        "roles"
+        "details",
+        "payload",
+        "revision"
       ]
     },
     {
