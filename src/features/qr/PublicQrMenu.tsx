@@ -19,7 +19,8 @@ function foodSymbol(name: string) {
 }
 function FoodImage({ product, large = false }: { product: QrProduct; large?: boolean }) {
   // Catalog sprite fragments need the same frame renderer as POS, not a cropped img.
-  const src = product.image_url?.replace('https://premieros.github.io/johna-s/catalog-product-sprite.svg', `${import.meta.env.BASE_URL}catalog-product-sprite.svg`);
+  const frame = product.image_url?.match(/(?:^|\/)catalog-product-sprite\.svg#([a-z0-9-]+)$/i)?.[1];
+  const src = frame ? `${import.meta.env.BASE_URL}catalog-product-sprite.svg#${frame}` : product.image_url;
   return <ProductImage src={src} name={product.name} category={product.category_name}
     className={`customer-image-content${large ? ' customer-image-large' : ''}`} imgClassName="customer-full-image" />;
 }

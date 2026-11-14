@@ -19,7 +19,7 @@ describe('public QR mobile order intake', () => {
   });
   it('uses the catalog sprite frame instead of enlarging the entire sheet, and preserves full photos', async () => {
     mocks.rpc.mockResolvedValue({ data: { ...menu, products: [
-      { id: 'sprite', name: 'Tea', price: 25, image_url: 'https://premieros.github.io/johna-s/catalog-product-sprite.svg#coffee-hot-p31' },
+      { id: 'sprite', name: 'Tea', price: 25, image_url: 'https://premieros.github.io/.com/catalog-product-sprite.svg#coffee-hot-p31' },
       { id: 'photo', name: 'Cake', price: 50, image_url: 'https://example.com/cake.jpg' },
     ] } });
     render(<PublicQrMenu token={token} />);
