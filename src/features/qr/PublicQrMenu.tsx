@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, Heart, Search, SlidersHorizontal, ShoppingBag, Home, Grid2X2, MapPin, Plus, Minus, UtensilsCrossed, Check } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Heart, Search, SlidersHorizontal, ShoppingBag, Home, Grid2X2, MapPin, Plus, Minus, UtensilsCrossed, Check } from 'lucide-react';
+import { ProductImage } from '@/features/catalog/components/ProductImage';
 import { qrPublic } from '@/api/domains/qrPublic';
 import type { QrAppearance, QrItem, QrProduct, QrTable } from './service';
 import { qrError } from './errors';
@@ -17,9 +18,11 @@ function foodSymbol(name: string) {
   return '🍽️';
 }
 function FoodImage({ product, large = false }: { product: QrProduct; large?: boolean }) {
-  const [failed, setFailed] = useState(false);
-  return product.image_url && !failed ? <img src={product.image_url} alt={product.name} loading={large ? 'eager' : 'lazy'} onError={() => setFailed(true)} />
-    : <span className="customer-food-symbol" role="img" aria-label={product.name}>{foodSymbol(`${product.category_name || ''} ${product.name}`)}</span>;
+  // Catalog sprite fragments need the same frame renderer as POS, not a cropped img.
+  const frame = product.image_url?.match(/(?:^|\/)catalog-product-sprite\.svg#([a-z0-9-]+)$/i)?.[1];
+  const src = frame ? `${import.meta.env.BASE_URL}catalog-product-sprite.svg#${frame}` : product.image_url;
+  return <ProductImage src={src} name={product.name} category={product.category_name}
+    className={`customer-image-content${large ? ' customer-image-large' : ''}`} imgClassName="customer-full-image" />;
 }
 export function PublicQrMenu({ token }: { token: string }) {
   const [menu, setMenu] = useState<Menu | null>(null);
@@ -38,10 +41,31 @@ export function PublicQrMenu({ token }: { token: string }) {
   const [receipt, setReceipt] = useState('');
   const [retry, setRetry] = useState<Draft | null>(null);
   const lock = useRef(false);
+  const categoriesRef = useRef<HTMLDivElement>(null);
+  const categoryDrag = useRef<{ x: number; scroll: number; moved: boolean } | null>(null);
+  const suppressCategoryClick = useRef(false);
+  const [categoryScroll, setCategoryScroll] = useState({ back: false, next: false });
   const storageKey = `premier_qr_pending_v1_${token}`;
   // Each screen starts at its header, even after scrolling a long product list.
   const detailId = detail?.id;
   useEffect(() => { document.documentElement.scrollTop = 0; }, [detailId, page]);
+  useEffect(() => {
+    const node = categoriesRef.current;
+    if (!node) return;
+    const update = () => setCategoryScroll({ back: Math.abs(node.scrollLeft) > 2, next: Math.abs(node.scrollLeft) + node.clientWidth < node.scrollWidth - 2 });
+    const wheel = (event: WheelEvent) => {
+      if (!event.deltaY || event.deltaX || event.ctrlKey) return;
+      const previous = node.scrollLeft;
+      node.scrollLeft -= event.deltaY;
+      if (node.scrollLeft !== previous) event.preventDefault();
+    };
+    update();
+    node.addEventListener('scroll', update, { passive: true });
+    node.addEventListener('wheel', wheel, { passive: false });
+    const resize = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
+    resize?.observe(node);
+    return () => { node.removeEventListener('scroll', update); node.removeEventListener('wheel', wheel); resize?.disconnect(); };
+  }, [menu, detailId, page]);
   useEffect(() => {
     let alive = true;
     setMenu(null); setCart({}); setRetry(null); setError(''); setReceipt(''); setTable(''); setDetail(null); setPage('home');
@@ -115,7 +139,11 @@ export function PublicQrMenu({ token }: { token: string }) {
       {page === 'home' ? <>
         <div className="customer-search"><Search size={21} /><input aria-label="ابحث في المنيو" placeholder="ابحث الآن" value={query} onChange={e => setQuery(e.target.value)} /><button aria-label="عرض كل التصنيفات" onClick={() => { setCategory(''); document.getElementById('customer-categories')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}><SlidersHorizontal size={20} /></button></div>
         {!query && !onlyFavorites && <div className="customer-promos"><div className="customer-promo-main"><div><span>طازج ولذيذ</span><h2>{appearance.banner_text || 'كل اللي بتحبه،\nفي طلب واحد'}</h2><small>اختر وجبتك واستمتع بوقتك</small></div>{appearance.banner_image_url ? <img src={appearance.banner_image_url} alt="اختيارات الفرع" /> : <span aria-hidden="true" className="customer-promo-food">{foodSymbol(categories[0]?.name || 'burger')}</span>}</div><div className="customer-promo-side" aria-hidden="true">☕<span>لحظتك الحلوة</span></div></div>}
-        <div id="customer-categories" className="customer-categories"><button className={!category ? 'is-selected' : ''} onClick={() => setCategory('')}><span>🍽️</span>الكل</button>{categories.map(c => <button key={c.id} className={category === c.id ? 'is-selected' : ''} onClick={() => setCategory(c.id)}><span>{foodSymbol(c.name)}</span>{c.name}</button>)}</div>
+        <div className="customer-category-navigation"><div className="customer-category-heading"><h2>الأقسام</h2><div><button aria-label="الأقسام السابقة" disabled={!categoryScroll.back} onClick={() => categoriesRef.current?.scrollBy({ left: 250, behavior: 'smooth' })}><ChevronRight size={21} /></button><button aria-label="الأقسام التالية" disabled={!categoryScroll.next} onClick={() => categoriesRef.current?.scrollBy({ left: -250, behavior: 'smooth' })}><ChevronLeft size={21} /></button></div></div><div id="customer-categories" ref={categoriesRef} className="customer-categories" aria-label="أقسام المنيو"
+          onPointerDown={e => { if (e.pointerType === 'mouse' && e.button === 0) { categoryDrag.current = { x: e.clientX, scroll: e.currentTarget.scrollLeft, moved: false }; suppressCategoryClick.current = false; } }}
+          onPointerMove={e => { const drag = categoryDrag.current; if (!drag) return; if (Math.abs(e.clientX - drag.x) > 6) { drag.moved = true; suppressCategoryClick.current = true; e.currentTarget.setPointerCapture(e.pointerId); } if (drag.moved) { e.currentTarget.scrollLeft = drag.scroll - (e.clientX - drag.x); e.preventDefault(); } }}
+          onPointerUp={() => { categoryDrag.current = null; }} onPointerCancel={() => { categoryDrag.current = null; }}
+          onClickCapture={e => { if (suppressCategoryClick.current) { e.preventDefault(); e.stopPropagation(); suppressCategoryClick.current = false; } }}><button className={!category ? 'is-selected' : ''} onClick={() => setCategory('')}><span>🍽️</span>الكل</button>{categories.map(c => <button key={c.id} className={category === c.id ? 'is-selected' : ''} onClick={() => setCategory(c.id)}><span>{foodSymbol(c.name)}</span>{c.name}</button>)}</div></div>
         <div className="customer-section-title"><h2>{onlyFavorites ? 'المفضلة' : category ? categories.find(c => c.id === category)?.name : 'اقتراحات لك'}</h2><button onClick={() => { setCategory(''); setQuery(''); setOnlyFavorites(false); }}>الكل ‹</button></div>
         {!menu && !error && <p className="customer-empty" role="status">جارٍ تحميل المنيو…</p>}
         {menu && filtered.length === 0 && <p className="customer-empty">لا توجد أصناف للعرض حاليًا.</p>}

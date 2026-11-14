@@ -17,6 +17,31 @@ describe('public QR mobile order intake', () => {
     expect(mocks.create.mock.calls[0][2]).toEqual({ auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     expect(screen.queryByText('Login')).not.toBeInTheDocument();
   });
+  it('uses the catalog sprite frame instead of enlarging the entire sheet, and preserves full photos', async () => {
+    mocks.rpc.mockResolvedValue({ data: { ...menu, products: [
+      { id: 'sprite', name: 'Tea', price: 25, image_url: 'https://premieros.github.io/.com/catalog-product-sprite.svg#coffee-hot-p31' },
+      { id: 'photo', name: 'Cake', price: 50, image_url: 'https://example.com/cake.jpg' },
+    ] } });
+    render(<PublicQrMenu token={token} />);
+    const sprite = await screen.findByRole('img', { name: 'Tea' });
+    expect(sprite).toHaveAttribute('data-product-sprite-frame', 'true');
+    expect(sprite.firstElementChild).toHaveStyle({ backgroundPosition: '100% 55.55555555555556%', backgroundSize: '800% 3700%' });
+    expect(screen.getByRole('img', { name: 'Cake' })).toHaveClass('customer-full-image');
+    fireEvent.click(screen.getByRole('button', { name: 'تفاصيل Tea' }));
+    expect(screen.getByRole('img', { name: 'Tea' })).toHaveClass('customer-image-large');
+  });
+  it('scrolls category navigation in both RTL directions without selecting another category', async () => {
+    render(<PublicQrMenu token={token} />); await screen.findByText('Table A');
+    const categories = screen.getByLabelText('أقسام المنيو');
+    Object.defineProperties(categories, { scrollWidth: { value: 900 }, clientWidth: { value: 300 } });
+    categories.scrollBy = vi.fn();
+    fireEvent.scroll(categories);
+    fireEvent.click(screen.getByRole('button', { name: 'الأقسام التالية' }));
+    expect(categories.scrollBy).toHaveBeenCalledWith({ left: -250, behavior: 'smooth' });
+    categories.scrollLeft = -200; fireEvent.scroll(categories);
+    fireEvent.click(screen.getByRole('button', { name: 'الأقسام السابقة' }));
+    expect(categories.scrollBy).toHaveBeenCalledWith({ left: 250, behavior: 'smooth' });
+  });
   it('prevents rapid double submission and confirms pending status', async () => {
     let resolve: (value: unknown) => void = () => undefined;
     mocks.rpc.mockImplementation((name: string) => name === 'qr_menu' ? Promise.resolve({ data: menu }) : new Promise(done => { resolve = done; }));
