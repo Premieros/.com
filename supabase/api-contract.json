@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-14T00:32:39.404Z",
+  "generated_at": "2026-11-14T01:44:21.424Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -1192,10 +1192,24 @@
       ]
     },
     {
+      "name": "qr_review",
+      "params": [
+        "accept",
+        "id",
+        "table"
+      ]
+    },
+    {
       "name": "qr_rotate",
       "params": [
         "enabled",
         "table"
+      ]
+    },
+    {
+      "name": "qr_routing",
+      "params": [
+        "branch"
       ]
     },
     {
@@ -1206,10 +1220,26 @@
       ]
     },
     {
-      "name": "qr_submit",
+      "name": "qr_save_settings",
+      "params": [
+        "appearance",
+        "branch",
+        "enabled",
+        "roles"
+      ]
+    },
+    {
+      "name": "qr_settings",
+      "params": [
+        "branch"
+      ]
+    },
+    {
+      "name": "qr_submit_selected",
       "params": [
         "items",
         "key",
+        "table",
         "token"
       ]
     },

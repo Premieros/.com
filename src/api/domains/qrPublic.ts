@@ -8,5 +8,5 @@ const client = createClient(import.meta.env.VITE_SUPABASE_URL || 'https://placeh
 const rpc = client.rpc.bind(client);
 export const qrPublic = {
   menu(p: { p_token: string }) { return rpc('qr_menu', p); },
-  submit(p: { p_token: string; p_key: string; p_items: QrItem[] }) { return rpc('qr_submit', p); },
+  submit(p: { p_token: string; p_key: string; p_items: QrItem[]; p_table: string }) { return rpc('qr_submit_selected', p); },
 };

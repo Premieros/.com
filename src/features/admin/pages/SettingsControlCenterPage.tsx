@@ -1,3 +1,4 @@
+import { CustomerOrderSettings } from '@/features/qr/CustomerOrderSettings';
 import { useEffect, useState, useCallback } from 'react';
 import {
   Palette,
@@ -34,7 +35,7 @@ import { findUiTheme, UI_THEMES } from '@/lib/themes';
 import type { BranchSettings } from '@/lib/types';
 import { APP_ROUTES } from '@/core/navigation/routes';
 
-type SettingsTab = 'branch_profile' | 'tax' | 'business_day' | 'inventory' | 'payments' | 'branch_staff' | 'appearance' | 'language';
+type SettingsTab = 'customer_orders' | 'branch_profile' | 'tax' | 'business_day' | 'inventory' | 'payments' | 'branch_staff' | 'appearance' | 'language';
 
 interface UserRow {
   id: string;
@@ -149,6 +150,7 @@ export function SettingsControlCenterPage() {
   };
 
   const SECTIONS: { key: SettingsTab; label: string; icon: React.ReactNode }[] = [
+    { key: 'customer_orders', label: isAr ? 'طلبات العملاء والمنيو' : 'Customer Orders & Menu', icon: <Smartphone className="w-4 h-4" /> },
     { key: 'branch_profile', label: isAr ? 'بيانات الفرع والطباعة' : 'Branch Profile & Receipts', icon: <Store className="w-4 h-4" /> },
     { key: 'tax', label: isAr ? 'الضريبة' : 'Tax', icon: <Percent className="w-4 h-4" /> },
     { key: 'business_day', label: isAr ? 'اليوم المالي والشفتات' : 'Business Day & Shifts', icon: <CalendarClock className="w-4 h-4" /> },
@@ -226,6 +228,7 @@ export function SettingsControlCenterPage() {
         </div>
 
         <div className="md:col-span-3 space-y-6">
+          {active === 'customer_orders' && <CustomerOrderSettings key={targetBranchId} branchId={targetBranchId} />}
           {active === 'branch_profile' && (
             <Card className="space-y-6 p-4 sm:p-6">
               <div>
