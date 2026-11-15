@@ -55,19 +55,25 @@ describe('Phase 1 — positive-data journal integrity fixtures (rollback only)',
       expect(Number(posted[0].credit)).toBe(125.5);
       expect(Number(posted[0].variance)).toBe(0);
 
-      // A deliberate anomaly must be observable; nonempty data is required.
+      // Use a separate DRAFT entry as a deliberate incomplete posting anomaly;
+      // never modify already-posted financial lines for a test.
+      const draftJournal = randomUUID();
+      await client.query(
+        `insert into public.journal_entries(id,branch_id,entry_number,description,posting_status)
+         values($1,$2,$3,'CI deliberately incomplete draft','DRAFT')`,
+        [draftJournal,branch,`CI-DRAFT-${marker}`]);
       await client.query(
         `insert into public.journal_entry_lines(journal_entry_id,account_id,debit,credit)
          values($1,$2,3,0)`,
-        [journal,debitAccount]);
-      const { rows: detected } = await client.query<{variance:string}>(sql,[journal]);
+        [draftJournal,debitAccount]);
+      const { rows: detected } = await client.query<{variance:string}>(sql,[draftJournal]);
       expect(Number(detected[0].variance)).toBe(3);
       const { rows: anomalies } = await client.query<{n:string}>(
         `select count(*)::text n from (
            select journal_entry_id from public.journal_entry_lines
            where journal_entry_id=$1 group by journal_entry_id
            having round(sum(coalesce(debit,0)-coalesce(credit,0)),2) <> 0
-         ) flagged`,[journal]);
+         ) flagged`,[draftJournal]);
       expect(anomalies[0].n).toBe('1');
     } finally {
       await client.query('ROLLBACK');
