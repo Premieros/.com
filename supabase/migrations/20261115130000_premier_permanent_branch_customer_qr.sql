@@ -35,7 +35,7 @@ BEGIN
 END $fn$;
 REVOKE ALL ON FUNCTION qr_private.branch_code(uuid) FROM PUBLIC,anon,authenticated;
 CREATE OR REPLACE FUNCTION public.qr_branch_code(p_branch uuid)
-RETURNS text LANGUAGE sql SECURITY INVOKER SET search_path TO ''
+RETURNS text LANGUAGE sql SECURITY DEFINER SET search_path TO ''
 AS $fn$ SELECT qr_private.branch_code(p_branch) $fn$;
 REVOKE ALL ON FUNCTION public.qr_branch_code(uuid) FROM PUBLIC,anon;
 GRANT EXECUTE ON FUNCTION public.qr_branch_code(uuid) TO authenticated,service_role;
