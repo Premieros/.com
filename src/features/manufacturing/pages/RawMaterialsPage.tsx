@@ -63,6 +63,9 @@ export function RawMaterialsPage() {
 
   const [form, setForm] = useState<MaterialForm>(EMPTY_FORM);
   const [modalOpen, setModalOpen] = useState(false);
+  const [approvalPrice, setApprovalPrice] = useState('');
+  const [approvalNote, setApprovalNote] = useState('');
+  const [approvingPrice, setApprovingPrice] = useState(false);
   const [adjustTarget, setAdjustTarget] = useState<RawMaterialInventory | null>(null);
   const [adjustQty, setAdjustQty] = useState(0);
   const [adjustReason, setAdjustReason] = useState('');
@@ -106,6 +109,8 @@ export function RawMaterialsPage() {
 
   const openAdd = () => { setForm({ ...EMPTY_FORM, branch_id: branchFilter || '' }); setModalOpen(true); };
   const openEdit = (m: RawMaterial) => {
+    setApprovalPrice(String(m.default_cost ?? ''));
+    setApprovalNote('');
     setForm({
       id: m.id, code: m.code, name: m.name, unit_id: m.unit_id || '',
       category: m.category || '', min_stock: Number(m.min_stock),
@@ -153,6 +158,37 @@ export function RawMaterialsPage() {
     }
     setModalOpen(false);
     reloadMaterials();
+  };
+
+  const approveMaterialPrice = async () => {
+    if (!form.id || !form.branch_id || approvingPrice || !can('raw_materials.manage')) return;
+    const raw = approvalPrice.trim();
+    // Blank/invalid input must NEVER become an approved zero by coercion.
+    if (!raw || !/^(?:\\d+)(?:\\.\\d{1,6})?$/.test(raw)) {
+      show(isAr ? 'أدخل سعرًا صالحًا، ويمكن اعتماد 0 صراحةً' : 'Enter a valid price; explicit zero is allowed', 'error');
+      return;
+    }
+    const amount = Number(raw);
+    if (!Number.isFinite(amount) || amount < 0) return;
+    setApprovingPrice(true);
+    try {
+      const { data, error } = await api.costing.setRawMaterialPrice({
+        p_raw_material_id: form.id,
+        p_branch_id: form.branch_id,
+        p_unit_cost: amount,
+        p_note: approvalNote.trim() || null,
+      });
+      if (error || !data?.success) {
+        show(error?.message || data?.error || t('error'), 'error');
+        return;
+      }
+      setForm(prev => ({ ...prev, default_cost: amount }));
+      setApprovalNote('');
+      reloadMaterials();
+      show(isAr ? `تم اعتماد السعر ${formatNumber(amount,2)} وحفظه في سجل الأسعار` : `Approved price ${formatNumber(amount,2)} saved to price history`, 'success');
+    } finally {
+      setApprovingPrice(false);
+    }
   };
 
   const remove = async () => {
@@ -227,7 +263,7 @@ export function RawMaterialsPage() {
     { key: 'material', header: t('rawMaterial'), render: (i) => <div><p>{i.raw_material?.name || '-'}</p><p className="text-xs text-ui-subtle">{unitLabel(i.raw_material?.unit_id)}</p></div> },
     { key: 'branch', header: t('branch'), render: (i) => branchLabel(i.branch_id) },
     { key: 'quantity', header: t('quantity'), render: (i) => <span className={`font-semibold ${Number(i.quantity) < Number(i.min_stock) ? 'text-ui-danger' : 'text-ui-text'}`}>{formatRawMaterialQuantity(Number(i.quantity), unitForMaterial(i.raw_material), { lang })}</span> },
-    { key: 'avg_cost', header: t('avgCost'), render: (i) => formatNumber(Number(i.avg_cost), 2) },
+    { key: 'avg_cost', header: isAr ? 'متوسط الدفعات التاريخي' : 'Historical batch average', render: (i) => formatNumber(Number(i.avg_cost), 2) },
     { key: 'actions', header: t('actions'), render: (i) => <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>{can('raw_materials.manage') && <button onClick={() => openAdjust(i)} className="p-1.5 rounded-md hover:bg-ui-info-soft text-ui-info" title={t('adjustRawStock')}><Edit2 className="w-4 h-4" /></button>}</div> },
   ];
 
@@ -277,7 +313,14 @@ export function RawMaterialsPage() {
           <Input label={t('category')} value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} />
           {branchFilter ? <div><label className="block text-sm font-medium text-ui-muted mb-1">{t('branch')}</label><div className="min-h-11 flex items-center"><BranchBadge name={branchLabel(form.branch_id || branchFilter)} /></div></div> : <Select label={t('branch')} value={form.branch_id} onChange={(e) => setForm({ ...form, branch_id: e.target.value })}><option value="">--</option>{branches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}</Select>}
           <Input label={`${t('minStock')} (${unitLabel(form.unit_id)})`} type="number" step="0.0001" value={form.min_stock} onChange={(e) => setForm({ ...form, min_stock: parseFloat(e.target.value) || 0 })} />
-          <Input label={t('defaultCost')} type="number" step="0.01" value={form.default_cost} onChange={(e) => setForm({ ...form, default_cost: parseFloat(e.target.value) || 0 })} />
+          <Input label={isAr ? 'التكلفة المرجعية بالكتالوج (ليست السعر المعتمد)' : 'Catalog reference cost (not approved price)'} type="number" step="0.01" value={form.default_cost} onChange={(e) => setForm({ ...form, default_cost: parseFloat(e.target.value) || 0 })} />
+           {form.id && can('raw_materials.manage') && <div className="sm:col-span-2 space-y-3 rounded-xl border border-ui-border p-4" data-testid="raw-material-approved-price-panel">
+             <p className="font-semibold text-ui-text">{isAr ? 'اعتماد سعر التكلفة' : 'Approve material cost price'}</p>
+             <p className="text-xs text-ui-subtle">{isAr ? 'هذا الإجراء منفصل عن حفظ بيانات الخامة. آخر سعر معتمد هو المستخدم للتكلفة، والصفر سعر معتمد صالح.' : 'This action is separate from saving the material. The latest approved price drives costing; zero is valid.'}</p>
+             <Input label={isAr ? 'السعر المطلوب اعتماده (يمكن إدخال 0)' : 'Price to approve (zero allowed)'} type="text" value={approvalPrice} onChange={(e) => setApprovalPrice(e.target.value)} />
+             <Input label={isAr ? 'سبب اعتماد السعر (اختياري)' : 'Approval note (optional)'} value={approvalNote} onChange={(e) => setApprovalNote(e.target.value)} />
+             <Button onClick={() => void approveMaterialPrice()} disabled={approvingPrice}>{approvingPrice ? (isAr ? 'جارٍ الاعتماد…' : 'Approving…') : (isAr ? 'اعتماد السعر وحفظه في السجل' : 'Approve price and record history')}</Button>
+           </div>}
           <div className="sm:col-span-2"><Input label={t('description')} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} /></div>
           <label className="flex items-center gap-2 text-sm text-ui-muted"><input type="checkbox" checked={form.is_active} onChange={(e) => setForm({ ...form, is_active: e.target.checked })} className="w-4 h-4 rounded border-ui-border text-brand-600 focus:ring-brand-500" />{t('active')}</label>
         </div>
