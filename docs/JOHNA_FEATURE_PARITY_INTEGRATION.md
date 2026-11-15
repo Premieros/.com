@@ -1,0 +1,46 @@
+# Premier selective Johna feature parity — unified integration
+
+## Source boundaries
+- **Write target:** `Premieros/.com` (Premier), based on `main`.
+- **Target database:** Supabase project `john's 1` (`hvqlkapynjfjikqithvd`), PostgreSQL database `postgres`.
+- **Read-only reference:** the external Johna source repository and its separate database. Do not write to either.
+- This document tracks selected compatibility work; do **not** bulk-copy code or apply source database migrations.
+- No automatic merging of unrelated legacy PRs or release branches.
+
+## Status legend
+- DONE: committed in this branch; not necessarily reviewed or released
+- REVIEW: found in source or older Premier PR, requires adaptation and tests
+- BLOCKED: dependency/invariant not validated yet
+
+| Area | Work item | Status | Notes |
+| --- | --- | --- | --- |
+| POS printing | Searchable cloud queue and safe ticket diagnostics | DONE | Search loaded queue jobs by ticket/order/table/station and copy non-sensitive job metadata; no print retries or replays, tests included |
+| POS printing | Guard cloud print queue against cross-branch stale responses, duplicate concurrent requests and hidden-tab polling | DONE | `src/features/pos/components/settings/PrinterSettingsPanel.tsx`; requires browser/CI validation |
+| POS printing | Cashier area / second station settings | BLOCKED | Source UI requires `get_cashier_area_settings` and `save_cashier_area_settings`; missing in Premier target database during read-only check; design Premier-native branch-scoped permissions and routing before enabling |
+| POS printing | Manual delayed-ticket print recovery | REVIEW | Reference flow depends on print recovery RPCs, job claiming, anti-duplicate safeguards and `pos.print_recovery`; preserve fail-closed behavior |
+| Reports | Search, reorder and persist report columns | DONE | Integrated with Premier's native ReportsPage, visible column controls, Excel/CSV/print projection and disabled empty-selection exports; unit tests included |
+| Reports | Semantic summary metrics and basis disclosures | DONE | Adapted report-specific labels from reference for existing Premier report types; inventory quantity/group counts no longer render with currency formatting; tests added |
+| Reports | Saved report view first-use and column restore | DONE | Always show Save Current View; restore saved visible columns with report filters across report types; component/hook tests included |
+| Reports | Previous-period / same-period-last-year navigation | DONE | New controls on existing detailed report screen, preserving report query and history permissions; Gregorian date utility and unit tests added |
+| Reports | Month-end review checklist screen | DONE (read-only) | New route `/reports/month-review` from report center with year/month selection, only authorized existing report links, full-month history access check, session-only review flags; no journal posting, period locks or shadow roll-ups. Unit tests added |
+| Reports | Consumption report workspace screen | DONE (Premier-native) | Route `/reports/consumption` with three permissioned existing consumption reports, accessible from reports center; no shadow SQL, valuation or source-only RPC dependency; unit tests added |
+| Reports | Reporting dashboard and filters | REVIEW | Draft PR #160 exists; compare against current Premier reports before cherry-picking |
+| Reports | Month/period close, consumption reports, exports | REVIEW | Source components may have different schema/permissions; match Premier native report loaders |
+| Inventory | Branch/warehouse stock, transfer and valuation gaps | REVIEW | Preserve Premier atomic counting and branch isolation |
+| Costing | Recipe costs, raw prices, FIFO/approved price consistency | REVIEW | Preserve merged approved-zero and inventory-cost invariants |
+| Accounting and procurement | Receivables, journal reports, buying workflow gaps | REVIEW | Assess dependencies and schema; no production data writes for discovery |
+| Admin | Registration, branch pulse, support and permissions | REVIEW | Use Premier org/branch boundaries and permission model |
+| Egyptian e-invoicing | ETA invoice/eReceipt routing foundation | DONE (foundation only) | Separate eInvoice and eReceipt channels, tenant/country eligibility, shared ETA/ZATCA dispatcher and unit tests; no network calls or operational schema changes. See `docs/EGYPT_ETA_INTEGRATION.md` |
+| Saudi e-invoicing | ZATCA clearance/reporting routing foundation | DONE (foundation only) | Fail-closed typed policy and unit tests; no live submission, compliance claim, credential storage or schema writes. See `docs/SAUDI_ZATCA_INTEGRATION.md` |
+| Database | Migration-history reconciliation | BLOCKED | Draft PR #155 exists; do not merge automatically or apply migrations without staged audit |
+| Offline/LAN | Existing draft PRs #133–#140 | REVIEW | Separate architectural scope, dependent branches; not automatic candidates for feature parity |
+
+## Validation gate before merging
+1. Review each changed file for Premier's org/branch permission model and current API contracts.
+2. Run TypeScript/build, relevant UI tests and print/order regression tests.
+3. Confirm branch-switching and failed/slow print-queue reads never show another branch's data.
+4. Check all database changes in a disposable environment first; verify RLS, function grants and cross-branch isolation.
+5. Merge this one integration PR only after the above checks pass. Its draft state is intentional.
+
+## Working convention
+Commit each completed feature separately to the **same branch and PR**; record a test and the exact dependency for every addition. Preserve already-merged features (notably area bulk-create PR #197, stock-count Excel PR #167 and purchase unit price conversion PR #168).

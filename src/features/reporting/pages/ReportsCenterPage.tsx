@@ -275,6 +275,20 @@ export function ReportsCenterPage() {
             <span className="max-w-56 truncate rounded-lg bg-ui-page-alt px-3 py-2 text-xs text-ui-muted" data-testid="reports-applied-range">
               {draftFrom} — {draftTo}
             </span>
+            {permittedOperational.some(report => report.key === 'component_consumption' || report.key === 'raw_material_consumption' || report.key === 'top_consumed_components') && (
+              <button type="button" data-testid="open-consumption-workspace"
+                onClick={() => navigate('/reports/consumption')}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border px-3 text-xs font-bold text-ui-text">
+                {isAr ? 'تقارير الاستهلاك' : 'Consumption reports'}
+              </button>
+            )}
+            {permittedOperational.some(report => ['sales', 'purchases', 'expenses', 'financial_reconciliation', 'profit'].includes(report.key)) && (
+              <button type="button" data-testid="open-month-review"
+                onClick={() => navigate('/reports/month-review')}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border px-3 text-xs font-bold text-ui-text">
+                {isAr ? 'مراجعة الشهر' : 'Month-end review'}
+              </button>
+            )}
             <button type="button" data-testid="toggle-reports-filters" aria-expanded={filtersOpen}
               aria-controls="reports-filters-popup" onClick={() => setFiltersOpen((open) => !open)}
               className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border px-3 text-xs font-bold text-ui-text">

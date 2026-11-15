@@ -15,6 +15,8 @@ import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useColumnPreferences } from '../useColumnPreferences';
+import { orderReportColumns, projectReportColumns } from '../reportColumnLayout';
+import { reportSummaryPresentation } from '../reportSummaryPresentation';
 import { filterAndSortReportRows, paginateReportRows, type ReportSortDirection } from '../reportTablePresentation';
 import { linkSourceSale, sourceSaleId } from '../reportSourceLinks';
 import { APP_ROUTES } from '@/core/navigation/routes';
@@ -161,7 +163,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   });
   const { effectiveSettings } = useSettings();
   const currency = effectiveSettings(branchFilter)?.currency || 'EGP';
-  const { visibleColumns, toggleColumn, showAllColumns } = useColumnPreferences(reportType);
+  const { visibleColumns, toggleColumn, showAllColumns, restoreVisibleColumns, columnOrder, moveColumn, resetColumnOrder } = useColumnPreferences(reportType);
   const { savedReports, saveReport, deleteReport } = useCustomReports();
   const reportBranchLabel = reportBranchIds.length === 1
     ? branchNameById(reportBranchIds[0])
@@ -204,6 +206,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
 
   const handleRestoreCustomReport = (config: SavedReportConfig) => {
     handleReportTypeSelect(config.reportType);
+    restoreVisibleColumns(config.reportType, config.visibleColumns);
     setFilters(config.filters || {});
     setFiltersDirty(false);
     setQueryVersion((version) => version + 1);
@@ -1147,6 +1150,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   };
 
   const handleExportExcel = () => {
+    if (loading || reportError || columns.length === 0) return;
     const excelProfile = getReportExcelProfile(reportType, lang as 'ar' | 'en');
     const totalRow = reportType === 'financial_reconciliation'
       ? {
@@ -1158,7 +1162,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         [lang === 'ar' ? 'عدد السجلات' : 'Record Count']: summary.count,
       };
     void exportToExcelAdvanced({
-      data: presentedRows,
+      data: projectReportColumns(presentedRows, columns),
       filename: `report_${reportType}_${from}_${to}`,
       sheetName: (reportTypes.find((row) => row.key === reportType)?.label ?? reportType).slice(0, 31),
       title: reportTypes.find((row) => row.key === reportType)?.label ?? reportType,
@@ -1166,13 +1170,16 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
       totalRow: tableSearch.trim() ? undefined : totalRow,
       currencyColumns: moneyKeys,
       integerColumns: excelProfile.integerColumns,
-      columns: excelProfile.columns,
+      columns,
       columnWidths: excelProfile.columnWidths,
       sourceNote: excelProfile.sourceNote,
       lang,
     });
   };
-  const handleExportCSV = () => { downloadCSV(presentedRows, `report_${reportType}_${from}_${to}`); };
+  const handleExportCSV = () => {
+    if (loading || reportError || columns.length === 0) return;
+    downloadCSV(projectReportColumns(presentedRows, columns), `report_${reportType}_${from}_${to}`);
+  };
 
   const reportTypes: { key: ReportType; label: string; icon: React.ReactNode }[] = [
     { key: 'sales', label: t('salesReport'), icon: <TrendingUp className="w-4 h-4" /> },
@@ -1253,8 +1260,9 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     lang === 'ar' ? 'فرق القيمة' : 'Value Difference',
   ];
 
+  const summaryPresentation = reportSummaryPresentation(reportType, lang === 'ar' ? 'ar' : 'en');
   const showDate = DATE_DRIVEN_REPORTS.has(reportType);
-  const allColumns = data.length > 0 ? Object.keys(data[0]) : [];
+  const allColumns = orderReportColumns(data.length > 0 ? Object.keys(data[0]) : [], columnOrder);
   const columns = visibleColumns ? allColumns.filter((column) => visibleColumns.includes(column)) : allColumns;
   const hiddenCount = visibleColumns ? allColumns.length - columns.length : 0;
   const reportMobilePrimaryColumns = columns.slice(0, 4);
@@ -1324,8 +1332,9 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   };
 
   const handlePrint = () => {
+    if (loading || reportError || columns.length === 0) return;
     const reportLabel = reportTypes.find((row) => row.key === reportType)?.label ?? reportType;
-    const headers = presentedRows.length > 0 ? Object.keys(presentedRows[0]) : [];
+    const headers = columns;
     const rows = presentedRows.map((row) => headers.map((header) => {
       const value = row[header];
       if (typeof value === 'number' && moneyKeys.includes(header)) return formatFinancialCurrency(value, currency, lang);
@@ -1361,18 +1370,28 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
       <PageHeader title={t('reports')} actions={
         <div className="flex flex-wrap gap-2">
           <ColumnPicker
-            columns={data.length > 0 ? Object.keys(data[0]) : []}
+            columns={allColumns}
             visibleColumns={visibleColumns}
-            onToggle={toggleColumn}
+            onToggle={(key) => toggleColumn(key, allColumns)}
             onShowAll={showAllColumns}
+            onMove={(key, direction) => moveColumn(key, direction, allColumns)}
+            onResetOrder={resetColumnOrder}
             lang={lang}
             hiddenCount={hiddenCount}
           />
-          {can('reports.export') && <Button variant="outline" size="sm" disabled={loading || reportError} onClick={handleExportExcel}><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}
-          {can('reports.export') && <Button variant="outline" size="sm" disabled={loading || reportError} onClick={handleExportCSV}><FileDown className="w-4 h-4" /> {t('exportCsv')}</Button>}
-          {can('reports.print') && <Button variant="outline" size="sm" disabled={loading || reportError} onClick={handlePrint}><Printer className="w-4 h-4" /> {t('print')}</Button>}
+          {can('reports.export') && <Button variant="outline" size="sm" disabled={loading || reportError || columns.length === 0} onClick={handleExportExcel}><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}
+          {can('reports.export') && <Button variant="outline" size="sm" disabled={loading || reportError || columns.length === 0} onClick={handleExportCSV}><FileDown className="w-4 h-4" /> {t('exportCsv')}</Button>}
+          {can('reports.print') && <Button variant="outline" size="sm" disabled={loading || reportError || columns.length === 0} onClick={handlePrint}><Printer className="w-4 h-4" /> {t('print')}</Button>}
         </div>
       } />
+
+      {data.length > 0 && columns.length === 0 && (
+        <p role="status" className="mb-3 rounded-xl border border-ui-warning/30 bg-ui-warning-soft px-3 py-2 text-sm text-ui-warning">
+          {lang === 'ar'
+            ? 'لا توجد أعمدة ظاهرة. اختر عمودًا واحدًا على الأقل من قائمة الأعمدة لعرض النتائج أو تصديرها.'
+            : 'No columns are visible. Select at least one column to display or export results.'}
+        </p>
+      )}
 
       {!history.unlimited && (
         <div className="mb-3 rounded-xl border border-ui-warning/30 bg-ui-warning-soft px-4 py-3 text-sm text-ui-warning">
@@ -1449,6 +1468,10 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         count={summary.count}
         currency={currency}
         lang={lang}
+        totalLabel={summaryPresentation.totalLabel}
+        countLabel={summaryPresentation.countLabel}
+        totalIsQuantity={summaryPresentation.totalIsQuantity}
+        summaryNote={summaryPresentation.note}
         financialTypes={canFinancial ? financialTypes : []}
         canFinancial={canFinancial}
         onFinancialSelect={(key) => navigate(`/financial-reports?view=${key}&from=${from}&to=${to}`)}

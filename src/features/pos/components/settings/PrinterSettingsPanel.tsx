@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Cloud, Coffee, Printer, Receipt, RefreshCw, Save, TestTube2, UtensilsCrossed, WalletCards } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AlertTriangle, Cloud, Coffee, Copy, Printer, Receipt, RefreshCw, Save, TestTube2, UtensilsCrossed, WalletCards } from 'lucide-react';
 import { catalog } from '@/api/domains/catalog';
 import { Button } from '@/components/Button';
 import { Select } from '@/components/Input';
@@ -22,6 +22,7 @@ import {
   type DetectedPrinter,
   type PrinterRouteConfig,
 } from '../../services/localPrintAgent';
+import { filterPrintQueueJobs, printQueueDiagnostics, printQueueJobSummary, type PrintQueueFilter } from '../../services/printQueueDiagnostics';
 import {
   getCloudPrintAgentBranchId,
   isCloudPrintAgentEnabled,
@@ -112,7 +113,8 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
   const [queueJobs, setQueueJobs] = useState<CloudPrintQueueRow[]>([]);
   const [queueLoading, setQueueLoading] = useState(false);
   const [queueError, setQueueError] = useState<string | null>(null);
-  const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'active' | 'submitted' | 'failed'>('pending');
+  const [queueFilter, setQueueFilter] = useState<PrintQueueFilter>('pending');
+  const [queueSearch, setQueueSearch] = useState('');
 
   useEffect(() => {
     if (!canManagePrinters) return;
@@ -149,30 +151,60 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
     return [CASHIER_STATION, ...dynamicStations];
   }, [branchStations, selectedBranchId, stationLoadFailed]);
 
+  // A slow response from another branch must never overwrite the selected branch's queue.
+  // Only one read per branch can run at a time, including manual refreshes.
+  const queueReadRef = useRef<{ branchId: string; token: number } | null>(null);
+  const queueTokenRef = useRef(0);
+
   const loadPrintQueue = useCallback(async () => {
     if (!canManagePrinters || !selectedBranchId) {
+      queueTokenRef.current += 1;
+      queueReadRef.current = null;
       setQueueJobs([]);
       setQueueError(null);
+      setQueueLoading(false);
       return;
     }
+    if (queueReadRef.current?.branchId === selectedBranchId) return;
+    const token = ++queueTokenRef.current;
+    queueReadRef.current = { branchId: selectedBranchId, token };
     setQueueLoading(true);
     try {
       const jobs = await listCloudPrintQueue(selectedBranchId, 150);
+      if (queueTokenRef.current !== token) return;
       setQueueJobs(jobs);
       setQueueError(null);
     } catch (error) {
+      if (queueTokenRef.current !== token) return;
       setQueueJobs([]);
       setQueueError(error instanceof Error ? error.message : String(error));
     } finally {
-      setQueueLoading(false);
+      if (queueTokenRef.current === token) {
+        queueReadRef.current = null;
+        setQueueLoading(false);
+      }
     }
   }, [canManagePrinters, selectedBranchId]);
 
   useEffect(() => {
-    if (!canManagePrinters || !selectedBranchId) return;
+    if (!canManagePrinters || !selectedBranchId) {
+      setQueueJobs([]);
+      setQueueError(null);
+      setQueueLoading(false);
+      return;
+    }
+    const refreshWhenVisible = () => {
+      if (!document.hidden) void loadPrintQueue();
+    };
     void loadPrintQueue();
-    const timer = window.setInterval(() => void loadPrintQueue(), 5000);
-    return () => window.clearInterval(timer);
+    const timer = window.setInterval(refreshWhenVisible, 5000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      queueTokenRef.current += 1;
+      queueReadRef.current = null;
+    };
   }, [canManagePrinters, loadPrintQueue, selectedBranchId]);
 
   const queueCounts = useMemo(() => {
@@ -186,18 +218,16 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
     return counts;
   }, [queueJobs]);
 
-  const visibleQueueJobs = useMemo(() => queueJobs.filter((job) => {
-    if (queueFilter === 'all') return true;
-    if (queueFilter === 'active') return job.status === 'claimed' || job.status === 'printing';
-    return job.status === queueFilter;
-  }), [queueFilter, queueJobs]);
+  const visibleQueueJobs = useMemo(() => filterPrintQueueJobs(queueJobs, queueFilter, queueSearch), [queueFilter, queueJobs, queueSearch]);
 
-  const queueJobLabel = useCallback((job: CloudPrintQueueRow) => {
-    const text = String(job.payload?.text || '');
-    const order = text.match(/طلب:\s*([^\r\n]+)/)?.[1]?.trim();
-    const table = text.match(/طاولة:\s*([^\r\n]+)/)?.[1]?.trim();
-    return { order: order || '—', table: table || '—' };
-  }, []);
+  const copyQueueDiagnostics = async (job: CloudPrintQueueRow) => {
+    try {
+      await navigator.clipboard.writeText(printQueueDiagnostics(job));
+      show(isAr ? 'تم نسخ معرف التذكرة ومعلومات التشخيص.' : 'Job identifiers and diagnostics copied.', 'success');
+    } catch {
+      show(isAr ? 'تعذر النسخ؛ تحقق من أذونات الحافظة.' : 'Copy failed; check clipboard permissions.', 'error');
+    }
+  };
 
   const loadBranchStations = useCallback(async () => {
     if (!selectedBranchId) {
@@ -406,6 +436,17 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
           </button>
         </div>
 
+        <div className="mt-3 flex flex-wrap items-center gap-3">
+          <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs font-semibold text-ui-muted">
+            {isAr ? 'بحث في التذاكر المحملة' : 'Search loaded tickets'}
+            <input type="search" value={queueSearch} onChange={(event) => setQueueSearch(event.target.value)}
+              placeholder={isAr ? 'رقم الطلب، المحطة أو معرف التذكرة' : 'Order, station, or job ID'}
+              data-testid="print-queue-search"
+              className="h-9 rounded-lg border border-ui-border bg-ui-page px-3 text-sm text-ui-text" />
+          </label>
+          <span className="text-xs text-ui-muted">{isAr ? `المعروض: ${visibleQueueJobs.length} من ${queueJobs.length} تذكرة محملة` : `Showing ${visibleQueueJobs.length} of ${queueJobs.length} loaded jobs`}</span>
+        </div>
+
         {queueError ? (
           <div className="mt-4 flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -424,11 +465,12 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
                 <th className="px-3 py-2 text-start">{isAr ? 'الحالة' : 'Status'}</th>
                 <th className="px-3 py-2 text-start">{isAr ? 'المحاولات' : 'Attempts'}</th>
                 <th className="px-3 py-2 text-start">{isAr ? 'آخر خطأ' : 'Last error'}</th>
+                <th className="px-3 py-2 text-start">{isAr ? 'التشخيص' : 'Diagnostics'}</th>
               </tr>
             </thead>
             <tbody>
               {visibleQueueJobs.map((job) => {
-                const label = queueJobLabel(job);
+                const label = printQueueJobSummary(job);
                 return (
                   <tr key={job.id} className="border-t border-ui-border text-ui-text">
                     <td className="whitespace-nowrap px-3 py-2">{new Date(job.created_at).toLocaleString(isAr ? 'ar-EG' : 'en-US')}</td>
@@ -440,11 +482,16 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
                     </td>
                     <td className="px-3 py-2">{job.attempts}</td>
                     <td className="max-w-[280px] truncate px-3 py-2 text-ui-muted" title={job.last_error || ''}>{job.last_error || '—'}</td>
+                    <td className="px-3 py-2"><button type="button" onClick={() => void copyQueueDiagnostics(job)}
+                      className="inline-flex items-center gap-1 rounded-lg border border-ui-border px-2 py-1 text-ui-primary"
+                      aria-label={isAr ? 'نسخ معلومات التذكرة' : 'Copy job diagnostics'}>
+                      <Copy className="h-3.5 w-3.5" />{isAr ? 'نسخ' : 'Copy'}
+                    </button></td>
                   </tr>
                 );
               })}
               {!queueLoading && visibleQueueJobs.length === 0 ? (
-                <tr><td colSpan={7} className="px-3 py-8 text-center text-ui-muted">{isAr ? 'لا توجد أوامر في هذه الحالة.' : 'No jobs in this status.'}</td></tr>
+                <tr><td colSpan={8} className="px-3 py-8 text-center text-ui-muted">{isAr ? 'لا توجد أوامر في هذه الحالة.' : 'No jobs in this status.'}</td></tr>
               ) : null}
             </tbody>
           </table>
