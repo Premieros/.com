@@ -39,6 +39,5 @@ export function printQueueDiagnostics(job: CloudPrintQueueRow): string {
     `status: ${job.status}`,
     `attempts: ${job.attempts}`,
     `created_at: ${job.created_at}`,
-    `last_error: ${String(job.last_error || '').replace(/[\r\n]+/g, ' ').slice(0, 250)}`,
   ].join('\n');
 }
