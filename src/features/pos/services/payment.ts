@@ -124,12 +124,36 @@ export function createSaleOperationKey(): string {
   return `sale:${createOfflineToken()}`;
 }
 
-async function queueOfflineSale(p: ProcessSalePayload): Promise<string> {
+async function queueOfflineSale(p: ProcessSalePayload, allowNegative: boolean, startedOffline: boolean): Promise<string> {
   // Revalidate at the durable write boundary: connectivity can change after
   // processSaleForOrder's initial offline check while settings load.
   if (!hasValidOfflineSaleItems(p.p_items)) throw new Error('OFFLINE_SALE_INVALID_ITEMS');
   if (!p.p_shift_id) throw new Error('SHIFT_REQUIRED_OFFLINE');
   if (!p.p_warehouse_id?.trim()) throw new Error('WAREHOUSE_REQUIRED_OFFLINE_CAPTURE');
+
+  // If the connection dropped AFTER the initial preflight, its branch-wide
+  // stock check cannot justify an offline sale in this pinned warehouse.
+  // Check the exact warehouse before any durable outbox insertion.
+  if (!allowNegative && !startedOffline) {
+    const requested = new Map<string, number>();
+    for (const item of p.p_items) {
+      requested.set(item.product_id, (requested.get(item.product_id) || 0) + item.quantity);
+    }
+    for (const [productId, quantity] of requested) {
+      let stock;
+      try {
+        stock = await InventoryRepository.getWarehouseAvailableStock(
+          productId, p.p_branch_id, p.p_warehouse_id,
+        );
+      } catch {
+        throw new Error('OFFLINE_WAREHOUSE_STOCK_UNVERIFIED');
+      }
+      if (stock.status !== 'known') {
+        throw new Error('OFFLINE_WAREHOUSE_STOCK_UNVERIFIED: ' + stock.reason);
+      }
+      if (quantity > stock.quantity) throw new Error('INSUFFICIENT_STOCK');
+    }
+  }
 
   // getSession() reads the persisted local Supabase session and therefore works
   // while offline. Never accept a financially relevant outbox row without a
@@ -321,7 +345,7 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   // outbox. They are pending reconciliation, not a server-confirmed payment.
   if (!splitPayments && typeof navigator !== 'undefined' && !navigator.onLine) {
     try {
-      const queuedId = await queueOfflineSale(p);
+      const queuedId = await queueOfflineSale(p, allowNegative, explicitlyOffline);
       return {
         result: {
           success: true,
