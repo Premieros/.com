@@ -63,13 +63,13 @@ const disposable = Boolean(url && ['localhost', '127.0.0.1', '[::1]'].some(host 
       expect(await rate(session)).toMatchObject({ submitted: true, overall: 5 });
       expect(await rate(session, 1)).toMatchObject({ submitted: true, overall: 5 });
       expect(await read(session)).toMatchObject({ eligible: true, submitted: true, overall: 5 });
-      expect((await db.query('select count(*)::integer n from qr_private.guest_ratings where visit_id=$1', [visit])).rows[0].n).toBe(1);
 
       await db.query('SAVEPOINT invalid_session');
       await expect(rate(otherSession)).rejects.toThrow();
       await db.query('ROLLBACK TO SAVEPOINT invalid_session');
       await db.query('RESET ROLE');
       await db.query("select set_config('app.user_id',$1,true)", [user]);
+      expect((await db.query('select count(*)::integer n from qr_private.guest_ratings where visit_id=$1', [visit])).rows[0].n).toBe(1);
 
       // Only staff with branch scope and pos.view can read ratings.
       const stats = (await db.query<{ data: { count: number; average: number } }>(
