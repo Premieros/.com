@@ -22,7 +22,7 @@ import {
   type DetectedPrinter,
   type PrinterRouteConfig,
 } from '../../services/localPrintAgent';
-import { filterPrintQueueJobs, printQueueDiagnostics, printQueueJobSummary, type PrintQueueFilter } from '../../services/printQueueDiagnostics';
+import { filterPrintQueueJobs, printQueueDiagnostics, printQueueJobSummary, scopeVisiblePrintQueueJobs, type PrintQueueFilter } from '../../services/printQueueDiagnostics';
 import {
   getCloudPrintAgentBranchId,
   isCloudPrintAgentEnabled,
@@ -111,6 +111,7 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
   const [testingStation, setTestingStation] = useState<string | null>(null);
   const [testingDrawer, setTestingDrawer] = useState(false);
   const [queueJobs, setQueueJobs] = useState<CloudPrintQueueRow[]>([]);
+  const [queueJobsBranchId, setQueueJobsBranchId] = useState('');
   const [queueLoading, setQueueLoading] = useState(false);
   const [queueError, setQueueError] = useState<string | null>(null);
   const [queueFilter, setQueueFilter] = useState<PrintQueueFilter>('pending');
@@ -173,10 +174,12 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
       const jobs = await listCloudPrintQueue(selectedBranchId, 150);
       if (queueTokenRef.current !== token) return;
       setQueueJobs(jobs);
+      setQueueJobsBranchId(selectedBranchId);
       setQueueError(null);
     } catch (error) {
       if (queueTokenRef.current !== token) return;
       setQueueJobs([]);
+      setQueueJobsBranchId('');
       setQueueError(error instanceof Error ? error.message : String(error));
     } finally {
       if (queueTokenRef.current === token) {
@@ -207,18 +210,22 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
     };
   }, [canManagePrinters, loadPrintQueue, selectedBranchId]);
 
+  const scopedQueueJobs = useMemo(() => scopeVisiblePrintQueueJobs(
+    queueJobs, queueJobsBranchId, selectedBranchId, canManagePrinters,
+  ), [queueJobs, queueJobsBranchId, selectedBranchId, canManagePrinters]);
+
   const queueCounts = useMemo(() => {
     const counts = { pending: 0, active: 0, submitted: 0, failed: 0 };
-    for (const job of queueJobs) {
+    for (const job of scopedQueueJobs) {
       if (job.status === 'pending') counts.pending += 1;
       else if (job.status === 'claimed' || job.status === 'printing') counts.active += 1;
       else if (job.status === 'submitted') counts.submitted += 1;
       else if (job.status === 'failed') counts.failed += 1;
     }
     return counts;
-  }, [queueJobs]);
+  }, [scopedQueueJobs]);
 
-  const visibleQueueJobs = useMemo(() => filterPrintQueueJobs(queueJobs, queueFilter, queueSearch), [queueFilter, queueJobs, queueSearch]);
+  const visibleQueueJobs = useMemo(() => filterPrintQueueJobs(scopedQueueJobs, queueFilter, queueSearch), [queueFilter, scopedQueueJobs, queueSearch]);
 
   const copyQueueDiagnostics = async (job: CloudPrintQueueRow) => {
     try {
