@@ -15,7 +15,7 @@ import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useColumnPreferences } from '../useColumnPreferences';
-import { orderReportColumns } from '../reportColumnLayout';
+import { orderReportColumns, projectReportColumns } from '../reportColumnLayout';
 import { filterAndSortReportRows, paginateReportRows, type ReportSortDirection } from '../reportTablePresentation';
 import { linkSourceSale, sourceSaleId } from '../reportSourceLinks';
 import { APP_ROUTES } from '@/core/navigation/routes';
@@ -1148,6 +1148,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   };
 
   const handleExportExcel = () => {
+    if (loading || reportError || columns.length === 0) return;
     const excelProfile = getReportExcelProfile(reportType, lang as 'ar' | 'en');
     const totalRow = reportType === 'financial_reconciliation'
       ? {
@@ -1159,7 +1160,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         [lang === 'ar' ? 'عدد السجلات' : 'Record Count']: summary.count,
       };
     void exportToExcelAdvanced({
-      data: presentedRows,
+      data: projectReportColumns(presentedRows, columns),
       filename: `report_${reportType}_${from}_${to}`,
       sheetName: (reportTypes.find((row) => row.key === reportType)?.label ?? reportType).slice(0, 31),
       title: reportTypes.find((row) => row.key === reportType)?.label ?? reportType,
@@ -1167,13 +1168,16 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
       totalRow: tableSearch.trim() ? undefined : totalRow,
       currencyColumns: moneyKeys,
       integerColumns: excelProfile.integerColumns,
-      columns: excelProfile.columns,
+      columns,
       columnWidths: excelProfile.columnWidths,
       sourceNote: excelProfile.sourceNote,
       lang,
     });
   };
-  const handleExportCSV = () => { downloadCSV(presentedRows, `report_${reportType}_${from}_${to}`); };
+  const handleExportCSV = () => {
+    if (loading || reportError || columns.length === 0) return;
+    downloadCSV(projectReportColumns(presentedRows, columns), `report_${reportType}_${from}_${to}`);
+  };
 
   const reportTypes: { key: ReportType; label: string; icon: React.ReactNode }[] = [
     { key: 'sales', label: t('salesReport'), icon: <TrendingUp className="w-4 h-4" /> },
@@ -1325,8 +1329,9 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   };
 
   const handlePrint = () => {
+    if (loading || reportError || columns.length === 0) return;
     const reportLabel = reportTypes.find((row) => row.key === reportType)?.label ?? reportType;
-    const headers = presentedRows.length > 0 ? Object.keys(presentedRows[0]) : [];
+    const headers = columns;
     const rows = presentedRows.map((row) => headers.map((header) => {
       const value = row[header];
       if (typeof value === 'number' && moneyKeys.includes(header)) return formatFinancialCurrency(value, currency, lang);
@@ -1371,9 +1376,9 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
             lang={lang}
             hiddenCount={hiddenCount}
           />
-          {can('reports.export') && <Button variant="outline" size="sm" disabled={loading || reportError} onClick={handleExportExcel}><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}
-          {can('reports.export') && <Button variant="outline" size="sm" disabled={loading || reportError} onClick={handleExportCSV}><FileDown className="w-4 h-4" /> {t('exportCsv')}</Button>}
-          {can('reports.print') && <Button variant="outline" size="sm" disabled={loading || reportError} onClick={handlePrint}><Printer className="w-4 h-4" /> {t('print')}</Button>}
+          {can('reports.export') && <Button variant="outline" size="sm" disabled={loading || reportError || columns.length === 0} onClick={handleExportExcel}><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}
+          {can('reports.export') && <Button variant="outline" size="sm" disabled={loading || reportError || columns.length === 0} onClick={handleExportCSV}><FileDown className="w-4 h-4" /> {t('exportCsv')}</Button>}
+          {can('reports.print') && <Button variant="outline" size="sm" disabled={loading || reportError || columns.length === 0} onClick={handlePrint}><Printer className="w-4 h-4" /> {t('print')}</Button>}
         </div>
       } />
 
