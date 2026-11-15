@@ -66,7 +66,7 @@ BEGIN
  END IF;
  IF l.table_id IS NULL THEN RAISE EXCEPTION 'QR_LINK_INVALID'; END IF;
  RETURN l;
-END $function$
+END $function$;
 
 
 CREATE OR REPLACE FUNCTION qr_private.menu_core(p_token text)
@@ -108,7 +108,7 @@ BEGIN
     'appearance',COALESCE((SELECT appearance FROM qr_private.branch_settings WHERE branch_id=t.branch_id),'{}'::jsonb),
     'currency',COALESCE(NULLIF((SELECT currency FROM public.branch_settings WHERE branch_id=t.branch_id),''),'ج.م'),
     'tables',qr_private.tables(t.branch_id));
-END $function$
+END $function$;
 
 
 CREATE OR REPLACE FUNCTION qr_private.submit_selected_core(p_token text, p_key uuid, p_items jsonb, p_table uuid)
