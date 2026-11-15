@@ -28,6 +28,10 @@ export function aggregateVerifiedWarehouseRows(
       || !row.product_id?.trim() || row.quantity === null) {
       throw new Error('WAREHOUSE_SNAPSHOT_ROW_SCOPE_MISMATCH');
     }
+    // A blank backend quantity is malformed, not an authoritative zero.
+    if (typeof row.quantity === 'string' && !row.quantity.trim()) {
+      throw new Error('WAREHOUSE_SNAPSHOT_INVALID_QUANTITY');
+    }
     const quantity = Number(row.quantity);
     if (!Number.isFinite(quantity)) throw new Error('WAREHOUSE_SNAPSHOT_INVALID_QUANTITY');
     const total = (quantities.get(row.product_id) || 0) + quantity;
