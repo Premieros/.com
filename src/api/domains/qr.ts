@@ -1,6 +1,7 @@
 import { rpc } from '../rpc';
 
 export const qr = {
+  customerHistory(p: { p_branch: string }) { return rpc<import('@/features/qr/service').QrCustomerHistory[]>('qr_customer_history', p); },
   ratings(p: { p_branch: string }) { return rpc<import('@/features/qr/service').BranchRatingSummary>('qr_branch_ratings', p); },
   visits(p: { p_branch: string }) { return rpc<import('@/features/qr/service').StaffVisit[]>('qr_guest_visits', p); },
   photo(p: { p_visit: string; p_verify: boolean }) { return rpc<string>('qr_guest_photo', p); },

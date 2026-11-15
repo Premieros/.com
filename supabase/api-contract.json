@@ -1210,6 +1210,12 @@
       ]
     },
     {
+      "name": "qr_customer_history",
+      "params": [
+        "branch"
+      ]
+    },
+    {
       "name": "qr_decide",
       "params": [
         "accept",

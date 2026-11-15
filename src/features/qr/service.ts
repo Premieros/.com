@@ -10,7 +10,7 @@ export interface StaffVisit { id: string; order_type: string; status: string; or
 export interface QrRequest { visit_id?: string; order_type?: string; customer_name?: string; customer_phone?: string; delivery_address?: string; has_photo?: boolean; photo_verified?: boolean; own_active_order_id?: string; own_active_table_id?: string; id: string; table_id: string | null; table_name: string; items: QrItem[]; created_at: string }
 export interface GuestRequest { id: string; status: string; items: QrItem[]; created_at: string; requested_table: string; assigned_table?: string }
 export interface GuestBill { has_unsent?: boolean; id: string; order_number: string; status: string; kitchen_status: string; payment_status: string; table_id: string; table_name: string; subtotal: number; discount_amount: number; discount_type: string; tax_amount: number; total: number; paid_amount: number; refunded_amount: number; balance: number; items: { name: string; quantity: number; unit_price: number; total: number }[] }
-export interface ServiceCall { order_id?: string; id: string; kind: 'service' | 'check'; note: string; status: 'open' | 'acknowledged' | 'done'; table_name: string; created_at: string }
+export interface ServiceCall { customer_name?: string; order_id?: string; id: string; kind: 'service' | 'check'; note: string; status: 'open' | 'acknowledged' | 'done'; table_name: string; created_at: string }
 export interface GuestTracking { visit?: GuestIdentity & { closed?: boolean }; requests: GuestRequest[]; bills: GuestBill[]; calls: ServiceCall[] }
 
 export async function qrInbox(branch: string): Promise<QrRequest[]> {
@@ -33,4 +33,31 @@ export interface GuestRating {
 export interface BranchRatingSummary {
   count: number; average: number | null;
   recent: { overall: number; food: number; service: number; note: string; created_at: string }[];
+}
+
+export interface QrCustomerOrderHistory {
+  id: string;
+  created_at: string;
+  status: string;
+  order_type: string | null;
+  table_name: string;
+  order_number: string | null;
+  order_status: string | null;
+  paid_value: number | null;
+}
+export interface QrCustomerRatingHistory {
+  overall: number; food: number; service: number;
+  note: string; created_at: string;
+}
+export interface QrCustomerServiceHistory {
+  id: string; kind: 'service' | 'check'; status: string;
+  note: string; table_name: string; created_at: string;
+}
+export interface QrCustomerHistory {
+  id: string; branch_id: string; name: string; phone: string;
+  total_spent: number; purchase_count: number;
+  rating_count: number; average_rating: number | null;
+  orders: QrCustomerOrderHistory[];
+  ratings: QrCustomerRatingHistory[];
+  service_history: QrCustomerServiceHistory[];
 }

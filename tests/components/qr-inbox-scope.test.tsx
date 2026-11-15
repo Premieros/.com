@@ -38,8 +38,9 @@ describe('QR inbox branch scope', () => {
     vi.mocked(qr.calls).mockResolvedValueOnce({data:[{id:'call',kind:'service',note:'مناديل',status:'open',table_name:'Table A',created_at:'2026-11-14T00:00:00Z'}],error:null});
     render(<QrInbox branchId="a" readOnly/>);await waitFor(()=>expect(screen.getByRole('status')).toHaveTextContent('1 شيك وخدمة'));
     fireEvent.click(screen.getByRole('button',{name:/طلبات QR/}));fireEvent.click(screen.getByRole('button',{name:'استلام طلب الخدمة'}));
-    await screen.findByText('تم إبلاغ العميل باستلام الطلب');expect(qr.handleCall).toHaveBeenCalledWith({p_id:'call',p_status:'acknowledged'});
-    fireEvent.click(screen.getByRole('button',{name:'تم تنفيذ الطلب'}));await waitFor(()=>expect(screen.getByRole('status')).toHaveTextContent('0 شيك وخدمة'));
+    await waitFor(()=>expect(screen.getByRole('status')).toHaveTextContent('0 شيك وخدمة'));
+    expect(qr.handleCall).toHaveBeenCalledWith({p_id:'call',p_status:'acknowledged'});
+    expect(screen.queryByText('تم إبلاغ العميل باستلام الطلب')).not.toBeInTheDocument();
     expect(mocks.navigate).not.toHaveBeenCalled();
   });
   it('accepts from the POS header without discarding a cart and opens the bill only after the workspace is saved', async () => {
@@ -47,7 +48,7 @@ describe('QR inbox branch scope', () => {
     mocks.decide.mockResolvedValue({order_id:'accepted-order',status:'accepted'});
     const view=render(<QrInbox branchId="a" header navigationBlocked workspaceTableId="t1"/>);
     await waitFor(()=>expect(screen.getByRole('status')).toHaveTextContent('1'));
-    fireEvent.click(screen.getByRole('button',{name:'طلبات العملاء: 1'}));
+    fireEvent.click(screen.getByRole('button',{name:'طلبات العملاء الجديدة: 1'}));
     expect(screen.getByRole('button',{name:'قبول طلب العميل'})).toBeDisabled();
     view.rerender(<QrInbox branchId="a" header navigationBlocked workspaceTableId="t2"/>);
     fireEvent.click(screen.getByRole('button',{name:'قبول طلب العميل'}));await screen.findByText('تم قبول طلب العميل.');
@@ -58,8 +59,8 @@ describe('QR inbox branch scope', () => {
   it('requires viewing and confirming the table photo before acceptance', async () => {
     mocks.inbox.mockResolvedValue([{id:'request',visit_id:'visit',has_photo:true,photo_verified:false,table_id:'t1',table_name:'Table A',items:[],created_at:'2026-11-14T00:00:00Z'}]);
     mocks.decide.mockResolvedValue({order_id:'order',status:'accepted'});
-    render(<QrInbox branchId="a" header/>);await screen.findByRole('button',{name:'طلبات العملاء: 1'});
-    fireEvent.click(screen.getByRole('button',{name:'طلبات العملاء: 1'}));expect(screen.getByRole('button',{name:'قبول طلب العميل'})).toBeDisabled();
+    render(<QrInbox branchId="a" header/>);await screen.findByRole('button',{name:'طلبات العملاء الجديدة: 1'});
+    fireEvent.click(screen.getByRole('button',{name:'طلبات العملاء الجديدة: 1'}));expect(screen.getByRole('button',{name:'قبول طلب العميل'})).toBeDisabled();
     fireEvent.click(screen.getByRole('button',{name:'عرض صورة رقم الطاولة'}));await screen.findByAltText('صورة رقم طاولة العميل');
     fireEvent.click(screen.getByRole('button',{name:'تأكيد صورة الطاولة'}));await screen.findByText('تم تأكيد الصورة');
     fireEvent.click(screen.getByRole('button',{name:'قبول طلب العميل'}));expect(mocks.decide).toHaveBeenCalledWith('request',true,'t1');
@@ -68,7 +69,7 @@ describe('QR inbox branch scope', () => {
     mocks.inbox.mockResolvedValue([{id:'delivery',order_type:'delivery',own_active_order_id:'own',table_id:null,table_name:'توصيل',items:[],created_at:'2026-11-14T00:00:00Z'}]);
     mocks.decide.mockResolvedValue({order_id:'own',status:'accepted'});
     const view=render(<QrInbox branchId="a" header navigationBlocked workspaceOrderId="own"/>);
-    fireEvent.click(await screen.findByRole('button',{name:'طلبات العملاء: 1'}));expect(screen.getByRole('button',{name:'قبول طلب العميل'})).toBeDisabled();
+    fireEvent.click(await screen.findByRole('button',{name:'طلبات العملاء الجديدة: 1'}));expect(screen.getByRole('button',{name:'قبول طلب العميل'})).toBeDisabled();
     expect(screen.queryByRole('combobox')).not.toBeInTheDocument();
     view.rerender(<QrInbox branchId="a" header navigationBlocked={false} workspaceOrderId="own"/>);
     fireEvent.click(screen.getByRole('button',{name:'قبول طلب العميل'}));expect(mocks.decide).toHaveBeenCalledWith('delivery',true,undefined);
