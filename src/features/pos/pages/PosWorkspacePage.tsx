@@ -25,7 +25,6 @@ import { usePosPermissions } from '../hooks/usePosPermissions';
 import { usePosKeyboard } from '../hooks/usePosKeyboard';
 import { cartLineKey, orderItemLineKey } from '../utils/cart';
 import { needsKitchenDispatchBeforeSettlement } from '../utils/unsentCheckoutGuard';
-import { InventoryRepository } from '@/core/repositories/InventoryRepository';
 import { OrderStartWizard, type StartStep, type StartOrderOptions } from '../components/start/OrderStartWizard';
 import { ProductBrowser } from '../components/catalog/ProductBrowser';
 import { ProductConfigModal } from '../components/catalog/ProductConfigModal';
