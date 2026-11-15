@@ -69,6 +69,7 @@ interface CurrentOrderPanelProps {
   onItemsTransferred?: (result: PosItemTransferResult) => void;
   onRemove: (lineKey: string) => void;
   onClear: () => void;
+  clearingOrder?: boolean;
   onSetItemDiscount: (lineKey: string, discount: number) => void;
   onHold: () => void;
   onSendKitchen: () => void;
@@ -113,6 +114,8 @@ export function CurrentOrderPanel({
   onUpdateQty,
   onItemsTransferred,
   onRemove,
+  onClear,
+  clearingOrder = false,
   onAddItem,
   onConfigureItem,
   onOpenTableModal,
@@ -154,7 +157,7 @@ export function CurrentOrderPanel({
     !!selectedItem &&
     (selectedSentQty > 0
       ? !!activeOrderId && !!onVoidItem
-      : canDeleteItem);
+      : (canDeleteItem && (!activeOrderId || cart.length !== 1 || perms.canCancelOrder)));
   const selectedTransferLines = useMemo<TransferItemLine[]>(() => selectedItems.flatMap((item) => {
     const lineKey = cartLineKey(item);
     const matches = orderItems.filter((row) => item.order_item_id ? row.id === item.order_item_id : orderItemLineKey(row) === lineKey);
@@ -192,7 +195,8 @@ export function CurrentOrderPanel({
       onVoidItem(selectedItem, sentQty);
     } else {
       if (!canDeleteItem) return;
-      onRemove(lineKey);
+      if (activeOrderId && cart.length === 1) onClear();
+      else onRemove(lineKey);
     }
 
     setSelectedLineKeys(new Set());
@@ -226,6 +230,19 @@ export function CurrentOrderPanel({
               {surface.showRestaurantOrderControls && <OrderStageBadge stage={stage} />}
             </div>
             <p className="text-[11px] font-bold text-ui-muted">{cart.length} {isAr ? 'صنف' : 'items'}</p>
+            {!empty && (
+              <button type="button" data-testid="pos-clear-cart"
+                onClick={onClear} disabled={clearingOrder || (activeOrderId ? !perms.canCancelOrder : !perms.canEditOrder)}
+                title={activeOrderId
+                  ? (isAr ? 'يلغي الطلب المحفوظ بعد إدخال السبب ويحرر الطاولة عند النجاح' : 'Cancels the saved order with a reason; releases the table on success')
+                  : (isAr ? 'تفريغ السلة غير المحفوظة' : 'Clear the unsaved cart')}
+                className="mt-1 inline-flex items-center gap-1 rounded-lg border border-ui-danger/30 px-2 py-1 text-[10px] font-bold text-ui-danger disabled:cursor-not-allowed disabled:opacity-40">
+                <Trash2 className="h-3 w-3" />
+                {clearingOrder ? (isAr ? 'جارٍ الإلغاء…' : 'Cancelling…')
+                  : activeOrderId ? (isAr ? 'إلغاء الطلب وتحرير الطاولة' : 'Cancel order and release table')
+                  : (isAr ? 'تفريغ السلة' : 'Clear cart')}
+              </button>
+            )}
           </div>
         </div>
 
