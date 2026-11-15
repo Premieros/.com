@@ -1174,6 +1174,12 @@
       ]
     },
     {
+      "name": "qr_branch_ratings",
+      "params": [
+        "branch"
+      ]
+    },
+    {
       "name": "qr_call_service",
       "params": [
         "key",
@@ -1276,6 +1282,24 @@
         "key",
         "session",
         "table",
+        "token"
+      ]
+    },
+    {
+      "name": "qr_guest_rate",
+      "params": [
+        "food",
+        "note",
+        "overall",
+        "service",
+        "session",
+        "token"
+      ]
+    },
+    {
+      "name": "qr_guest_rating",
+      "params": [
+        "session",
         "token"
       ]
     },
