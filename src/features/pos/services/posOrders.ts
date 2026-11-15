@@ -36,7 +36,7 @@ export async function fetchActiveOrders(branchId: string): Promise<PosRealtimeDa
   const [tRes, oRes, operatorRes] = await Promise.all([
     supabase.from('dining_tables').select('*').eq('branch_id', branchId).eq('is_active', true).order('name'),
     supabase.from('orders')
-      .select('*, table:dining_tables(*)')
+      .select('*')
       .eq('branch_id', branchId)
       .in('status', ['open', 'held'])
       .order('created_at', { ascending: false }),
@@ -52,20 +52,33 @@ export async function fetchActiveOrders(branchId: string): Promise<PosRealtimeDa
   if (operatorRes.error) throw operatorRes.error;
 
   const tables = (tRes.data as DiningTable[]) || [];
+  // Reuse active tables for linked orders rather than doing a joined table
+  // lookup for every order. Inactive tables with open checks are recovered in a
+  // single branch-scoped fallback; they never enter the active floor-plan list.
+  const tableById = new Map(tables.map((table) => [table.id, table]));
+  const rawOrders = (oRes.data as Order[] | null) || [];
+  const missingIds = [...new Set(rawOrders.map(order => order.table_id)
+    .filter((id): id is string => !!id && !tableById.has(id)))];
+  if (missingIds.length) {
+    const missing = await supabase.from('dining_tables').select('*')
+      .eq('branch_id', branchId).in('id', missingIds);
+    if (missing.error) throw missing.error;
+    for (const table of (missing.data as DiningTable[] | null) || []) {
+      tableById.set(table.id, table);
+    }
+  }
   const operatorLabels = (operatorRes.data as PosOrderOperatorLabel[] | null) || [];
   const operatorByOrder = new Map(operatorLabels.map((row) => [row.order_id, row]));
-  let orders = (((oRes.data as Order[]) || []).map((order) => {
+  let orders = rawOrders.map((order): Order => {
     const label = operatorByOrder.get(order.id);
-    if (!label?.cashier_id) return order;
     return {
       ...order,
-      cashier: {
-        id: label.cashier_id,
-        full_name: label.operator_name,
-        email: null,
-      },
-    } satisfies Order;
-  }));
+      table: order.table_id ? tableById.get(order.table_id) : undefined,
+      ...(label?.cashier_id ? {
+        cashier: { id: label.cashier_id, full_name: label.operator_name, email: null },
+      } : {}),
+    };
+  });
   const watchedOrderIds = orders.map((o) => o.id);
   let orderItems: OrderItem[] = [];
   let kitchenSends: OrderKitchenSend[] = [];
