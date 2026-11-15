@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { sortQrCustomersByPurchases } from '../../src/features/qr/QrCustomerHistoryPanel';
+import { sortQrCustomersByPurchases } from '../../src/features/qr/qrCustomerRanking';
 import type { QrCustomerHistory } from '../../src/features/qr/service';
 
 const make = (id: string, total_spent: number): QrCustomerHistory => ({
