@@ -211,7 +211,7 @@ export function ReportFilterBar({
               <span className="text-ui-muted">{countLabel || t('count')}: </span>
               <span className="font-extrabold tabular-nums text-ui-text">{count}</span>
             </div>
-            {summaryNote && <p className="basis-full w-full text-xs text-ui-muted" role="note">{summaryNote}</p>}
+            {summaryNote && <p className="w-full text-xs text-ui-muted" role="note">{summaryNote}</p>}
             {pendingChanges && (
               <span className="rounded-lg border border-ui-warning/30 bg-ui-warning-soft px-3 py-1.5 font-semibold text-ui-warning">
                 {lang === 'ar' ? 'تم تعديل الفلاتر — اضغط عرض التقرير' : 'Filters changed — run the report'}
