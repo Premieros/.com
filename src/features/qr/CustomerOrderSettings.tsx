@@ -48,7 +48,7 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
         {settings.reviewer_roles.length > 0 && <button className="text-sm underline" disabled={busy} onClick={() => setSettings(s => s && ({ ...s, reviewer_roles: [] }))}>السماح لكل من لديه صلاحية تعديل الطلبات</button>}
       </fieldset>
       <button className="rounded-xl bg-ui-primary px-5 py-3 text-white" disabled={busy} onClick={() => void save()}>{busy ? 'جارٍ الحفظ…' : 'حفظ إعدادات طلبات العملاء'}</button>
-      <QrManagement key={branchId} branchId={branchId} tables={tables} />
+      <QrManagement key={branchId} branchId={branchId} tables={tables} brandName={settings.appearance.brand_name} />
     </>}
   </section>;
 }
