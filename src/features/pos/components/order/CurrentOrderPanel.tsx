@@ -230,7 +230,7 @@ export function CurrentOrderPanel({
               {surface.showRestaurantOrderControls && <OrderStageBadge stage={stage} />}
             </div>
             <p className="text-[11px] font-bold text-ui-muted">{cart.length} {isAr ? 'صنف' : 'items'}</p>
-            {!empty && (
+            {(!empty || activeOrderId) && (
               <button type="button" data-testid="pos-clear-cart"
                 onClick={onClear} disabled={clearingOrder || (activeOrderId ? !perms.canCancelOrder : !perms.canEditOrder)}
                 title={activeOrderId
