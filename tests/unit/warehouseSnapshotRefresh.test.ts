@@ -72,7 +72,7 @@ describe('validated warehouse-specific server inventory snapshot', () => {
   it('rejects corrupted quantities and missing product identities', () => {
     for (const quantity of [null, '', ' ', '\t', 'not-a-number', true, false, '0x10', '1_000', 'NaN']) {
       expect(() => aggregateVerifiedWarehouseRows('branch-a','warehouse-a',
-        [{...row('product-1'), quantity: quantity as number | string | null}],TIME)).toThrow();
+        [{...row('product-1'), quantity: quantity as unknown as number | string | null}],TIME)).toThrow();
     }
     expect(() => aggregateVerifiedWarehouseRows('branch-a','warehouse-a',
       [{...row('product-1'),product_id:null}],TIME)).toThrow();
