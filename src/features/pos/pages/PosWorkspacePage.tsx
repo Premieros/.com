@@ -668,7 +668,10 @@ export function PosWorkspacePage() {
       show(t('cancelOrder'), 'success');
       setPanel(null);
       setReloadKey((value) => value + 1);
-      if (pos.activeOrderId === orderId) pos.resetWorkspace();
+      if (pos.activeOrderId === orderId) {
+        pos.resetWorkspace();
+        if (orderIdParam) navigate('/pos', { replace: true });
+      }
       return true;
     } catch (error) {
       show(userFacingErrorMessage(error, isAr ? 'ar' : 'en'), 'error');
