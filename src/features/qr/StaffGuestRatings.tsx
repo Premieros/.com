@@ -6,11 +6,13 @@ import { qrError } from './errors';
 
 export function StaffGuestRatings({ branchId }: { branchId: string }) {
   const [state, setState] = useState<BranchRatingSummary | null>(null);
+  const [expanded, setExpanded] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
 
   useEffect(() => {
+    if (!expanded) return;
     let active = true;
     setState(null); setLoading(true); setError('');
     void qr.ratings({ p_branch: branchId }).then(({ data, error: failure }) => {
@@ -20,9 +22,9 @@ export function StaffGuestRatings({ branchId }: { branchId: string }) {
     }).catch(failure => { if (active) setError(qrError(failure)); })
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [branchId, revision]);
+  }, [branchId, revision, expanded]);
 
-  return <details className="mt-4 rounded border border-ui-border p-3" data-testid="qr-branch-ratings">
+  return <details className="mt-4 rounded border border-ui-border p-3" data-testid="qr-branch-ratings" onToggle={event => setExpanded(event.currentTarget.open)}>
     <summary className="cursor-pointer font-bold">تقييمات العملاء</summary>
     <div className="mt-3 space-y-3">
       <div className="flex items-center justify-between gap-3">
