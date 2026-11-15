@@ -10,7 +10,7 @@ import { REPORT_REGISTRY } from '../reportRegistry';
 import { ReportsPage } from './ReportsPage';
 import { monthReviewPeriod } from '../monthCloseReview';
 import type { ReportType } from '../reportFilters';
-import { PERIOD_REVIEW_PERIOD_REVIEW_DOCUMENT_REPORTS } from '../periodReviewDocuments';
+import { PERIOD_REVIEW_DOCUMENT_REPORTS } from '../periodReviewDocuments';
 
 /** Documents for review: live Premier report loaders, not a snapshot or ledger close. */
 export function PeriodCloseDocumentsPage() {
