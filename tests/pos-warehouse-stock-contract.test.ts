@@ -11,11 +11,18 @@ describe('POS authoritative warehouse and stock policy contract', () => {
     expect(page).toContain(".eq('warehouse_id', warehouseId)");
     expect(page).toMatch(/if \(!warehouseId\) \{[\s\S]*?navigator\.onLine[\s\S]*?setLiveStockMap\(\{\}\)/);
   });
-  it('retains offline fallback while keeping the final server settlement separate', () => {
+  it('never displays branch-aggregate stock when warehouse stock is missing or the online read fails', () => {
     const page = read('src/features/pos/pages/PosWorkspacePage.tsx');
+    expect(page).not.toContain('InventoryRepository.getBranchStockMap(effectiveBranch)');
+    expect(page).toMatch(/if \\(!warehouseId\\) \\{[\\s\\S]*?setLiveStockMap\\(\\{\\}\\)/);
+    expect(page).toMatch(/if \\(online\\) \\{[\\s\\S]*?setLiveStockMap\\(live\\);[\\s\\S]*?else \\{[\\s\\S]*?setLiveStockMap\\(\\{\\}\\)/);
+    expect(page).toMatch(/catch \\{[\\s\\S]*?setLiveStockMap\\(\\{\\}\\)/);
+  });
+  it('continues to require verified warehouse stock for offline payment', () => {
     const payment = read('src/features/pos/services/payment.ts');
-    expect(page).toContain('InventoryRepository.getBranchStockMap(effectiveBranch)');
-    expect(payment).toContain('InventoryRepository.getEffectiveAvailableStock');
+    expect(payment).toContain('InventoryRepository.getWarehouseAvailableStock');
+    expect(payment).toContain('OFFLINE_WAREHOUSE_STOCK_UNVERIFIED');
+    expect(payment).toContain('WAREHOUSE_REQUIRED_OFFLINE_CAPTURE');
     expect(payment).toContain('INSUFFICIENT_STOCK');
   });
   it('uses the canonical signed stock source in the online POS and inventory UI', () => {
