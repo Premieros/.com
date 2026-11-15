@@ -16,6 +16,7 @@ import { useCan } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useColumnPreferences } from '../useColumnPreferences';
 import { orderReportColumns, projectReportColumns } from '../reportColumnLayout';
+import { reportSummaryPresentation } from '../reportSummaryPresentation';
 import { filterAndSortReportRows, paginateReportRows, type ReportSortDirection } from '../reportTablePresentation';
 import { linkSourceSale, sourceSaleId } from '../reportSourceLinks';
 import { APP_ROUTES } from '@/core/navigation/routes';
@@ -1258,6 +1259,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     lang === 'ar' ? 'فرق القيمة' : 'Value Difference',
   ];
 
+  const summaryPresentation = reportSummaryPresentation(reportType, lang === 'ar' ? 'ar' : 'en');
   const showDate = DATE_DRIVEN_REPORTS.has(reportType);
   const allColumns = orderReportColumns(data.length > 0 ? Object.keys(data[0]) : [], columnOrder);
   const columns = visibleColumns ? allColumns.filter((column) => visibleColumns.includes(column)) : allColumns;
@@ -1465,6 +1467,10 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         count={summary.count}
         currency={currency}
         lang={lang}
+        totalLabel={summaryPresentation.totalLabel}
+        countLabel={summaryPresentation.countLabel}
+        totalIsQuantity={summaryPresentation.totalIsQuantity}
+        summaryNote={summaryPresentation.note}
         financialTypes={canFinancial ? financialTypes : []}
         canFinancial={canFinancial}
         onFinancialSelect={(key) => navigate(`/financial-reports?view=${key}&from=${from}&to=${to}`)}
