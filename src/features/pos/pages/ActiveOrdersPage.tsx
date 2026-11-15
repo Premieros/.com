@@ -410,7 +410,7 @@ export function ActiveOrdersPage() {
 
   return (
     <DesignSurface testId="active-orders-page" className="space-y-6">
-      {canManage && effectiveBranch && <QrManagement key={effectiveBranch} branchId={effectiveBranch} tables={tables} />}
+      {canManage && effectiveBranch && <QrManagement key={effectiveBranch} branchId={effectiveBranch} />}
       <DesignPageHeader
         title={t('activeOrders')}
         subtitle={isAr ? 'مركز الطلبات النشطة والطاولات' : 'Active orders and table center'}
