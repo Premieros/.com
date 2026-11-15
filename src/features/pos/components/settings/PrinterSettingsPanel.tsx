@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, Cloud, Coffee, Printer, Receipt, RefreshCw, Save, TestTube2, UtensilsCrossed, WalletCards } from 'lucide-react';
 import { catalog } from '@/api/domains/catalog';
 import { Button } from '@/components/Button';
@@ -149,30 +149,60 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
     return [CASHIER_STATION, ...dynamicStations];
   }, [branchStations, selectedBranchId, stationLoadFailed]);
 
+  // A slow response from another branch must never overwrite the selected branch's queue.
+  // Only one read per branch can run at a time, including manual refreshes.
+  const queueReadRef = useRef<{ branchId: string; token: number } | null>(null);
+  const queueTokenRef = useRef(0);
+
   const loadPrintQueue = useCallback(async () => {
     if (!canManagePrinters || !selectedBranchId) {
+      queueTokenRef.current += 1;
+      queueReadRef.current = null;
       setQueueJobs([]);
       setQueueError(null);
+      setQueueLoading(false);
       return;
     }
+    if (queueReadRef.current?.branchId === selectedBranchId) return;
+    const token = ++queueTokenRef.current;
+    queueReadRef.current = { branchId: selectedBranchId, token };
     setQueueLoading(true);
     try {
       const jobs = await listCloudPrintQueue(selectedBranchId, 150);
+      if (queueTokenRef.current !== token) return;
       setQueueJobs(jobs);
       setQueueError(null);
     } catch (error) {
+      if (queueTokenRef.current !== token) return;
       setQueueJobs([]);
       setQueueError(error instanceof Error ? error.message : String(error));
     } finally {
-      setQueueLoading(false);
+      if (queueTokenRef.current === token) {
+        queueReadRef.current = null;
+        setQueueLoading(false);
+      }
     }
   }, [canManagePrinters, selectedBranchId]);
 
   useEffect(() => {
-    if (!canManagePrinters || !selectedBranchId) return;
+    if (!canManagePrinters || !selectedBranchId) {
+      setQueueJobs([]);
+      setQueueError(null);
+      setQueueLoading(false);
+      return;
+    }
+    const refreshWhenVisible = () => {
+      if (!document.hidden) void loadPrintQueue();
+    };
     void loadPrintQueue();
-    const timer = window.setInterval(() => void loadPrintQueue(), 5000);
-    return () => window.clearInterval(timer);
+    const timer = window.setInterval(refreshWhenVisible, 5000);
+    document.addEventListener('visibilitychange', refreshWhenVisible);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', refreshWhenVisible);
+      queueTokenRef.current += 1;
+      queueReadRef.current = null;
+    };
   }, [canManagePrinters, loadPrintQueue, selectedBranchId]);
 
   const queueCounts = useMemo(() => {
