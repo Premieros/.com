@@ -17,6 +17,7 @@
 | POS printing | Guard cloud print queue against cross-branch stale responses, duplicate concurrent requests and hidden-tab polling | DONE | `src/features/pos/components/settings/PrinterSettingsPanel.tsx`; requires browser/CI validation |
 | POS printing | Cashier area / second station settings | BLOCKED | Source UI requires `get_cashier_area_settings` and `save_cashier_area_settings`; missing in Premier target database during read-only check; design Premier-native branch-scoped permissions and routing before enabling |
 | POS printing | Manual delayed-ticket print recovery | REVIEW | Reference flow depends on print recovery RPCs, job claiming, anti-duplicate safeguards and `pos.print_recovery`; preserve fail-closed behavior |
+| Reports | Search, reorder and persist report columns | DONE | Adapted to Premier's existing ReportsPage, visibility, export/print column order; unit tests added, CI validation pending |
 | Reports | Reporting dashboard and filters | REVIEW | Draft PR #160 exists; compare against current Premier reports before cherry-picking |
 | Reports | Month/period close, consumption reports, exports | REVIEW | Source components may have different schema/permissions; match Premier native report loaders |
 | Inventory | Branch/warehouse stock, transfer and valuation gaps | REVIEW | Preserve Premier atomic counting and branch isolation |
