@@ -12,3 +12,8 @@ export function moveReportColumn(available: string[], saved: string[] | undefine
   [ordered[index], ordered[target]] = [ordered[target], ordered[index]];
   return ordered;
 }
+
+/** Project already-authorized report rows into the exact visible display/export order. */
+export function projectReportColumns(rows: Record<string, unknown>[], columns: string[]): Record<string, unknown>[] {
+  return rows.map(row => Object.fromEntries(columns.map(column => [column, row[column]])));
+}
