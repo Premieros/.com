@@ -4,6 +4,7 @@ import { SettingsRepository, InventoryRepository } from '@/core/repositories';
 import { saveVerifiedSaleWarehouse } from '@/core/offline/warehouseBinding';
 import type { RpcResult, OrderType } from '@/lib/types';
 import type { ItemPayload } from '../utils/cart';
+import { hasValidOfflineSaleItems } from '../utils/offlineSaleItemGuard';
 import { cacheConfirmedSaleMovements } from './saleConfirmationCache';
 
 export interface ProcessSalePayload {
@@ -263,6 +264,9 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   const allowNegative = branchSettings?.allow_negative_stock ?? globalSettings?.allow_negative_stock ?? false;
 
   const explicitlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  if (explicitlyOffline && !hasValidOfflineSaleItems(p.p_items)) {
+    return { result: null, error: 'OFFLINE_SALE_INVALID_ITEMS' };
+  }
   if (explicitlyOffline && !p.p_warehouse_id?.trim()) {
     return { result: null, error: 'WAREHOUSE_REQUIRED_OFFLINE_CAPTURE' };
   }
