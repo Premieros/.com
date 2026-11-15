@@ -5,7 +5,7 @@
 export interface ComparisonPeriod { from: string; to: string }
 
 function parseDateOnly(raw: string): Date {
-  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(raw)) throw new Error('INVALID_COMPARISON_PERIOD');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(raw)) throw new Error('INVALID_COMPARISON_PERIOD');
   const date = new Date(raw + 'T00:00:00.000Z');
   if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== raw) {
     throw new Error('INVALID_COMPARISON_PERIOD');
