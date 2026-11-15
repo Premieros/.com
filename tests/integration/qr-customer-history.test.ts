@@ -12,7 +12,7 @@ const isolated = Boolean(dbUrl && ['localhost', '127.0.0.1', '[::1]'].some(host 
 
   it('requires a permitted branch and retains each customer rating with the correct QR profile', async () => {
     const org = randomUUID(), branch = randomUUID(), otherBranch = randomUUID();
-    const profile = randomUUID(), otherProfile = randomUUID(), visit = randomUUID(), rating = randomUUID();
+    const profile = randomUUID(), otherProfile = randomUUID(), visit = randomUUID(), rating = randomUUID(), table = randomUUID();
     const user = randomUUID(), marker = randomUUID().slice(0, 8);
     await db.query('BEGIN');
     try {
@@ -29,12 +29,13 @@ const isolated = Boolean(dbUrl && ['localhost', '127.0.0.1', '[::1]'].some(host 
       await db.query('insert into public.users(id,email,full_name,role,branch_id,is_active) values($1,$2,$3,$4,$5,true)',
         [user,`ci-history-${marker}@ci.invalid`,'CI Manager','super_admin',branch]);
       await db.query("select set_config('app.user_id',$1,true),set_config('app.register_branch','off',true)", [user]);
+      await db.query('insert into public.dining_tables(id,branch_id,name) values($1,$2,$3)', [table,branch,'Test Table']);
       await db.query('insert into qr_private.customer_profiles(id,branch_id,phone,name) values($1,$2,$3,$4)',
         [profile,branch,'01000001111','Guest Alpha']);
       await db.query('insert into qr_private.customer_profiles(id,branch_id,phone,name) values($1,$2,$3,$4)',
         [otherProfile,otherBranch,'01000002222','Guest Beta']);
-      await db.query(`insert into qr_private.visits(id,branch_id,generation,profile_id,guest_hash,order_type)
-        values($1,$2,gen_random_uuid(),$3,$4,'delivery')`, [visit,branch,profile,'ci-hash']);
+      await db.query(`insert into qr_private.visits(id,branch_id,generation,profile_id,guest_hash,origin_table_id,order_type)
+        values($1,$2,gen_random_uuid(),$3,$4,$5,'delivery')`, [visit,branch,profile,'ci-hash',table]);
       await db.query(`insert into qr_private.guest_ratings(id,visit_id,branch_id,overall,food,service,note)
         values($1,$2,$3,5,4,5,'CI feedback')`, [rating,visit,branch]);
       const history = (await db.query<{ data: { id: string; rating_count: number; ratings: { note: string }[]; total_spent: number }[] }>(
