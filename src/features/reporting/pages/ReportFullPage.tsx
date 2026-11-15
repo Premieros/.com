@@ -66,7 +66,7 @@ export function ReportFullPage() {
     const next = new URLSearchParams(params);
     next.set('from', period.from);
     next.set('to', period.to);
-    navigate(`/reports/detail?${next.toString()}`);
+    navigate(`/reports/view?${next.toString()}`);
   };
 
   return (
