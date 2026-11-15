@@ -11,7 +11,9 @@ import { Input, Select } from '@/components/Input';
 import { useBranchFilter } from '@/lib/useBranchFilter';
 import { useBranches } from '@/hooks/useBranches';
 import { useCan } from '@/lib/permissions';
-import { generateBarcode } from '@/lib/format';
+import { formatFinancialCurrency, generateBarcode } from '@/lib/format';
+import { useSettings } from '@/context/SettingsContext';
+import { estimateRawRecipeDefaultCost } from '../recipeDefaultCostPreview';
 import { useGuidedWorkflow } from '@/core/guard';
 import { invalidatePosCatalogCache } from '@/core/offline/invalidatePosCatalogCache';
 import { BusinessAttributesFields } from '@/features/shared/BusinessAttributesFields';
@@ -37,6 +39,7 @@ export function ProductSetupWizardPage() {
   const { show } = useToast();
   const branchFilter = useBranchFilter();
   const { branches } = useBranches();
+  const { effectiveSettings } = useSettings();
   const can = useCan();
   const { runtime } = useOrganizationModules();
   const { guidedContext, completePrerequisiteAndReturn } = useGuidedWorkflow();
@@ -72,6 +75,11 @@ export function ProductSetupWizardPage() {
   const selectedManufacturedIds = useMemo(() => new Set(manufacturedComponents.map((row) => row.unit_id).filter(Boolean)), [manufacturedComponents]);
   const selectedRawIds = useMemo(() => new Set(rawComponents.map((row) => row.raw_material_id).filter(Boolean)), [rawComponents]);
   const totalComponentCount = manufacturedComponents.length + rawComponents.length;
+  const rawCostEstimate = useMemo(() => estimateRawRecipeDefaultCost(
+    rawComponents, rawMaterials, manufacturedComponents.length,
+  ), [rawComponents, rawMaterials, manufacturedComponents.length]);
+  const currency = effectiveSettings(branchId || null)?.currency || 'EGP';
+
   const wizardSteps = useMemo(() => [
     { step: 1, label: isAr ? `بيانات ${itemLabel}` : itemLabel },
     ...(supportsComponentGroups ? [{ step: 2, label: isAr ? 'مجموعات المكونات' : 'Component groups' }] : []),
@@ -398,6 +406,21 @@ export function ProductSetupWizardPage() {
                 </div>}
               </div>
             </div>
+            {supportsComposition && <section data-testid="product-raw-cost-preview"
+              className="rounded-xl border border-ui-border bg-ui-page-alt p-4 space-y-2">
+              <h3 className="font-semibold">{isAr ? 'معاينة تكلفة الخامات الافتراضية' : 'Configured raw-cost preview'}</h3>
+              <p className="text-lg font-bold text-ui-text">{formatFinancialCurrency(rawCostEstimate.subtotal, currency, lang)}</p>
+              <p role="note" className="text-xs text-ui-muted">
+                {isAr
+                  ? 'مجموع تكلفة الخامات المباشرة بكمياتها وهالكها من سعر الخامة الافتراضي المسجل. ليست FIFO أو تكلفة وصفة نهائية ولا تُحفظ كمصروف.'
+                  : 'Direct raw quantities and waste using configured default material costs only. Not FIFO, final recipe cost or a posted expense.'}
+              </p>
+              {!rawCostEstimate.complete && <p role="status" className="text-xs font-semibold text-ui-warning">
+                {isAr
+                  ? `التقدير غير مكتمل: ${rawCostEstimate.missingPrices} خامة بلا سعر صالح أو بيانات ناقصة${rawCostEstimate.includesGroups ? '؛ تكلفة مجموعات المكونات غير مشمولة' : ''}.`
+                  : `Incomplete estimate: ${rawCostEstimate.missingPrices} unpriced/invalid raw lines${rawCostEstimate.includesGroups ? '; component group costs excluded' : ''}.`}
+              </p>}
+            </section>}
             <p className="text-sm text-ui-subtle">{supportsComposition
               ? (isAr ? `سيتم ربط ${totalComponentCount} مكوّن بـ ${itemLabel}.` : `${totalComponentCount} existing components will be linked to the ${itemLabel}.`)
               : (isAr ? `سيتم حفظ ${itemLabel} بدون دورة تصنيع أو مكونات غير مطلوبة لهذا النشاط.` : `The ${itemLabel} will be saved without manufacturing composition that this business does not use.`)}</p>
