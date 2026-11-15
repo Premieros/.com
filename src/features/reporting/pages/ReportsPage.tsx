@@ -15,6 +15,7 @@ import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useColumnPreferences } from '../useColumnPreferences';
+import { orderReportColumns } from '../reportColumnLayout';
 import { filterAndSortReportRows, paginateReportRows, type ReportSortDirection } from '../reportTablePresentation';
 import { linkSourceSale, sourceSaleId } from '../reportSourceLinks';
 import { APP_ROUTES } from '@/core/navigation/routes';
@@ -161,7 +162,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   });
   const { effectiveSettings } = useSettings();
   const currency = effectiveSettings(branchFilter)?.currency || 'EGP';
-  const { visibleColumns, toggleColumn, showAllColumns } = useColumnPreferences(reportType);
+  const { visibleColumns, toggleColumn, showAllColumns, columnOrder, moveColumn, resetColumnOrder } = useColumnPreferences(reportType);
   const { savedReports, saveReport, deleteReport } = useCustomReports();
   const reportBranchLabel = reportBranchIds.length === 1
     ? branchNameById(reportBranchIds[0])
@@ -1254,7 +1255,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   ];
 
   const showDate = DATE_DRIVEN_REPORTS.has(reportType);
-  const allColumns = data.length > 0 ? Object.keys(data[0]) : [];
+  const allColumns = orderReportColumns(data.length > 0 ? Object.keys(data[0]) : [], columnOrder);
   const columns = visibleColumns ? allColumns.filter((column) => visibleColumns.includes(column)) : allColumns;
   const hiddenCount = visibleColumns ? allColumns.length - columns.length : 0;
   const reportMobilePrimaryColumns = columns.slice(0, 4);
@@ -1361,10 +1362,12 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
       <PageHeader title={t('reports')} actions={
         <div className="flex flex-wrap gap-2">
           <ColumnPicker
-            columns={data.length > 0 ? Object.keys(data[0]) : []}
+            columns={allColumns}
             visibleColumns={visibleColumns}
-            onToggle={toggleColumn}
+            onToggle={(key) => toggleColumn(key, allColumns)}
             onShowAll={showAllColumns}
+            onMove={(key, direction) => moveColumn(key, direction, allColumns)}
+            onResetOrder={resetColumnOrder}
             lang={lang}
             hiddenCount={hiddenCount}
           />
