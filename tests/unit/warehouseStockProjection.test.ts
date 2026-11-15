@@ -113,7 +113,7 @@ describe('warehouse-scoped offline inventory', () => {
   it('rejects coerced legacy queued quantities instead of trusting an inventory reservation', () => {
     for (const quantity of ['2', ' 2 ', true, ' ', '0.5']) {
       const legacy = sale('legacy-sale', 'warehouse-a', 2);
-      legacy.payload.p_items = [{ product_id:'product-1', quantity }] as typeof legacy.payload.p_items;
+      legacy.payload.p_items = [{ product_id:'product-1', quantity: quantity as unknown as number }] as typeof legacy.payload.p_items;
       expect(check({balances:[snap('warehouse-a', 20)], sales:[legacy]}))
         .toEqual({status:'unknown',reason:'UNSCOPED_QUEUED_SALE'});
     }
