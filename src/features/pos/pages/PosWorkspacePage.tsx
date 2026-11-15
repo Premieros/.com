@@ -160,18 +160,13 @@ export function PosWorkspacePage() {
   const refreshLiveStockMap = useCallback(async () => {
     if (!effectiveBranch) return;
     try {
-      // Prefer the authoritative signed stock read contract online.
-      // The IndexedDB stock map is only an offline fallback, never an additional source to sum.
+      // Prefer the authoritative signed, warehouse-scoped stock read.
+      // Branch-aggregated IndexedDB entries must never represent warehouse stock.
       const warehouseId = await fetchBranchWarehouseId(effectiveBranch, orderIdParam || null);
       if (!warehouseId) {
-        // An unresolved online warehouse must NOT expose branch-wide cached stock
-        // as sellable warehouse availability. Offline mode keeps its own verified
-        // warehouse/outbox checks in the payment service.
-        if (typeof navigator !== 'undefined' && !navigator.onLine) {
-          setLiveStockMap(await InventoryRepository.getBranchStockMap(effectiveBranch));
-        } else {
-          setLiveStockMap({});
-        }
+        // Never display aggregate branch stock as if it belonged to this
+        // warehouse, even while offline. An unknown warehouse is unknown.
+        setLiveStockMap({});
         return;
       }
       const live: Record<string, number> = {};
@@ -217,10 +212,13 @@ export function PosWorkspacePage() {
       if (online) {
         setLiveStockMap(live);
       } else {
-        setLiveStockMap(await InventoryRepository.getBranchStockMap(effectiveBranch));
+        // The server read failed. A branch-wide cache could include another
+        // warehouse and must not be displayed as stock for this POS.
+        setLiveStockMap({});
       }
     } catch {
-      // fallback
+      // A transport or permission failure is not proof of warehouse stock.
+      setLiveStockMap({});
     }
   }, [effectiveBranch, orderIdParam, products]);
 
