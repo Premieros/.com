@@ -3,7 +3,7 @@
 ## Source boundaries
 - **Write target:** `Premieros/.com` (Premier), based on `main`.
 - **Target database:** Supabase project `john's 1` (`hvqlkapynjfjikqithvd`), PostgreSQL database `postgres`.
-- **Read-only reference:** `Premieros/johna-s` and Supabase `john's` (`azzdesuowpdcoflmyezn`). Do not write to either.
+- **Read-only reference:** the external Johna source repository and its separate database. Do not write to either.
 - This document tracks selected compatibility work; do **not** bulk-copy code or apply source database migrations.
 - No automatic merging of unrelated legacy PRs or release branches.
 
