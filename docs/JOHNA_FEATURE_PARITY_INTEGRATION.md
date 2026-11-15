@@ -19,6 +19,7 @@
 | POS printing | Manual delayed-ticket print recovery | REVIEW | Reference flow depends on print recovery RPCs, job claiming, anti-duplicate safeguards and `pos.print_recovery`; preserve fail-closed behavior |
 | Reports | Search, reorder and persist report columns | DONE | Integrated with Premier's native ReportsPage, visible column controls, Excel/CSV/print projection and disabled empty-selection exports; unit tests included |
 | Reports | Semantic summary metrics and basis disclosures | DONE | Adapted report-specific labels from reference for existing Premier report types; inventory quantity/group counts no longer render with currency formatting; tests added |
+| Reports | Saved report view first-use and column restore | DONE | Always show Save Current View; restore saved visible columns with report filters across report types; component/hook tests included |
 | Reports | Previous-period / same-period-last-year navigation | DONE | New controls on existing detailed report screen, preserving report query and history permissions; Gregorian date utility and unit tests added |
 | Reports | Reporting dashboard and filters | REVIEW | Draft PR #160 exists; compare against current Premier reports before cherry-picking |
 | Reports | Month/period close, consumption reports, exports | REVIEW | Source components may have different schema/permissions; match Premier native report loaders |
