@@ -3,6 +3,7 @@ import { qrPublic } from '@/api/domains/qrPublic';
 import { PublicQrMenu } from './PublicQrMenu';
 import { readVisit, resetVisit } from './useGuestVisit';
 import { qrError } from './errors';
+import { normalizeRecoveryPin } from './normalizeRecoveryPin';
 import type { GuestIdentity, QrTable } from './service';
 import './customer-menu.css';
 
@@ -70,6 +71,7 @@ export function GuestEntryGate({ token }: { token: string }) {
     if (failure) throw failure; setIdentity(data);
   }
   async function resume() {
+    if (!/^[0-9]{2}$/.test(pin)) throw new Error('QR_PIN_INVALID');
     const { data, error: failure } = await qrPublic.resume({ p_token: token, p_session: session, p_phone: phone, p_pin: pin });
     if (failure) throw failure; if (!data?.success) throw new Error(data?.error || 'QR_PIN_INVALID'); setIdentity(data.visit);
   }
@@ -81,7 +83,7 @@ export function GuestEntryGate({ token }: { token: string }) {
     {!entry ? <><p role="status">جارٍ التحقق من رابط الفرع…</p>{error && <button className="customer-primary" onClick={() => window.location.reload()}>إعادة المحاولة</button>}</> : closed ? <button className="customer-primary" onClick={restart}>بدء طلب جديد</button> : <form onSubmit={e => { e.preventDefault(); void run(step === 'phone' ? lookup : step === 'pin' ? resume : step === 'table' ? () => begin('dine_in') : step === 'delivery' ? () => begin('delivery') : async () => setStep('type')); }}>
       {step === 'phone' && <><label>رقم الهاتف<input type="tel" autoComplete="tel" inputMode="tel" required maxLength={24} value={phone} disabled={busy} onChange={e => setPhone(e.target.value)} /></label><p>إذا كان لديك طلب نشط سنفتح طلبك بعد التحقق من رمز الاسترجاع.</p></>}
       {step === 'name' && <label>اسمك<input required autoComplete="name" minLength={2} maxLength={100} value={name} disabled={busy} onChange={e => setName(e.target.value)} /></label>}
-      {step === 'pin' && <><label>رمز استرجاع الطلب<input required type="text" inputMode="numeric" autoComplete="off" minLength={2} maxLength={2} value={pin} onChange={e => setPin(e.target.value.replace(/[٠-٩]/g, c => String('٠١٢٣٤٥٦٧٨٩'.indexOf(c))).replace(/\D/g, ''))} /></label><p>الرقمان اللذان ظهرا بعد إرسال أول طلب. إذا نسيتهما، اطلب رمزًا جديدًا من الموظف. بعد ٣ محاولات خاطئة يتوقف الاسترجاع.</p></>}
+      {step === 'pin' && <><label>رمز استرجاع الطلب<input required type="text" inputMode="numeric" autoComplete="off" minLength={2} maxLength={2} value={pin} onChange={e => setPin(normalizeRecoveryPin(e.target.value))} /></label><p>الرقمان اللذان ظهرا بعد إرسال أول طلب. إذا نسيتهما، اطلب رمزًا جديدًا من الموظف. بعد ٣ محاولات خاطئة يتوقف الاسترجاع.</p></>}
       {step === 'type' && <div className="customer-entry-types"><h2>نوع طلبك</h2><button type="button" className="customer-primary" onClick={() => setStep('table')}>داخل المطعم · طاولة</button><button type="button" className="customer-primary" onClick={() => setStep('delivery')}>توصيل</button></div>}
       {step === 'table' && <><h2>صوّر رقم طاولتك</h2><p>وجّه الكاميرا لرقم الطاولة فقط. الموظف سيراجع الصورة ويؤكد الطاولة أو يختار لك بديلًا.</p>{photo ? <><img className="customer-table-photo" src={photo} alt="صورة رقم الطاولة" /><button type="button" className="customer-refresh" onClick={() => { setPhoto(''); setCamera(true); }}>إعادة التصوير</button></> : camera ? <TableCamera onCapture={image => { setPhoto(image); setCamera(false); }} /> : <button type="button" className="customer-primary" onClick={() => setCamera(true)}>فتح الكاميرا</button>}<label>رقم الطاولة الظاهر في الصورة<select required value={table} onChange={e => setTable(e.target.value)}><option value="">اختر الطاولة</option>{entry.tables?.map(t => <option key={t.id} value={t.id}>{t.name}{t.busy ? ' · مشغولة' : ''}</option>)}</select></label><p>بعد الدخول ترتبط بهذه الطاولة، وتعديلها يكون لدى الموظف فقط.</p></>}
       {step === 'delivery' && <label>عنوان التوصيل<textarea required minLength={5} maxLength={500} value={address} onChange={e => setAddress(e.target.value)} /></label>}

@@ -12,6 +12,7 @@ import { catalog } from '@/api/domains/catalog';
 import { subscribePosRealtime } from '@/features/pos/services/posRealtime';
 import type { KitchenQueueItem, KitchenStation } from '@/lib/types';
 import { KitchenCompletedHistory } from '../components/KitchenCompletedHistory';
+import { useQrNotificationTone } from '@/features/qr/useQrNotificationTone';
 
 function elapsedColor(seconds: number): string {
   if (seconds > 600) return 'text-ui-danger font-bold';
@@ -60,7 +61,9 @@ export function KitchenDisplayPage() {
   const [loadError, setLoadError] = useState('');
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [orderContext, setOrderContext] = useState<Record<string, { table_name: string | null; operator_name: string | null }>>({});
-  const prevCountRef = useRef(0);
+  const previousKitchenOrders = useRef<Set<string> | null>(null);
+  const [newOrderSignal, setNewOrderSignal] = useState(0);
+  const bell = useQrNotificationTone(newOrderSignal, soundEnabled && canViewKds, 'once');
   const statusWritesRef = useRef(new Set<string>());
   const [pendingStatusWrites, setPendingStatusWrites] = useState<ReadonlySet<string>>(new Set());
 
@@ -88,7 +91,7 @@ export function KitchenDisplayPage() {
       if (!branchFilter || !canViewKds) {
         setItems([]);
         setOrderContext({});
-        prevCountRef.current = 0;
+        previousKitchenOrders.current = null;
         setLoadError(userFacingErrorMessage(!canViewKds ? 'POS_KDS_VIEW_REQUIRED' : 'BRANCH_REQUIRED', ar ? 'ar' : 'en'));
         return;
       }
@@ -101,8 +104,13 @@ export function KitchenDisplayPage() {
       });
       if (error) throw error;
       const newItems = (data ?? []) as KitchenQueueItem[];
-      if (soundEnabled && prevCountRef.current > 0 && newItems.length > prevCountRef.current) playBeep();
-      prevCountRef.current = newItems.length;
+      const currentIds = new Set(newItems.map(item => `${item.order_id}:${item.station}`));
+      const previousIds = previousKitchenOrders.current;
+      // Ring only for genuinely new tickets, never on initial load or on a poll.
+      if (previousIds && [...currentIds].some(id => !previousIds.has(id))) {
+        setNewOrderSignal(signal => signal + 1);
+      }
+      previousKitchenOrders.current = currentIds;
       setItems(newItems);
 
       const orderIds = [...new Set(newItems.map((item) => item.order_id).filter(Boolean))];
@@ -135,21 +143,9 @@ export function KitchenDisplayPage() {
     } finally {
       setLoading(false);
     }
-  }, [branchFilter, station, soundEnabled, canViewKds]);
+  }, [branchFilter, station, canViewKds]);
 
-  const playBeep = () => {
-    try {
-      const ctx = new AudioContext();
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.frequency.value = 800;
-      gain.gain.value = 0.3;
-      osc.start();
-      osc.stop(ctx.currentTime + 0.15);
-    } catch { /* browser may block audio before user interaction */ }
-  };
+  useEffect(() => { previousKitchenOrders.current = null; }, [branchFilter, station]);
 
   useEffect(() => { void loadStations(); }, [loadStations]);
   useEffect(() => { void load(); }, [load]);
@@ -203,9 +199,10 @@ export function KitchenDisplayPage() {
             {stations.filter(s => s.is_active).map(s => <option key={s.code} value={s.code}>{ar ? s.name_ar : s.name_en}</option>)}
           </Select>
           <Button onClick={() => void load()} variant="outline" disabled={!canViewKds}><RefreshCw className="h-4 w-4" /> {ar ? 'تحديث' : 'Refresh'}</Button>
-          <button onClick={() => setSoundEnabled(!soundEnabled)} className="rounded-lg p-2 text-ui-muted hover:bg-ui-muted/10 transition" title={soundEnabled ? (ar ? 'كتم الصوت' : 'Mute') : (ar ? 'تشغيل الصوت' : 'Unmute')}>
+          <button onClick={() => { setSoundEnabled(value => !value); if (!bell.ready && !soundEnabled) void bell.unlock(); }} className="rounded-lg p-2 text-ui-muted hover:bg-ui-muted/10 transition" title={soundEnabled ? (ar ? 'كتم الصوت' : 'Mute') : (ar ? 'تشغيل الصوت' : 'Unmute')}>
             {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
           </button>
+          {soundEnabled && !bell.ready && <button type="button" className="rounded-lg border border-ui-border px-3 py-1 text-xs" onClick={() => void bell.unlock()}>{ar ? 'تفعيل جرس المطبخ' : 'Enable kitchen bell'}</button>}
           <span className="w-full text-xs text-ui-muted sm:w-auto sm:text-sm"><span className="me-1 inline-block h-2 w-2 rounded-full bg-ui-success animate-pulse" />{items.length} {ar ? 'طلب/محطة نشطة' : 'active order/station cards'}</span>
         </div>
 
