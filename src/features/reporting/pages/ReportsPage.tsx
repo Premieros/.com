@@ -1382,6 +1382,14 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         </div>
       } />
 
+      {data.length > 0 && columns.length === 0 && (
+        <p role="status" className="mb-3 rounded-xl border border-ui-warning/30 bg-ui-warning-soft px-3 py-2 text-sm text-ui-warning">
+          {lang === 'ar'
+            ? 'لا توجد أعمدة ظاهرة. اختر عمودًا واحدًا على الأقل من قائمة الأعمدة لعرض النتائج أو تصديرها.'
+            : 'No columns are visible. Select at least one column to display or export results.'}
+        </p>
+      )}
+
       {!history.unlimited && (
         <div className="mb-3 rounded-xl border border-ui-warning/30 bg-ui-warning-soft px-4 py-3 text-sm text-ui-warning">
           {lang === 'ar'
