@@ -182,5 +182,4 @@ BEGIN
       (SELECT o.id FROM public.orders o WHERE o.table_id=t.id AND o.status IN ('open','held')
         AND EXISTS(SELECT 1 FROM public.order_items oi WHERE oi.order_id=o.id AND oi.quantity>0))) RETURNING * INTO r;
   RETURN jsonb_build_object('id',r.id,'status',r.status);
-END $function$
-
+END $function$;
