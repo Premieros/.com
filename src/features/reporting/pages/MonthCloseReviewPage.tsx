@@ -54,6 +54,11 @@ export function MonthCloseReviewPage() {
                 : 'A manual checklist linked to Premier reports. It does not post entries or lock accounting periods.'}
             </p>
           </div>
+          {can('reports.view') && <button type="button" onClick={() => navigate(`/reports/period-documents?month=${encodeURIComponent(month)}`)}
+            disabled={!completeHistory}
+            className="rounded-lg border border-ui-border px-3 py-2 text-xs font-bold text-ui-primary disabled:opacity-40">
+            {ar ? 'مستندات مراجعة الشهر' : 'Monthly review documents'}
+          </button>}
           <button type="button" onClick={() => navigate('/reports')}
             className="rounded-lg border border-ui-border px-3 py-2 text-xs font-bold text-ui-text">
             {ar ? 'العودة للتقارير' : 'Back to reports'}
