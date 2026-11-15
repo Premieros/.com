@@ -74,7 +74,7 @@ describe('POS branch-scoped table snapshot reuse', () => {
     mock.items = [{ id: 'i1', order_id: 'o1', quantity: 1 }, { id: 'i2', order_id: 'o2', quantity: 1 }];
     const result = await fetchActiveOrders('branch');
     expect(result.orders.map(order => order.table)).toEqual([undefined, undefined]);
-    expect(mock.queries.filter(q => q.entity === 'dining_tables').at(-1)?.filters)
+    expect(mock.queries.filter(q => q.entity === 'dining_tables').slice(-1)[0]?.filters)
       .toEqual([['branch_id', 'branch'], ['id', ['hidden']]]);
   });
 });
