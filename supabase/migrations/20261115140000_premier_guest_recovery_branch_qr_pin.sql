@@ -25,7 +25,13 @@ BEGIN
   IF v.table_id IS DISTINCT FROM locked_table THEN RETURN jsonb_build_object('success',false,'error','QR_RETRY');END IF;
  END IF;
  IF v.id IS NULL OR v.status='closed' OR v.expires_at<=now() OR (v.generation<>l.generation AND NOT v_branch_qr) THEN RETURN jsonb_build_object('success',false,'error','QR_PIN_INVALID'); END IF;
- IF v.guest_hash=h THEN RETURN jsonb_build_object('success',true,'visit',qr_private.visit_view(v)); END IF;
+ IF v.guest_hash=h THEN
+   IF v_branch_qr AND v.generation<>l.generation THEN
+     UPDATE qr_private.visits SET generation=l.generation,origin_table_id=l.table_id
+       WHERE id=v.id RETURNING * INTO v;
+   END IF;
+   RETURN jsonb_build_object('success',true,'visit',qr_private.visit_view(v));
+ END IF;
  IF v.pin_failures>=3 THEN RETURN jsonb_build_object('success',false,'error','QR_PIN_LOCKED'); END IF;
  IF v_pin !~ '^[0-9]{2} THEN
   UPDATE qr_private.visits SET pin_failures=pin_failures+1 WHERE id=v.id;
