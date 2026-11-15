@@ -40,11 +40,10 @@ export function CustomReportBar({
   onDelete,
   lang,
 }: CustomReportBarProps) {
-  if (savedReports.length === 0) return null;
 
   return (
     <div className="mb-4 flex flex-wrap items-center gap-2">
-      <button onClick={onSave}
+      <button type="button" onClick={onSave}
         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-ui text-xs font-medium bg-ui-page-alt border border-ui-border text-ui-text hover:bg-ui-primary-soft hover:text-ui-primary transition-colors">
         <Plus className="w-3.5 h-3.5" />
         {lang === 'ar' ? 'حفظ العرض الحالي' : 'Save Current View'}
@@ -54,10 +53,10 @@ export function CustomReportBar({
         return (
           <span key={cfg.id}
             className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-ui text-xs font-medium cursor-pointer transition-colors ${active ? 'bg-ui-primary text-ui-primary-fg' : 'bg-ui-page-alt border border-ui-border text-ui-text hover:bg-ui-primary-soft'}`}>
-            <button onClick={() => onSelect(cfg)} className="outline-none">
+            <button type="button" onClick={() => onSelect(cfg)} className="outline-none">
               {cfg.name}
             </button>
-            <button onClick={() => onDelete(cfg.id)} className="ml-0.5 p-0.5 rounded hover:bg-black/10 text-ui-muted" aria-label={lang === 'ar' ? 'حذف' : 'Delete'}>
+            <button type="button" onClick={() => onDelete(cfg.id)} className="ml-0.5 p-0.5 rounded hover:bg-black/10 text-ui-muted" aria-label={lang === 'ar' ? 'حذف' : 'Delete'}>
               <X className="w-3 h-3" />
             </button>
           </span>
