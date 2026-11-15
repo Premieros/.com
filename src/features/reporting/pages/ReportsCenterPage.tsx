@@ -282,6 +282,13 @@ export function ReportsCenterPage() {
                 {isAr ? 'تقارير الاستهلاك' : 'Consumption reports'}
               </button>
             )}
+            {permittedOperational.some(report => ['sales', 'purchases', 'expenses', 'financial_reconciliation', 'profit'].includes(report.key)) && (
+              <button type="button" data-testid="open-month-review"
+                onClick={() => navigate('/reports/month-review')}
+                className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border px-3 text-xs font-bold text-ui-text">
+                {isAr ? 'مراجعة الشهر' : 'Month-end review'}
+              </button>
+            )}
             <button type="button" data-testid="toggle-reports-filters" aria-expanded={filtersOpen}
               aria-controls="reports-filters-popup" onClick={() => setFiltersOpen((open) => !open)}
               className="inline-flex h-9 items-center gap-1.5 rounded-lg border border-ui-border px-3 text-xs font-bold text-ui-text">
