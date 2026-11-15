@@ -109,7 +109,9 @@ export function RawMaterialsPage() {
 
   const openAdd = () => { setForm({ ...EMPTY_FORM, branch_id: branchFilter || '' }); setModalOpen(true); };
   const openEdit = (m: RawMaterial) => {
-    setApprovalPrice(String(m.default_cost ?? ''));
+    // Never prefill an approval with possibly stale catalog reference cost.
+    // A new published price requires deliberate entry (including explicit 0).
+    setApprovalPrice('');
     setApprovalNote('');
     setForm({
       id: m.id, code: m.code, name: m.name, unit_id: m.unit_id || '',
