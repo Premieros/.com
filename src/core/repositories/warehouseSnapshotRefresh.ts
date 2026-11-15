@@ -34,7 +34,7 @@ export function aggregateVerifiedWarehouseRows(
       throw new Error('WAREHOUSE_SNAPSHOT_INVALID_QUANTITY');
     }
     if (typeof row.quantity === 'string'
-      && !/^[+-]?(?:\\d+(?:\\.\\d*)?|\\.\\d+)(?:[eE][+-]?\\d+)?$/.test(row.quantity.trim())) {
+      && !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(row.quantity.trim())) {
       throw new Error('WAREHOUSE_SNAPSHOT_INVALID_QUANTITY');
     }
     const quantity = Number(row.quantity);
