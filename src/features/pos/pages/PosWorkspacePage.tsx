@@ -632,11 +632,7 @@ export function PosWorkspacePage() {
   };
 
   const handleCancelOrder = async (orderId: string): Promise<boolean> => {
-    if (clearOrderInFlightRef.current) return false;
-    clearOrderInFlightRef.current = true;
-    setClearingOrder(true);
-    try {
-      if (!perms.canCancelOrder) return false;
+    if (clearOrderInFlightRef.current || !perms.canCancelOrder) return false;
     const entered = window.prompt(
       isAr ? 'اكتب سبب إلغاء الطلب (مطلوب):' : 'Enter the cancellation reason (required):',
       '',
@@ -647,29 +643,36 @@ export function PosWorkspacePage() {
       show(isAr ? 'اكتب سببًا واضحًا للإلغاء (3 أحرف على الأقل).' : 'Enter a clear cancellation reason (at least 3 characters).', 'error');
       return false;
     }
-
-    const { data, error } = await api.floorPlan.setOrderStatus({
-      p_order_id: orderId,
-      p_status: 'cancelled',
-      p_notes: reason,
-    });
-    if (error) show(userFacingErrorMessage(error, isAr ? 'ar' : 'en'), 'error');
-    else if (!(data as RpcResult | null)?.success) {
-      const r = data as RpcResult | null;
-      show(userFacingErrorMessage(r ?? t('error'), isAr ? 'ar' : 'en'), 'error');
-    } else {
+    clearOrderInFlightRef.current = true;
+    setClearingOrder(true);
+    try {
+      const { data, error } = await api.floorPlan.setOrderStatus({
+        p_order_id: orderId,
+        p_status: 'cancelled',
+        p_notes: reason,
+      });
+      if (error) {
+        show(userFacingErrorMessage(error, isAr ? 'ar' : 'en'), 'error');
+        return false;
+      }
+      if (!(data as RpcResult | null)?.success) {
+        const response = data as RpcResult | null;
+        show(userFacingErrorMessage(response ?? t('error'), isAr ? 'ar' : 'en'), 'error');
+        return false;
+      }
       show(t('cancelOrder'), 'success');
       setPanel(null);
       setReloadKey((value) => value + 1);
       if (pos.activeOrderId === orderId) pos.resetWorkspace();
       return true;
-    }
+    } catch (error) {
+      show(userFacingErrorMessage(error, isAr ? 'ar' : 'en'), 'error');
+      return false;
     } finally {
       clearOrderInFlightRef.current = false;
       setClearingOrder(false);
     }
   };
-
 
   const handleClearCart = async () => {
     if (pos.completing || pos.kitchenSending || pos.orderLoading || clearingOrder) return;
@@ -680,7 +683,9 @@ export function PosWorkspacePage() {
     }
     if (action === 'clear-local') {
       if (!window.confirm(isAr ? 'تفريغ السلة غير المحفوظة؟' : 'Clear this unsaved cart?')) return;
-      pos.clearCart();
+      // A table selection without a saved order must also be detached locally.
+      if (pos.tableId || pos.activeTable) pos.resetWorkspace();
+      else pos.clearCart();
       return;
     }
     // Never hide a saved table order by clearing only React state.
@@ -831,7 +836,11 @@ export function PosWorkspacePage() {
       onGuestCountChange={pos.setGuestCount}
       onDiscountTypeChange={pos.setDiscountType}
       onDiscountAmountChange={pos.setDiscountAmount}
-      onUpdateQty={pos.updateQty}
+      onUpdateQty={(lineKey, delta) => {
+        const last = pos.cart.length === 1 && cartLineKey(pos.cart[0]) === lineKey && pos.cart[0].quantity + delta <= 0;
+        if (last && pos.activeOrderId) { void handleClearCart(); return; }
+        pos.updateQty(lineKey, delta);
+      }}
       onSetQty={pos.setQty}
       onItemsTransferred={(result) => {
         pos.applyItemsTransfer(result);
