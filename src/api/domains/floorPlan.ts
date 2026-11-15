@@ -8,6 +8,10 @@ const isServiceOrderType = (orderType?: OrderType): orderType is 'delivery' | 'd
   orderType === 'delivery' || orderType === 'drive_thru';
 
 export const floorPlan = {
+  /** Atomically create one named area and 0–100 tables, with server-side permissions. */
+  createAreaWithTables(p: { p_branch_id: string; p_name: string; p_table_count: number }): ApiResult<RpcResult & { area_id?: string; table_count?: number }> {
+    return rpc<RpcResult & { area_id?: string; table_count?: number }>('floor_plan_create_area_with_tables', p);
+  },
   createArea(p: { p_branch_id: string; p_name: string }): ApiResult<RpcResult & { area_id?: string }> {
     return rpc('floor_plan_create_area', p);
   },
