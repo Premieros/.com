@@ -26,6 +26,7 @@ import { useBranches } from '@/hooks/useBranches';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
 import type { ArAgingRow, Customer } from '@/lib/types';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
+import { QrCustomerHistoryPanel } from '@/features/qr/QrCustomerHistoryPanel';
 
 export function CustomersPage() {
   const { t, lang } = useLanguage();
@@ -140,6 +141,7 @@ export function CustomersPage() {
   return (
     <DesignSurface testId="customers-page">
       <DesignPageHeader title={customerLabel} actions={can('customers.manage') ? <Button size="sm" onClick={openAdd} data-testid="customers-add"><Plus className="w-4 h-4" /> {t('add')}</Button> : undefined} />
+      <QrCustomerHistoryPanel />
       <DesignPanel testId="customers-search-panel">
         <DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="customers-search" />
       </DesignPanel>
