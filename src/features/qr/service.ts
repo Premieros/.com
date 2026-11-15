@@ -35,6 +35,9 @@ export interface BranchRatingSummary {
   recent: { overall: number; food: number; service: number; note: string; created_at: string }[];
 }
 
+export interface QrCustomerOrderItem {
+  name: string; quantity: string; price: string; notes: string;
+}
 export interface QrCustomerOrderHistory {
   id: string;
   created_at: string;
@@ -44,6 +47,8 @@ export interface QrCustomerOrderHistory {
   order_number: string | null;
   order_status: string | null;
   paid_value: number | null;
+  items: QrCustomerOrderItem[];
+  items_truncated: boolean;
 }
 export interface QrCustomerRatingHistory {
   overall: number; food: number; service: number;

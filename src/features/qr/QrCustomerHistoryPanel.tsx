@@ -8,7 +8,7 @@ import { useSettings } from '@/context/SettingsContext';
 import { formatCurrency } from '@/lib/format';
 import { qrError } from './errors';
 import type { QrCustomerHistory } from './service';
-import { rankWithinCustomerBranch, sortQrCustomersByPurchases } from './qrCustomerRanking';
+import { filterQrCustomers, rankWithinCustomerBranch, sortQrCustomersByPurchases, type QrCustomerFilter } from './qrCustomerRanking';
 import { StaffGuestVisits } from './StaffGuestVisits';
 import { StaffGuestRatings } from './StaffGuestRatings';
 
@@ -22,6 +22,7 @@ export function QrCustomerHistoryPanel() {
   const { effectiveSettings } = useSettings();
   const [rows, setRows] = useState<QrCustomerHistory[]>([]);
   const [search, setSearch] = useState('');
+  const [filter, setFilter] = useState<QrCustomerFilter>('all');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [revision, setRevision] = useState(0);
@@ -48,9 +49,7 @@ export function QrCustomerHistoryPanel() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [allowed, scopeKey, revision]);
 
-  const filtered = useMemo(() => rows.filter(row =>
-    !search || `${row.name} ${row.phone}`.toLocaleLowerCase().includes(search.trim().toLocaleLowerCase())
-  ), [rows, search]);
+  const filtered = useMemo(() => filterQrCustomers(rows, search, filter), [rows, search, filter]);
 
   if (!allowed) return null;
   return <section data-testid="qr-customer-history" className="space-y-3 rounded-xl border border-ui-border bg-ui-surface p-4">
@@ -72,6 +71,19 @@ export function QrCustomerHistoryPanel() {
       aria-label={ar ? 'ابحث في عملاء طلبات QR' : 'Search QR customers'}
       placeholder={ar ? 'اسم العميل أو رقم الهاتف' : 'Customer name or phone'}
       className="w-full rounded-lg border border-ui-border bg-ui-page px-3 py-2 text-sm" />
+    <div className="flex flex-wrap gap-2" role="group" aria-label={ar ? 'تصفية عملاء QR' : 'Filter QR customers'}>
+      {([
+        ['all', ar ? 'الجميع' : 'All'],
+        ['purchased', ar ? 'قاموا بالشراء' : 'Purchased'],
+        ['rated', ar ? 'لديهم تقييمات' : 'Rated'],
+        ['pending', ar ? 'طلبات معلقة' : 'Pending orders'],
+      ] as const).map(([value, label]) => <button key={value} type="button" onClick={() => setFilter(value)}
+        aria-pressed={filter === value}
+        className={`rounded-lg border px-3 py-2 text-xs font-semibold ${filter === value ? 'border-ui-primary bg-ui-primary-soft text-ui-primary' : 'border-ui-border text-ui-text'}`}>
+        {label}
+      </button>)}
+    </div>
+    {!loading && !error && <p className="text-xs text-ui-muted">{ar ? `عدد النتائج: ${filtered.length}` : `Results: ${filtered.length}`}</p>}
     {loading && <p className="text-sm text-ui-muted">{ar ? 'جارٍ تحميل العملاء...' : 'Loading customers...'}</p>}
     {error && <p role="alert" className="text-sm text-ui-danger">{error}</p>}
     {!loading && !error && filtered.length === 0 && <p className="text-sm text-ui-muted">
@@ -115,7 +127,15 @@ export function QrCustomerHistoryPanel() {
             {customer.orders.map(order => <div key={order.id} className="mb-2 rounded-lg border border-ui-border bg-ui-surface p-3 text-xs">
               <p className="font-semibold">#{order.order_number || order.id.slice(0, 8)} · {order.order_type === 'delivery' ? (ar ? 'توصيل' : 'Delivery') : (ar ? 'داخل المطعم' : 'Dine-in')} · {order.table_name}</p>
               <p className="text-ui-muted">{new Date(order.created_at).toLocaleString(ar ? 'ar-EG' : 'en-GB')} · {order.status}</p>
-              <p className="mt-1">{ar ? 'تظهر الفواتير المدفوعة مرة واحدة في قسم المشتريات أعلاه' : 'Completed invoices are listed once in Purchases above'}</p>
+              {order.items?.length > 0 && <ul className="mt-2 space-y-1" aria-label={ar ? 'أصناف الطلب' : 'Requested items'}>
+                {order.items.map((item, index) => <li key={index} className="rounded border border-ui-border bg-ui-page-alt p-2">
+                  <strong>{item.name || (ar ? 'صنف غير مسمى' : 'Unnamed item')}</strong>
+                  {' · '}{item.quantity} × {item.price}
+                  {item.notes && <p className="mt-1 text-ui-muted">{item.notes}</p>}
+                </li>)}
+              </ul>}
+              {order.items_truncated && <p className="mt-1 text-ui-warning">{ar ? 'تم عرض أول 30 صنفًا فقط.' : 'Showing the first 30 items only.'}</p>}
+              <p className="mt-1 text-ui-muted">{ar ? 'تظهر الفواتير المكتملة مرة واحدة في قسم المشتريات أعلاه' : 'Completed invoices appear once in Purchases above'}</p>
             </div>)}
           </div>
           <div>
