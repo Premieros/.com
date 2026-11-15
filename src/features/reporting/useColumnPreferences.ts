@@ -44,6 +44,17 @@ export function useColumnPreferences(reportType: string) {
     });
   }, [reportType]);
 
+  /** Restore a named report's saved column set, even when switching report types. */
+  const restoreVisibleColumns = useCallback((targetReportType: string, visible: string[] | null) => {
+    setStored((previous) => {
+      const updated = { ...previous };
+      if (visible === null) delete updated[targetReportType];
+      else updated[targetReportType] = [...new Set(visible)];
+      writeAll(updated);
+      return updated;
+    });
+  }, []);
+
   const showAllColumns = useCallback(() => {
     setStored((prev) => {
       const updated = { ...prev };
@@ -70,5 +81,5 @@ export function useColumnPreferences(reportType: string) {
     });
   }, [reportType]);
 
-  return { visibleColumns, toggleColumn, showAllColumns, columnOrder: orders[reportType], moveColumn, resetColumnOrder };
+  return { visibleColumns, toggleColumn, showAllColumns, restoreVisibleColumns, columnOrder: orders[reportType], moveColumn, resetColumnOrder };
 }
