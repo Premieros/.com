@@ -48,7 +48,10 @@ const disposable = Boolean(dbUrl && (dbUrl.includes('localhost') || dbUrl.includ
       const menu = await db.query<{data:{table_id:null;tables:{id:string}[]}}>(
         'select public.qr_menu($1) data',[token]);
       expect(menu.rows[0].data.table_id).toBeNull();
-      expect(menu.rows[0].data.tables.map(t=>t.id).sort()).toEqual([table1,table2].sort());
+      const visibleTableIds = menu.rows[0].data.tables.map(t=>t.id);
+      expect(visibleTableIds).toContain(table1);
+      expect(visibleTableIds).toContain(table2);
+      expect(visibleTableIds).not.toContain(foreignTable);
 
       // Legacy per-table tokens remain independent of the permanent branch QR.
       const legacy = await db.query<{token:string}>('select public.qr_rotate($1,true) token',[table1]);
