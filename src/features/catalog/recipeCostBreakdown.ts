@@ -60,7 +60,8 @@ export function recipeCostBreakdown(
   const excludedGroups = Math.max(0, Math.floor(manufacturedGroups) || 0);
   const complete = details.length > 0 && incompleteLines === 0 && excludedGroups === 0;
   const safePrice = Number.isFinite(salePrice) && salePrice > 0 ? salePrice : null;
-  const projectedCostRatio = complete && safePrice !== null ? knownSubtotal / safePrice * 100 : null;
+  const projectedCostRatio = complete && safePrice !== null
+    ? Math.round((knownSubtotal / safePrice * 100) * 1_000_000) / 1_000_000 : null;
   const projectedGrossMargin = projectedCostRatio !== null ? 100 - projectedCostRatio : null;
 
   return {
