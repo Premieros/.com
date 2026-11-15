@@ -25,6 +25,7 @@ import { usePosPermissions } from '../hooks/usePosPermissions';
 import { usePosKeyboard } from '../hooks/usePosKeyboard';
 import { cartLineKey, orderItemLineKey } from '../utils/cart';
 import { needsKitchenDispatchBeforeSettlement } from '../utils/unsentCheckoutGuard';
+import { resolveCartClearAction } from '../utils/clearCartPolicy';
 import { OrderStartWizard, type StartStep, type StartOrderOptions } from '../components/start/OrderStartWizard';
 import { ProductBrowser } from '../components/catalog/ProductBrowser';
 import { ProductConfigModal } from '../components/catalog/ProductConfigModal';
@@ -83,6 +84,8 @@ export function PosWorkspacePage() {
   const initState = useMemo<WorkspaceState>(() => (location.state || {}) as WorkspaceState, [location.state]);
   const { cachePosData, loadCachedPosData } = useOffline();
   const [reloadKey, setReloadKey] = useState(0);
+  const clearOrderInFlightRef = useRef(false);
+  const [clearingOrder, setClearingOrder] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [offlineSettings, setOfflineSettings] = useState<Settings | null>(null);
@@ -628,34 +631,74 @@ export function PosWorkspacePage() {
     openOrderWorkspace(order.id, pay ? { pay: true } : {});
   };
 
-  const handleCancelOrder = async (orderId: string) => {
-    if (!perms.canCancelOrder) return;
+  const handleCancelOrder = async (orderId: string): Promise<boolean> => {
+    if (clearOrderInFlightRef.current || !perms.canCancelOrder) return false;
     const entered = window.prompt(
       isAr ? 'اكتب سبب إلغاء الطلب (مطلوب):' : 'Enter the cancellation reason (required):',
       '',
     );
-    if (entered === null) return;
+    if (entered === null) return false;
     const reason = entered.trim();
     if (reason.length < 3) {
       show(isAr ? 'اكتب سببًا واضحًا للإلغاء (3 أحرف على الأقل).' : 'Enter a clear cancellation reason (at least 3 characters).', 'error');
-      return;
+      return false;
     }
-
-    const { data, error } = await api.floorPlan.setOrderStatus({
-      p_order_id: orderId,
-      p_status: 'cancelled',
-      p_notes: reason,
-    });
-    if (error) show(userFacingErrorMessage(error, isAr ? 'ar' : 'en'), 'error');
-    else if (!(data as RpcResult | null)?.success) {
-      const r = data as RpcResult | null;
-      show(userFacingErrorMessage(r ?? t('error'), isAr ? 'ar' : 'en'), 'error');
-    } else {
+    clearOrderInFlightRef.current = true;
+    setClearingOrder(true);
+    try {
+      const { data, error } = await api.floorPlan.setOrderStatus({
+        p_order_id: orderId,
+        p_status: 'cancelled',
+        p_notes: reason,
+      });
+      if (error) {
+        show(userFacingErrorMessage(error, isAr ? 'ar' : 'en'), 'error');
+        return false;
+      }
+      if (!(data as RpcResult | null)?.success) {
+        const response = data as RpcResult | null;
+        const message = response?.error === 'SENT_ORDER_CANCEL_REQUIRES_CONTROLLED_VOID'
+          ? (isAr
+            ? 'يوجد صنف أُرسل للمطبخ. استخدم إلغاء الصنف المرسل (Void) أولًا، ثم ألغِ الطلب لتحرير الطاولة.'
+            : 'This order has kitchen-sent items. Void those items through the controlled flow before cancelling the order and releasing the table.')
+          : userFacingErrorMessage(response ?? t('error'), isAr ? 'ar' : 'en');
+        show(message, 'error');
+        return false;
+      }
       show(t('cancelOrder'), 'success');
       setPanel(null);
       setReloadKey((value) => value + 1);
-      if (pos.activeOrderId === orderId) pos.resetWorkspace();
+      if (pos.activeOrderId === orderId) {
+        pos.resetWorkspace();
+        if (orderIdParam) navigate('/pos', { replace: true });
+      }
+      return true;
+    } catch (error) {
+      show(userFacingErrorMessage(error, isAr ? 'ar' : 'en'), 'error');
+      return false;
+    } finally {
+      clearOrderInFlightRef.current = false;
+      setClearingOrder(false);
     }
+  };
+
+  const handleClearCart = async () => {
+    if (pos.completing || pos.kitchenSending || pos.orderLoading || clearingOrder) return;
+    const action = resolveCartClearAction(pos.activeOrderId, perms.canCancelOrder);
+    if (action === 'permission-denied') {
+      show(isAr ? 'إلغاء الطلب المحفوظ يحتاج صلاحية إلغاء الطلبات.' : 'Cancelling this saved order requires the cancel-order permission.', 'error');
+      return;
+    }
+    if (action === 'clear-local') {
+      if (!window.confirm(isAr ? 'تفريغ السلة غير المحفوظة؟' : 'Clear this unsaved cart?')) return;
+      // A table selection without a saved order must also be detached locally.
+      if (pos.tableId || pos.activeTable) pos.resetWorkspace();
+      else pos.clearCart();
+      return;
+    }
+    // Never hide a saved table order by clearing only React state.
+    // The audited server RPC updates the order and releases the table.
+    await handleCancelOrder(pos.activeOrderId!);
   };
 
   const handleBranchChange = (v: string) => {
@@ -801,14 +844,18 @@ export function PosWorkspacePage() {
       onGuestCountChange={pos.setGuestCount}
       onDiscountTypeChange={pos.setDiscountType}
       onDiscountAmountChange={pos.setDiscountAmount}
-      onUpdateQty={pos.updateQty}
+      onUpdateQty={(lineKey, delta) => {
+        const last = pos.cart.length === 1 && cartLineKey(pos.cart[0]) === lineKey && pos.cart[0].quantity + delta <= 0;
+        if (last && pos.activeOrderId) { void handleClearCart(); return; }
+        pos.updateQty(lineKey, delta);
+      }}
       onSetQty={pos.setQty}
       onItemsTransferred={(result) => {
         pos.applyItemsTransfer(result);
         if (result.snapshot) live.applyTransferSnapshot(result.snapshot);
       }}
       onRemove={pos.removeFromCart}
-      onClear={pos.clearCart}
+      onClear={() => void handleClearCart()}
       onSetItemDiscount={pos.setItemDiscount}
       onHold={() => void pos.holdOrder()}
       onSendKitchen={() => void pos.sendToKitchen()}
@@ -827,6 +874,7 @@ export function PosWorkspacePage() {
         canTransferOrder: posSurface.showTables && perms.canTransferOrder,
         canSplitOrder: posSurface.showTables && perms.canSplitOrder,
       }}
+      clearingOrder={clearingOrder}
       onVoidItem={(item, sentQty) => {
         setVoidItem(item);
         setVoidSentQty(sentQty);
