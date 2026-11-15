@@ -119,10 +119,19 @@ export function QrCustomerHistoryPanel() {
               <p className="text-ui-muted">{new Date(rating.created_at).toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
             </div>)}
           </div>
+          <div>
+            <h3 className="mb-2 text-sm font-bold">{ar ? 'سجل طلبات الخدمة والشيك' : 'Service and check requests'}</h3>
+            {!customer.service_history.length && <p className="text-xs text-ui-muted">{ar ? 'لا توجد طلبات خدمة سابقة.' : 'No previous service calls.'}</p>}
+            {customer.service_history.map(item => <div key={item.id} className="mb-2 rounded-lg border border-ui-border bg-ui-surface p-3 text-xs">
+              <p className="font-semibold">{item.kind === 'check' ? (ar ? 'طلب شيك' : 'Check request') : (ar ? 'طلب خدمة' : 'Service request')} · {item.table_name} · {item.status}</p>
+              {item.note && <p className="mt-1 whitespace-pre-wrap break-words">{item.note}</p>}
+              <p className="text-ui-muted">{new Date(item.created_at).toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
+            </div>)}
+          </div>
         </div>
       </details>;
     })}
-    <p className="text-xs text-ui-muted">{ar ? 'يظهر ما يصل إلى 250 ملف عميل و50 طلبًا و20 تقييمًا لكل ملف في كل فرع. ملفات عملاء QR منفصلة عن سجل الائتمان حتى يتم التحقق من الهوية.' : 'Up to 250 guests, 50 requests and 20 ratings per guest per branch. QR profiles stay separate from credit accounts pending identity verification.'}</p>
+    <p className="text-xs text-ui-muted">{ar ? 'يظهر ما يصل إلى 250 ملف عميل و50 طلبًا و20 تقييمًا و30 طلب خدمة لكل ملف في كل فرع. ملفات عملاء QR منفصلة عن سجل الائتمان حتى يتم التحقق من الهوية.' : 'Up to 250 guests, 50 requests and 20 ratings per guest per branch. QR profiles stay separate from credit accounts pending identity verification.'}</p>
     {can('pos.view') && branchIds.map(id => <div key={id}>
       <StaffGuestVisits branchId={id} canReview={can('pos.order.edit')} />
       <StaffGuestRatings branchId={id} />
