@@ -26,7 +26,7 @@ describe('QR customer purchase leaderboard', () => {
   });
   it('filters only matching customer profiles without moving ratings or requests', () => {
     const first = {
-      ...make('guest-1', 0), name: 'Ahmed', phone: '012345',
+      ...make('guest-1', 0), purchase_count: 0, name: 'Ahmed', phone: '012345',
       rating_count: 1, orders: [{ id: 'request-1', status: 'pending', created_at: '2026-11-15',
         order_type: 'dine_in', table_name: 'T1', order_number: null, order_status: null, paid_value: null,
         items: [{ name: 'Tea', quantity: '2', price: '10', notes: '' }], items_truncated: false }],
