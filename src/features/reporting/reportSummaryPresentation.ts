@@ -34,8 +34,8 @@ export function reportSummaryPresentation(type: ReportType, lang: 'ar' | 'en'): 
     financial_reconciliation: ['صافي المبيعات', 'Net sales'],
     inventory: ['إجمالي الكمية', 'Total quantity'],
     low_stock: ['عدد الأصناف منخفضة المخزون', 'Low-stock item count'],
-    top_consumed_components: ['إجمالي الكمية المستهلكة', 'Total consumed quantity'],
-    top_consumed_products: ['إجمالي الكمية المباعة', 'Total sold quantity'],
+    top_consumed_components: ['عدد المكونات المعروضة', 'Displayed component groups'],
+    top_consumed_products: ['عدد المنتجات المعروضة', 'Displayed product groups'],
   };
   const quantityTypes: ReportType[] = ['inventory', 'low_stock', 'top_consumed_components', 'top_consumed_products'];
   const basis: Partial<Record<ReportType, [string, string]>> = {
