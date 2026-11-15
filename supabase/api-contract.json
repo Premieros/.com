@@ -1160,6 +1160,12 @@
       ]
     },
     {
+      "name": "qr_branch_code",
+      "params": [
+        "branch"
+      ]
+    },
+    {
       "name": "qr_call_service",
       "params": [
         "key",
