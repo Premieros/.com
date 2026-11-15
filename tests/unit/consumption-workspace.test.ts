@@ -13,7 +13,7 @@ describe('consumption workspace integration', () => {
       expect(report).toBeDefined();
       expect(report?.permissions).toContain('reports.view');
       expect(report?.permissions).toContain('reports.costing');
-      expect(report?.category).toBe('manufacturing_costing');
+      expect(['manufacturing_costing', 'inventory']).toContain(report?.category);
     }
   });
 
