@@ -1,20 +1,30 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-// Browsers require a user gesture before audio may play. Never claim audio is active until resume succeeds.
-export function useQrNotificationTone(count: number, enabled: boolean) {
+export type KitchenBellMode = 'repeat' | 'once';
+
+/** A resonant double-stroke kitchen bell. Respects browser audio gesture rules.
+ * Repeat: POS/customer order alert until requests are handled.
+ * Once: KDS chime once for each newly detected batch of kitchen orders.
+ */
+export function useQrNotificationTone(count: number, enabled: boolean, mode: KitchenBellMode = 'repeat') {
   const context = useRef<AudioContext | null>(null);
   const pending = useRef(count); pending.current = count;
+  const lastPlayed = useRef(0);
   const [ready, setReady] = useState(false);
   const pulse = useCallback(() => {
     const audio = context.current;
     if (!audio || audio.state !== 'running' || pending.current < 1) return;
-    [880, 1175].forEach((frequency, index) => {
-      const oscillator = audio.createOscillator(); const gain = audio.createGain();
-      const start = audio.currentTime + index * 0.25;
-      oscillator.type = 'sine'; oscillator.frequency.value = frequency;
-      gain.gain.setValueAtTime(0, start); gain.gain.linearRampToValueAtTime(0.08, start + 0.025);
-      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.21);
-      oscillator.connect(gain); gain.connect(audio.destination); oscillator.start(start); oscillator.stop(start + 0.23);
+    [940, 1250].forEach((frequency, index) => {
+      const oscillator = audio.createOscillator();
+      const gain = audio.createGain();
+      const start = audio.currentTime + index * 0.32;
+      oscillator.type = 'triangle';
+      oscillator.frequency.value = frequency;
+      gain.gain.setValueAtTime(0, start);
+      gain.gain.linearRampToValueAtTime(0.2, start + 0.012);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + 0.55);
+      oscillator.connect(gain); gain.connect(audio.destination);
+      oscillator.start(start); oscillator.stop(start + 0.56);
       oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
     });
   }, []);
@@ -29,14 +39,31 @@ export function useQrNotificationTone(count: number, enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     const activate = () => { if (context.current?.state !== 'running') void unlock(); };
-    window.addEventListener('pointerdown', activate); window.addEventListener('keydown', activate);
-    return () => { window.removeEventListener('pointerdown', activate); window.removeEventListener('keydown', activate); };
+    window.addEventListener('pointerdown', activate);
+    window.addEventListener('keydown', activate);
+    return () => {
+      window.removeEventListener('pointerdown', activate);
+      window.removeEventListener('keydown', activate);
+    };
   }, [enabled, unlock]);
   useEffect(() => {
-    if (!enabled || !ready || count < 1) return;
-    pulse(); const timer = setInterval(pulse, 10000);
+    if (!enabled || !ready) return;
+    if (mode === 'once') {
+      if (count > lastPlayed.current) {
+        lastPlayed.current = count;
+        pulse();
+      }
+      return;
+    }
+    if (count < 1) return;
+    pulse();
+    const timer = setInterval(pulse, 7000);
     return () => clearInterval(timer);
-  }, [enabled, ready, count, pulse]);
-  useEffect(() => () => { const audio = context.current; context.current = null; if (audio) void audio.close().catch(() => {}); }, []);
+  }, [count, enabled, mode, pulse, ready]);
+  useEffect(() => () => {
+    const audio = context.current;
+    context.current = null;
+    if (audio) void audio.close().catch(() => {});
+  }, []);
   return { ready, unlock };
 }
