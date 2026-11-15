@@ -8,7 +8,7 @@ import { useSettings } from '@/context/SettingsContext';
 import { formatCurrency } from '@/lib/format';
 import { qrError } from './errors';
 import type { QrCustomerHistory } from './service';
-import { sortQrCustomersByPurchases } from './qrCustomerRanking';
+import { rankWithinCustomerBranch, sortQrCustomersByPurchases } from './qrCustomerRanking';
 import { StaffGuestVisits } from './StaffGuestVisits';
 import { StaffGuestRatings } from './StaffGuestRatings';
 
@@ -59,8 +59,8 @@ export function QrCustomerHistoryPanel() {
         <h2 className="text-base font-bold">{ar ? 'عملاء طلبات QR — الأعلى شراءً' : 'QR ordering customers — top spenders'}</h2>
         <p className="text-xs text-ui-muted">
           {ar
-            ? 'إجمالي مشتريات الفواتير المكتملة فقط، مرتبط بهوية الزيارة وليس بتطابق الهاتف. طلبات العملاء الأخرى تظهر بالسجل دون إضافتها للمشتريات.'
-            : 'Only settled sales linked to the guest visit count as purchases. Other requests remain in history; no phone-based CRM matching.'}
+            ? 'ترتيب المشتريات داخل كل فرع وعملته، والفاتورة المكتملة تُحسب مرة واحدة فقط. مرتبط بهوية الزيارة وليس بتطابق الهاتف. طلبات العملاء الأخرى تظهر بالسجل دون إضافتها للمشتريات.'
+            : 'Ranked within each branch and currency; every settled invoice counts once. Other requests remain in history; no phone-based CRM matching.'}
         </p>
       </div>
       <button type="button" onClick={() => setRevision(value => value + 1)} disabled={loading}
@@ -77,13 +77,14 @@ export function QrCustomerHistoryPanel() {
     {!loading && !error && filtered.length === 0 && <p className="text-sm text-ui-muted">
       {ar ? 'لا يوجد عملاء QR مطابقون في الفروع المحددة.' : 'No matching QR customers in selected branches.'}
     </p>}
-    {!loading && !error && filtered.map((customer, rank) => {
+    {!loading && !error && filtered.map((customer) => {
       const branch = branches.find(item => item.id === customer.branch_id);
+      const rank = rankWithinCustomerBranch(rows, customer.id);
       const currency = effectiveSettings(customer.branch_id)?.currency || 'EGP';
       return <details key={customer.id} className="rounded-xl border border-ui-border bg-ui-page-alt p-3">
         <summary className="cursor-pointer list-none">
           <div className="flex flex-wrap items-center gap-3">
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ui-primary-soft font-bold text-ui-primary">{rank + 1}</span>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-ui-primary-soft font-bold text-ui-primary">{rank}</span>
             <div className="min-w-[140px] flex-1">
               <p className="font-bold">{customer.name}</p>
               <p className="text-xs text-ui-muted" dir="ltr">{customer.phone}</p>
@@ -100,14 +101,21 @@ export function QrCustomerHistoryPanel() {
         </summary>
         <div className="mt-3 space-y-3 border-t border-ui-border pt-3">
           <div>
+            <h3 className="mb-2 text-sm font-bold">{ar ? 'فواتير الشراء المكتملة' : 'Completed purchase invoices'}</h3>
+            {!customer.purchases.length && <p className="text-xs text-ui-muted">{ar ? 'لا توجد فواتير مكتملة منسوبة لهذا العميل.' : 'No settled invoices attributable to this guest.'}</p>}
+            {customer.purchases.map(purchase => <div key={purchase.id} className="mb-2 rounded-lg border border-ui-border bg-ui-surface p-3 text-xs">
+              <p className="font-semibold">#{purchase.invoice_number || purchase.id.slice(0, 8)}</p>
+              <p className="text-ui-muted">{new Date(purchase.created_at).toLocaleString(ar ? 'ar-EG' : 'en-GB')}</p>
+              <p className="mt-1 font-bold">{formatCurrency(purchase.net_paid, currency, lang)}</p>
+            </div>)}
+          </div>
+          <div>
             <h3 className="mb-2 text-sm font-bold">{ar ? 'طلبات العميل السابقة' : 'Customer request history'}</h3>
             {!customer.orders.length && <p className="text-xs text-ui-muted">{ar ? 'لا توجد طلبات.' : 'No requests.'}</p>}
             {customer.orders.map(order => <div key={order.id} className="mb-2 rounded-lg border border-ui-border bg-ui-surface p-3 text-xs">
               <p className="font-semibold">#{order.order_number || order.id.slice(0, 8)} · {order.order_type === 'delivery' ? (ar ? 'توصيل' : 'Delivery') : (ar ? 'داخل المطعم' : 'Dine-in')} · {order.table_name}</p>
               <p className="text-ui-muted">{new Date(order.created_at).toLocaleString(ar ? 'ar-EG' : 'en-GB')} · {order.status}</p>
-              <p className="mt-1">{order.paid_value == null
-                ? (ar ? 'غير محسوب ضمن المشتريات المدفوعة' : 'Not counted as a settled purchase')
-                : formatCurrency(order.paid_value, currency, lang)}</p>
+              <p className="mt-1">{ar ? 'تظهر الفواتير المدفوعة مرة واحدة في قسم المشتريات أعلاه' : 'Completed invoices are listed once in Purchases above'}</p>
             </div>)}
           </div>
           <div>
@@ -131,7 +139,7 @@ export function QrCustomerHistoryPanel() {
         </div>
       </details>;
     })}
-    <p className="text-xs text-ui-muted">{ar ? 'يظهر ما يصل إلى 250 ملف عميل و50 طلبًا و20 تقييمًا و30 طلب خدمة لكل ملف في كل فرع. ملفات عملاء QR منفصلة عن سجل الائتمان حتى يتم التحقق من الهوية.' : 'Up to 250 guests, 50 requests and 20 ratings per guest per branch. QR profiles stay separate from credit accounts pending identity verification.'}</p>
+    <p className="text-xs text-ui-muted">{ar ? 'يظهر ما يصل إلى 250 عميلًا و50 فاتورة شراء و50 طلبًا و20 تقييمًا و30 طلب خدمة لكل ملف في كل فرع. ملفات عملاء QR منفصلة عن سجل الائتمان حتى يتم التحقق من الهوية.' : 'Up to 250 guests, 50 requests and 20 ratings per guest per branch. QR profiles stay separate from credit accounts pending identity verification.'}</p>
     {can('pos.view') && branchIds.map(id => <div key={id}>
       <StaffGuestVisits branchId={id} canReview={can('pos.order.edit')} />
       <StaffGuestRatings branchId={id} />

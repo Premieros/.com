@@ -53,11 +53,16 @@ export interface QrCustomerServiceHistory {
   id: string; kind: 'service' | 'check'; status: string;
   note: string; table_name: string; created_at: string;
 }
+export interface QrCustomerPurchase {
+  id: string; invoice_number: string; source_order_id: string;
+  created_at: string; net_paid: number;
+}
 export interface QrCustomerHistory {
   id: string; branch_id: string; name: string; phone: string;
   total_spent: number; purchase_count: number;
   rating_count: number; average_rating: number | null;
   orders: QrCustomerOrderHistory[];
+  purchases: QrCustomerPurchase[];
   ratings: QrCustomerRatingHistory[];
   service_history: QrCustomerServiceHistory[];
 }

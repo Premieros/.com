@@ -1,11 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { sortQrCustomersByPurchases } from '../../src/features/qr/qrCustomerRanking';
+import { rankWithinCustomerBranch, sortQrCustomersByPurchases } from '../../src/features/qr/qrCustomerRanking';
 import type { QrCustomerHistory } from '../../src/features/qr/service';
 
 const make = (id: string, total_spent: number): QrCustomerHistory => ({
   id, branch_id: 'branch-a', name: id, phone: '',
   total_spent, purchase_count: 1, rating_count: 0, average_rating: null,
-  orders: [], ratings: [], service_history: [],
+  orders: [], purchases: [], ratings: [], service_history: [],
 });
 
 describe('QR customer purchase leaderboard', () => {
@@ -13,6 +13,16 @@ describe('QR customer purchase leaderboard', () => {
     const rows = [make('low', 10), make('high', 120), make('medium', 50)];
     expect(sortQrCustomersByPurchases(rows).map(row => row.id)).toEqual(['high', 'medium', 'low']);
     expect(rows.map(row => row.id)).toEqual(['low', 'high', 'medium']);
+  });
+  it('never mixes spending ranks across branches or currencies', () => {
+    const a = make('a', 200);
+    const b = { ...make('b', 50000), branch_id: 'branch-b' };
+    const c = { ...make('c', 800), branch_id: 'branch-b' };
+    const rows = sortQrCustomersByPurchases([c, a, b]);
+    expect(rows.map(row => row.id)).toEqual(['a', 'b', 'c']);
+    expect(rankWithinCustomerBranch(rows, 'a')).toBe(1);
+    expect(rankWithinCustomerBranch(rows, 'b')).toBe(1);
+    expect(rankWithinCustomerBranch(rows, 'c')).toBe(2);
   });
   it('retains ratings and order history with their exact customer identity', () => {
     const one = { ...make('guest-1', 0), ratings: [{ overall: 5, food: 4, service: 5, note: 'Great', created_at: '2026-11-15' }], rating_count: 1 };
