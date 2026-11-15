@@ -97,7 +97,19 @@ BEGIN
           WHERE v.branch_id = p_branch AND v.profile_id = p.id
           ORDER BY g.created_at DESC LIMIT 20
         ) a
-      ) AS ratings
+      ) AS ratings,
+      (
+        SELECT coalesce(jsonb_agg(to_jsonb(h) ORDER BY h.created_at DESC),'[]'::jsonb)
+        FROM (
+          SELECT c.id, c.kind, c.status, c.note, c.created_at,
+            coalesce(dt.name, '—') AS table_name
+          FROM qr_private.visits v
+          JOIN qr_private.service_calls c ON c.visit_id = v.id AND c.branch_id = p_branch
+          LEFT JOIN public.dining_tables dt ON dt.id = c.table_id AND dt.branch_id = p_branch
+          WHERE v.profile_id = p.id AND v.branch_id = p_branch
+          ORDER BY c.created_at DESC LIMIT 30
+        ) h
+      ) AS service_history
     FROM profiles p
     LEFT JOIN purchase_totals t ON t.profile_id = p.id
     LEFT JOIN rating_totals rt ON rt.profile_id = p.id
