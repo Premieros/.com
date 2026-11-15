@@ -262,12 +262,12 @@ export function CostingCenterPage() {
 
   const stats = useMemo(() => {
     const count = filteredOverview.length;
-    const costedRows = filteredOverview.filter((r) => Number(r.actual_cost || r.theoretical_cost || r.unit_cost || 0) > 0);
-    const fc = costedRows.map((r) => foodCostPct(r.actual_cost || r.theoretical_cost || r.unit_cost, r.sale_price));
+    const costedRows = filteredOverview.filter((r) => Number(r.actual_cost ?? r.theoretical_cost ?? r.unit_cost ?? 0) > 0);
+    const fc = costedRows.map((r) => foodCostPct(r.actual_cost ?? r.theoretical_cost ?? r.unit_cost, r.sale_price));
     const avg = safeDiv(fc.reduce((s, v) => s + v, 0), fc.length);
     const worst = costedRows.reduce<CostingOverviewRow | null>((acc, r) => {
-      const v = foodCostPct(r.actual_cost || r.theoretical_cost || r.unit_cost, r.sale_price);
-      return !acc || v > foodCostPct(acc.actual_cost || acc.theoretical_cost || acc.unit_cost, acc.sale_price) ? r : acc;
+      const v = foodCostPct(r.actual_cost ?? r.theoretical_cost ?? r.unit_cost, r.sale_price);
+      return !acc || v > foodCostPct(acc.actual_cost ?? acc.theoretical_cost ?? acc.unit_cost, acc.sale_price) ? r : acc;
     }, null);
     return { count, avg, worst };
   }, [filteredOverview]);
@@ -315,6 +315,7 @@ export function CostingCenterPage() {
     if (source === 'purchase') return isAr ? 'مشتريات' : 'Purchase';
     if (source === 'stock_count') return isAr ? 'جرد' : 'Stock count';
     if (source === 'pricing') return isAr ? 'تسعير' : 'Pricing';
+    if (source === 'no_published_price') return isAr ? 'لا يوجد سعر معتمد' : 'No approved price';
     if (source === 'inventory_average') return isAr ? 'متوسط المخزون' : 'Inventory average';
     if (source === 'batch_average') return isAr ? 'متوسط الدفعات' : 'Batch average';
     return isAr ? 'تكلفة افتراضية' : 'Default cost';
@@ -337,7 +338,7 @@ export function CostingCenterPage() {
     { key: 'unitCost', header: t('unitCost'), render: (r) => money(r.unit_cost) },
     { key: 'theoretical', header: t('theoreticalCost'), render: (r) => money(r.theoretical_cost) },
     { key: 'actual', header: t('actualCost'), render: (r) => money(r.actual_cost) },
-    { key: 'margin', header: t('marginPct'), render: (r) => marginPill(marginPct(r.actual_cost || r.theoretical_cost || r.unit_cost, r.sale_price)) },
+    { key: 'margin', header: t('marginPct'), render: (r) => marginPill(marginPct(r.actual_cost ?? r.theoretical_cost ?? r.unit_cost, r.sale_price)) },
     { key: 'variance', header: t('variance'), render: (r) => !r.theoretical_cost && !r.actual_cost ? '-' : <span className="text-xs">{formatNumber(variancePct(r.actual_cost, r.theoretical_cost), 1)}%</span> },
   ];
 
@@ -497,8 +498,8 @@ export function CostingCenterPage() {
             <p className="font-semibold text-ui-text">{isAr ? 'قاعدة احتساب تكلفة الخامة' : 'Raw-material costing rule'}</p>
             <p className="mt-1">
               {isAr
-                ? 'التكلفة الفعلية تُحسب من الرصيد الموجب وFIFO الحقيقي فقط ولا تتأثر بالسالب. عند نفاد الخامة يُسعّر الرصيد السالب مؤقتًا بآخر تكلفة FIFO معروفة ويظهر منفصلًا كتقدير حتى تصل المشتريات الفعلية وتتم تسوية FIFO.'
-                : 'Actual cost uses positive stock and settled FIFO only and is never changed by negative stock. When stock is exhausted, the negative balance is temporarily valued at the last known FIFO cost and shown separately as an estimate until a real purchase settles FIFO.'}
+                 ? 'سعر تكلفة الخامة هو آخر سعر معتمد، حتى لو كان صفرًا. عند عدم وجود سعر معتمد تُستخدم تكلفة صفر، ولا يُستبدل الصفر بمتوسط المخزون أو تكلفة الكتالوج. يظل تقييم الدفعات التاريخية منفصلًا، وما زالت تسوية FIFO التشغيلية قيد الاستكمال.'
+                 : 'Raw material costing uses the latest approved price, including zero. With no approved price, costing is zero—not inventory average or catalog cost. Historical batch valuation is separate; operational FIFO settlement remains under review.'}
             </p>
           </div>
         </DesignPanel>
@@ -615,8 +616,8 @@ export function CostingCenterPage() {
             <div className="rounded-ui-lg border border-ui-border bg-ui-page p-3"><p className="text-xs text-ui-subtle">{t('unitCost')}</p><p className="text-lg font-bold text-ui-text">{money(detail.unit_cost)}</p></div>
             <div className="rounded-ui-lg border border-ui-border bg-ui-page p-3"><p className="text-xs text-ui-subtle">{t('theoreticalCost')}</p><p className="text-lg font-bold text-ui-text">{money(detail.theoretical_cost)}</p></div>
             <div className="rounded-ui-lg border border-ui-border bg-ui-page p-3"><p className="text-xs text-ui-subtle">{t('actualCost')}</p><p className="text-lg font-bold text-ui-text">{money(detail.actual_cost)}</p></div>
-            <div className="rounded-ui-lg border border-ui-border bg-ui-page p-3"><p className="text-xs text-ui-subtle">{t('foodCostPct')}</p><p className="text-lg font-bold text-ui-text">{formatNumber(foodCostPct(detail.actual_cost || detail.theoretical_cost || detail.unit_cost || 0, detail.sale_price || 0), 1)}%</p></div>
-            <div className="rounded-ui-lg border border-ui-border bg-ui-page p-3"><p className="text-xs text-ui-subtle">{t('marginPct')}</p><p className="text-lg font-bold text-ui-text">{formatNumber(marginPct(detail.actual_cost || detail.theoretical_cost || detail.unit_cost || 0, detail.sale_price || 0), 1)}%</p></div>
+            <div className="rounded-ui-lg border border-ui-border bg-ui-page p-3"><p className="text-xs text-ui-subtle">{t('foodCostPct')}</p><p className="text-lg font-bold text-ui-text">{formatNumber(foodCostPct(detail.actual_cost ?? detail.theoretical_cost ?? detail.unit_cost ?? 0, detail.sale_price ?? 0), 1)}%</p></div>
+            <div className="rounded-ui-lg border border-ui-border bg-ui-page p-3"><p className="text-xs text-ui-subtle">{t('marginPct')}</p><p className="text-lg font-bold text-ui-text">{formatNumber(marginPct(detail.actual_cost ?? detail.theoretical_cost ?? detail.unit_cost ?? 0, detail.sale_price ?? 0), 1)}%</p></div>
           </div>
 
           {(detail.components?.length || 0) > 0 && <div>
