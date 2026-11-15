@@ -38,11 +38,12 @@ const isolated = Boolean(dbUrl && ['localhost', '127.0.0.1', '[::1]'].some(host 
         values($1,$2,gen_random_uuid(),$3,$4,$5,'delivery')`, [visit,branch,profile,'ci-hash',table]);
       await db.query(`insert into qr_private.guest_ratings(id,visit_id,branch_id,overall,food,service,note)
         values($1,$2,$3,5,4,5,'CI feedback')`, [rating,visit,branch]);
-      const history = (await db.query<{ data: { id: string; rating_count: number; ratings: { note: string }[]; total_spent: number }[] }>(
+      const history = (await db.query<{ data: { id: string; rating_count: number; ratings: { note: string }[]; purchases: { id: string }[]; total_spent: number }[] }>(
         'select public.qr_customer_history($1) data', [branch])).rows[0].data;
       expect(history).toHaveLength(1);
       expect(history[0]).toMatchObject({ id: profile, rating_count: 1, total_spent: 0 });
       expect(history[0].ratings[0].note).toBe('CI feedback');
+      expect(history[0].purchases).toEqual([]); // An unbilled visit cannot create a purchase.
       expect(history.some(row => row.id === otherProfile)).toBe(false);
 
       await db.query('SAVEPOINT denied');
