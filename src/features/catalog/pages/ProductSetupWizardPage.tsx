@@ -14,6 +14,7 @@ import { useCan } from '@/lib/permissions';
 import { formatFinancialCurrency, generateBarcode } from '@/lib/format';
 import { useSettings } from '@/context/SettingsContext';
 import { estimateRawRecipeDefaultCost } from '../recipeDefaultCostPreview';
+import { recipeCostBreakdown } from '../recipeCostBreakdown';
 import { useGuidedWorkflow } from '@/core/guard';
 import { invalidatePosCatalogCache } from '@/core/offline/invalidatePosCatalogCache';
 import { BusinessAttributesFields } from '@/features/shared/BusinessAttributesFields';
@@ -79,6 +80,10 @@ export function ProductSetupWizardPage() {
     rawComponents, rawMaterials, manufacturedComponents.length,
   ), [rawComponents, rawMaterials, manufacturedComponents.length]);
   const currency = effectiveSettings(branchId || null)?.currency || 'EGP';
+  const costBreakdown = useMemo(() => recipeCostBreakdown(
+    rawComponents, rawMaterials, manufacturedComponents.length, form.sale_price,
+  ), [rawComponents, rawMaterials, manufacturedComponents.length, form.sale_price]);
+
 
   const wizardSteps = useMemo(() => [
     { step: 1, label: isAr ? `بيانات ${itemLabel}` : itemLabel },
@@ -415,6 +420,28 @@ export function ProductSetupWizardPage() {
                   ? 'مجموع تكلفة الخامات المباشرة بكمياتها وهالكها من سعر الخامة الافتراضي المسجل. ليست FIFO أو تكلفة وصفة نهائية ولا تُحفظ كمصروف.'
                   : 'Direct raw quantities and waste using configured default material costs only. Not FIFO, final recipe cost or a posted expense.'}
               </p>
+              {costBreakdown.lines.length > 0 && <div className="overflow-x-auto rounded-lg border border-ui-border">
+                <table className="w-full min-w-[550px] text-xs">
+                  <thead className="bg-ui-surface"><tr>
+                    {(isAr ? ['الخامة', 'كمية مع الهالك', 'تكلفة الوحدة الافتراضية', 'التكلفة'] :
+                      ['Material', 'Qty incl. waste', 'Configured unit cost', 'Extended cost'])
+                      .map(label => <th key={label} className="px-2 py-2 text-start">{label}</th>)}
+                  </tr></thead>
+                  <tbody>{costBreakdown.lines.map((line, index) => <tr key={index} className="border-t border-ui-border">
+                    <td className="px-2 py-2">{rawMaterials.find(item => item.id === line.rawMaterialId)?.name || (isAr ? 'خامة غير مختارة' : 'Unselected material')}</td>
+                    <td className="px-2 py-2 tabular-nums">{line.effectiveQuantity === null ? '—' : line.effectiveQuantity.toLocaleString(lang, { maximumFractionDigits: 4 })}</td>
+                    <td className="px-2 py-2">{line.unitCost === null ? '—' : formatFinancialCurrency(line.unitCost, currency, lang)}</td>
+                    <td className="px-2 py-2 font-semibold">{line.extendedCost === null ? (isAr ? 'غير مكتملة' : 'Incomplete') : formatFinancialCurrency(line.extendedCost, currency, lang)}</td>
+                  </tr>)}</tbody>
+                </table>
+              </div>}
+              {costBreakdown.complete && costBreakdown.projectedCostRatio !== null && (
+                <p className="text-sm font-semibold text-ui-text" data-testid="recipe-expected-margin">
+                  {isAr ? 'نسبة تكلفة الخامات إلى البيع' : 'Raw cost / sale price'}: {costBreakdown.projectedCostRatio.toFixed(1)}%
+                  {' · '}
+                  {isAr ? 'الهامش المتوقع قبل المصروفات' : 'Projected margin before expenses'}: {costBreakdown.projectedGrossMargin?.toFixed(1)}%
+                </p>
+              )}
               {!rawCostEstimate.complete && <p role="status" className="text-xs font-semibold text-ui-warning">
                 {isAr
                   ? `التقدير غير مكتمل: ${rawCostEstimate.missingPrices} خامة بلا سعر صالح أو بيانات ناقصة${rawCostEstimate.includesGroups ? '؛ تكلفة مجموعات المكونات غير مشمولة' : ''}.`
