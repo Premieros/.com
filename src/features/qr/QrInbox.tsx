@@ -83,10 +83,18 @@ export function QrInbox({ branchId, readOnly = false, header = false, navigation
     } catch (failure) { if (mounted.current && scope.current === branch) setError(qrError(failure)); }
     finally { lock.current = false; setBusy(false); }
   }
+  const latestRequest = requests.length ? requests[requests.length - 1] : null;
+  const latestCall = calls.length ? calls[calls.length - 1] : null;
+  const noticeSummary = latestRequest
+    ? `${latestRequest.customer_name || 'ضيف'} · ${latestRequest.order_type === 'delivery' ? 'توصيل' : 'داخل المطعم'} · ${latestRequest.order_type === 'delivery' ? 'بدون طاولة' : `طاولة ${latestRequest.table_name || '—'}`}`
+    : latestCall
+      ? `${latestCall.customer_name || 'ضيف'} · ${latestCall.kind === 'check' ? 'شيك' : 'خدمة'} · طاولة ${latestCall.table_name || '—'}`
+      : '';
   if (!branchId || !can('pos.view')) return null;
   return <section dir="rtl" className={header ? 'relative shrink-0' : 'shrink-0 rounded border border-ui-border bg-ui-surface p-3'} data-testid={header ? 'pos-customer-orders' : undefined}>
     <button onClick={() => { setOpen(v => !v); if (header && !tone.ready) void tone.unlock(); }} aria-label={header ? `طلبات العملاء الجديدة: ${requests.length + calls.length}` : undefined} aria-expanded={open} className={header ? 'flex min-h-9 items-center gap-1.5 rounded-xl border border-orange-400/50 bg-orange-500/10 px-2 text-xs font-bold text-ui-text' : 'font-bold'}>
-      {header ? <><BellRing size={17} /><span className="hidden sm:inline">طلبات العملاء</span></> : 'طلبات QR · '}
+      {header ? <><BellRing size={17} /><span className="hidden sm:inline">طلبات العملاء</span>{noticeSummary && <span title={noticeSummary}
+        className="hidden max-w-44 truncate border-s border-orange-400/40 ps-2 text-[10px] font-semibold xl:inline">{noticeSummary}</span>}</> : 'طلبات QR · '}
       <span role="status" aria-live="polite">{header ? requests.length + calls.length : `${requests.length} طلبات · ${calls.length} شيك وخدمة`}</span>
     </button>
     {error && !open && <span className="text-xs text-ui-danger" role="alert">تعذر تحديث الطلبات</span>}
