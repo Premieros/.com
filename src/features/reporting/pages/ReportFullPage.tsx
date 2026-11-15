@@ -10,6 +10,7 @@ import { businessReportAllowed, businessFinancialViewAllowed } from '@/core/orga
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useLanguage } from '@/context/LanguageContext';
 import { businessDateISO, addIsoDays } from '@/lib/businessTime';
+import { comparisonPeriod } from '../reportComparison';
 
 export function ReportFullPage() {
   const [params] = useSearchParams();
@@ -51,6 +52,23 @@ export function ReportFullPage() {
     && !Number.isNaN(Date.parse(`${from}T12:00:00Z`)) && !Number.isNaN(Date.parse(`${to}T12:00:00Z`))
     && from <= to && allowedDates.from === from && allowedDates.to === to;
 
+  const comparisonOptions = (['previous', 'year'] as const).map((mode) => {
+    try {
+      const period = comparisonPeriod({ from, to }, mode);
+      const clamped = history.clampRange(period.from, period.to);
+      return { mode, period, allowed: validDates && clamped.from === period.from && clamped.to === period.to };
+    } catch {
+      return { mode, period: null, allowed: false };
+    }
+  });
+
+  const openComparison = (period: { from: string; to: string }) => {
+    const next = new URLSearchParams(params);
+    next.set('from', period.from);
+    next.set('to', period.to);
+    navigate(`/reports/detail?${next.toString()}`);
+  };
+
   return (
     <section className="min-w-0 space-y-3" dir={isAr ? 'rtl' : 'ltr'} data-testid="report-full-page">
       <header className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-ui-border bg-ui-surface p-3 shadow-ui-sm">
@@ -66,6 +84,26 @@ export function ReportFullPage() {
           <ArrowRight className="h-4 w-4" />{isAr ? 'العودة إلى لوحة التقارير' : 'Back to reports overview'}
         </button>
       </header>
+      {validDates && (allowedReport || financialAllowed) && (
+        <nav aria-label={isAr ? 'مقارنة فترات التقارير' : 'Compare report periods'}
+          className="flex flex-wrap items-center gap-2 rounded-xl border border-ui-border bg-ui-surface p-3" data-testid="report-period-comparison">
+          <span className="text-xs font-semibold text-ui-muted">{isAr ? 'مقارنة الفترة:' : 'Compare period:'}</span>
+          {comparisonOptions.map(({ mode, period, allowed }) => (
+            <button key={mode} type="button"
+              disabled={!allowed || !period}
+              onClick={() => { if (allowed && period) openComparison(period); }}
+              className="rounded-lg border border-ui-border px-3 py-2 text-xs font-bold text-ui-text disabled:cursor-not-allowed disabled:opacity-40">
+              {mode === 'previous'
+                ? (isAr ? 'الفترة السابقة' : 'Previous period')
+                : (isAr ? 'نفس الفترة العام الماضي' : 'Same period last year')}
+              {period && <span className="ms-2 text-ui-muted" dir="ltr">{period.from} — {period.to}</span>}
+            </button>
+          ))}
+          <span className="text-xs text-ui-muted">
+            {isAr ? 'يُعاد فتح التقرير ضمن نطاق التاريخ المسموح دون تغيير نوعه أو فروعه.' : 'Opens the same report for an authorized comparison period.'}
+          </span>
+        </nav>
+      )}
       {!validDates ? (
         <p role="alert" className="rounded-xl border border-ui-danger/30 bg-ui-danger-soft p-5 text-sm text-ui-danger">
           {isAr ? 'الفترة المحددة غير صحيحة أو خارج نطاق الوصول المسموح.' : 'Invalid dates or history outside your allowed access.'}
