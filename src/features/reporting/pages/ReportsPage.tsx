@@ -163,7 +163,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   });
   const { effectiveSettings } = useSettings();
   const currency = effectiveSettings(branchFilter)?.currency || 'EGP';
-  const { visibleColumns, toggleColumn, showAllColumns, columnOrder, moveColumn, resetColumnOrder } = useColumnPreferences(reportType);
+  const { visibleColumns, toggleColumn, showAllColumns, restoreVisibleColumns, columnOrder, moveColumn, resetColumnOrder } = useColumnPreferences(reportType);
   const { savedReports, saveReport, deleteReport } = useCustomReports();
   const reportBranchLabel = reportBranchIds.length === 1
     ? branchNameById(reportBranchIds[0])
@@ -206,6 +206,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
 
   const handleRestoreCustomReport = (config: SavedReportConfig) => {
     handleReportTypeSelect(config.reportType);
+    restoreVisibleColumns(config.reportType, config.visibleColumns);
     setFilters(config.filters || {});
     setFiltersDirty(false);
     setQueryVersion((version) => version + 1);
