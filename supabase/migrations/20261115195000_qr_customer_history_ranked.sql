@@ -2,6 +2,8 @@
 -- identifiers, never guess that a CRM customer matches by phone.
 -- Shared orders linked to more than one guest cannot be attributed to one payer;
 -- retain their request histories but exclude those sales from individual ranking.
+-- Sales explicitly tied to a separate CRM account are also not attributed
+-- to the unverified QR profile.
 -- Read-only, branch- and permission-scoped, capped for safe dashboard payloads.
 SET LOCAL lock_timeout = '3s';
 SET LOCAL statement_timeout = '45s';
@@ -40,7 +42,7 @@ BEGIN
     SELECT DISTINCT l.profile_id, s.id, s.total, s.refunded_amount
     FROM unambiguous_orders l
     JOIN public.sales s ON s.source_order_id = l.order_id AND s.branch_id = p_branch
-    WHERE s.status = 'completed'
+    WHERE s.status = 'completed' AND s.customer_id IS NULL
   ),
   purchase_totals AS (
     SELECT profile_id,
@@ -68,7 +70,7 @@ BEGIN
           SELECT r.id, r.created_at, r.status, r.order_type,
             coalesce(dt.name,'—') AS table_name,
             o.order_number, o.status AS order_status,
-            CASE WHEN s.status = 'completed' AND EXISTS (
+            CASE WHEN s.status = 'completed' AND s.customer_id IS NULL AND EXISTS (
               SELECT 1 FROM unambiguous_orders u
               WHERE u.order_id = o.id AND u.profile_id = p.id
             ) THEN greatest(0, s.total - coalesce(s.refunded_amount,0))
@@ -80,7 +82,7 @@ BEGIN
           LEFT JOIN public.dining_tables dt ON dt.id = coalesce(r.assigned_table_id,r.requested_table_id)
             AND dt.branch_id = p_branch
           LEFT JOIN LATERAL (
-            SELECT s.status, s.total, s.refunded_amount
+            SELECT s.status, s.total, s.refunded_amount, s.customer_id
             FROM public.sales s WHERE s.source_order_id = o.id AND s.branch_id = p_branch
             ORDER BY s.created_at DESC LIMIT 1
           ) s ON true
