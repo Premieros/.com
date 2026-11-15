@@ -44,3 +44,10 @@
 
 ## Working convention
 Commit each completed feature separately to the **same branch and PR**; record a test and the exact dependency for every addition. Preserve already-merged features (notably area bulk-create PR #197, stock-count Excel PR #167 and purchase unit price conversion PR #168).
+
+## POS pressure and table-read parity update (2026-11-15)
+
+- Scoped implementation in this branch: reuse the active branch table snapshot when hydrating open/held orders rather than issuing an embedded dining-table join per order. Open orders referring to inactive tables get one distinct branch-filtered fallback read; fallback errors reject the entire snapshot instead of presenting missing tables as available.
+- Scoped implementation in this branch: coalesce rapid POS Realtime notifications into bounded snapshot refreshes, defer refresh while the page is hidden, and preserve an eventual trailing read and cross-branch loading completion. No database change, new permission or printing change.
+- Verification: unit coverage for multiple orders sharing a table, inactive/missing tables and fail-closed errors; React hook regression for sustained events, slow reads, branch switches and unmount cleanup. Merge only after exact-head CI success.
+- Still outstanding, not claimed complete: server-backed cashier station assignments, delayed print ticket claim/recovery, certified accounting period evidence and close operations, nested recipe valuation, and live tax-authority transport.
