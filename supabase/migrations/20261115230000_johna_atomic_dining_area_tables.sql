@@ -1,4 +1,4 @@
--- Ported and reviewed from Premieros/johna-s; additive API only.
+-- Additive atomic area-and-tables API; adapted for Premier's security model.
 -- New RPC is SECURITY INVOKER and uses caller RLS and permission checks.
 -- Additive only: no live areas/tables are created by applying this migration.
 -- Area INSERT remains under the caller's RLS. Each table uses the existing
