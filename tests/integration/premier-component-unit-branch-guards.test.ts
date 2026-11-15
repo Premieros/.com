@@ -3,7 +3,7 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const dbUrl = process.env.SUPABASE_DB_URL;
-const disposable = !!dbUrl && /(?:localhost|127\\.0\\.0\\.1|\\[::1\\])(?::\\d+)?\\//.test(dbUrl);
+const disposable = Boolean(dbUrl && (dbUrl.includes('localhost') || dbUrl.includes('127.0.0.1') || dbUrl.includes('[::1]')));
 (disposable ? describe : describe.skip)('Premier product BOM / unit branch protection', () => {
   const db = new Client({ connectionString: dbUrl });
   beforeAll(async () => { await db.connect(); });
