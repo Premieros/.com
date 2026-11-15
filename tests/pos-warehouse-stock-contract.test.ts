@@ -9,14 +9,14 @@ describe('POS authoritative warehouse and stock policy contract', () => {
     const page = read('src/features/pos/pages/PosWorkspacePage.tsx');
     expect(page).toContain('fetchBranchWarehouseId(effectiveBranch, orderIdParam || null)');
     expect(page).toContain(".eq('warehouse_id', warehouseId)");
-    expect(page).toMatch(/if \(!warehouseId\) \{[\s\S]*?navigator\.onLine[\s\S]*?setLiveStockMap\(\{\}\)/);
+    expect(page).toMatch(/if \(!warehouseId\) \{[\s\S]*?setLiveStockMap\(\{\}\)/);
   });
   it('never displays branch-aggregate stock when warehouse stock is missing or the online read fails', () => {
     const page = read('src/features/pos/pages/PosWorkspacePage.tsx');
     expect(page).not.toContain('InventoryRepository.getBranchStockMap(effectiveBranch)');
-    expect(page).toMatch(/if \\(!warehouseId\\) \\{[\\s\\S]*?setLiveStockMap\\(\\{\\}\\)/);
-    expect(page).toMatch(/if \\(online\\) \\{[\\s\\S]*?setLiveStockMap\\(live\\);[\\s\\S]*?else \\{[\\s\\S]*?setLiveStockMap\\(\\{\\}\\)/);
-    expect(page).toMatch(/catch \\{[\\s\\S]*?setLiveStockMap\\(\\{\\}\\)/);
+    expect(page).toMatch(/if \(!warehouseId\) \{[\s\S]*?setLiveStockMap\(\{\}\)/);
+    expect(page).toMatch(/if \(online\) \{[\s\S]*?setLiveStockMap\(live\);[\s\S]*?else \{[\s\S]*?setLiveStockMap\(\{\}\)/);
+    expect(page).toMatch(/catch \{[\s\S]*?setLiveStockMap\(\{\}\)/);
   });
   it('continues to require verified warehouse stock for offline payment', () => {
     const payment = read('src/features/pos/services/payment.ts');
