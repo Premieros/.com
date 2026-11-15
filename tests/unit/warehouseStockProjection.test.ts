@@ -121,7 +121,7 @@ describe('warehouse-scoped offline inventory', () => {
 
   it('rejects malformed cached warehouse snapshot quantities, never converting blank to zero', () => {
     for (const quantity of ['', ' ', '20', null, true]) {
-      const corrupted = {...snap('warehouse-a', 20), serverQuantity:quantity as number};
+      const corrupted = {...snap('warehouse-a', 20), serverQuantity:quantity as unknown as number};
       expect(check({balances:[corrupted]}))
         .toEqual({status:'unknown',reason:'WAREHOUSE_STOCK_SNAPSHOT_STALE'});
     }
