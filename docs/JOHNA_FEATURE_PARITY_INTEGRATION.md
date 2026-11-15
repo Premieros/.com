@@ -25,6 +25,7 @@
 | Costing | Recipe costs, raw prices, FIFO/approved price consistency | REVIEW | Preserve merged approved-zero and inventory-cost invariants |
 | Accounting and procurement | Receivables, journal reports, buying workflow gaps | REVIEW | Assess dependencies and schema; no production data writes for discovery |
 | Admin | Registration, branch pulse, support and permissions | REVIEW | Use Premier org/branch boundaries and permission model |
+| Egyptian e-invoicing | ETA invoice/eReceipt routing foundation | DONE (foundation only) | Separate eInvoice and eReceipt channels, tenant/country eligibility, shared ETA/ZATCA dispatcher and unit tests; no network calls or operational schema changes. See `docs/EGYPT_ETA_INTEGRATION.md` |
 | Saudi e-invoicing | ZATCA clearance/reporting routing foundation | DONE (foundation only) | Fail-closed typed policy and unit tests; no live submission, compliance claim, credential storage or schema writes. See `docs/SAUDI_ZATCA_INTEGRATION.md` |
 | Database | Migration-history reconciliation | BLOCKED | Draft PR #155 exists; do not merge automatically or apply migrations without staged audit |
 | Offline/LAN | Existing draft PRs #133–#140 | REVIEW | Separate architectural scope, dependent branches; not automatic candidates for feature parity |
