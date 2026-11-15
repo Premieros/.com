@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react';
-import { supabase } from '@/api';
 import { qr } from '@/api/domains/qr';
 import { useRoles } from '@/context/RolesContext';
-import type { DiningTable } from '@/lib/types';
 import type { QrSettings } from './service';
 import { qrError } from './errors';
 import { QrManagement } from './QrManagement';
@@ -10,17 +8,16 @@ import { QrManagement } from './QrManagement';
 export function CustomerOrderSettings({ branchId }: { branchId: string }) {
   const { rolesList } = useRoles();
   const [settings, setSettings] = useState<QrSettings | null>(null);
-  const [tables, setTables] = useState<DiningTable[]>([]);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState('');
   useEffect(() => {
     let alive = true;
-    setSettings(null); setTables([]); setMessage('');
+    setSettings(null); setMessage('');
     if (!branchId) return;
-    void Promise.all([qr.settings({ p_branch: branchId }), supabase.from('dining_tables').select('*').eq('branch_id', branchId).eq('is_active', true).order('name')]).then(([config, result]) => {
+    void qr.settings({ p_branch: branchId }).then(config => {
       if (!alive) return;
-      if (config.error || result.error) setMessage(qrError(config.error || result.error));
-      else { setSettings(config.data); setTables(result.data || []); }
+      if (config.error) setMessage(qrError(config.error));
+      else setSettings(config.data);
     }).catch(failure => { if (alive) setMessage(qrError(failure)); });
     return () => { alive = false; };
   }, [branchId]);
@@ -48,7 +45,7 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
         {settings.reviewer_roles.length > 0 && <button className="text-sm underline" disabled={busy} onClick={() => setSettings(s => s && ({ ...s, reviewer_roles: [] }))}>السماح لكل من لديه صلاحية تعديل الطلبات</button>}
       </fieldset>
       <button className="rounded-xl bg-ui-primary px-5 py-3 text-white" disabled={busy} onClick={() => void save()}>{busy ? 'جارٍ الحفظ…' : 'حفظ إعدادات طلبات العملاء'}</button>
-      <QrManagement key={branchId} branchId={branchId} tables={tables} brandName={settings.appearance.brand_name} />
+      <QrManagement key={branchId} branchId={branchId} brandName={settings.appearance.brand_name} />
     </>}
   </section>;
 }
