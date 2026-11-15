@@ -125,6 +125,9 @@ export function createSaleOperationKey(): string {
 }
 
 async function queueOfflineSale(p: ProcessSalePayload): Promise<string> {
+  // Revalidate at the durable write boundary: connectivity can change after
+  // processSaleForOrder's initial offline check while settings load.
+  if (!hasValidOfflineSaleItems(p.p_items)) throw new Error('OFFLINE_SALE_INVALID_ITEMS');
   if (!p.p_shift_id) throw new Error('SHIFT_REQUIRED_OFFLINE');
   if (!p.p_warehouse_id?.trim()) throw new Error('WAREHOUSE_REQUIRED_OFFLINE_CAPTURE');
 
