@@ -14,6 +14,7 @@
 
 | Area | Work item | Status | Notes |
 | --- | --- | --- | --- |
+| POS printing | Searchable cloud queue and safe ticket diagnostics | DONE | Search loaded queue jobs by ticket/order/table/station and copy non-sensitive job metadata; no print retries or replays, tests included |
 | POS printing | Guard cloud print queue against cross-branch stale responses, duplicate concurrent requests and hidden-tab polling | DONE | `src/features/pos/components/settings/PrinterSettingsPanel.tsx`; requires browser/CI validation |
 | POS printing | Cashier area / second station settings | BLOCKED | Source UI requires `get_cashier_area_settings` and `save_cashier_area_settings`; missing in Premier target database during read-only check; design Premier-native branch-scoped permissions and routing before enabling |
 | POS printing | Manual delayed-ticket print recovery | REVIEW | Reference flow depends on print recovery RPCs, job claiming, anti-duplicate safeguards and `pos.print_recovery`; preserve fail-closed behavior |
