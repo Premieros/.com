@@ -103,10 +103,10 @@ export function QrInbox({ branchId, readOnly = false, header = false, navigation
         <h2 className="font-bold">الإشعارات الجديدة فقط</h2>
         <button aria-label="إغلاق طلبات العملاء" onClick={() => setOpen(false)}><X size={20} /></button>
       </div>}
-      <button type="button" onClick={() => { setOpen(false); navigate('/customers'); }}
+      {can('customers.view') && <button type="button" onClick={() => { setOpen(false); navigate('/customers'); }}
         className="mb-3 rounded-lg border border-ui-border px-3 py-2 text-xs font-semibold text-ui-primary">
         سجل طلبات العملاء وتقييماتهم ← صفحة العملاء
-      </button>
+      </button>}
       {header && !tone.ready && canReview && <button className="mb-3 flex items-center gap-2 rounded border p-2 text-sm" onClick={() => void tone.unlock()}><Volume2 size={17} />تفعيل صوت التنبيه المتكرر</button>}
       {header && tone.ready && <p className="mb-2 text-xs text-ui-subtle">صوت التنبيه مفعّل · يتكرر حتى معالجة الطلبات الجديدة</p>}
       {error && <p role="alert" className="text-ui-danger">{error}</p>}
