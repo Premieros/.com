@@ -174,7 +174,16 @@ export async function listCloudPrintQueue(branchId: string, limit = 100): Promis
     .order('created_at', { ascending: false })
     .limit(Math.max(1, Math.min(250, Number(limit) || 100)));
   if (error) throw error;
-  return (Array.isArray(data) ? data : []) as CloudPrintQueueRow[];
+  const rows = (Array.isArray(data) ? data : []) as CloudPrintQueueRow[];
+  return ensureCloudPrintQueueBranchScope(rows, scopedBranchId);
+}
+
+/** Fail closed if a query ever returns jobs outside the requested branch. */
+export function ensureCloudPrintQueueBranchScope(rows: CloudPrintQueueRow[], branchId: string): CloudPrintQueueRow[] {
+  if (!branchId || rows.some(row => !row || row.branch_id !== branchId)) {
+    throw new Error('CLOUD_PRINT_BRANCH_SCOPE_MISMATCH');
+  }
+  return rows;
 }
 
 export async function claimCloudPrintJobs(branchId: string, agentId: string, limit = 12): Promise<CloudPrintJob[]> {
