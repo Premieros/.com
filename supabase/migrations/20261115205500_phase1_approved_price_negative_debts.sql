@@ -33,7 +33,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public._raw_remove_fifo(p_raw_material_id uuid, p_branch_id uuid, p_warehouse_id uuid, p_qty numeric, p_entry_type text DEFAULT 'production'::text, p_reference_type text DEFAULT NULL::text, p_reference_id uuid DEFAULT NULL::uuid, p_reference_number text DEFAULT NULL::text, p_created_by uuid DEFAULT NULL::uuid, p_allow_negative boolean DEFAULT false)
  RETURNS jsonb
@@ -204,7 +204,7 @@ BEGIN
     'fifo_debt_ledger_id',v_oversold_ledger_id
   );
 END;
-$function$
+$function$;
 
 CREATE OR REPLACE FUNCTION public._raw_fifo_settle_receipt(p_receipt_ledger_id bigint, p_receipt_batch_id uuid, p_run_id uuid DEFAULT NULL::uuid)
  RETURNS jsonb
@@ -363,4 +363,4 @@ BEGIN
     'remaining_receipt_quantity',v_available
   );
 END;
-$function$
+$function$;
