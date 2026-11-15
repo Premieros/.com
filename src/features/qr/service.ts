@@ -34,3 +34,25 @@ export interface BranchRatingSummary {
   count: number; average: number | null;
   recent: { overall: number; food: number; service: number; note: string; created_at: string }[];
 }
+
+export interface QrCustomerOrderHistory {
+  id: string;
+  created_at: string;
+  status: string;
+  order_type: string | null;
+  table_name: string;
+  order_number: string | null;
+  order_status: string | null;
+  paid_value: number | null;
+}
+export interface QrCustomerRatingHistory {
+  overall: number; food: number; service: number;
+  note: string; created_at: string;
+}
+export interface QrCustomerHistory {
+  id: string; branch_id: string; name: string; phone: string;
+  total_spent: number; purchase_count: number;
+  rating_count: number; average_rating: number | null;
+  orders: QrCustomerOrderHistory[];
+  ratings: QrCustomerRatingHistory[];
+}
