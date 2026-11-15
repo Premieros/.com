@@ -25,3 +25,12 @@ export async function qrDecide(id: string, accept: boolean, table?: string): Pro
   return data;
 }
 export { qrError } from './errors';
+
+export interface GuestRating {
+  eligible: boolean; submitted: boolean;
+  overall?: number | null; food?: number | null; service?: number | null; note?: string | null;
+}
+export interface BranchRatingSummary {
+  count: number; average: number | null;
+  recent: { overall: number; food: number; service: number; note: string; created_at: string }[];
+}

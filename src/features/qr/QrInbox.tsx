@@ -6,6 +6,7 @@ import type { QrTable, ServiceCall } from './service';
 import { qrDecide, qrError, qrInbox, type QrRequest } from './service';
 import { BellRing, Volume2, X } from 'lucide-react';
 import { StaffGuestVisits } from './StaffGuestVisits';
+import { StaffGuestRatings } from './StaffGuestRatings';
 import { useQrNotificationTone } from './useQrNotificationTone';
 
 export function QrInbox({ branchId, readOnly = false, header = false, navigationBlocked = false, workspaceTableId, workspaceOrderId }: { branchId: string; readOnly?: boolean; header?: boolean; navigationBlocked?: boolean; workspaceTableId?: string | null; workspaceOrderId?: string | null }) {
@@ -121,6 +122,7 @@ export function QrInbox({ branchId, readOnly = false, header = false, navigation
         {!readOnly && !canReview && <p className="mt-2 text-sm text-ui-subtle">بانتظار اعتماد الموظف المخوّل لهذا الفرع.</p>}
       </article>)}
       <StaffGuestVisits key={branchId} branchId={branchId} canReview={canReview && can('pos.order.edit')} />
+      <StaffGuestRatings key={branchId} branchId={branchId} />
     </div>}
   </section>;
 }

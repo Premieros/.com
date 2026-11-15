@@ -3,6 +3,7 @@ import { BellRing, ReceiptText, RefreshCw } from 'lucide-react';
 import { qrPublic } from '@/api/domains/qrPublic';
 import type { GuestTracking } from './service';
 import { qrError } from './errors';
+import { GuestRatingPanel } from './GuestRatingPanel';
 
 const requestLabels: Record<string,string> = { pending: 'بانتظار اعتماد الموظف', accepted: 'تم اعتماد الطلب', rejected: 'لم يُعتمد الطلب' };
 const kitchenLabels: Record<string,string> = { pending: 'بانتظار الإرسال للمطبخ', sent: 'أُرسل للمطبخ', cooking: 'قيد التحضير', ready: 'جاهز للتقديم', served: 'تم التقديم', cancelled: 'أُلغي التحضير' };
@@ -44,6 +45,8 @@ export function GuestVisitPanel({ token, session, table, currency, tracking, err
    <button disabled={busy||!!pending.current||(secure ? !active : (!active&&!table))||tracking.calls.some(c=>c.kind==='service'&&c.status!=='done')} onClick={()=>void requestService('service')}><BellRing size={20}/>طلب خدمة</button>
    <button disabled={busy||!!pending.current||!active||tracking.calls.some(c=>c.kind==='check'&&c.status!=='done')} onClick={()=>void requestService('check')}><ReceiptText size={20}/>طلب الشيك</button>
   </div>{!active&&<p className="customer-table-hint">طلب الشيك يتاح بعد اعتماد طلبك وفتح حسابك.</p>}{tracking.calls.map(c=><p className="customer-call-state" key={c.id}><strong>{c.kind==='check'?'طلب الشيك':'طلب خدمة'} · {c.table_name}</strong><span>{callLabels[c.status]}</span>{c.note&&<small>{c.note}</small>}</p>)}</div>
+  {secure && tracking.requests.some(request => request.status === 'accepted') &&
+    <GuestRatingPanel token={token} session={session} />}
   {!secure&&!outstanding&&(tracking.requests.length>0||error.includes('انتهت'))&&<button className="customer-refresh" disabled={busy} onClick={newVisit}>بدء زيارة جديدة على هذا الجهاز</button>}
  </section>;
 }
