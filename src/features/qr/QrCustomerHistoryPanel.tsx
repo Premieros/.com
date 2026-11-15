@@ -8,13 +8,9 @@ import { useSettings } from '@/context/SettingsContext';
 import { formatCurrency } from '@/lib/format';
 import { qrError } from './errors';
 import type { QrCustomerHistory } from './service';
+import { sortQrCustomersByPurchases } from './qrCustomerRanking';
 import { StaffGuestVisits } from './StaffGuestVisits';
 import { StaffGuestRatings } from './StaffGuestRatings';
-
-export function sortQrCustomersByPurchases(rows: QrCustomerHistory[]): QrCustomerHistory[] {
-  return [...rows].sort((a, b) => Number(b.total_spent || 0) - Number(a.total_spent || 0)
-    || a.name.localeCompare(b.name, 'ar') || a.id.localeCompare(b.id));
-}
 
 /** QR guest profiles are kept distinct from ordinary CRM contacts until identity is verified. */
 export function QrCustomerHistoryPanel() {
