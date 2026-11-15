@@ -18,6 +18,7 @@
 | POS printing | Cashier area / second station settings | BLOCKED | Source UI requires `get_cashier_area_settings` and `save_cashier_area_settings`; missing in Premier target database during read-only check; design Premier-native branch-scoped permissions and routing before enabling |
 | POS printing | Manual delayed-ticket print recovery | REVIEW | Reference flow depends on print recovery RPCs, job claiming, anti-duplicate safeguards and `pos.print_recovery`; preserve fail-closed behavior |
 | Reports | Search, reorder and persist report columns | DONE | Integrated with Premier's native ReportsPage, visible column controls, Excel/CSV/print projection and disabled empty-selection exports; unit tests included |
+| Reports | Semantic summary metrics and basis disclosures | DONE | Adapted report-specific labels from reference for existing Premier report types; inventory quantity/group counts no longer render with currency formatting; tests added |
 | Reports | Reporting dashboard and filters | REVIEW | Draft PR #160 exists; compare against current Premier reports before cherry-picking |
 | Reports | Month/period close, consumption reports, exports | REVIEW | Source components may have different schema/permissions; match Premier native report loaders |
 | Inventory | Branch/warehouse stock, transfer and valuation gaps | REVIEW | Preserve Premier atomic counting and branch isolation |
