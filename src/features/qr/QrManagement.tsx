@@ -3,9 +3,10 @@ import { supabase } from '@/api';
 import { qr } from '@/api/domains/qr';
 import type { DiningTable } from '@/lib/types';
 import { qrError } from './service';
+import { printCustomerOrderQr } from './printCustomerOrderQr';
 
 interface MenuChoice { id: string; name: string; sale_price: number }
-export function QrManagement({ branchId, tables }: { branchId: string; tables: DiningTable[] }) {
+export function QrManagement({ branchId, tables, brandName }: { branchId: string; tables: DiningTable[]; brandName?: string }) {
   const [products, setProducts] = useState<MenuChoice[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [tableId, setTableId] = useState('');
@@ -49,8 +50,15 @@ export function QrManagement({ branchId, tables }: { branchId: string; tables: D
       setMessage(enabled ? 'رمز جديد جاهز. استبدل الرمز المطبوع السابق؛ لم يعد صالحًا.' : 'تم تعطيل رابط الطاولة.');
     } catch (failure) { setMessage(qrError(failure)); } finally { setBusy(false); }
   }
+  const selectedTableName = tables.find(table => table.id === tableId && table.branch_id === branchId)?.name || 'طاولة';
+  function printQr() {
+    if (!image || !link || !tableId) return;
+    if (!printCustomerOrderQr({ image, link, tableName: selectedTableName, brandName })) {
+      setMessage('تعذر فتح نافذة الطباعة. اسمح بالنوافذ المنبثقة لهذا الموقع ثم أعد المحاولة.');
+    }
+  }
   return <details dir="rtl" className="rounded border bg-ui-surface p-4">
-    <summary className="cursor-pointer font-bold">إعداد منيو ورموز QR</summary>
+    <summary className="cursor-pointer font-bold">إعداد المنيو وإنشاء رموز QR للطباعة</summary>
     <p className="my-2">نشر الأصناف يستبدل قائمة منيو الفرع بالكامل. اختر القائمة كاملة قبل الحفظ.</p>
     <div className="my-3 grid max-h-60 gap-2 overflow-auto sm:grid-cols-2">{products.map(p => <label key={p.id}>
       <input type="checkbox" checked={selected.includes(p.id)} disabled={busy} onChange={e => setSelected(ids => e.target.checked ? [...ids, p.id] : ids.filter(id => id !== p.id))} /> {p.name} · {Number(p.sale_price).toFixed(2)}
@@ -59,10 +67,18 @@ export function QrManagement({ branchId, tables }: { branchId: string; tables: D
     <label className="my-3 block">الطاولة <select value={tableId} disabled={busy} className="rounded border p-2" onChange={e => { setTableId(e.target.value); setImage(''); setLink(''); }}>
       <option value="">اختر طاولة</option>{tables.filter(t => t.branch_id === branchId).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
     </select></label>
-    <div className="flex gap-4"><button disabled={!tableId || busy} onClick={() => void rotate(true)}>إنشاء / استبدال رمز QR</button>
+    <div className="flex flex-wrap gap-4"><button disabled={!tableId || busy} onClick={() => void rotate(true)}>إنشاء / استبدال رمز QR</button>
       <button disabled={!tableId || busy} onClick={() => void rotate(false)}>تعطيل الرمز</button></div>
     {message && <p role="status" className="my-3">{message}</p>}
-    {image && <div><img src={image} width={300} height={300} alt="رمز منيو الطاولة" /><a download={`premier-table-${tableId}.png`} href={image}>تحميل رمز الطاولة</a>
-      <a className="mx-4" href={link} target="_blank" rel="noreferrer">فتح المنيو</a></div>}
+    {image && <div className="mt-4 space-y-3 rounded-xl border border-ui-border p-4">
+      <p className="font-bold">رمز طلب العملاء — {selectedTableName}</p>
+      <img src={image} width={300} height={300} alt={`رمز QR لطلب العملاء في ${selectedTableName}`} />
+      <div className="flex flex-wrap items-center gap-4">
+        <button type="button" className="rounded-xl bg-ui-primary px-5 py-3 text-white" onClick={printQr}>طباعة رمز QR</button>
+        <a download={`premier-table-${tableId}.png`} href={image} className="underline">تحميل الرمز PNG</a>
+        <a href={link} target="_blank" rel="noreferrer" className="underline">فتح المنيو</a>
+      </div>
+      <p className="text-sm text-ui-subtle">تُطبع بطاقة باسم الطاولة ورمز مسح للعميل. يمكنك طباعة البطاقة أكثر من مرة دون استبدال الرمز. إنشاء رمز جديد لهذه الطاولة يلغي صلاحية الرمز المطبوع القديم.</p>
+    </div>}
   </details>;
 }
