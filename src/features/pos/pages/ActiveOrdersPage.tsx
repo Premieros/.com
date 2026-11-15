@@ -66,6 +66,7 @@ export function ActiveOrdersPage() {
   const [mainAreaCountSaving, setMainAreaCountSaving] = useState(false);
 
   const [areaName, setAreaName] = useState('');
+  const [newAreaTableCount, setNewAreaTableCount] = useState('0');
   const [tableForm, setTableForm] = useState({
     name: '', capacity: 4, area_id: '', x: 0, y: 0, w: 120, h: 80,
   });
@@ -220,6 +221,7 @@ export function ActiveOrdersPage() {
   const openCreateArea = () => {
     setAreaTarget(null);
     setAreaName('');
+    setNewAreaTableCount('0');
     setAreaModal(true);
   };
 
@@ -244,12 +246,17 @@ export function ActiveOrdersPage() {
       show(isAr ? 'توجد منطقة بنفس الاسم في هذا الفرع.' : 'An area with this name already exists in this branch.', 'error');
       return;
     }
+    const count = Number(newAreaTableCount);
+    if (!areaTarget && (newAreaTableCount.trim() === '' || !Number.isInteger(count) || count < 0 || count > 100)) {
+      show(isAr ? 'أدخل عدد طاولات صحيحًا من 0 إلى 100.' : 'Enter a whole table count from 0 to 100.', 'error');
+      return;
+    }
     if (areaSaving) return;
     setAreaSaving(true);
     try {
       const { data, error: saveError } = areaTarget
         ? await api.floorPlan.renameArea({ p_area_id: areaTarget.id, p_name: name })
-        : await api.floorPlan.createArea({ p_branch_id: effectiveBranch, p_name: name });
+        : await api.floorPlan.createAreaWithTables({ p_branch_id: effectiveBranch, p_name: name, p_table_count: count });
       if (saveError) {
         show(userFacingErrorMessage(saveError, isAr ? 'ar' : 'en'), 'error');
         return;
@@ -264,7 +271,7 @@ export function ActiveOrdersPage() {
         show(message, 'error');
         return;
       }
-      show(isAr ? (areaTarget ? 'تم تحديث اسم المنطقة.' : 'تم إنشاء المنطقة. أضف الطاولات إليها.') : (areaTarget ? 'Area renamed.' : 'Area created. You can now add tables.'), 'success');
+      show(isAr ? (areaTarget ? 'تم تحديث اسم المنطقة.' : `تم إنشاء المنطقة مع ${count} طاولة.`) : (areaTarget ? 'Area renamed.' : `Area created with ${count} tables.`), 'success');
       setAreaModal(false);
       setAreaTarget(null);
       setAreaName('');
@@ -685,6 +692,11 @@ export function ActiveOrdersPage() {
             />
             <p className="mt-1.5 text-xs text-ui-muted">{isAr ? 'تظهر المنطقة فورًا ويمكنك إضافة الطاولات إليها لاحقًا.' : 'Areas appear immediately; tables can be added later.'}</p>
           </div>
+          {!areaTarget && <div>
+            <label htmlFor="floor-area-table-count" className="block text-sm font-medium text-ui-muted mb-1.5">{isAr ? 'عدد الطاولات عند إنشاء المنطقة (0–100)' : 'Number of tables to create (0–100)'}</label>
+            <input id="floor-area-table-count" data-testid="floor-area-table-count" type="number" min={0} max={100} step={1} value={newAreaTableCount} onChange={event => setNewAreaTableCount(event.target.value)} disabled={areaSaving} className="w-full px-3 py-2.5 rounded-xl border border-ui-border bg-ui-surface-raised text-sm text-ui-text" />
+            <p className="mt-1.5 text-xs text-ui-muted">{isAr ? 'إنشاء المنطقة والطاولات في عملية واحدة. أدخل صفرًا لمنطقة فارغة.' : 'The area and its tables are created atomically. Enter zero for an empty area.'}</p>
+          </div>}
           <Button data-testid="floor-area-save" type="submit" className="w-full" disabled={areaSaving || !areaName.trim() || !effectiveBranch}>
             {areaSaving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (areaTarget ? (isAr ? 'حفظ التعديل' : 'Save changes') : (isAr ? 'إنشاء المنطقة' : 'Create area'))}
           </Button>

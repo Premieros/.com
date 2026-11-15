@@ -371,6 +371,14 @@
       ]
     },
     {
+      "name": "floor_plan_create_area_with_tables",
+      "params": [
+        "branch_id",
+        "name",
+        "table_count"
+      ]
+    },
+    {
       "name": "floor_plan_delete_area",
       "params": [
         "area_id"
