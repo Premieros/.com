@@ -657,7 +657,12 @@ export function PosWorkspacePage() {
       }
       if (!(data as RpcResult | null)?.success) {
         const response = data as RpcResult | null;
-        show(userFacingErrorMessage(response ?? t('error'), isAr ? 'ar' : 'en'), 'error');
+        const message = response?.error === 'SENT_ORDER_CANCEL_REQUIRES_CONTROLLED_VOID'
+          ? (isAr
+            ? 'يوجد صنف أُرسل للمطبخ. استخدم إلغاء الصنف المرسل (Void) أولًا، ثم ألغِ الطلب لتحرير الطاولة.'
+            : 'This order has kitchen-sent items. Void those items through the controlled flow before cancelling the order and releasing the table.')
+          : userFacingErrorMessage(response ?? t('error'), isAr ? 'ar' : 'en');
+        show(message, 'error');
         return false;
       }
       show(t('cancelOrder'), 'success');
