@@ -17,6 +17,7 @@ import { useBranchFilter } from '@/lib/useBranchFilter';
 import { useCan } from '@/lib/permissions';
 import type { ArAgingRow } from '@/lib/types';
 import { EmployeeReceivableDetailPage } from './EmployeeReceivableDetailPage';
+import { EmployeeReceivablesAsOfPanel } from '../components/EmployeeReceivablesAsOfPanel';
 
 type EmployeeCustomer = {
   id: string;
@@ -60,6 +61,7 @@ export function EmployeeReceivablesPage() {
   const [rows, setRows] = useState<EmployeeReceivableRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [showHistoricalBalances, setShowHistoricalBalances] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -216,6 +218,15 @@ export function EmployeeReceivablesPage() {
         </div>
       </DesignPanel>
 
+      {effectiveBranchId && can('accounts.view') && <>
+        <button type="button" onClick={() => setShowHistoricalBalances(value => !value)}
+          aria-expanded={showHistoricalBalances}
+          className="rounded-lg border border-ui-border bg-ui-surface px-4 py-2 text-sm font-semibold text-ui-primary">
+          {ar ? (showHistoricalBalances ? 'إخفاء أرصدة الموظفين التاريخية' : 'أرصدة الموظفين بتاريخ محدد')
+            : (showHistoricalBalances ? 'Hide historical balances' : 'Employee balances as of date')}
+        </button>
+        {showHistoricalBalances && <EmployeeReceivablesAsOfPanel key={effectiveBranchId} branchId={effectiveBranchId} />}
+      </>}
       {!effectiveBranchId ? <DesignPanel><div className="py-8 text-center text-sm text-ui-muted">{ar ? 'اختر الفرع لعرض ذمم الموظفين.' : 'Select a branch to view employee receivables.'}</div></DesignPanel> : <DesignPanel><DataTable columns={columns} data={filtered} loading={loading} emptyMessage={ar ? 'لا توجد حسابات موظفين' : 'No employee accounts'} /></DesignPanel>}
 
       <Modal open={employeeModalOpen} onClose={() => setEmployeeModalOpen(false)} title={ar ? 'إضافة موظف' : 'Add Employee'}>
