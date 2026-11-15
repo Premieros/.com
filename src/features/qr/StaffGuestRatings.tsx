@@ -33,7 +33,7 @@ export function StaffGuestRatings({ branchId }: { branchId: string }) {
           className="rounded border border-ui-border p-2" onClick={() => setRevision(n => n + 1)}>
           <RefreshCw size={16} /></button>
       </div>
-      {loading && <p role="status">جارٍ تحميل التقييمات…</p>}
+      {loading && <p>جارٍ تحميل التقييمات…</p>}
       {error && <p role="alert" className="text-ui-danger">{error}</p>}
       {state && !loading && <>
         <p className="inline-flex items-center gap-2 font-semibold">
