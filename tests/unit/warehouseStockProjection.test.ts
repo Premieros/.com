@@ -100,4 +100,36 @@ describe('warehouse-scoped offline inventory', () => {
       lastSyncedAt:new Date(NOW+6*60*1000).toISOString()}]}))
       .toEqual({status:'unknown',reason:'WAREHOUSE_STOCK_SNAPSHOT_STALE'});
   });
+
+  it('fails closed when a queued product quantity is missing, invalid or nonpositive', () => {
+    for (const quantity of [undefined, null, '', 'not-a-number', Number.POSITIVE_INFINITY, -2, 0]) {
+      const malformed = sale('bad-quantity', 'warehouse-a', 2);
+      malformed.payload.p_items = [{ product_id: 'product-1', quantity }] as typeof malformed.payload.p_items;
+      expect(check({balances:[snap('warehouse-a', 15)],sales:[malformed]}))
+        .toEqual({status:'unknown',reason:'UNSCOPED_QUEUED_SALE'});
+    }
+  });
+
+  it('fails closed on a malformed warehouse binding for a matching queued product', () => {
+    const malformed = sale('bad-warehouse', 'warehouse-a', 2);
+    malformed.payload.p_warehouse_id = { unexpected: 'warehouse' } as unknown as string;
+    expect(check({balances:[snap('warehouse-a', 15)],sales:[malformed]}))
+      .toEqual({status:'unknown',reason:'UNSCOPED_QUEUED_SALE'});
+  });
+
+  it('fails closed on corrupt movement quantities instead of omitting local deductions', () => {
+    for (const quantityDelta of [Number.NaN, Number.POSITIVE_INFINITY, undefined, 'invalid']) {
+      const bad = {...movement('bad-movement', 'warehouse-a', 2),
+        quantityDelta: quantityDelta as number};
+      expect(check({balances:[snap('warehouse-a', 15)],movements:[bad]}))
+        .toEqual({status:'unknown',reason:'UNSCOPED_LOCAL_MOVEMENT'});
+    }
+  });
+
+  it('does not block valid warehouse quantities due to unrelated product sales', () => {
+    const unrelated = sale('other-product', null, 3);
+    unrelated.payload.p_items = [{product_id:'product-2',quantity:'invalid'}] as typeof unrelated.payload.p_items;
+    expect(check({balances:[snap('warehouse-a', 15)],sales:[unrelated]}))
+      .toEqual({status:'known',quantity:15,snapshotAt:new Date(NOW).toISOString()});
+  });
 });
