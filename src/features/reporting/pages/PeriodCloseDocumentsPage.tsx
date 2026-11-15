@@ -16,7 +16,7 @@ const DOCUMENT_REPORTS = [
   { key: 'purchases', ar: 'مستندات المشتريات', en: 'Purchase documents' },
   { key: 'expenses', ar: 'مستندات المصروفات', en: 'Expense documents' },
   { key: 'returns', ar: 'مرتجعات المبيعات', en: 'Sales returns' },
-  { key: 'inventory_movement', ar: 'حركة المخزون', en: 'Inventory movement' },
+  { key: 'raw_material_consumption', ar: 'حركة واستهلاك الخامات', en: 'Raw material movements' },
 ] as const satisfies readonly { key: ReportType; ar: string; en: string }[];
 
 /** Documents for review: live Premier report loaders, not a snapshot or ledger close. */
