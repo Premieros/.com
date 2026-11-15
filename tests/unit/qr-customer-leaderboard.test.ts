@@ -5,7 +5,7 @@ import type { QrCustomerHistory } from '../../src/features/qr/service';
 const make = (id: string, total_spent: number): QrCustomerHistory => ({
   id, branch_id: 'branch-a', name: id, phone: '',
   total_spent, purchase_count: 1, rating_count: 0, average_rating: null,
-  orders: [], ratings: [],
+  orders: [], ratings: [], service_history: [],
 });
 
 describe('QR customer purchase leaderboard', () => {
