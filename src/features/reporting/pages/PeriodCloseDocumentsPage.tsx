@@ -10,14 +10,7 @@ import { REPORT_REGISTRY } from '../reportRegistry';
 import { ReportsPage } from './ReportsPage';
 import { monthReviewPeriod } from '../monthCloseReview';
 import type { ReportType } from '../reportFilters';
-
-const DOCUMENT_REPORTS = [
-  { key: 'detailed_invoices', ar: 'فواتير البيع التفصيلية', en: 'Detailed sales invoices' },
-  { key: 'purchases', ar: 'مستندات المشتريات', en: 'Purchase documents' },
-  { key: 'expenses', ar: 'مستندات المصروفات', en: 'Expense documents' },
-  { key: 'returns', ar: 'مرتجعات المبيعات', en: 'Sales returns' },
-  { key: 'raw_material_consumption', ar: 'حركة واستهلاك الخامات', en: 'Raw material movements' },
-] as const satisfies readonly { key: ReportType; ar: string; en: string }[];
+import { PERIOD_REVIEW_PERIOD_REVIEW_DOCUMENT_REPORTS } from '../periodReviewDocuments';
 
 /** Documents for review: live Premier report loaders, not a snapshot or ledger close. */
 export function PeriodCloseDocumentsPage() {
@@ -35,7 +28,7 @@ export function PeriodCloseDocumentsPage() {
   const allowed = period ? history.clampRange(period.from, period.to) : null;
   const allowedFullMonth = !!period && allowed?.from === period.from && allowed?.to === period.to;
 
-  const permitted = DOCUMENT_REPORTS.filter(item => {
+  const permitted = PERIOD_REVIEW_DOCUMENT_REPORTS.filter(item => {
     const report = REPORT_REGISTRY.find(candidate => candidate.key === item.key);
     return !!report && report.permissions.every(permission => can(permission as Permission))
       && businessReportAllowed(runtime, report.key, report.category);
