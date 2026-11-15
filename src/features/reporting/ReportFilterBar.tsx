@@ -35,6 +35,10 @@ export interface ReportFilterBarProps {
   count: number;
   currency: string;
   lang: Language;
+  totalLabel?: string;
+  countLabel?: string;
+  totalIsQuantity?: boolean;
+  summaryNote?: string;
   financialTypes?: Array<{ key: string; label: string }>;
   canFinancial?: boolean;
   onFinancialSelect?: (key: string) => void;
@@ -68,6 +72,10 @@ export function ReportFilterBar({
   count,
   currency,
   lang,
+  totalLabel,
+  countLabel,
+  totalIsQuantity = false,
+  summaryNote,
   financialTypes = [],
   canFinancial = false,
   onFinancialSelect,
@@ -196,13 +204,14 @@ export function ReportFilterBar({
         <div className="flex flex-col gap-2 border-t border-ui-border pt-2 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-2 text-xs">
             <div className="rounded-lg border border-ui-border bg-ui-page-alt px-3 py-1.5">
-              <span className="text-ui-muted">{t('total')}: </span>
-              <span className="font-extrabold tabular-nums text-ui-accent">{formatFinancialCurrency(total, currency, lang)}</span>
+              <span className="text-ui-muted">{totalLabel || t('total')}: </span>
+              <span className="font-extrabold tabular-nums text-ui-accent">{totalIsQuantity ? new Intl.NumberFormat(lang === 'ar' ? 'ar-EG' : 'en-GB', { maximumFractionDigits: 3 }).format(total) : formatFinancialCurrency(total, currency, lang)}</span>
             </div>
             <div className="rounded-lg border border-ui-border bg-ui-page-alt px-3 py-1.5">
-              <span className="text-ui-muted">{t('count')}: </span>
+              <span className="text-ui-muted">{countLabel || t('count')}: </span>
               <span className="font-extrabold tabular-nums text-ui-text">{count}</span>
             </div>
+            {summaryNote && <p className="basis-full w-full text-xs text-ui-muted" role="note">{summaryNote}</p>}
             {pendingChanges && (
               <span className="rounded-lg border border-ui-warning/30 bg-ui-warning-soft px-3 py-1.5 font-semibold text-ui-warning">
                 {lang === 'ar' ? 'تم تعديل الفلاتر — اضغط عرض التقرير' : 'Filters changed — run the report'}
