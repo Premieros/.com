@@ -20,6 +20,43 @@ async function open() {
  return { completed, close, qty: screen.getByLabelText('Transfer quantity Water'), button: screen.getByRole('button', { name: 'Move selected' }) };
 }
 describe('partial item transfer form', () => {
+ it('moves one or multiple selected saved items in one atomic command with distinct exact quantities', async () => {
+  const secondSaved = { ...saved, id: 'line-2', product_id: 'juice', quantity: 5, unit_price: 15, notes: 'no ice' } as OrderItem;
+  const secondItem = { ...item, product: { id: 'juice', name: 'Juice' }, order_item_id: 'line-2', quantity: 5 } as CartItem;
+  const onCompleted = vi.fn();
+  m.move.mockResolvedValue({ data: { ...success, quantity_transfers: [
+    { source_item_id: 'line-1', moved_item_id: 'new-water', quantity: 1 },
+    { source_item_id: 'line-2', moved_item_id: 'new-juice', quantity: 3 },
+  ] }, error: null });
+  render(<TransferItemsModal open onClose={vi.fn()}
+    lines={[{ item, orderItemId: saved.id, saved }, { item: secondItem, orderItemId: secondSaved.id, saved: secondSaved }]}
+    orderId="order-1" sourceTable={table} onCompleted={onCompleted} />);
+  fireEvent.click(await screen.findByTestId('transfer-items-target-target'));
+  fireEvent.change(screen.getByLabelText('Transfer quantity Water'), { target: { value: '1' } });
+  fireEvent.change(screen.getByLabelText('Transfer quantity Juice'), { target: { value: '3' } });
+  fireEvent.click(screen.getByRole('button', { name: 'Move selected' }));
+  await waitFor(() => expect(onCompleted).toHaveBeenCalledTimes(1));
+  expect(m.move).toHaveBeenCalledTimes(1);
+  const command = m.move.mock.calls[0][0];
+  expect(command.p_order_item_ids).toEqual(['line-1', 'line-2']);
+  expect(command.p_transfer.quantities).toEqual([
+    expect.objectContaining({ order_item_id: 'line-1', quantity: 1, expected: expect.objectContaining({ product_id: 'water', quantity: 3 }) }),
+    expect.objectContaining({ order_item_id: 'line-2', quantity: 3, expected: expect.objectContaining({ product_id: 'juice', quantity: 5, notes: 'no ice' }) }),
+  ]);
+  expect(command.p_transfer.operation_id).toEqual(expect.any(String));
+ });
+ it('rejects invalid second-line quantity without submitting any of the selected items', async () => {
+  const secondSaved = { ...saved, id: 'line-2', product_id: 'juice', quantity: 2 } as OrderItem;
+  const secondItem = { ...item, product: { id: 'juice', name: 'Juice' }, order_item_id: 'line-2', quantity: 2 } as CartItem;
+  render(<TransferItemsModal open onClose={vi.fn()}
+    lines={[{ item, orderItemId: saved.id, saved }, { item: secondItem, orderItemId: secondSaved.id, saved: secondSaved }]}
+    orderId="order-1" sourceTable={table} onCompleted={vi.fn()} />);
+  fireEvent.click(await screen.findByTestId('transfer-items-target-target'));
+  fireEvent.change(screen.getByLabelText('Transfer quantity Juice'), { target: { value: '3' } });
+  expect(screen.getByRole('button', { name: 'Move selected' })).toBeDisabled();
+  expect(m.move).not.toHaveBeenCalled();
+ });
+
  it('sends the chosen one from three with exact saved identity, and submits once while pending', async () => {
   let resolve!: (value: unknown) => void; m.move.mockImplementation(() => new Promise((r) => { resolve = r; }));
   const { qty, button, completed } = await open(); fireEvent.change(qty, { target: { value: '1' } });

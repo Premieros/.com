@@ -113,6 +113,167 @@ describe('partial table transfer against the full schema and actual guards', () 
   expect((await client.query(`SELECT count(*)::int n FROM public.inventory_ledger`)).rows[0].n).toBe(ledgerBefore);
   expect((await client.query(`SELECT count(*)::int n FROM public.audit_log WHERE id=$1`,[payload.operation_id])).rows[0].n).toBe(1);
  });
+ it('transfers a whole order only to a vacant table, preserving kitchen rows and source/target states', async () => {
+  await client.query("UPDATE public.roles SET permissions=(COALESCE(permissions,'[]'::jsonb)||'[\"approvals.review\",\"pos.order.transfer\"]'::jsonb) WHERE role='branch_manager'");
+  const occupied = await runAsPersist(client,ids.users.branch_manager,
+    'SELECT public.transfer_order_to_table($1,$2) result',[source,targetTable]);
+  expect(occupied.error?.message).toBeUndefined();
+  expect(occupied.rows[0].result).toMatchObject({success:false,error:'TARGET_TABLE_OCCUPIED'});
+  const vacant=(await client.query(
+    "INSERT INTO public.dining_tables(branch_id,name,status) VALUES($1,$2,'vacant') RETURNING id",
+    [ids.branchA,`whole-target-${randomUUID()}`])).rows[0].id;
+  const originalTable=(await client.query('SELECT table_id FROM public.orders WHERE id=$1',[source])).rows[0].table_id;
+  const sendsBefore=(await client.query('SELECT order_id,order_item_id,sent_quantity FROM public.order_kitchen_sends WHERE order_id=$1',[source])).rows;
+  const stockBefore=(await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n;
+  const transferred=await runAsPersist(client,ids.users.branch_manager,
+    'SELECT public.transfer_order_to_table($1,$2) result',[source,vacant]);
+  expect(transferred.error?.message).toBeUndefined();
+  expect(transferred.rows[0].result).toMatchObject({success:true,source_table_id:originalTable,target_table_id:vacant});
+  expect((await client.query('SELECT table_id FROM public.orders WHERE id=$1',[source])).rows[0].table_id).toBe(vacant);
+  expect((await client.query('SELECT status FROM public.dining_tables WHERE id=$1',[originalTable])).rows[0].status).toBe('vacant');
+  expect((await client.query('SELECT status FROM public.dining_tables WHERE id=$1',[vacant])).rows[0].status).toBe('occupied');
+  expect((await client.query('SELECT order_id,order_item_id,sent_quantity FROM public.order_kitchen_sends WHERE order_id=$1',[source])).rows).toEqual(sendsBefore);
+  expect((await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n).toBe(stockBefore);
+ });
+
+ it('rejects merging kitchen-sent source, then merges unsent lines with no second inventory or KDS event', async () => {
+  await client.query("UPDATE public.roles SET permissions=(COALESCE(permissions,'[]'::jsonb)||'[\"approvals.review\"]'::jsonb) WHERE role='branch_manager'");
+  const merge = () => runAsPersist(client,ids.users.branch_manager,
+    'SELECT public.perform_pos_order_action($1,$2,$3::jsonb,$4) result',
+    ['merge_order',source,JSON.stringify({target_order_id:target,target_table_id:targetTable}),'Combine two orders']);
+  const sent=await merge();
+  expect(sent.error?.message).toBeUndefined();
+  expect(sent.rows[0].result).toMatchObject({success:false,error:'SOURCE_HAS_SENT_ITEMS'});
+  await client.query('DELETE FROM public.order_kitchen_inventory_events WHERE order_id=$1',[source]);
+  await client.query('DELETE FROM public.order_kitchen_sends WHERE order_id=$1',[source]);
+  const stockBefore=(await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n;
+  const targetSendBefore=(await client.query('SELECT count(*)::int n FROM public.order_kitchen_sends WHERE order_id=$1',[target])).rows[0].n;
+  const merged=await merge();
+  expect(merged.error?.message).toBeUndefined();
+  expect(merged.rows[0].result,JSON.stringify(merged.rows[0].result)).toMatchObject({success:true,action:'merge_order',source_order_id:source,target_order_id:target,inventory_changed:false,kds_changed:false});
+  expect((await client.query('SELECT status FROM public.orders WHERE id=$1',[source])).rows[0].status).toBe('cancelled');
+  expect((await client.query('SELECT count(*)::int n FROM public.order_items WHERE order_id=$1',[source])).rows[0].n).toBe(0);
+  expect((await client.query('SELECT count(*)::int n FROM public.order_items WHERE order_id=$1',[target])).rows[0].n).toBe(2);
+  expect((await client.query('SELECT count(*)::int n FROM public.order_kitchen_sends WHERE order_id=$1',[target])).rows[0].n).toBe(targetSendBefore);
+  expect((await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n).toBe(stockBefore);
+ });
+
+ it('separates one unsent item quantity into a new quick order while conserving total and never re-sending kitchen', async () => {
+  await client.query("UPDATE public.roles SET permissions=(COALESCE(permissions,'[]'::jsonb)||'[\"approvals.review\"]'::jsonb) WHERE role='branch_manager'");
+  const split=()=>runAsPersist(client,ids.users.branch_manager,
+    'SELECT public.perform_pos_order_action($1,$2,$3::jsonb,$4) result',
+    ['split_order',source,JSON.stringify({order_item_id:line,quantity:1,target_kind:'quick',target_table_id:null}),'Separate single item']);
+  const sent=await split();
+  expect(sent.error?.message).toBeUndefined();
+  expect(sent.rows[0].result).toMatchObject({success:false,error:'ITEM_ALREADY_SENT'});
+  await client.query('DELETE FROM public.order_kitchen_inventory_events WHERE order_id=$1',[source]);
+  await client.query('DELETE FROM public.order_kitchen_sends WHERE order_id=$1',[source]);
+  const before=(await client.query('SELECT sum(total)::float8 v FROM public.orders WHERE id=ANY($1::uuid[])',[[source,target]])).rows[0].v;
+  const stockBefore=(await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n;
+  const result=await split();
+  expect(result.error?.message).toBeUndefined();
+  expect(result.rows[0].result,JSON.stringify(result.rows[0].result)).toMatchObject({success:true,action:'split_order',source_order_id:source,inventory_changed:false,kds_changed:false});
+  const newOrder=result.rows[0].result.target_order_id;
+  expect(newOrder).not.toBe(source);
+  expect((await client.query('SELECT order_type,status FROM public.orders WHERE id=$1',[newOrder])).rows[0]).toMatchObject({order_type:'takeaway',status:'open'});
+  expect((await client.query('SELECT quantity::float8 q FROM public.order_items WHERE id=$1',[line])).rows[0].q).toBe(2);
+  expect((await client.query('SELECT sum(quantity)::float8 q FROM public.order_items WHERE order_id=$1',[newOrder])).rows[0].q).toBe(1);
+  const after=(await client.query('SELECT sum(total)::float8 v FROM public.orders WHERE id=ANY($1::uuid[])',[[source,target,newOrder]])).rows[0].v;
+  expect(after).toBe(before);
+  expect((await client.query('SELECT count(*)::int n FROM public.order_kitchen_sends WHERE order_id=$1',[newOrder])).rows[0].n).toBe(0);
+  expect((await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n).toBe(stockBefore);
+ });
+
+ it('moves two distinct selected lines atomically, preserves quantities and kitchen/inventory totals, and replays once', async () => {
+  // The fixture starts with manually seeded totals. Make its fiscal policy
+  // explicit before comparing pre/post totals; otherwise a transfer rightly
+  // recalculates tax under the branch's default rate and gives a false alarm.
+  await client.query(
+    'INSERT INTO public.branch_settings(branch_id,tax_enabled,tax_rate) VALUES($1,false,0) ON CONFLICT(branch_id) DO UPDATE SET tax_enabled=false,tax_rate=0',
+    [ids.branchA],
+  );
+  const extra = (await client.query(
+   "INSERT INTO public.order_items(order_id,product_id,quantity,unit_price,total,notes) VALUES($1,$2,2,20,40,'second line') RETURNING id",
+   [source,productId],
+  )).rows[0].id as string;
+  const extraSend = (await client.query(
+   'INSERT INTO public.order_kitchen_sends(branch_id,order_id,order_item_id,sent_quantity,sent_by) VALUES($1,$2,$3,2,$4) RETURNING id',
+   [ids.branchA,source,extra,ids.users.branch_manager],
+  )).rows[0].id as string;
+  await client.query(
+   'INSERT INTO public.order_kitchen_inventory_events(branch_id,warehouse_id,order_id,order_item_id,kitchen_send_id,sent_quantity,total_cost,created_by) VALUES($1,$2,$3,$4,$5,2,6,$6)',
+   [ids.branchA,ids.whA,source,extra,extraSend,ids.users.branch_manager],
+  );
+  await client.query('UPDATE public.orders SET subtotal=100,discount_amount=6,tax_amount=0,total=94 WHERE id=$1',[source]);
+  // The second seed order retained a 15%-tax total from the default fixture;
+  // normalize both original orders before asserting monetary conservation.
+  await client.query('UPDATE public.orders SET subtotal=20,discount_amount=0,tax_amount=0,total=20 WHERE id=$1',[target]);
+  const balancesBefore = (await client.query(
+   "SELECT sum(subtotal)::float8 subtotal,sum(discount_amount)::float8 discount,sum(total)::float8 total FROM public.orders WHERE id=ANY($1::uuid[])",
+   [[source,target]],
+  )).rows[0];
+  const sendsBefore = (await client.query(
+   'SELECT sum(sent_quantity)::float8 quantity FROM public.order_kitchen_sends WHERE order_id=ANY($1::uuid[])',
+   [[source,target]],
+  )).rows[0].quantity;
+  const eventsBefore = (await client.query(
+   'SELECT count(*)::int count,sum(total_cost)::float8 cost FROM public.order_kitchen_inventory_events WHERE order_id=ANY($1::uuid[])',
+   [[source,target]],
+  )).rows[0];
+  const ledgerBefore = (await client.query('SELECT count(*)::int count FROM public.inventory_ledger')).rows[0].count;
+  const extraExpected = (await client.query(
+   "SELECT jsonb_build_object('quantity',quantity,'product_id',product_id,'unit_name',unit_name,'unit_price',unit_price,'discount_amount',discount_amount,'bonus_quantity',bonus_quantity,'notes',COALESCE(notes,''),'modifier_option_ids',COALESCE(to_jsonb(modifier_option_ids),'[]')) expected FROM public.order_items WHERE id=$1",
+   [extra],
+  )).rows[0].expected;
+  const payload = { operation_id:randomUUID(), quantities: [
+   { order_item_id:line, quantity:1, expected },
+   { order_item_id:extra, quantity:2, expected:extraExpected },
+  ] };
+  const move = () => runAsPersist(client,ids.users.cashier,
+   'SELECT public.transfer_order_items_to_table($1,$2::uuid[],$3,$4::jsonb) result',
+   [source,[line,extra],targetTable,JSON.stringify(payload)],
+  );
+  const moved = await move();
+  expect(moved.error?.message).toBeUndefined();
+  const result = moved.rows[0].result as PosItemTransferResult;
+  expect(result,JSON.stringify(result)).toMatchObject({ success:true,inventory_changed:false,kds_resent:false });
+  expect(result.quantity_transfers).toHaveLength(2);
+  expect((await client.query('SELECT quantity::float8 quantity FROM public.order_items WHERE id=$1',[line])).rows[0].quantity).toBe(2);
+  // A full-line move may retain the original item ID; any replacement must
+  // still belong to the destination and preserve its exact quantity.
+  const secondMove = result.quantity_transfers!.find(x => x.source_item_id===extra)!;
+  const movedExtra = (await client.query(
+   'SELECT order_id,quantity::float8 quantity FROM public.order_items WHERE id=$1',[secondMove.moved_item_id],
+  )).rows[0];
+  expect(movedExtra).toMatchObject({order_id:target,quantity:2});
+  const balancesAfter = (await client.query(
+   "SELECT sum(subtotal)::float8 subtotal,sum(discount_amount)::float8 discount,sum(total)::float8 total FROM public.orders WHERE id=ANY($1::uuid[])",
+   [[source,target]],
+  )).rows[0];
+  expect(balancesAfter).toEqual(balancesBefore);
+  expect((await client.query(
+   'SELECT sum(sent_quantity)::float8 quantity FROM public.order_kitchen_sends WHERE order_id=ANY($1::uuid[])',
+   [[source,target]],
+  )).rows[0].quantity).toBe(sendsBefore);
+  // Splitting a previously sent line creates one *lineage* event for the
+  // transferred quantity, while conserving the original ingredient cost.
+  const eventsAfter=(await client.query(
+   'SELECT count(*)::int count,sum(total_cost)::float8 cost FROM public.order_kitchen_inventory_events WHERE order_id=ANY($1::uuid[])',
+   [[source,target]],
+  )).rows[0];
+  expect(eventsAfter.cost).toBe(eventsBefore.cost);
+  expect(eventsAfter.count).toBe(eventsBefore.count + 1);
+  const movedPartial=result.quantity_transfers!.find(x=>x.source_item_id===line)!.moved_item_id;
+  const movedLineage=(await client.query(
+   'SELECT transfer_origin_event_id FROM public.order_kitchen_inventory_events WHERE order_item_id=$1',
+   [movedPartial],
+  )).rows;
+  expect(movedLineage).toEqual([expect.objectContaining({transfer_origin_event_id:originalEvent})]);
+  expect((await client.query('SELECT count(*)::int count FROM public.inventory_ledger')).rows[0].count).toBe(ledgerBefore);
+  const replay = await move();
+  expect(replay.rows[0].result).toMatchObject({success:true,replayed:true});
+  expect((await client.query('SELECT count(*)::int count FROM public.audit_log WHERE id=$1',[payload.operation_id])).rows[0].count).toBe(1);
+ });
  it('preserves served quantity and never makes a served transfer pending again', async () => {
   await client.query('INSERT INTO public.order_kitchen_served_quantities(order_id,order_item_id,served_quantity,served_at) VALUES($1,$2,3,now())',[source,line]);
   await client.query("UPDATE public.orders SET kitchen_status='served' WHERE id=$1",[source]);
