@@ -96,7 +96,7 @@ export function Layout({ children }: { children: ReactNode }) {
     return {
       main: false,
       centers: false,
-      catalog: true,
+      catalog: false,
       operations: true,
       people: true,
       finance: true,
@@ -342,13 +342,23 @@ export function Layout({ children }: { children: ReactNode }) {
             const items = grouped[group] ?? [];
             if (!items.length) return null;
             return (
-              <section key={group} data-testid={`nav-group-${group}`} className="mb-2">
-                <button data-testid={`nav-group-toggle-${group}`} type="button" onClick={() => setCollapsed((v) => ({ ...v, [group]: !v[group] }))} className={`flex min-h-9 w-full items-center justify-between rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition text-ui-subtle hover:bg-ui-page-alt hover:text-ui-text`}>
-                  <span>{businessGroupLabel(runtime, group, ar ? 'ar' : 'en', MENU_GROUPS[group][ar ? 'ar' : 'en'])}</span>
-                  <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-150 ${collapsed[group] ? 'rotate-90' : ''}`} />
+              <section key={group} data-testid={`nav-group-${group}`} className="mb-3 border-b border-ui-border/70 pb-2 last:border-b-0">
+                <button
+                  data-testid={`nav-group-toggle-${group}`}
+                  type="button"
+                  onClick={() => setCollapsed((v) => ({ ...v, [group]: !v[group] }))}
+                  aria-expanded={!collapsed[group]}
+                  aria-controls={`nav-group-items-${group}`}
+                  className={`flex min-h-11 w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-xs font-extrabold tracking-wide transition hover:bg-ui-page-alt hover:text-ui-text ${activeMenuGroup === group ? 'text-ui-primary' : 'text-ui-muted'}`}
+                >
+                  <span className="min-w-0 truncate text-start">{businessGroupLabel(runtime, group, ar ? 'ar' : 'en', MENU_GROUPS[group][ar ? 'ar' : 'en'])}</span>
+                  <span className="inline-flex shrink-0 items-center gap-2">
+                    <span className="rounded-md bg-ui-page-alt px-1.5 py-0.5 text-[10px] tabular-nums text-ui-subtle" aria-label={ar ? `${items.length} عناصر` : `${items.length} items`}>{items.length}</span>
+                    <ChevronDown className={`h-4 w-4 transition-transform duration-150 ${collapsed[group] ? (ar ? 'rotate-90' : '-rotate-90') : ''}`} />
+                  </span>
                 </button>
                 {!collapsed[group] && (
-                  <div className="mt-0.5 space-y-0.5">
+                  <div id={`nav-group-items-${group}`} className="mt-1 space-y-1 border-s-2 border-ui-border/60 ps-2">
                     {items.map((item) => (
                       <NavLink
                         data-testid={`nav-item-${item.id}`}
@@ -358,7 +368,8 @@ export function Layout({ children }: { children: ReactNode }) {
                         onFocus={() => prefetchAppRoute(item.route)}
                         onTouchStart={() => prefetchAppRoute(item.route)}
                         onClick={() => setMobileOpen(false)}
-                        className={({ isActive }) => `group flex min-h-[38px] items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-all duration-150 ${isActive ? 'bg-ui-primary text-ui-primary-fg shadow-[0_4px_12px_rgba(91,43,216,0.18)]' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary'}`}
+                        aria-current={location.pathname === item.route || location.pathname.startsWith(`${item.route}/`) ? 'page' : undefined}
+                        className={({ isActive }) => `group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-colors duration-150 ${isActive ? 'bg-ui-primary text-ui-primary-fg shadow-sm' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary'}`}
                       >
                         {ICONS[item.icon]}
                         <span className="flex-1 truncate">{businessMenuLabel(
