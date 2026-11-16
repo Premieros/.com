@@ -629,6 +629,7 @@ export function PaymentPanel(p: PaymentPanelProps) {
               || !p.canComplete
               || (splitMode && !splitValid)
               || (!splitMode && p.paymentMethod === 'credit' && !creditAllowed)
+              || (!splitMode && p.paymentMethod !== 'credit' && !isManualMethod && p.total > 0 && p.paidAmount <= 0)
               || (!splitMode && isManualMethod && (!manualConfigured || manualApprovalStatus !== 'approved' || !manualApprovalId))
             }
           >
