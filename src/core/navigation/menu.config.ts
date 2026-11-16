@@ -45,6 +45,7 @@ export const MENU_ITEMS: MenuItemConfig[] = [
   { id: 'administration-center', route: APP_ROUTES.administrationCenter, icon: 'settings', labelKey: 'settings', label: { ar: 'مركز الإدارة', en: 'Administration Center' }, permissionsAny: ['branches.manage', 'users.view', 'roles.permissions.manage', 'approvals.review', 'audit.view', 'settings.manage'], group: 'centers' },
 
   { id: 'products', route: APP_ROUTES.products, icon: 'products', labelKey: 'products', permission: 'products.view', group: 'catalog' },
+  { id: 'sales-invoices', route: APP_ROUTES.sales, icon: 'sales', labelKey: 'sales', label: { ar: 'فواتير البيع', en: 'Sales Invoices' }, permission: 'sales.view', group: 'catalog' },
   { id: 'raw-materials', route: APP_ROUTES.rawMaterials, icon: 'rawMaterials', labelKey: 'rawMaterials', permission: 'raw_materials.view', group: 'catalog' },
   { id: 'manufactured-units', route: APP_ROUTES.inventoryUnits, icon: 'inventoryUnits', labelKey: 'rawMaterials', label: { ar: 'المصنّعات', en: 'Manufactured units' }, permission: 'raw_materials.view', group: 'catalog' },
   { id: 'production-orders', route: APP_ROUTES.production, icon: 'inventoryUnits', labelKey: 'rawMaterials', label: { ar: 'أوامر الإنتاج', en: 'Production orders' }, permission: 'production.view', group: 'catalog' },
