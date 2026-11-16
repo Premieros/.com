@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
@@ -25,8 +25,30 @@ import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
 import type { ArAgingRow, Customer } from '@/lib/types';
+import { qr } from '@/api/domains/qr';
+import { qrError } from '@/features/qr/errors';
+import type { QrCustomerHistory } from '@/features/qr/service';
+
+type CustomerViewRow = Customer & { qrHistory?: QrCustomerHistory };
+const isQrGuest = (row: CustomerViewRow) => Boolean(row.qrHistory);
+
+/** View adapters only: never persist a QR guest as a CRM customer automatically. */
+const toQrCustomerRow = (guest: QrCustomerHistory): CustomerViewRow => ({
+  id: `qr:${guest.branch_id}:${guest.id}`,
+  branch_id: guest.branch_id,
+  name: guest.name,
+  phone: guest.phone,
+  name_en: null,
+  email: null,
+  address: null,
+  tax_number: null,
+  balance: 0,
+  notes: null,
+  customer_type: 'customer',
+  created_at: guest.purchases[0]?.created_at || guest.orders[0]?.created_at || '',
+  qrHistory: guest,
+});
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
-import { QrCustomerHistoryPanel } from '@/features/qr/QrCustomerHistoryPanel';
 
 export function CustomersPage() {
   const { t, lang } = useLanguage();
@@ -44,6 +66,10 @@ export function CustomersPage() {
     pageSize: 100,
   });
   const [search, setSearch] = useState('');
+  const [qrGuests, setQrGuests] = useState<QrCustomerHistory[]>([]);
+  const [qrLoading, setQrLoading] = useState(false);
+  const [qrLoadError, setQrLoadError] = useState('');
+  const [selectedQrGuest, setSelectedQrGuest] = useState<QrCustomerHistory | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -75,8 +101,35 @@ export function CustomersPage() {
     return () => { cancelled = true; };
   }, [branchScope.scopeKey]);
 
+  useEffect(() => {
+    let active = true;
+    setQrGuests([]);
+    setQrLoadError('');
+    if (!can('customers.view') || !branchScope.selectedBranchIds.length) return;
+    setQrLoading(true);
+    void Promise.all(branchScope.selectedBranchIds.map(async (id) => {
+      const result = await qr.customerHistory({ p_branch: id });
+      if (result.error) throw result.error;
+      return (result.data || []).filter((guest) => guest.branch_id === id);
+    })).then((groups) => {
+      if (active) setQrGuests(groups.flat());
+    }).catch((error) => {
+      if (active) setQrLoadError(qrError(error));
+    }).finally(() => {
+      if (active) setQrLoading(false);
+    });
+    return () => { active = false; };
+    // Scope key is authoritative; changing branch reloads QR records.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [branchScope.scopeKey]);
+
   const balanceFor = (customer: Customer) => Number(openBalances[customer.id] || 0);
-  const filtered = items.filter((c) => !search || c.name.toLowerCase().includes(search.toLowerCase()) || c.phone?.includes(search));
+  const allRows = useMemo<CustomerViewRow[]>(() => [
+    ...items,
+    ...qrGuests.filter((guest) => branchScope.selectedBranchSet.has(guest.branch_id)).map(toQrCustomerRow),
+  ], [items, qrGuests, branchScope.scopeKey]);
+  const term = search.trim().toLowerCase();
+  const filtered = allRows.filter((c) => !term || c.name.toLowerCase().includes(term) || c.phone?.includes(term));
   const openAdd = () => { setEditing(null); setBusinessAttributes({}); setForm({ name: '', name_en: '', phone: '', email: '', address: '', tax_number: '', balance: 0, notes: '', branch_id: branchFilter || '' }); setModalOpen(true); };
   const openEdit = (c: Customer) => { setEditing(c); setBusinessAttributes(((c as Customer & { business_attributes?: Record<string, unknown> }).business_attributes) || {}); setForm({ name: c.name, name_en: c.name_en || '', phone: c.phone || '', email: c.email || '', address: c.address || '', tax_number: c.tax_number || '', balance: c.balance, notes: c.notes || '', branch_id: c.branch_id || branchFilter || '' }); setModalOpen(true); };
 
@@ -116,22 +169,32 @@ export function CustomersPage() {
     } catch (err) { show(String(err), 'error'); }
   };
 
-  const columns: Column<Customer>[] = [
+  const columns: Column<CustomerViewRow>[] = [
     { key: 'name', header: t('name'), render: (c) => <span className="font-medium text-ui-text">{c.name}</span> },
+    { key: 'source', header: lang === 'ar' ? 'نوع العميل' : 'Customer source',
+      filterValue: (c) => isQrGuest(c) ? 'QR' : (lang === 'ar' ? 'عميل مسجل' : 'Registered'),
+      exportValue: (c) => isQrGuest(c) ? 'QR' : 'Registered',
+      render: (c) => <span className="rounded-lg border border-ui-border bg-ui-page-alt px-2 py-1 text-xs font-semibold text-ui-muted">
+        {isQrGuest(c) ? 'QR' : (lang === 'ar' ? 'مسجل' : 'Registered')}
+      </span> },
     { key: 'branch', header: t('branch'), filterValue: (c) => branches.find((b) => b.id === c.branch_id)?.name || '', exportValue: (c) => branches.find((b) => b.id === c.branch_id)?.name || '', render: (c) => <BranchBadge name={branches.find((b) => b.id === c.branch_id)?.name || '-'} /> },
     { key: 'phone', header: t('phone'), render: (c) => c.phone || '-' },
     { key: 'email', header: t('emailField'), render: (c) => c.email || '-' },
     { key: 'address', header: t('address'), render: (c) => c.address || '-' },
-    { key: 'balance', header: t('amount'), filterValue: balanceFor, exportValue: balanceFor, render: (c) => {
+    { key: 'balance', header: t('amount'),
+      filterValue: (c) => isQrGuest(c) ? '' : balanceFor(c),
+      exportValue: (c) => isQrGuest(c) ? '' : balanceFor(c),
+      render: (c) => {
+      if (isQrGuest(c)) return <span className="text-ui-muted" title={lang === 'ar' ? 'لم يتم ربط حساب ائتمان لهذا العميل' : 'No verified credit account linked'}>—</span>;
       const balance = balanceFor(c);
       return <span className={balance > 0 ? 'text-ui-danger font-medium' : ''}>{formatCurrency(balance, currency, lang)}</span>;
     } },
     { key: 'actions', header: t('actions'), filterable: false, render: (c) => (
       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-        {can('customers.manage') && (
+        {!isQrGuest(c) && can('customers.manage') && (
           <button onClick={() => openEdit(c)} className="ui-icon-action ui-icon-action-info"><Edit2 className="w-4 h-4" /></button>
         )}
-        {can('customers.manage') && (
+        {!isQrGuest(c) && can('customers.manage') && (
           <button onClick={() => setDeleteId(c.id)} className="ui-icon-action ui-icon-action-danger"><Trash2 className="w-4 h-4" /></button>
         )}
       </div>
@@ -140,34 +203,99 @@ export function CustomersPage() {
 
   return (
     <DesignSurface testId="customers-page">
-      <DesignPageHeader title={customerLabel} actions={can('customers.manage') ? <Button size="sm" onClick={openAdd} data-testid="customers-add"><Plus className="w-4 h-4" /> {t('add')}</Button> : undefined} />
-      <QrCustomerHistoryPanel />
-      <DesignPanel testId="customers-search-panel">
-        <DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="customers-search" />
-      </DesignPanel>
-      <DesignPanel testId="customers-table-panel">
+      <DesignPageHeader title={customerLabel} actions={
+        <>
+          <DesignSearch value={search} onChange={setSearch}
+            placeholder={lang === 'ar' ? 'بحث باسم العميل أو الهاتف' : 'Search customer name or phone'}
+            label={t('search')} testId="customers-search"
+            className="w-40 sm:w-64" />
+          {can('customers.manage') && (
+            <Button size="sm" onClick={openAdd} data-testid="customers-add">
+              <Plus className="w-4 h-4" /> {t('add')}
+            </Button>
+          )}
+        </>
+      } />
+      <DesignPanel testId="customers-table-panel" bodyClassName="p-2 sm:p-3">
+        {qrLoading && <p role="status" className="mb-2 text-xs text-ui-muted">{lang === 'ar' ? 'جارٍ تحميل عملاء QR...' : 'Loading QR customers...'}</p>}
+        {qrLoadError && <p role="alert" className="mb-2 text-xs text-ui-danger">
+          {lang === 'ar' ? 'تعذر تحميل عملاء QR؛ تظهر سجلات العملاء المسجلين فقط. ' : 'Could not load QR customers; showing registered customers only. '}{qrLoadError}
+        </p>}
         <DataTable
           tableId="customers"
           columns={columns}
           data={filtered}
           loading={loading}
           emptyMessage={t('noData')}
-          onRowClick={can('customers.manage') ? openEdit : undefined}
+          onRowClick={(row) => {
+            if (row.qrHistory) setSelectedQrGuest(row.qrHistory);
+            else if (can('customers.manage')) openEdit(row);
+          }}
           enableExport={can('customers.export')}
           enableTemplate={can('customers.manage')}
           onImportFile={can('customers.manage') ? handleImport : undefined}
           exportFilename="customers"
           exportDataProvider={async () => {
             const all = await fetchAllCustomers();
-            const term = search.trim().toLowerCase();
+            // Export QR guests from the same branch-scoped data already shown;
+            // they are not silently converted to or merged with CRM accounts.
+            const combined: CustomerViewRow[] = [
+              ...all,
+              ...qrGuests.filter((guest) => branchScope.selectedBranchSet.has(guest.branch_id)).map(toQrCustomerRow),
+            ];
             return term
-              ? all.filter((customer) => customer.name.toLowerCase().includes(term) || customer.phone?.includes(search))
-              : all;
+              ? combined.filter((customer) => customer.name.toLowerCase().includes(term) || customer.phone?.includes(term))
+              : combined;
           }}
           templateFilename="customers-template"
         />
-        <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
+        <DesignPagination loaded={allRows.length} total={total + qrGuests.length} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
       </DesignPanel>
+      <Modal open={!!selectedQrGuest} onClose={() => setSelectedQrGuest(null)}
+        title={lang === 'ar' ? 'تفاصيل عميل QR' : 'QR customer details'} size="lg">
+        {selectedQrGuest && (
+          <div className="space-y-4" data-testid="qr-customer-details">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="rounded-xl border border-ui-border p-3">
+                <p className="text-xs text-ui-muted">{t('name')}</p>
+                <p className="font-bold">{selectedQrGuest.name}</p>
+              </div>
+              <div className="rounded-xl border border-ui-border p-3">
+                <p className="text-xs text-ui-muted">{t('phone')}</p>
+                <p dir="auto" className="font-semibold">{selectedQrGuest.phone || '—'}</p>
+              </div>
+              <div className="rounded-xl border border-ui-border p-3">
+                <p className="text-xs text-ui-muted">{lang === 'ar' ? 'عدد المشتريات' : 'Purchases'}</p>
+                <p className="font-bold">{selectedQrGuest.purchase_count}</p>
+              </div>
+              <div className="rounded-xl border border-ui-border p-3">
+                <p className="text-xs text-ui-muted">{lang === 'ar' ? 'مشتريات QR المسددة' : 'Settled QR purchases'}</p>
+                <p className="font-bold">{formatCurrency(selectedQrGuest.total_spent,
+                  effectiveSettings(selectedQrGuest.branch_id)?.currency || 'EGP', lang)}</p>
+              </div>
+            </div>
+            <p className="text-xs text-ui-muted">
+              {lang === 'ar'
+                ? 'هذه بيانات سجل QR؛ لا يتم دمجها مع حساب ائتمان العميل المسجل دون تحقق من الهوية.'
+                : 'This is a QR visit profile; it is not automatically linked to a registered customer credit account.'}
+            </p>
+            {selectedQrGuest.purchases.length > 0 && (
+              <div>
+                <h3 className="mb-2 font-bold">{lang === 'ar' ? 'فواتير QR المكتملة' : 'Completed QR invoices'}</h3>
+                <div className="max-h-52 space-y-2 overflow-auto">
+                  {selectedQrGuest.purchases.map((purchase) => (
+                    <div key={purchase.id} className="flex justify-between gap-3 rounded-lg border border-ui-border p-3 text-sm">
+                      <span>{purchase.invoice_number || purchase.id.slice(0, 8)}</span>
+                      <span>{formatCurrency(purchase.net_paid,
+                        effectiveSettings(selectedQrGuest.branch_id)?.currency || 'EGP', lang)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </Modal>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? `${t('edit')} — ${customerLabel}` : `${t('add')} — ${customerLabel}`}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
