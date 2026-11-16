@@ -865,7 +865,7 @@ export function usePosOrder(input: UsePosOrderInput) {
       const warehouseId = previousAttempt?.payload.p_warehouse_id ?? await fetchBranchWarehouseId(branchId, activeOrderId);
       const invoiceNumber = previousAttempt?.payload.p_invoice_number ?? await nextInvoiceNumber();
       const itemsPayload = cartToItems(cart);
-      const paidAmountToUse = paymentMethod === 'credit' ? 0 : paidAmount || total;
+      const paidAmountToUse = paymentMethod === 'credit' ? 0 : paidAmount;
       const binding = resolveOrderBindingForSave({
         activeOrderId,
         orderType,
