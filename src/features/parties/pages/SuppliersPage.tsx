@@ -13,6 +13,7 @@ import { Button } from '@/components/Button';
 import { Input, Select, Textarea } from '@/components/Input';
 import { Modal } from '@/components/Modal';
 import { BranchBadge } from '@/components/BranchBadge';
+import { PartyProfileCard } from '../components/PartyProfileCard';
 import { BusinessAttributesFields } from '@/features/shared/BusinessAttributesFields';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { formatDate, formatCurrency } from '@/lib/format';
@@ -47,6 +48,7 @@ export function SuppliersPage() {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
+  const [viewProfile, setViewProfile] = useState<Supplier | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [statementSupplier, setStatementSupplier] = useState<Supplier | null>(null);
   const [showEvaluation, setShowEvaluation] = useState(false);
@@ -195,7 +197,7 @@ export function SuppliersPage() {
               data={filtered}
               loading={loading}
               emptyMessage={t('noData')}
-              onRowClick={can('suppliers.manage') ? openEdit : undefined}
+              onRowClick={(record) => setViewProfile(record)}
               enableExport={can('suppliers.manage')}
               enableTemplate={can('suppliers.manage')}
               exportFilename="suppliers"
@@ -212,6 +214,26 @@ export function SuppliersPage() {
           </DesignPanel>
         </>
       )}
+      <Modal open={!!viewProfile} onClose={() => setViewProfile(null)}
+        title={lang === 'ar' ? 'بطاقة المورد' : 'Supplier profile'} size="lg">
+        {viewProfile && items.some((row) => row.id === viewProfile.id) && (
+          <PartyProfileCard record={viewProfile}
+            branchName={branches.find((branch) => branch.id === viewProfile.branch_id)?.name || '-'}
+            amount={formatCurrency(balanceFor(viewProfile), currency, lang)}
+            ar={lang === 'ar'}
+            actions={
+              <>
+                <Button variant="outline" size="sm" onClick={() => { setStatementSupplier(viewProfile); setViewProfile(null); }}>{lang === 'ar' ? 'كشف حساب المورد' : 'Supplier statement'}</Button>
+                {can('suppliers.manage') && (
+                  <Button size="sm" onClick={() => { openEdit(viewProfile); setViewProfile(null); }}>
+                    <Edit2 className="h-4 w-4" /> {t('edit')}
+                  </Button>
+                )}
+              </>
+            }
+          />
+        )}
+      </Modal>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? `${t('edit')} — ${supplierLabel}` : `${t('add')} — ${supplierLabel}`}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
