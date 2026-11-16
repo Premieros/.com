@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Trash2, FileText, Edit2, RotateCcw, Eye, Printer, RefreshCw, CalendarDays } from 'lucide-react';
+import { Trash2, FileText, Edit2, RotateCcw, Eye, Printer, RefreshCw, CalendarDays, Filter } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
-import { DesignSurface, DesignPageHeader, DesignSearch, DesignPanel, DesignPagination } from '@/components/design';
+import { DesignSurface, DesignPageHeader, DesignPanel, DesignPagination } from '@/components/design';
 import { DataTable, type Column } from '@/components/DataTable';
 import { Button } from '@/components/Button';
 import { Select, Textarea } from '@/components/Input';
@@ -74,6 +74,7 @@ export function SalesPage() {
   const [search, setSearch] = useState('');
   const [displayStatus, setDisplayStatus] = useState<'all' | 'today' | 'completed' | 'returned' | 'other'>('all');
   const [displayDate, setDisplayDate] = useState('');
+  const [showViewFilters, setShowViewFilters] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteSelectedConfirm, setDeleteSelectedConfirm] = useState(false);
@@ -697,6 +698,27 @@ export function SalesPage() {
     <DesignSurface testId="sales-page">
       <DesignPageHeader title={t('salesInvoices')} actions={
         <>
+          <input
+            data-testid="sales-search"
+            aria-label={isAr ? 'بحث في الفواتير المحمّلة' : 'Search loaded invoices'}
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder={isAr ? 'بحث في الفواتير...' : 'Search invoices...'}
+            className="h-9 w-32 min-w-0 rounded-lg border border-ui-border bg-ui-surface px-3 text-xs text-ui-text outline-none focus:border-ui-primary sm:w-52"
+          />
+          <Button variant="outline" size="sm"
+            onClick={() => setShowViewFilters((value) => !value)}
+            data-testid="sales-toggle-filters"
+            aria-expanded={showViewFilters}
+          >
+            <Filter className="h-4 w-4" />
+            {isAr ? 'تصفية' : 'Filters'}
+            {displayDate ? ' •' : ''}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => void reloadSales()} data-testid="sales-view-refresh">
+            <RefreshCw className="h-4 w-4" /> <span className="hidden sm:inline">{isAr ? 'تحديث' : 'Refresh'}</span>
+          </Button>
           {selectedIds.size > 0 && (
             <Button variant="danger" size="sm" onClick={() => setDeleteSelectedConfirm(true)} data-testid="sales-delete-selected">
               <Trash2 className="w-4 h-4" /> {t('deleteSelected')} ({selectedIds.size})
@@ -718,16 +740,12 @@ export function SalesPage() {
                 : null}
         </div>
       )}
-      <DesignPanel testId="sales-search-panel" bodyClassName="p-4 sm:p-5">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div className="min-w-0 flex-1 lg:max-w-xl">
-            <DesignSearch value={search} onChange={setSearch} label={t('search')}
-              placeholder={isAr ? 'رقم الفاتورة أو الطلب أو العميل...' : 'Invoice, order or customer...'} testId="sales-search" />
-          </div>
-          <div className="flex flex-wrap items-end gap-2">
+      {showViewFilters && (
+        <DesignPanel testId="sales-search-panel" bodyClassName="px-3 py-2">
+          <div className="flex flex-wrap items-end gap-2" data-testid="sales-expanded-filters">
             <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted" htmlFor="sales-view-date">
               <span>{isAr ? 'تاريخ الإنشاء' : 'Creation date'}</span>
-              <span className="inline-flex items-center gap-2 rounded-lg border border-ui-border bg-ui-surface px-3 py-2">
+              <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-ui-border bg-ui-surface px-3">
                 <CalendarDays className="h-4 w-4 text-ui-subtle" />
                 <input id="sales-view-date" data-testid="sales-view-date" type="date"
                   className="min-w-0 bg-transparent text-sm text-ui-text outline-none"
@@ -739,12 +757,9 @@ export function SalesPage() {
                 {isAr ? 'مسح التصفية' : 'Clear filters'}
               </Button>
             )}
-            <Button variant="outline" size="sm" onClick={() => void reloadSales()} data-testid="sales-view-refresh">
-              <RefreshCw className="h-4 w-4" /> {isAr ? 'تحديث' : 'Refresh'}
-            </Button>
           </div>
-        </div>
-      </DesignPanel>
+        </DesignPanel>
+      )}
 
       <DesignPanel testId="sales-table-panel" bodyClassName="p-0">
         <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ui-border px-4 py-3 sm:px-5">
