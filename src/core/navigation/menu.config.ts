@@ -34,6 +34,7 @@ export const MENU_ITEMS: MenuItemConfig[] = [
   { id: 'kitchen-display', route: APP_ROUTES.kitchenDisplay, icon: 'kitchenDisplay', labelKey: 'kitchenDisplay', permission: 'pos.kds_view', group: 'main' },
   { id: 'reports', route: APP_ROUTES.reports, icon: 'reports', labelKey: 'reports', label: { ar: 'مركز التقارير', en: 'Reports Center' }, permissionsAny: ['reports.view', 'reports.financial'], group: 'main' },
   { id: 'business-records', route: APP_ROUTES.businessRecords, icon: 'customers', labelKey: 'customers', label: { ar: 'سجلات النشاط', en: 'Business Records' }, permission: 'customers.view', group: 'main' },
+  { id: 'customers', route: APP_ROUTES.customers, icon: 'customers', labelKey: 'customers', permission: 'customers.view', group: 'main' },
 
   { id: 'operations-center', route: APP_ROUTES.operationsCenter, icon: 'pos', labelKey: 'orders', label: { ar: 'مركز العمليات', en: 'Operations Center' }, permission: 'dashboard.view', group: 'centers' },
   { id: 'inventory-center', route: APP_ROUTES.inventoryCenter, icon: 'inventory', labelKey: 'inventory', label: { ar: 'مركز المخزون', en: 'Inventory Center' }, permission: 'inventory.view', group: 'centers' },
@@ -56,13 +57,15 @@ export const MENU_ITEMS: MenuItemConfig[] = [
  * Sidebar-only grouping. Existing routes and permission gates remain the
  * source of truth; this only reorganizes already-visible links.
  */
-export type SidebarSection = MenuGroup | 'reports' | 'inventory';
+export type SidebarSection = MenuGroup | 'orders' | 'customers' | 'reports' | 'inventory';
 
 export const SIDEBAR_SECTION_ORDER: readonly SidebarSection[] = [
-  'main', 'reports', 'inventory', 'catalog', 'centers', 'admin',
+  'main', 'orders', 'customers', 'reports', 'inventory', 'catalog', 'centers', 'admin',
 ] as const;
 
 export function sidebarSectionForItem(item: Pick<MenuItemConfig, 'id' | 'group'>): SidebarSection {
+  if (item.id === 'pos' || item.id === 'kitchen-display' || item.id === 'operations-center') return 'orders';
+  if (item.id === 'customers' || item.id === 'business-records' || item.id === 'people-center') return 'customers';
   if (item.id === 'reports') return 'reports';
   if (item.id === 'inventory-center' || item.id === 'stock-counts' || item.id === 'procurement-center') {
     return 'inventory';
