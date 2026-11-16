@@ -1,4 +1,4 @@
-﻿import { useCallback, useEffect, useState } from 'react';
+﻿import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RefreshCw, Trash2 } from 'lucide-react';
 import { supabase } from '@/api';
@@ -49,6 +49,8 @@ export function LowStockAlertsPage() {
   const [reorderItems, setReorderItems] = useState<ReorderLine[]>([]);
   const [qtyOverride, setQtyOverride] = useState<Record<string, number>>({});
   const [loadingReorder, setLoadingReorder] = useState(false);
+  const [reorderError, setReorderError] = useState<string | null>(null);
+  const reorderRequestId = useRef(0);
   const [savingReorder, setSavingReorder] = useState(false);
   const [reorderForm, setReorderForm] = useState({
     branch_id: '',
@@ -86,6 +88,20 @@ export function LowStockAlertsPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // An operational page must follow the globally selected branch.
+  useEffect(() => {
+    // Close a pending purchase request before a global branch switch can
+    // submit it for the previously selected branch.
+    reorderRequestId.current += 1;
+    setReorderOpen(false);
+    setReorderItems([]);
+    setQtyOverride({});
+    setReorderError(null);
+    setLoadingReorder(false);
+    setBranchId(branchFilter || '');
+    setWarehouseId('');
+  }, [branchFilter]);
+
   const filtered = rows.map((r) => ({
     ...r,
     id: `${r.product_id}-${r.warehouse_id || 'n/a'}`,
@@ -111,6 +127,8 @@ export function LowStockAlertsPage() {
 
   const loadReorder = useCallback(async (branchId: string) => {
     if (!branchId) return;
+    const requestId = ++reorderRequestId.current;
+    setReorderError(null);
     setLoadingReorder(true);
     const [alerts, rawRes] = await Promise.all([
       api.inventory.getLowStockAlerts({ p_branch_id: branchId, p_warehouse_id: null }),
@@ -119,6 +137,16 @@ export function LowStockAlertsPage() {
         .select('raw_material_id, quantity, min_stock, raw_material:raw_materials(id, name, code, min_stock, default_cost, is_active, unit:units(name))')
         .eq('branch_id', branchId),
     ]);
+    // Never create a partial procurement request when either source failed.
+    // Ignore results from an earlier branch selection as well.
+    if (requestId !== reorderRequestId.current) return;
+    if (alerts.error || rawRes.error) {
+      setReorderItems([]);
+      setQtyOverride({});
+      setReorderError(alerts.error?.message || rawRes.error?.message || t('error'));
+      setLoadingReorder(false);
+      return;
+    }
     const alertRows = alerts.data || [];
     const productIds = alertRows.map((r) => r.product_id);
     const costMap: Record<string, number> = {};
@@ -145,13 +173,14 @@ export function LowStockAlertsPage() {
     }));
     const rawLines = buildRawReorderLines(rawRows);
     const lines = [...productLines, ...rawLines];
+    if (requestId !== reorderRequestId.current) return;
     setReorderItems(lines);
     setQtyOverride(Object.fromEntries(lines.map((l) => [l.key, l.suggested_qty])));
     setLoadingReorder(false);
-  }, []);
+  }, [t]);
 
   const openReorder = () => {
-    const effBranch = branchId || user?.branch_id || branches[0]?.id || '';
+    const effBranch = branchFilter || branchId || user?.branch_id || visibleBranches[0]?.id || '';
     if (!effBranch) { show(t('required') + ': ' + t('branch'), 'error'); return; }
     setReorderForm({ branch_id: effBranch, supplier_id: '', priority: 'normal', expected_date: '', notes: '' });
     setReorderOpen(true);
@@ -160,8 +189,11 @@ export function LowStockAlertsPage() {
 
   const changeReorderBranch = (next: string) => {
     setReorderForm((f) => ({ ...f, branch_id: next, supplier_id: '' }));
+    reorderRequestId.current += 1;
     setReorderItems([]);
     setQtyOverride({});
+    setReorderError(null);
+    setLoadingReorder(false);
     if (next) loadReorder(next);
   };
 
@@ -177,6 +209,7 @@ export function LowStockAlertsPage() {
   };
 
   const submitReorder = async () => {
+    if (loadingReorder || reorderError) { show(reorderError || t('loading'), 'error'); return; }
     if (!reorderForm.branch_id) { show(t('required') + ': ' + t('branch'), 'error'); return; }
     const items = reorderLinesToProcurementItems(reorderItems, qtyOverride);
     if (items.length === 0) { show(t('required') + ': ' + t('addItem'), 'error'); return; }
@@ -289,7 +322,7 @@ export function LowStockAlertsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <Select label={t('branch')} value={reorderForm.branch_id} onChange={(e) => changeReorderBranch(e.target.value)}>
               <option value="">--</option>
-              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              {visibleBranches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </Select>
             <Select label={t('supplier')} value={reorderForm.supplier_id} onChange={(e) => setReorderForm({ ...reorderForm, supplier_id: e.target.value })}>
               <option value="">{t('all')}</option>
@@ -304,6 +337,7 @@ export function LowStockAlertsPage() {
             <Input label={t('expectedDate')} type="date" value={reorderForm.expected_date} onChange={(e) => setReorderForm({ ...reorderForm, expected_date: e.target.value })} />
           </div>
 
+          {reorderError && <div role="alert" data-testid="reorder-source-error" className="rounded-lg border border-ui-danger bg-ui-danger-soft px-3 py-2 text-sm text-ui-danger">{isAr ? 'تعذر تحميل بيانات إعادة الطلب كاملة. أعد المحاولة قبل إنشاء طلب شراء.' : 'Reorder data could not be fully loaded. Retry before creating a purchase request.'} {reorderError}</div>}
           <div className="rounded-xl border border-ui-border overflow-hidden">
             <div className="max-h-80 overflow-y-auto">
               <table className="w-full text-sm">
@@ -353,7 +387,7 @@ export function LowStockAlertsPage() {
 
           <div className="flex items-center justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setReorderOpen(false)}>{t('cancel')}</Button>
-            <Button size="sm" onClick={submitReorder} disabled={savingReorder || loadingReorder} data-testid="low-stock-reorder-submit">
+            <Button size="sm" onClick={submitReorder} disabled={savingReorder || loadingReorder || !!reorderError} data-testid="low-stock-reorder-submit">
               {savingReorder ? t('loading') : t('createRequest')}
             </Button>
           </div>
