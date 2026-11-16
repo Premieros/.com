@@ -35,7 +35,7 @@ export const MENU_ITEMS: MenuItemConfig[] = [
   { id: 'reports', route: APP_ROUTES.reports, icon: 'reports', labelKey: 'reports', label: { ar: 'مركز التقارير', en: 'Reports Center' }, permissionsAny: ['reports.view', 'reports.financial'], group: 'main' },
   { id: 'business-records', route: APP_ROUTES.businessRecords, icon: 'customers', labelKey: 'customers', label: { ar: 'سجلات النشاط', en: 'Business Records' }, permission: 'customers.view', group: 'centers' },
   { id: 'customers', route: APP_ROUTES.customers, icon: 'customers', labelKey: 'customers', permission: 'customers.view', group: 'main' },
-  { id: 'sales-invoices', route: APP_ROUTES.sales, icon: 'sales', labelKey: 'sales', label: { ar: 'الطلبات', en: 'Orders' }, permission: 'sales.view', group: 'main' },
+  { id: 'sales-invoices', route: APP_ROUTES.sales, icon: 'sales', labelKey: 'orders', label: { ar: 'الطلبات', en: 'Orders' }, permission: 'sales.view', group: 'main' },
 
   { id: 'operations-center', route: APP_ROUTES.operationsCenter, icon: 'pos', labelKey: 'orders', label: { ar: 'مركز العمليات', en: 'Operations Center' }, permission: 'dashboard.view', group: 'centers' },
   { id: 'inventory-center', route: APP_ROUTES.inventoryCenter, icon: 'inventory', labelKey: 'inventory', label: { ar: 'مركز المخزون', en: 'Inventory Center' }, permission: 'inventory.view', group: 'centers' },
