@@ -255,10 +255,20 @@ describe('partial table transfer against the full schema and actual guards', () 
    'SELECT sum(sent_quantity)::float8 quantity FROM public.order_kitchen_sends WHERE order_id=ANY($1::uuid[])',
    [[source,target]],
   )).rows[0].quantity).toBe(sendsBefore);
-  expect((await client.query(
+  // Splitting a previously sent line creates one *lineage* event for the
+  // transferred quantity, while conserving the original ingredient cost.
+  const eventsAfter=(await client.query(
    'SELECT count(*)::int count,sum(total_cost)::float8 cost FROM public.order_kitchen_inventory_events WHERE order_id=ANY($1::uuid[])',
    [[source,target]],
-  )).rows[0]).toEqual(eventsBefore);
+  )).rows[0];
+  expect(eventsAfter.cost).toBe(eventsBefore.cost);
+  expect(eventsAfter.count).toBe(eventsBefore.count + 1);
+  const movedPartial=result.quantity_transfers!.find(x=>x.source_item_id===line)!.moved_item_id;
+  const movedLineage=(await client.query(
+   'SELECT transfer_origin_event_id FROM public.order_kitchen_inventory_events WHERE order_item_id=$1',
+   [movedPartial],
+  )).rows;
+  expect(movedLineage).toEqual([expect.objectContaining({transfer_origin_event_id:originalEvent})]);
   expect((await client.query('SELECT count(*)::int count FROM public.inventory_ledger')).rows[0].count).toBe(ledgerBefore);
   const replay = await move();
   expect(replay.rows[0].result).toMatchObject({success:true,replayed:true});
