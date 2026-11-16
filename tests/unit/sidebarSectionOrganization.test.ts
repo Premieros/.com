@@ -15,12 +15,13 @@ describe('Premier sidebar section organization', () => {
       return sidebarSectionForItem(item);
     };
     expect(group('dashboard')).toBe('main');
-    expect(group('pos')).toBe('orders');
-    expect(group('kitchen-display')).toBe('orders');
-    expect(group('operations-center')).toBe('orders');
+    expect(group('sales-invoices')).toBe('orders');
+    expect(group('pos')).toBe('centers');
+    expect(group('kitchen-display')).toBe('centers');
+    expect(group('operations-center')).toBe('centers');
     expect(group('customers')).toBe('customers');
-    expect(group('people-center')).toBe('customers');
-    expect(group('business-records')).toBe('customers');
+    expect(group('people-center')).toBe('centers');
+    expect(group('business-records')).toBe('centers');
     expect(group('reports')).toBe('reports');
     expect(group('inventory-center')).toBe('inventory');
     expect(group('stock-counts')).toBe('inventory');
@@ -28,6 +29,9 @@ describe('Premier sidebar section organization', () => {
     expect(group('products')).toBe('catalog');
     expect(group('raw-materials')).toBe('catalog');
     expect(group('finance-center')).toBe('centers');
+    expect(MENU_ITEMS.find((item) => item.id === 'sales-invoices')).toMatchObject({
+      route: '/sales', permission: 'sales.view',
+    });
     expect(MENU_ITEMS.find((item) => item.id === 'customers')).toMatchObject({
       route: '/customers', permission: 'customers.view',
     });
