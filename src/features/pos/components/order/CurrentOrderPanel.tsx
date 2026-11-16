@@ -359,7 +359,7 @@ export function CurrentOrderPanel({
             <div className="flex gap-2">
               <button data-testid="pos-discount-percent" type="button" onClick={() => onDiscountTypeChange('percent')} className={`flex-1 rounded-lg p-2 text-xs font-black ${discountType === 'percent' ? 'bg-ui-primary text-ui-primary-fg' : 'bg-ui-surface text-ui-muted'}`}>%</button>
               <button data-testid="pos-discount-amount" type="button" onClick={() => onDiscountTypeChange('amount')} className={`flex-1 rounded-lg p-2 text-xs font-black ${discountType === 'amount' ? 'bg-ui-primary text-ui-primary-fg' : 'bg-ui-surface text-ui-muted'}`}>{currency}</button>
-              <input data-testid="pos-discount-input" aria-label={isAr ? 'قيمة الخصم' : 'Discount value'} type="number" min={0} value={discountAmount || ''} onChange={(event) => onDiscountAmountChange(parseFloat(event.target.value) || 0)} className="w-24 rounded-lg border border-ui-border bg-ui-surface p-2 text-center text-xs font-black text-ui-text" />
+              <input data-testid="pos-discount-input" aria-label={isAr ? 'قيمة الخصم' : 'Discount value'} type="number" min={0} value={discountAmount || ''} onChange={(event) => onDiscountAmountChange(Math.min(discountType === 'percent' ? 100 : Math.max(0, subtotal), Math.max(0, parseFloat(event.target.value) || 0)))} className="w-24 rounded-lg border border-ui-border bg-ui-surface p-2 text-center text-xs font-black text-ui-text" />
             </div>
           </div>
         )}
