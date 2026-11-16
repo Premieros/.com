@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { MENU_ITEMS, SIDEBAR_SECTION_ORDER, sidebarSectionForItem } from '@/core/navigation/menu.config';
+import { readFileSync } from 'node:fs';
 
 describe('Premier sidebar section organization', () => {
   it('keeps the visual sections in a predictable order', () => {
@@ -36,6 +37,15 @@ describe('Premier sidebar section organization', () => {
       route: '/customers', permission: 'customers.view',
     });
     expect(group('super-admin')).toBe('admin');
+  });
+
+  it('keeps Orders and Customers one-click links and sends Orders to sales invoices', () => {
+    const layout = readFileSync('src/components/Layout.tsx', 'utf8');
+    expect(layout).toContain("group === 'orders' || group === 'customers'");
+    expect(MENU_ITEMS.find((item) => item.id === 'sales-invoices')).toMatchObject({
+      label: { ar: 'الطلبات', en: 'Orders' },
+      route: '/sales', permission: 'sales.view',
+    });
   });
 
   it('reorganizes without hiding, duplicating or modifying any link', () => {
