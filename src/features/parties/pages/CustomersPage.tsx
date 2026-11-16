@@ -26,7 +26,6 @@ import { useBranches } from '@/hooks/useBranches';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
 import type { ArAgingRow, Customer } from '@/lib/types';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
-import { QrCustomerHistoryPanel } from '@/features/qr/QrCustomerHistoryPanel';
 
 export function CustomersPage() {
   const { t, lang } = useLanguage();
@@ -140,12 +139,20 @@ export function CustomersPage() {
 
   return (
     <DesignSurface testId="customers-page">
-      <DesignPageHeader title={customerLabel} actions={can('customers.manage') ? <Button size="sm" onClick={openAdd} data-testid="customers-add"><Plus className="w-4 h-4" /> {t('add')}</Button> : undefined} />
-      <QrCustomerHistoryPanel />
-      <DesignPanel testId="customers-search-panel">
-        <DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="customers-search" />
-      </DesignPanel>
-      <DesignPanel testId="customers-table-panel">
+      <DesignPageHeader title={customerLabel} actions={
+        <>
+          <DesignSearch value={search} onChange={setSearch}
+            placeholder={lang === 'ar' ? 'بحث باسم العميل أو الهاتف' : 'Search customer name or phone'}
+            label={t('search')} testId="customers-search"
+            className="w-40 sm:w-64" />
+          {can('customers.manage') && (
+            <Button size="sm" onClick={openAdd} data-testid="customers-add">
+              <Plus className="w-4 h-4" /> {t('add')}
+            </Button>
+          )}
+        </>
+      } />
+      <DesignPanel testId="customers-table-panel" bodyClassName="p-2 sm:p-3">
         <DataTable
           tableId="customers"
           columns={columns}
