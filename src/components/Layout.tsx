@@ -18,7 +18,7 @@ import { Logo } from './Logo';
 import { ApprovalInbox } from './ApprovalInbox';
 import { APP_ROUTES } from '@/core/navigation/routes';
 import { prefetchAppRoute } from '@/core/navigation/prefetch';
-import { MENU_GROUPS, MENU_ITEMS, type MenuIcon, type MenuGroup } from '@/core/navigation/menu.config';
+import { MENU_GROUPS, MENU_ITEMS, SIDEBAR_SECTION_ORDER, sidebarSectionForItem, type MenuIcon, type SidebarSection } from '@/core/navigation/menu.config';
 import { CommandPalette, CommandPaletteTrigger } from './CommandPalette';
 import { OfflineStatusIndicator } from './OfflineStatusIndicator';
 import { PageUtilityControls } from './PageUtilityControls';
@@ -97,6 +97,8 @@ export function Layout({ children }: { children: ReactNode }) {
       main: false,
       centers: false,
       catalog: true,
+      reports: true,
+      inventory: true,
       operations: true,
       people: true,
       finance: true,
@@ -133,17 +135,24 @@ export function Layout({ children }: { children: ReactNode }) {
       )
       .sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
   }, [can, user?.role, isAdmin, canAccessModule, canAccessPath, runtime]);
-  const grouped = useMemo(() => visibleItems.reduce<Record<MenuGroup, typeof visibleItems>>((acc, item) => {
-    (acc[item.group] ??= []).push(item);
+  const grouped = useMemo(() => visibleItems.reduce<Partial<Record<SidebarSection, typeof visibleItems>>>((acc, item) => {
+    const section = sidebarSectionForItem(item);
+    (acc[section] ??= []).push(item);
     return acc;
-  }, {} as Record<MenuGroup, typeof visibleItems>), [visibleItems]);
+  }, {}), [visibleItems]);
 
-  const activeMenuGroup = useMemo<MenuGroup | null>(() => {
+  const activeMenuGroup = useMemo<SidebarSection | null>(() => {
     const activeItem = visibleItems.find((item) =>
       location.pathname === item.route || location.pathname.startsWith(`${item.route}/`),
     );
-    return activeItem?.group ?? null;
+    return activeItem ? sidebarSectionForItem(activeItem) : null;
   }, [location.pathname, visibleItems]);
+
+  const sidebarSectionLabel = (group: SidebarSection) => {
+    if (group === 'reports') return ar ? 'التقارير' : 'Reports';
+    if (group === 'inventory') return ar ? 'المخزون والمشتريات' : 'Inventory & Purchasing';
+    return businessGroupLabel(runtime, group, ar ? 'ar' : 'en', MENU_GROUPS[group][ar ? 'ar' : 'en']);
+  };
 
   useEffect(() => {
     if (!activeMenuGroup) return;
@@ -338,7 +347,7 @@ export function Layout({ children }: { children: ReactNode }) {
             )}
           </section>
 
-          {(['main', 'catalog', 'centers', 'admin'] as MenuGroup[]).map((group) => {
+          {SIDEBAR_SECTION_ORDER.map((group) => {
             const items = grouped[group] ?? [];
             if (!items.length) return null;
             return (
@@ -351,7 +360,7 @@ export function Layout({ children }: { children: ReactNode }) {
                   aria-controls={`nav-group-items-${group}`}
                   className="flex min-h-9 w-full items-center justify-between rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-ui-subtle transition hover:bg-ui-page-alt hover:text-ui-text"
                 >
-                  <span className="min-w-0 truncate text-start">{businessGroupLabel(runtime, group, ar ? 'ar' : 'en', MENU_GROUPS[group][ar ? 'ar' : 'en'])}</span>
+                  <span className="min-w-0 truncate text-start">{sidebarSectionLabel(group)}</span>
                   <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform duration-150 ${collapsed[group] ? 'rotate-90' : ''}`} />
                 </button>
                 {!collapsed[group] && (
