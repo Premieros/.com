@@ -14,8 +14,8 @@ describe('Premier shared top space on every app screen', () => {
 
   it('reserves exactly the same height for content on every route', () => {
     expect(layout).toContain('pt-[var(--premier-topbar-height)]');
-    expect(layout.match(/min-h-\\[calc\\(100vh-var\\(--premier-topbar-height\\)\\)\\]/g))
-      .toHaveLength(2);
+    expect(layout.split('min-h-[calc(100vh-var(--premier-topbar-height))]').length - 1)
+      .toBe(2);
     expect(layout).not.toContain('pt-[64px]');
     expect(layout).not.toContain('h-[64px]');
     expect(layout).not.toContain('calc(100vh-64px)');
