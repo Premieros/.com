@@ -85,15 +85,7 @@ export function Layout({ children }: { children: ReactNode }) {
     typeof window !== 'undefined' && window.localStorage.getItem('premier:desktop-sidebar-hidden') === '1',
   );
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = JSON.parse(window.localStorage.getItem('premier:nav-collapsed-groups') || '{}') as Record<string, boolean>;
-        if (Object.keys(saved).length > 0) return saved;
-      } catch {
-        // Fall back to the compact default below.
-      }
-    }
-    return {
+    const defaults: Record<string, boolean> = {
       main: false,
       centers: false,
       catalog: true,
@@ -104,6 +96,21 @@ export function Layout({ children }: { children: ReactNode }) {
       finance: true,
       admin: true,
     };
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = JSON.parse(window.localStorage.getItem('premier:nav-collapsed-groups') || '{}') as Record<string, unknown>;
+        // Preserve each user's existing choices while new headings start
+        // collapsed rather than unexpectedly expanding old saved menus.
+        if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+          for (const key of Object.keys(defaults)) {
+            if (typeof saved[key] === 'boolean') defaults[key] = saved[key];
+          }
+        }
+      } catch {
+        // Use safe defaults if stored preferences are malformed.
+      }
+    }
+    return defaults;
   });
   const ar = lang === 'ar';
   const branchFilter = useBranchFilter();
