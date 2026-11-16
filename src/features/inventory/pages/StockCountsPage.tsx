@@ -62,6 +62,9 @@ export function StockCountsPage() {
   const [formItems, setFormItems] = useState<CreateLine[]>([{ item_id: '', counted_quantity: '', reason: '' }]);
 
   const [viewTarget, setViewTarget] = useState<StockCount | null>(null);
+  const [viewItemsLoading, setViewItemsLoading] = useState(false);
+  const [viewItemsError, setViewItemsError] = useState<string | null>(null);
+  const viewRequestRef = useRef(0);
   const [editTarget, setEditTarget] = useState<StockCount | null>(null);
   const [editLines, setEditLines] = useState<EditLine[]>([]);
   const [confirmTarget, setConfirmTarget] = useState<{ count: StockCount; action: 'submit' | 'approve' | 'reject' | 'apply' } | null>(null);
@@ -292,6 +295,45 @@ export function StockCountsPage() {
   };
   const typePill = (type: string) => <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-ui-page-alt text-ui-muted">{typeOptions.find((x) => x.key === type)?.label || type}</span>;
 
+  const openCountDetails = async (count: StockCount) => {
+    // A row's embedded items are not proof that all count lines were loaded.
+    // Fetch the specific count's lines on demand, preserving RLS and the
+    // currently authorized branch scope. Never show a stale response after a
+    // different count was opened or the dialog was closed.
+    const requestId = ++viewRequestRef.current;
+    if (!branchScope.selectedBranchSet.has(count.branch_id)) return;
+    setViewTarget({ ...count, items: [] });
+    setViewItemsError(null);
+    setViewItemsLoading(true);
+    try {
+      const { data, error: detailError } = await supabase.from('stock_count_items')
+        .select('*, product:products(*), raw_material:raw_materials(*)')
+        .eq('stock_count_id', count.id)
+        .order('id');
+      if (requestId !== viewRequestRef.current) return;
+      if (!branchScope.selectedBranchSet.has(count.branch_id)) {
+        setViewTarget(null);
+        return;
+      }
+      if (detailError) throw detailError;
+      setViewTarget({ ...count, items: (data || []) as StockCountItem[] });
+    } catch {
+      if (requestId === viewRequestRef.current) {
+        setViewItemsError(isAr
+          ? 'تعذر تحميل تفاصيل الجرد. تحقق من صلاحيات الفرع والمستودع وأعد المحاولة.'
+          : 'Could not load count details. Check branch and warehouse access, then retry.');
+      }
+    } finally {
+      if (requestId === viewRequestRef.current) setViewItemsLoading(false);
+    }
+  };
+  const closeCountDetails = () => {
+    ++viewRequestRef.current;
+    setViewTarget(null);
+    setViewItemsError(null);
+    setViewItemsLoading(false);
+  };
+
   const columns: Column<StockCount>[] = [
     { key: 'number', header: t('countNumber'), render: (c) => <div className="text-sm"><p className="font-medium text-ui-text">{c.count_number || '#' + String(c.id).slice(0, 8)}</p><p className="text-xs text-ui-subtle">{formatDateTime(c.created_at, lang)}</p></div> },
     { key: 'branch', header: t('branch'), render: (c) => c.branch?.name || '-' },
@@ -302,7 +344,7 @@ export function StockCountsPage() {
     { key: 'actions', header: t('actions'), render: (c) => {
       const hasRaw = (c.items || []).some((i) => !!i.raw_material_id);
       return <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
-        <button onClick={() => setViewTarget(c)} className="p-1.5 rounded-md hover:bg-ui-page-alt text-ui-subtle" title={t('viewCountItems')}><Eye className="w-4 h-4" /></button>
+        <button onClick={() => void openCountDetails(c)} className="p-1.5 rounded-md hover:bg-ui-page-alt text-ui-subtle" title={t('viewCountItems')}><Eye className="w-4 h-4" /></button>
         {can('inventory.count.create') && c.status === 'draft' && <>{!hasRaw && <button onClick={() => openEdit(c)} className="p-1.5 rounded-md hover:bg-ui-info-soft text-ui-info" title={t('addCountItem')}><Plus className="w-4 h-4" /></button>}<button onClick={() => setConfirmTarget({ count: c, action: 'submit' })} className="p-1.5 rounded-md hover:bg-ui-success-soft text-ui-success" title={t('submitCount')}><Send className="w-4 h-4" /></button></>}
         {can('inventory.count.approve') && c.status === 'submitted' && <button onClick={() => setConfirmTarget({ count: c, action: 'approve' })} className="p-1.5 rounded-md hover:bg-ui-success-soft text-ui-success" title={t('approveCount')}><CheckCircle2 className="w-4 h-4" /></button>}
         {can('inventory.count.reject') && c.status === 'submitted' && <button onClick={() => { setConfirmTarget({ count: c, action: 'reject' }); setRejectReason(''); }} className="p-1.5 rounded-md hover:bg-ui-danger-soft text-ui-danger" title={t('rejectCount')}><XCircle className="w-4 h-4" /></button>}
@@ -332,7 +374,7 @@ export function StockCountsPage() {
     <DesignSurface testId="stock-counts-page">
       <DesignPageHeader title={t('stockCounts')} subtitle={isAr ? 'جرد الخامات بالمخزن مع الاعتماد وتطبيق الرصيد' : 'Raw-material warehouse counts with approval and stock adjustment'} actions={can('inventory.count.create') ? <Button size="sm" onClick={openCreate}><ClipboardCheck className="w-4 h-4" /> {t('newStockCount')}</Button> : undefined} />
       <DesignPanel testId="stock-counts-search-panel"><div className="flex flex-col sm:flex-row gap-3"><DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={t('search')} testId="stock-counts-search" /><Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="sm:w-44"><option value="all">{t('all')}</option>{statusOptions.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</Select><Select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="sm:w-48"><option value="">{t('allBranches')}</option>{visibleBranches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}</Select></div></DesignPanel>
-      <DesignPanel testId="stock-counts-table-panel"><DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} /><DesignPagination loaded={counts.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} /></DesignPanel>
+      <DesignPanel testId="stock-counts-table-panel"><DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} onRowClick={(count) => void openCountDetails(count)} /><DesignPagination loaded={counts.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} /></DesignPanel>
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={t('newStockCount')} size="lg"><div className="space-y-4">
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3"><Select label={t('branch')} value={form.branch_id} onChange={(e) => { const nextBranchId = e.target.value; const branchWarehouses = warehouses.filter((w) => w.branch_id === nextBranchId); setForm({ ...form, branch_id: nextBranchId, warehouse_id: branchWarehouses.length === 1 ? branchWarehouses[0].id : '' }); resetCreateLines(); }}><option value="">{t('branch')}</option>{visibleBranches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}</Select><Select label={t('warehouse')} value={form.warehouse_id} onChange={(e) => { setForm({ ...form, warehouse_id: e.target.value }); resetCreateLines(); }}><option value="">{t('warehouse')}</option>{warehouses.filter((w) => !form.branch_id || w.branch_id === form.branch_id).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</Select><Select label={t('countType')} value={form.count_type} onChange={(e) => setForm({ ...form, count_type: e.target.value })}>{typeOptions.map((x) => <option key={x.key} value={x.key}>{x.label}</option>)}</Select></div>
@@ -361,7 +403,36 @@ export function StockCountsPage() {
         <div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setCreateOpen(false)}>{t('cancel')}</Button><Button onClick={createCount}>{t('save')}</Button></div>
       </div></Modal>
 
-      <Modal open={!!viewTarget} onClose={() => setViewTarget(null)} title={t('countItems') + (viewTarget?.count_number ? ` - ${viewTarget.count_number}` : '')} size="lg">{viewTarget && <div className="space-y-3"><div className="flex items-center justify-between rounded-lg bg-ui-page-alt px-4 py-3"><span className="text-sm text-ui-muted">{isAr ? 'إجمالي قيمة الجرد' : 'Total Count Value'}</span><span className="text-lg font-bold text-ui-text">{formatNumber(viewTotalValue, 2)}</span></div><DataTable columns={itemColumns} data={viewTarget.items || []} emptyMessage={t('noData')} /></div>}</Modal>
+      <Modal open={!!viewTarget} onClose={closeCountDetails} title={t('countItems') + (viewTarget?.count_number ? ` - ${viewTarget.count_number}` : '')} size="lg">
+        {viewTarget && <div className="space-y-4" data-testid="stock-count-details">
+          <div className="grid grid-cols-2 gap-3 rounded-xl border border-ui-border bg-ui-page-alt p-4 text-sm sm:grid-cols-4">
+            <div><div className="text-xs text-ui-muted">{t('branch')}</div><div className="font-semibold text-ui-text">{viewTarget.branch?.name || '-'}</div></div>
+            <div><div className="text-xs text-ui-muted">{t('warehouse')}</div><div className="font-semibold text-ui-text">{viewTarget.warehouse?.name || '-'}</div></div>
+            <div><div className="text-xs text-ui-muted">{t('status')}</div>{statusPill(viewTarget.status)}</div>
+            <div><div className="text-xs text-ui-muted">{t('date')}</div><div className="font-semibold text-ui-text">{formatDateTime(viewTarget.created_at, lang)}</div></div>
+          </div>
+          <div className="flex items-center justify-between rounded-lg bg-ui-page-alt px-4 py-3">
+            <span className="text-sm text-ui-muted">{isAr ? 'إجمالي قيمة الجرد' : 'Total Count Value'}</span>
+            <span className="text-lg font-bold text-ui-text">{viewItemsLoading ? '—' : formatNumber(viewTotalValue, 2)}</span>
+          </div>
+          {viewItemsLoading ? (
+            <p role="status" className="py-6 text-center text-sm text-ui-muted">{isAr ? 'جارٍ تحميل تفاصيل الأصناف...' : 'Loading count lines...'}</p>
+          ) : viewItemsError ? (
+            <div role="alert" className="rounded-xl border border-ui-danger p-4 text-sm text-ui-danger">
+              {viewItemsError}
+              <Button variant="outline" size="sm" onClick={() => void openCountDetails(viewTarget)}>{isAr ? 'إعادة المحاولة' : 'Retry'}</Button>
+            </div>
+          ) : (viewTarget.items || []).length ? (
+            <DataTable columns={itemColumns} data={viewTarget.items || []} emptyMessage={t('noData')} />
+          ) : (
+            <div data-testid="stock-count-details-empty" className="rounded-xl border border-dashed border-ui-border p-6 text-center text-sm text-ui-muted">
+              {isAr ? 'جلسة الجرد هذه لا تحتوي على بنود محفوظة. يمكن أن تكون مسودة فارغة.' : 'This stock count has no saved lines; it may be an empty draft.'}
+            </div>
+          )}
+          {viewTarget.notes && <div className="text-sm text-ui-muted">{t('notes')}: {viewTarget.notes}</div>}
+          {viewTarget.rejection_reason && <div className="text-sm text-ui-danger">{t('reason')}: {viewTarget.rejection_reason}</div>}
+        </div>}
+      </Modal>
       <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title={t('editCountItem')} size="lg">{editTarget && <div className="space-y-4"><div className="flex items-center justify-between"><p className="text-sm font-medium text-ui-muted">{t('countItems')}</p><Button variant="outline" size="sm" onClick={addEditLine}><Plus className="w-4 h-4" /> {t('addCountItem')}</Button></div><div className="space-y-2">{editLines.map((l, idx) => <div key={idx} className="grid grid-cols-12 gap-2 items-end"><div className="col-span-6"><Select label={idx === 0 ? t('product') : undefined} value={l.product_id} onChange={(e) => updateEditLine(idx, 'product_id', e.target.value)}><option value="">{t('product')}</option>{editProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div><div className="col-span-3"><Input label={idx === 0 ? t('countedQuantity') : undefined} type="number" step="0.0001" value={l.counted_quantity} onChange={(e) => updateEditLine(idx, 'counted_quantity', e.target.value)} placeholder="0" /></div><div className="col-span-2"><Input label={idx === 0 ? t('reason') : undefined} value={l.reason} onChange={(e) => updateEditLine(idx, 'reason', e.target.value)} placeholder={isAr ? 'سبب' : 'Reason'} /></div><div className="col-span-1 flex justify-end"><button onClick={() => removeEditLine(idx)} className="p-2 rounded-md hover:bg-ui-danger-soft text-ui-danger"><Trash2 className="w-4 h-4" /></button></div></div>)}</div><div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setEditTarget(null)}>{t('cancel')}</Button><Button onClick={saveEdit}>{t('save')}</Button></div></div>}</Modal>
       <ConfirmDialog open={!!confirmTarget && confirmTarget.action !== 'reject'} onClose={() => setConfirmTarget(null)} onConfirm={() => confirmTarget && runWorkflow(confirmTarget.action)} title={confirmTarget?.action ? t(confirmTarget.action === 'submit' ? 'submitCount' : confirmTarget.action === 'approve' ? 'approveCount' : 'applyCount') : ''} message={confirmTarget?.action ? (confirmTarget.action === 'submit' ? t('submitCountConfirm') : confirmTarget.action === 'approve' ? t('approveCountConfirm') : t('applyCountConfirm')) : ''} confirmLabel={t('save')} cancelLabel={t('cancel')} />
       <Modal open={!!confirmTarget && confirmTarget.action === 'reject'} onClose={() => setConfirmTarget(null)} title={t('rejectCount')} size="sm"><div className="space-y-4"><p className="text-sm text-ui-subtle">{t('rejectCountConfirm')}</p><Input label={t('reason')} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder={isAr ? 'سبب الرفض' : 'Rejection reason'} /><div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setConfirmTarget(null)}>{t('cancel')}</Button><Button variant="danger" onClick={() => runWorkflow('reject')}>{t('rejectCount')}</Button></div></div></Modal>
