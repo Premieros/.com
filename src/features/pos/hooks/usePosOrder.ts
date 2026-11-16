@@ -250,6 +250,10 @@ export function usePosOrder(input: UsePosOrderInput) {
   const completeSale = useCallback(async (): Promise<boolean> => {
     const explicitlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
     if (settlementLockRef.current || base.mutationLockRef.current) return false;
+    if (base.paymentMethod !== 'credit' && base.total > 0 && base.paidAmount <= 0) {
+      show(isAr ? 'أدخل مبلغ التحصيل قبل تأكيد البيع.' : 'Enter a payment amount before confirming the sale.', 'error');
+      return false;
+    }
 
     if (explicitlyOffline) {
       if (base.cart.length === 0 || base.completing || offlineCompleting) return false;
