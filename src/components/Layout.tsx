@@ -87,6 +87,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
     const defaults: Record<string, boolean> = {
       main: false,
+      orders: true,
+      customers: true,
       centers: false,
       catalog: true,
       reports: true,
@@ -156,6 +158,8 @@ export function Layout({ children }: { children: ReactNode }) {
   }, [location.pathname, visibleItems]);
 
   const sidebarSectionLabel = (group: SidebarSection) => {
+    if (group === 'orders') return ar ? 'الطلبات' : 'Orders';
+    if (group === 'customers') return ar ? 'العملاء' : 'Customers';
     if (group === 'reports') return ar ? 'التقارير' : 'Reports';
     if (group === 'inventory') return ar ? 'المخزون والمشتريات' : 'Inventory & Purchasing';
     return businessGroupLabel(runtime, group, ar ? 'ar' : 'en', MENU_GROUPS[group][ar ? 'ar' : 'en']);
@@ -357,6 +361,31 @@ export function Layout({ children }: { children: ReactNode }) {
           {SIDEBAR_SECTION_ORDER.map((group) => {
             const items = grouped[group] ?? [];
             if (!items.length) return null;
+            // Orders (Sales Invoices) and Customers are one-click primary
+            // destinations, not nested accordions. Other sections keep their
+            // existing expand/collapse behavior and Premier visual styling.
+            if (group === 'orders' || group === 'customers') {
+              const item = items[0];
+              return (
+                <section key={group} data-testid={`nav-group-${group}`} className="mb-1">
+                  <NavLink
+                    to={item.route}
+                    data-testid={`nav-item-${item.id}`}
+                    onPointerEnter={() => prefetchAppRoute(item.route)}
+                    onFocus={() => prefetchAppRoute(item.route)}
+                    onTouchStart={() => prefetchAppRoute(item.route)}
+                    onClick={() => setMobileOpen(false)}
+                    className={({ isActive }) => `group flex min-h-[38px] items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-all duration-150 ${isActive ? 'bg-ui-primary text-ui-primary-fg shadow-[0_4px_12px_rgba(91,43,216,0.18)]' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary'}`}
+                  >
+                    {ICONS[item.icon]}
+                    <span className="flex-1 truncate">{businessMenuLabel(
+                      runtime, item.id, ar ? 'ar' : 'en',
+                      item.label ? item.label[ar ? 'ar' : 'en'] : t(item.labelKey),
+                    )}</span>
+                  </NavLink>
+                </section>
+              );
+            }
             return (
               <section key={group} data-testid={`nav-group-${group}`} className="mb-2">
                 <button

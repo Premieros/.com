@@ -30,10 +30,12 @@ export const MENU_GROUPS: Record<MenuGroup, { ar: string; en: string }> = {
 
 export const MENU_ITEMS: MenuItemConfig[] = [
   { id: 'dashboard', route: APP_ROUTES.dashboard, icon: 'dashboard', labelKey: 'dashboard', permission: 'dashboard.view', group: 'main' },
-  { id: 'pos', route: APP_ROUTES.pos, icon: 'pos', labelKey: 'pos', permission: 'pos.view', group: 'main' },
-  { id: 'kitchen-display', route: APP_ROUTES.kitchenDisplay, icon: 'kitchenDisplay', labelKey: 'kitchenDisplay', permission: 'pos.kds_view', group: 'main' },
+  { id: 'pos', route: APP_ROUTES.pos, icon: 'pos', labelKey: 'pos', permission: 'pos.view', group: 'centers' },
+  { id: 'kitchen-display', route: APP_ROUTES.kitchenDisplay, icon: 'kitchenDisplay', labelKey: 'kitchenDisplay', permission: 'pos.kds_view', group: 'centers' },
   { id: 'reports', route: APP_ROUTES.reports, icon: 'reports', labelKey: 'reports', label: { ar: 'مركز التقارير', en: 'Reports Center' }, permissionsAny: ['reports.view', 'reports.financial'], group: 'main' },
-  { id: 'business-records', route: APP_ROUTES.businessRecords, icon: 'customers', labelKey: 'customers', label: { ar: 'سجلات النشاط', en: 'Business Records' }, permission: 'customers.view', group: 'main' },
+  { id: 'business-records', route: APP_ROUTES.businessRecords, icon: 'customers', labelKey: 'customers', label: { ar: 'سجلات النشاط', en: 'Business Records' }, permission: 'customers.view', group: 'centers' },
+  { id: 'customers', route: APP_ROUTES.customers, icon: 'customers', labelKey: 'customers', permission: 'customers.view', group: 'main' },
+  { id: 'sales-invoices', route: APP_ROUTES.sales, icon: 'sales', labelKey: 'orders', label: { ar: 'الطلبات', en: 'Orders' }, permission: 'sales.view', group: 'main' },
 
   { id: 'operations-center', route: APP_ROUTES.operationsCenter, icon: 'pos', labelKey: 'orders', label: { ar: 'مركز العمليات', en: 'Operations Center' }, permission: 'dashboard.view', group: 'centers' },
   { id: 'inventory-center', route: APP_ROUTES.inventoryCenter, icon: 'inventory', labelKey: 'inventory', label: { ar: 'مركز المخزون', en: 'Inventory Center' }, permission: 'inventory.view', group: 'centers' },
@@ -56,13 +58,15 @@ export const MENU_ITEMS: MenuItemConfig[] = [
  * Sidebar-only grouping. Existing routes and permission gates remain the
  * source of truth; this only reorganizes already-visible links.
  */
-export type SidebarSection = MenuGroup | 'reports' | 'inventory';
+export type SidebarSection = MenuGroup | 'orders' | 'customers' | 'reports' | 'inventory';
 
 export const SIDEBAR_SECTION_ORDER: readonly SidebarSection[] = [
-  'main', 'reports', 'inventory', 'catalog', 'centers', 'admin',
+  'main', 'orders', 'customers', 'reports', 'inventory', 'catalog', 'centers', 'admin',
 ] as const;
 
 export function sidebarSectionForItem(item: Pick<MenuItemConfig, 'id' | 'group'>): SidebarSection {
+  if (item.id === 'sales-invoices') return 'orders';
+  if (item.id === 'customers') return 'customers';
   if (item.id === 'reports') return 'reports';
   if (item.id === 'inventory-center' || item.id === 'stock-counts' || item.id === 'procurement-center') {
     return 'inventory';

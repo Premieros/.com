@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { MENU_ITEMS, SIDEBAR_SECTION_ORDER, sidebarSectionForItem } from '@/core/navigation/menu.config';
+import { readFileSync } from 'node:fs';
 
 describe('Premier sidebar section organization', () => {
   it('keeps the visual sections in a predictable order', () => {
     expect(SIDEBAR_SECTION_ORDER).toEqual([
-      'main', 'reports', 'inventory', 'catalog', 'centers', 'admin',
+      'main', 'orders', 'customers', 'reports', 'inventory', 'catalog', 'centers', 'admin',
     ]);
   });
 
@@ -14,6 +15,14 @@ describe('Premier sidebar section organization', () => {
       if (!item) throw new Error('Missing menu item: ' + id);
       return sidebarSectionForItem(item);
     };
+    expect(group('dashboard')).toBe('main');
+    expect(group('sales-invoices')).toBe('orders');
+    expect(group('pos')).toBe('centers');
+    expect(group('kitchen-display')).toBe('centers');
+    expect(group('operations-center')).toBe('centers');
+    expect(group('customers')).toBe('customers');
+    expect(group('people-center')).toBe('centers');
+    expect(group('business-records')).toBe('centers');
     expect(group('reports')).toBe('reports');
     expect(group('inventory-center')).toBe('inventory');
     expect(group('stock-counts')).toBe('inventory');
@@ -21,7 +30,22 @@ describe('Premier sidebar section organization', () => {
     expect(group('products')).toBe('catalog');
     expect(group('raw-materials')).toBe('catalog');
     expect(group('finance-center')).toBe('centers');
+    expect(MENU_ITEMS.find((item) => item.id === 'sales-invoices')).toMatchObject({
+      route: '/sales', permission: 'sales.view',
+    });
+    expect(MENU_ITEMS.find((item) => item.id === 'customers')).toMatchObject({
+      route: '/customers', permission: 'customers.view',
+    });
     expect(group('super-admin')).toBe('admin');
+  });
+
+  it('keeps Orders and Customers one-click links and sends Orders to sales invoices', () => {
+    const layout = readFileSync('src/components/Layout.tsx', 'utf8');
+    expect(layout).toContain("group === 'orders' || group === 'customers'");
+    expect(MENU_ITEMS.find((item) => item.id === 'sales-invoices')).toMatchObject({
+      label: { ar: 'الطلبات', en: 'Orders' },
+      route: '/sales', permission: 'sales.view',
+    });
   });
 
   it('reorganizes without hiding, duplicating or modifying any link', () => {
