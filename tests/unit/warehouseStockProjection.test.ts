@@ -110,6 +110,23 @@ describe('warehouse-scoped offline inventory', () => {
     }
   });
 
+  it('rejects coerced legacy queued quantities instead of trusting an inventory reservation', () => {
+    for (const quantity of ['2', ' 2 ', true, ' ', '0.5']) {
+      const legacy = sale('legacy-sale', 'warehouse-a', 2);
+      legacy.payload.p_items = [{ product_id:'product-1', quantity: quantity as unknown as number }] as typeof legacy.payload.p_items;
+      expect(check({balances:[snap('warehouse-a', 20)], sales:[legacy]}))
+        .toEqual({status:'unknown',reason:'UNSCOPED_QUEUED_SALE'});
+    }
+  });
+
+  it('rejects malformed cached warehouse snapshot quantities, never converting blank to zero', () => {
+    for (const quantity of ['', ' ', '20', null, true]) {
+      const corrupted = {...snap('warehouse-a', 20), serverQuantity:quantity as unknown as number};
+      expect(check({balances:[corrupted]}))
+        .toEqual({status:'unknown',reason:'WAREHOUSE_STOCK_SNAPSHOT_STALE'});
+    }
+  });
+
   it('fails closed on a malformed warehouse binding for a matching queued product', () => {
     const malformed = sale('bad-warehouse', 'warehouse-a', 2);
     malformed.payload.p_warehouse_id = { unexpected: 'warehouse' } as unknown as string;

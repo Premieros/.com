@@ -41,3 +41,18 @@ export function printQueueDiagnostics(job: CloudPrintQueueRow): string {
     `created_at: ${job.created_at}`,
   ].join('\n');
 }
+
+/** Hide stale results synchronously on branch/permission changes.
+ * Network response validation alone does not prevent the previous branch's
+ * already-rendered jobs from remaining visible while a new read is pending.
+ */
+export function scopeVisiblePrintQueueJobs(
+  rows: CloudPrintQueueRow[],
+  loadedBranchId: string,
+  selectedBranchId: string,
+  canManagePrinters: boolean,
+): CloudPrintQueueRow[] {
+  if (!canManagePrinters || !selectedBranchId || loadedBranchId !== selectedBranchId
+    || rows.some(row => !row || row.branch_id !== selectedBranchId)) return [];
+  return rows;
+}
