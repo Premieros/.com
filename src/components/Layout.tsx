@@ -209,7 +209,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-ui-page text-ui-text overflow-x-hidden" data-testid="app-shell">
-      <header data-testid="app-header" className={`fixed top-0 start-0 end-0 z-[60] flex h-[64px] items-center justify-between gap-3 liquid-glass-header px-4 shadow-ui-sm transition-all duration-200 sm:px-6 ${desktopSidebarHidden ? 'lg:start-0' : 'lg:start-[260px]'}`}>
+      <header data-testid="app-header" className={`fixed top-0 start-0 end-0 z-[60] flex h-[var(--premier-topbar-height)] min-h-0 items-center justify-between gap-3 liquid-glass-header px-4 shadow-ui-sm transition-all duration-200 sm:px-6 ${desktopSidebarHidden ? 'lg:start-0' : 'lg:start-[260px]'}`}>
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <button data-testid="sidebar-open" type="button" onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-ui-muted hover:bg-ui-page-alt lg:hidden" aria-label={ar ? 'فتح القائمة' : 'Open sidebar'}>
             <Menu className="h-5 w-5" />
@@ -451,7 +451,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {mobileOpen && <button data-testid="mobile-sidebar-backdrop" type="button" className="fixed inset-0 z-40 bg-ui-text/20 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} aria-label={ar ? 'إغلاق' : 'Close'} />}
 
-      <div data-testid="app-content-shell" className={`min-h-screen pt-[64px] transition-all duration-200 ${desktopSidebarHidden ? 'lg:ms-0' : 'lg:ms-[260px]'}`}>
+      <div data-testid="app-content-shell" className={`min-h-screen pt-[var(--premier-topbar-height)] transition-all duration-200 ${desktopSidebarHidden ? 'lg:ms-0' : 'lg:ms-[260px]'}`}>
         <ReturnContextBanner />
         {branchScope.isAggregate && (
           <div data-testid="aggregate-branch-action-banner" className="border-b border-ui-warning/30 bg-ui-warning/10 px-4 py-2.5 sm:px-6 lg:px-7">
@@ -488,10 +488,10 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           </div>
         )}
-        <main data-testid="app-main" className="min-h-[calc(100vh-64px)] bg-ui-page p-4 pb-36 sm:p-6 sm:pb-24 lg:p-7 lg:pb-24">
+        <main data-testid="app-main" className="min-h-[calc(100vh-var(--premier-topbar-height))] bg-ui-page px-4 pb-36 pt-3 sm:px-6 sm:pb-24 sm:pt-4 lg:px-7 lg:pb-24 lg:pt-4">
           <div
             data-testid="design-content-surface"
-            className={`min-h-[calc(100vh-64px)] w-full min-w-0 space-y-5 ${fullWidthContent ? 'max-w-none' : 'mx-auto max-w-[1600px]'}`}
+            className={`min-h-[calc(100vh-var(--premier-topbar-height))] w-full min-w-0 space-y-5 ${fullWidthContent ? 'max-w-none' : 'mx-auto max-w-[1600px]'}`}
           >
             {children}
           </div>
