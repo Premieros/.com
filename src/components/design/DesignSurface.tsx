@@ -14,7 +14,7 @@ export function DesignSurface({
   testId: string;
 }) {
   return (
-    <section data-testid={testId} className={clsx('min-w-0 space-y-4', className)}>
+    <section data-testid={testId} className={clsx('min-w-0 space-y-2', className)}>
       {children}
     </section>
   );
@@ -40,7 +40,7 @@ export function DesignPageHeader({
 
 export function DesignFilterBar({ children }: { children: ReactNode }) {
   return (
-    <div data-testid="design-filter-bar" className="ui-accent-card ui-accent-system flex flex-col gap-2 rounded-xl border border-ui-border bg-ui-surface p-3 shadow-ui-sm sm:flex-row sm:flex-wrap sm:items-center">
+    <div data-testid="design-filter-bar" className="ui-accent-card ui-accent-system flex flex-wrap items-center gap-2 rounded-xl border border-ui-border bg-ui-surface px-3 py-2 shadow-ui-sm">
       {children}
     </div>
   );

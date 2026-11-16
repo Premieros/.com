@@ -488,10 +488,10 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           </div>
         )}
-        <main data-testid="app-main" className="min-h-[calc(100vh-64px)] bg-ui-page p-4 pb-36 sm:p-6 sm:pb-24 lg:p-7 lg:pb-24">
+        <main data-testid="app-main" className="min-h-[calc(100vh-64px)] bg-ui-page px-4 pb-36 pt-3 sm:px-6 sm:pb-24 sm:pt-3 lg:px-7 lg:pb-24 lg:pt-3">
           <div
             data-testid="design-content-surface"
-            className={`min-h-[calc(100vh-64px)] w-full min-w-0 space-y-5 ${fullWidthContent ? 'max-w-none' : 'mx-auto max-w-[1600px]'}`}
+            className={`min-h-[calc(100vh-64px)] w-full min-w-0 space-y-3 ${fullWidthContent ? 'max-w-none' : 'mx-auto max-w-[1600px]'}`}
           >
             {children}
           </div>
