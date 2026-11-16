@@ -6,6 +6,7 @@ const header = read('src/components/PageHeader.tsx');
 const surface = read('src/components/design/DesignSurface.tsx');
 const sales = read('src/features/trade/pages/SalesPage.tsx');
 const layout = read('src/components/Layout.tsx');
+const dataTable = read('src/components/DataTable.tsx');
 
 describe('compact above-table page controls', () => {
   it('preserves Premier global app header dimensions and actions', () => {
@@ -20,6 +21,20 @@ describe('compact above-table page controls', () => {
     expect(header).toContain('overflow-x-auto overscroll-x-contain');
     expect(surface).toContain("'min-w-0 space-y-2'");
     expect(layout).toContain('lg:pt-3');
+  });
+
+  it('scrolls rows inside a bounded table while keeping bold column labels and the footer visible', () => {
+    expect(dataTable).toContain('data-testid="data-table-scroll"');
+    expect(dataTable).toContain('overflow-auto overscroll-contain');
+    expect(dataTable).toContain('max-h-[clamp(260px,calc(100dvh-260px),820px)]');
+    expect(dataTable).toContain('sticky top-0 z-20');
+    expect(dataTable).toContain('font-extrabold uppercase');
+    expect(dataTable).toContain('data-testid="data-table-footer"');
+    expect(dataTable).toContain('displayData.reduce((acc, row)');
+    expect(dataTable).toContain('displayData.length');
+    expect(sales).toContain("key: 'total'");
+    expect(sales).toContain("key: 'paid_amount'");
+    expect(sales).toContain('branch_ids: branchScope.selectedBranchIds');
   });
 
   it('keeps invoice search visible but moves optional filters out of the above-table area', () => {
