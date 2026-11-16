@@ -1386,6 +1386,7 @@ export function PosWorkspacePage() {
         tables={tables}
         areas={diningAreas}
         ordersByTable={ordersByTable}
+        onOrderChanged={() => setReloadKey((value) => value + 1)}
         onOperatorTransferred={() => setReloadKey((value) => value + 1)}
       />
       )}
