@@ -113,6 +113,79 @@ describe('partial table transfer against the full schema and actual guards', () 
   expect((await client.query(`SELECT count(*)::int n FROM public.inventory_ledger`)).rows[0].n).toBe(ledgerBefore);
   expect((await client.query(`SELECT count(*)::int n FROM public.audit_log WHERE id=$1`,[payload.operation_id])).rows[0].n).toBe(1);
  });
+ it('moves two distinct selected lines atomically, preserves quantities and kitchen/inventory totals, and replays once', async () => {
+  const extra = (await client.query(
+   "INSERT INTO public.order_items(order_id,product_id,quantity,unit_price,total,notes) VALUES($1,$2,2,20,40,'second line') RETURNING id",
+   [source,productId],
+  )).rows[0].id as string;
+  const extraSend = (await client.query(
+   'INSERT INTO public.order_kitchen_sends(branch_id,order_id,order_item_id,sent_quantity,sent_by) VALUES($1,$2,$3,2,$4) RETURNING id',
+   [ids.branchA,source,extra,ids.users.branch_manager],
+  )).rows[0].id as string;
+  await client.query(
+   'INSERT INTO public.order_kitchen_inventory_events(branch_id,warehouse_id,order_id,order_item_id,kitchen_send_id,sent_quantity,total_cost,created_by) VALUES($1,$2,$3,$4,$5,2,6,$6)',
+   [ids.branchA,ids.whA,source,extra,extraSend,ids.users.branch_manager],
+  );
+  await client.query('UPDATE public.orders SET subtotal=100,total=94 WHERE id=$1',[source]);
+  const balancesBefore = (await client.query(
+   "SELECT sum(subtotal)::float8 subtotal,sum(discount_amount)::float8 discount,sum(total)::float8 total FROM public.orders WHERE id=ANY($1::uuid[])",
+   [[source,target]],
+  )).rows[0];
+  const sendsBefore = (await client.query(
+   'SELECT sum(sent_quantity)::float8 quantity FROM public.order_kitchen_sends WHERE order_id=ANY($1::uuid[])',
+   [[source,target]],
+  )).rows[0].quantity;
+  const eventsBefore = (await client.query(
+   'SELECT count(*)::int count,sum(total_cost)::float8 cost FROM public.order_kitchen_inventory_events WHERE order_id=ANY($1::uuid[])',
+   [[source,target]],
+  )).rows[0];
+  const ledgerBefore = (await client.query('SELECT count(*)::int count FROM public.inventory_ledger')).rows[0].count;
+  const extraExpected = (await client.query(
+   "SELECT jsonb_build_object('quantity',quantity,'product_id',product_id,'unit_name',unit_name,'unit_price',unit_price,'discount_amount',discount_amount,'bonus_quantity',bonus_quantity,'notes',COALESCE(notes,''),'modifier_option_ids',COALESCE(to_jsonb(modifier_option_ids),'[]')) expected FROM public.order_items WHERE id=$1",
+   [extra],
+  )).rows[0].expected;
+  const payload = { operation_id:randomUUID(), quantities: [
+   { order_item_id:line, quantity:1, expected },
+   { order_item_id:extra, quantity:2, expected:extraExpected },
+  ] };
+  const move = () => runAsPersist(client,ids.users.cashier,
+   'SELECT public.transfer_order_items_to_table($1,$2::uuid[],$3,$4::jsonb) result',
+   [source,[line,extra],targetTable,JSON.stringify(payload)],
+  );
+  const moved = await move();
+  expect(moved.error?.message).toBeUndefined();
+  const result = moved.rows[0].result as PosItemTransferResult;
+  expect(result,JSON.stringify(result)).toMatchObject({ success:true,inventory_changed:false,kds_resent:false });
+  expect(result.quantity_transfers).toHaveLength(2);
+  expect((await client.query('SELECT quantity::float8 quantity FROM public.order_items WHERE id=$1',[line])).rows[0].quantity).toBe(2);
+  const lineRows = (await client.query(
+   'SELECT order_id,quantity::float8 quantity FROM public.order_items WHERE id=$1',[extra],
+  )).rows;
+  // A full-line move may retain the original item ID; any replacement must
+  // still belong to the destination and preserve its exact quantity.
+  const secondMove = result.quantity_transfers!.find(x => x.source_item_id===extra)!;
+  const movedExtra = (await client.query(
+   'SELECT order_id,quantity::float8 quantity FROM public.order_items WHERE id=$1',[secondMove.moved_item_id],
+  )).rows[0];
+  expect(movedExtra).toMatchObject({order_id:target,quantity:2});
+  const balancesAfter = (await client.query(
+   "SELECT sum(subtotal)::float8 subtotal,sum(discount_amount)::float8 discount,sum(total)::float8 total FROM public.orders WHERE id=ANY($1::uuid[])",
+   [[source,target]],
+  )).rows[0];
+  expect(balancesAfter).toEqual(balancesBefore);
+  expect((await client.query(
+   'SELECT sum(sent_quantity)::float8 quantity FROM public.order_kitchen_sends WHERE order_id=ANY($1::uuid[])',
+   [[source,target]],
+  )).rows[0].quantity).toBe(sendsBefore);
+  expect((await client.query(
+   'SELECT count(*)::int count,sum(total_cost)::float8 cost FROM public.order_kitchen_inventory_events WHERE order_id=ANY($1::uuid[])',
+   [[source,target]],
+  )).rows[0]).toEqual(eventsBefore);
+  expect((await client.query('SELECT count(*)::int count FROM public.inventory_ledger')).rows[0].count).toBe(ledgerBefore);
+  const replay = await move();
+  expect(replay.rows[0].result).toMatchObject({success:true,replayed:true});
+  expect((await client.query('SELECT count(*)::int count FROM public.audit_log WHERE id=$1',[payload.operation_id])).rows[0].count).toBe(1);
+ });
  it('preserves served quantity and never makes a served transfer pending again', async () => {
   await client.query('INSERT INTO public.order_kitchen_served_quantities(order_id,order_item_id,served_quantity,served_at) VALUES($1,$2,3,now())',[source,line]);
   await client.query("UPDATE public.orders SET kitchen_status='served' WHERE id=$1",[source]);
