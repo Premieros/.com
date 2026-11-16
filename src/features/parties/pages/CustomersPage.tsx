@@ -217,12 +217,15 @@ export function CustomersPage() {
         </>
       } />
       <DesignPanel testId="customers-table-panel" bodyClassName="p-2 sm:p-3">
+        {qrLoading && <p role="status" className="mb-2 text-xs text-ui-muted">{lang === 'ar' ? 'جارٍ تحميل عملاء QR...' : 'Loading QR customers...'}</p>}
+        {qrLoadError && <p role="alert" className="mb-2 text-xs text-ui-danger">
+          {lang === 'ar' ? 'تعذر تحميل عملاء QR؛ تظهر سجلات العملاء المسجلين فقط. ' : 'Could not load QR customers; showing registered customers only. '}{qrLoadError}
+        </p>}
         <DataTable
           tableId="customers"
           columns={columns}
           data={filtered}
-          loading={loading || qrLoading}
-          error={qrLoadError ? (lang === 'ar' ? 'تعذر تحميل بعض عملاء QR: ' : 'Some QR customers could not be loaded: ') + qrLoadError : undefined}
+          loading={loading}
           emptyMessage={t('noData')}
           onRowClick={(row) => {
             if (row.qrHistory) setSelectedQrGuest(row.qrHistory);
