@@ -764,10 +764,6 @@ export function PosWorkspacePage() {
     }
   };
 
-  const handleConfirmTransfer = async (orderId: string, fromTableId: string, toTableId: string) => {
-    return await pos.transferOrderToTable(orderId, fromTableId, toTableId);
-  };
-
   const handleConfirmVoid = async (lineKey: string, voidQuantity: number, reason: string) => {
     await pos.voidSentItem(lineKey, voidQuantity, reason);
   };
@@ -1390,7 +1386,6 @@ export function PosWorkspacePage() {
         tables={tables}
         areas={diningAreas}
         ordersByTable={ordersByTable}
-        onConfirmTransfer={handleConfirmTransfer}
         onOperatorTransferred={() => setReloadKey((value) => value + 1)}
       />
       )}
