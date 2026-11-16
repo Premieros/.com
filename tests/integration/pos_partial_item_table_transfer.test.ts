@@ -185,6 +185,13 @@ describe('partial table transfer against the full schema and actual guards', () 
  });
 
  it('moves two distinct selected lines atomically, preserves quantities and kitchen/inventory totals, and replays once', async () => {
+  // The fixture starts with manually seeded totals. Make its fiscal policy
+  // explicit before comparing pre/post totals; otherwise a transfer rightly
+  // recalculates tax under the branch's default rate and gives a false alarm.
+  await client.query(
+    'INSERT INTO public.branch_settings(branch_id,tax_enabled,tax_rate) VALUES($1,false,0) ON CONFLICT(branch_id) DO UPDATE SET tax_enabled=false,tax_rate=0',
+    [ids.branchA],
+  );
   const extra = (await client.query(
    "INSERT INTO public.order_items(order_id,product_id,quantity,unit_price,total,notes) VALUES($1,$2,2,20,40,'second line') RETURNING id",
    [source,productId],
