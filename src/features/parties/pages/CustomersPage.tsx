@@ -13,6 +13,7 @@ import { Button } from '@/components/Button';
 import { Input, Select, Textarea } from '@/components/Input';
 import { Modal } from '@/components/Modal';
 import { BranchBadge } from '@/components/BranchBadge';
+import { PartyProfileCard } from '../components/PartyProfileCard';
 import { BusinessAttributesFields } from '@/features/shared/BusinessAttributesFields';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { formatCurrency } from '@/lib/format';
@@ -46,6 +47,7 @@ export function CustomersPage() {
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
+  const [viewProfile, setViewProfile] = useState<Customer | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [openBalances, setOpenBalances] = useState<Record<string, number>>({});
   const { effectiveSettings } = useSettings();
@@ -152,7 +154,7 @@ export function CustomersPage() {
           data={filtered}
           loading={loading}
           emptyMessage={t('noData')}
-          onRowClick={can('customers.manage') ? openEdit : undefined}
+          onRowClick={(record) => setViewProfile(record)}
           enableExport={can('customers.export')}
           enableTemplate={can('customers.manage')}
           onImportFile={can('customers.manage') ? handleImport : undefined}
@@ -168,6 +170,26 @@ export function CustomersPage() {
         />
         <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
       </DesignPanel>
+      <Modal open={!!viewProfile} onClose={() => setViewProfile(null)}
+        title={lang === 'ar' ? 'بطاقة العميل' : 'Customer profile'} size="lg">
+        {viewProfile && items.some((row) => row.id === viewProfile.id) && (
+          <PartyProfileCard record={viewProfile}
+            branchName={branches.find((branch) => branch.id === viewProfile.branch_id)?.name || '-'}
+            amount={formatCurrency(balanceFor(viewProfile), currency, lang)}
+            ar={lang === 'ar'}
+            actions={
+              <>
+                
+                {can('customers.manage') && (
+                  <Button size="sm" onClick={() => { openEdit(viewProfile); setViewProfile(null); }}>
+                    <Edit2 className="h-4 w-4" /> {t('edit')}
+                  </Button>
+                )}
+              </>
+            }
+          />
+        )}
+      </Modal>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? `${t('edit')} — ${customerLabel}` : `${t('add')} — ${customerLabel}`}>
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
