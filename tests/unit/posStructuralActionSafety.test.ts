@@ -21,17 +21,17 @@ describe('POS structural order operations route through approved server actions'
     expect(modal).toContain('p_reason: reason.trim()');
     expect(modal).toContain("data?.error === 'MANAGER_APPROVAL_REQUIRED'");
     expect(modal).toContain("data?.error === 'SOURCE_HAS_SENT_ITEMS'");
-    expect(modal).toContain('onOrderChanged?.();');
+    expect(modal).toContain('onOrderChanged?.(order.id, actionType);');
   });
 
   it('refreshes order and table snapshots only after successful structural action', () => {
     const page = read('src/features/pos/pages/PosWorkspacePage.tsx');
     const modal = read('src/features/pos/components/tables/TransferOrderModal.tsx');
-    expect(page).toContain('onOrderChanged={() => setReloadKey((value) => value + 1)}');
+    expect(page).toContain('onOrderChanged={(changedOrderId) => {');
     const success = modal.indexOf('if (data?.success) {');
     expect(success).toBeGreaterThan(0);
-    expect(modal.indexOf('onOrderChanged?.();', success)).toBeGreaterThan(success);
+    expect(modal.indexOf('onOrderChanged?.(order.id, actionType);', success)).toBeGreaterThan(success);
     expect(modal.indexOf("data?.error === 'MANAGER_APPROVAL_REQUIRED'", success))
-      .toBeGreaterThan(modal.indexOf('onOrderChanged?.();', success));
+      .toBeGreaterThan(modal.indexOf('onOrderChanged?.(order.id, actionType);', success));
   });
 });
