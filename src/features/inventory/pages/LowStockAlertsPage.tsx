@@ -90,6 +90,14 @@ export function LowStockAlertsPage() {
 
   // An operational page must follow the globally selected branch.
   useEffect(() => {
+    // Close a pending purchase request before a global branch switch can
+    // submit it for the previously selected branch.
+    reorderRequestId.current += 1;
+    setReorderOpen(false);
+    setReorderItems([]);
+    setQtyOverride({});
+    setReorderError(null);
+    setLoadingReorder(false);
     setBranchId(branchFilter || '');
     setWarehouseId('');
   }, [branchFilter]);
