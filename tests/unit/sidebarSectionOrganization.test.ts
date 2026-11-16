@@ -4,7 +4,7 @@ import { MENU_ITEMS, SIDEBAR_SECTION_ORDER, sidebarSectionForItem } from '@/core
 describe('Premier sidebar section organization', () => {
   it('keeps the visual sections in a predictable order', () => {
     expect(SIDEBAR_SECTION_ORDER).toEqual([
-      'main', 'reports', 'inventory', 'catalog', 'centers', 'admin',
+      'main', 'orders', 'customers', 'reports', 'inventory', 'catalog', 'centers', 'admin',
     ]);
   });
 
@@ -14,6 +14,13 @@ describe('Premier sidebar section organization', () => {
       if (!item) throw new Error('Missing menu item: ' + id);
       return sidebarSectionForItem(item);
     };
+    expect(group('dashboard')).toBe('main');
+    expect(group('pos')).toBe('orders');
+    expect(group('kitchen-display')).toBe('orders');
+    expect(group('operations-center')).toBe('orders');
+    expect(group('customers')).toBe('customers');
+    expect(group('people-center')).toBe('customers');
+    expect(group('business-records')).toBe('customers');
     expect(group('reports')).toBe('reports');
     expect(group('inventory-center')).toBe('inventory');
     expect(group('stock-counts')).toBe('inventory');
@@ -21,6 +28,9 @@ describe('Premier sidebar section organization', () => {
     expect(group('products')).toBe('catalog');
     expect(group('raw-materials')).toBe('catalog');
     expect(group('finance-center')).toBe('centers');
+    expect(MENU_ITEMS.find((item) => item.id === 'customers')).toMatchObject({
+      route: '/customers', permission: 'customers.view',
+    });
     expect(group('super-admin')).toBe('admin');
   });
 
