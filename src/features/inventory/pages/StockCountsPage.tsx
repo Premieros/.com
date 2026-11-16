@@ -306,17 +306,19 @@ export function StockCountsPage() {
     setViewItemsError(null);
     setViewItemsLoading(true);
     try {
-      const { data, error: detailError } = await supabase.from('stock_count_items')
-        .select('*, product:products(*), raw_material:raw_materials(*)')
-        .eq('stock_count_id', count.id)
-        .order('id');
+      const { data, error: detailError } = await supabase.from('stock_counts')
+        .select('id, branch_id, items:stock_count_items(*, product:products(*), raw_material:raw_materials(*))')
+        .eq('id', count.id)
+        .eq('branch_id', count.branch_id)
+        .maybeSingle();
       if (requestId !== viewRequestRef.current) return;
       if (!branchScope.selectedBranchSet.has(count.branch_id)) {
         setViewTarget(null);
         return;
       }
       if (detailError) throw detailError;
-      setViewTarget({ ...count, items: (data || []) as StockCountItem[] });
+      if (!data) throw new Error('STOCK_COUNT_NOT_FOUND_OR_FORBIDDEN');
+      setViewTarget({ ...count, items: (data.items || []) as StockCountItem[] });
     } catch {
       if (requestId === viewRequestRef.current) {
         setViewItemsError(isAr
