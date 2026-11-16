@@ -87,6 +87,8 @@ export function Layout({ children }: { children: ReactNode }) {
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
     const defaults: Record<string, boolean> = {
       main: false,
+      orders: true,
+      customers: true,
       centers: false,
       catalog: true,
       reports: true,
@@ -156,6 +158,8 @@ export function Layout({ children }: { children: ReactNode }) {
   }, [location.pathname, visibleItems]);
 
   const sidebarSectionLabel = (group: SidebarSection) => {
+    if (group === 'orders') return ar ? 'الطلبات' : 'Orders';
+    if (group === 'customers') return ar ? 'العملاء' : 'Customers';
     if (group === 'reports') return ar ? 'التقارير' : 'Reports';
     if (group === 'inventory') return ar ? 'المخزون والمشتريات' : 'Inventory & Purchasing';
     return businessGroupLabel(runtime, group, ar ? 'ar' : 'en', MENU_GROUPS[group][ar ? 'ar' : 'en']);
