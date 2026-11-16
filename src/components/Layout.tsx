@@ -144,7 +144,11 @@ export function Layout({ children }: { children: ReactNode }) {
       )
       .sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
   }, [can, user?.role, isAdmin, canAccessModule, canAccessPath, runtime]);
+  // POS has a permanent top-bar shortcut. Reuse the exact same permission,
+  // organization-module and route filters as every other navigation entry.
+  const canOpenPos = visibleItems.some((item) => item.id === 'pos');
   const grouped = useMemo(() => visibleItems.reduce<Partial<Record<SidebarSection, typeof visibleItems>>>((acc, item) => {
+    if (item.id === 'pos') return acc;
     const section = sidebarSectionForItem(item);
     (acc[section] ??= []).push(item);
     return acc;
@@ -239,6 +243,21 @@ export function Layout({ children }: { children: ReactNode }) {
             </button>
           )}
           <CommandPaletteTrigger />
+          {canOpenPos && (
+            <NavLink
+              data-testid="header-pos-shortcut"
+              to={APP_ROUTES.pos}
+              onPointerEnter={() => prefetchAppRoute(APP_ROUTES.pos)}
+              onFocus={() => prefetchAppRoute(APP_ROUTES.pos)}
+              onTouchStart={() => prefetchAppRoute(APP_ROUTES.pos)}
+              aria-label={ar ? 'نقطة البيع' : 'Point of Sale'}
+              title={ar ? 'نقطة البيع' : 'Point of Sale'}
+              className={`flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl border border-ui-border bg-ui-surface px-2.5 text-xs font-bold text-ui-text shadow-ui-xs transition hover:bg-ui-page-alt active:scale-95 sm:px-3 ${isPosRoute ? 'border-ui-primary text-ui-primary' : ''}`}
+            >
+              <ShoppingCart className="h-4 w-4 shrink-0" />
+              <span className="hidden sm:inline">{ar ? 'نقطة البيع' : 'Point of Sale'}</span>
+            </NavLink>
+          )}
         </div>
 
         <div className="relative flex items-center gap-1.5 sm:gap-2">
