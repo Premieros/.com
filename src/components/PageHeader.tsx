@@ -20,7 +20,7 @@ export function PageHeader({ title, subtitle, actions, breadcrumbs }: PageHeader
   const embedded = useEmbeddedCenterPage();
   if (embedded) return actions ? <div data-testid="page-actions" className="flex min-w-0 flex-wrap items-center gap-2 py-2">{actions}</div> : null;
   return (
-    <div data-testid="page-header" className="mb-1 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 sm:flex-nowrap">
+    <div data-testid="page-header" className="mb-1 grid min-w-0 grid-cols-1 items-center gap-x-4 gap-y-2 sm:min-h-12 sm:grid-cols-[minmax(0,1fr)_minmax(0,auto)]">
       <div className="min-w-0">
         {breadcrumbs && breadcrumbs.length > 0 && (
           <nav data-testid="page-breadcrumbs" aria-label="Breadcrumbs" className="mb-0.5 flex flex-wrap items-center gap-1 text-xs">
@@ -45,7 +45,7 @@ export function PageHeader({ title, subtitle, actions, breadcrumbs }: PageHeader
       {actions && (
         <div
           data-testid="page-actions"
-          className="flex min-w-0 max-w-full shrink items-center gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex min-w-0 max-w-full flex-wrap items-center justify-start gap-2 sm:justify-end sm:flex-nowrap sm:overflow-x-auto sm:overscroll-x-contain sm:[scrollbar-width:none] sm:[&::-webkit-scrollbar]:hidden"
         >
           {actions}
         </div>
