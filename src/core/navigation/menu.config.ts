@@ -51,3 +51,21 @@ export const MENU_ITEMS: MenuItemConfig[] = [
 
   { id: 'super-admin', route: APP_ROUTES.superAdmin, icon: 'superAdmin', labelKey: 'superAdmin', permission: 'settings.manage', group: 'admin', superAdminOnly: true },
 ];
+
+/**
+ * Sidebar-only grouping. Existing routes and permission gates remain the
+ * source of truth; this only reorganizes already-visible links.
+ */
+export type SidebarSection = MenuGroup | 'reports' | 'inventory';
+
+export const SIDEBAR_SECTION_ORDER: readonly SidebarSection[] = [
+  'main', 'reports', 'inventory', 'catalog', 'centers', 'admin',
+] as const;
+
+export function sidebarSectionForItem(item: Pick<MenuItemConfig, 'id' | 'group'>): SidebarSection {
+  if (item.id === 'reports') return 'reports';
+  if (item.id === 'inventory-center' || item.id === 'stock-counts' || item.id === 'procurement-center') {
+    return 'inventory';
+  }
+  return item.group;
+}
