@@ -20,10 +20,10 @@ export function PageHeader({ title, subtitle, actions, breadcrumbs }: PageHeader
   const embedded = useEmbeddedCenterPage();
   if (embedded) return actions ? <div data-testid="page-actions" className="flex min-w-0 flex-wrap items-center gap-2 py-2">{actions}</div> : null;
   return (
-    <div data-testid="page-header" className="mb-3 flex min-w-0 flex-col gap-2 sm:mb-4 sm:flex-row sm:items-center sm:justify-between sm:gap-3 lg:mb-5">
+    <div data-testid="page-header" className="mb-1 flex min-w-0 flex-wrap items-center justify-between gap-x-3 gap-y-1.5 sm:flex-nowrap">
       <div className="min-w-0">
         {breadcrumbs && breadcrumbs.length > 0 && (
-          <nav data-testid="page-breadcrumbs" aria-label="Breadcrumbs" className="mb-1.5 flex flex-wrap items-center gap-1 text-xs">
+          <nav data-testid="page-breadcrumbs" aria-label="Breadcrumbs" className="mb-0.5 flex flex-wrap items-center gap-1 text-xs">
             {breadcrumbs.map((crumb, i) => {
               const last = i === breadcrumbs.length - 1;
               return (
@@ -39,13 +39,13 @@ export function PageHeader({ title, subtitle, actions, breadcrumbs }: PageHeader
             })}
           </nav>
         )}
-        <h1 data-testid="page-title" className="text-lg font-extrabold tracking-tight text-ui-text sm:text-xl">{title}</h1>
-        {subtitle && <p data-testid="page-description" className="mt-0.5 text-xs font-medium leading-5 text-ui-muted sm:text-sm">{subtitle}</p>}
+        <h1 data-testid="page-title" className="text-base font-extrabold tracking-tight text-ui-text sm:text-lg">{title}</h1>
+        {subtitle && <p data-testid="page-description" className="mt-0.5 text-xs font-medium leading-4 text-ui-muted">{subtitle}</p>}
       </div>
       {actions && (
         <div
           data-testid="page-actions"
-          className="flex w-full min-w-0 items-center gap-2 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:w-auto sm:flex-wrap sm:overflow-visible sm:pb-0"
+          className="flex min-w-0 max-w-full shrink items-center gap-2 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {actions}
         </div>
