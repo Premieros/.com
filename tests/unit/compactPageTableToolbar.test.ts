@@ -30,6 +30,9 @@ describe('compact above-table page controls', () => {
     expect(dataTable).toContain('sticky top-0 z-20');
     expect(dataTable).toContain('font-extrabold uppercase');
     expect(dataTable).toContain('data-testid="data-table-footer"');
+    expect(dataTable).toContain('renderOpenFilterPanel()');
+    expect(dataTable).toContain('data-testid="data-table-filter-menu"');
+    expect(dataTable).toContain('setOpenFilterKey');
     expect(dataTable).toContain('displayData.reduce((acc, row)');
     expect(dataTable).toContain('displayData.length');
     expect(sales).toContain("key: 'total'");
