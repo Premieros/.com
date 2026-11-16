@@ -30,6 +30,14 @@ describe('immediate navigation screen layout', () => {
     expect(routes).toContain('if (loading || rolesLoading || modulesLoading) return <PageLoader />;');
   });
 
+  it('prefetches frequent list-screen bundles on navigation intent', () => {
+    const prefetch = readFileSync('src/core/navigation/prefetch.ts', 'utf8');
+    expect(prefetch).toContain('[APP_ROUTES.sales]');
+    expect(prefetch).toContain('[APP_ROUTES.customers]');
+    expect(prefetch).toContain('[APP_ROUTES.stockCounts]');
+    expect(prefetch).toContain('prefetched.add(baseRoute)');
+  });
+
   it('shows bold table headings and stable placeholder rows on first fetch, never stale records', () => {
     render(<DataTable columns={columns} data={data} loading showCheckbox tableId="initial-skeleton-test" />);
     expect(screen.getByTestId('table-loading')).toHaveAttribute('aria-busy', 'true');
