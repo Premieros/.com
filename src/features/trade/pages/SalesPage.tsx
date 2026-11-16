@@ -790,7 +790,11 @@ export function SalesPage() {
         <div className="min-w-0 px-3 py-3 sm:px-4 sales-invoices-layout [&_table]:w-full [&_thead_tr]:bg-ui-page-alt/60 [&_th]:px-4 [&_th]:py-4 [&_tbody_tr]:h-[68px] [&_tbody_tr]:hover:bg-ui-page-alt/60 [&_td]:px-4 [&_td]:py-4">
           <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')}
             onRowClick={openViewSale} showCheckbox selectedIds={selectedIds} onSelectionChange={setSelectedIds}
-            tableId="sales-invoices-layout" />
+            tableId="sales-invoices-layout"
+            columnTotals={[
+              { key: 'total', label: isAr ? 'إجمالي الفواتير المعروضة' : 'Visible invoices total', value: (row) => row.total, format: (sum) => formatCurrency(sum, currency, lang) },
+              { key: 'paid_amount', label: isAr ? 'إجمالي المدفوع المعروض' : 'Visible paid total', value: (row) => row.paid_amount, format: (sum) => formatCurrency(sum, currency, lang) },
+            ]} />
         </div>
         <div className="border-t border-ui-border px-4 py-3">
           <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
