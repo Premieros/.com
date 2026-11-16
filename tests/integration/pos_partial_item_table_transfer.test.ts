@@ -113,6 +113,77 @@ describe('partial table transfer against the full schema and actual guards', () 
   expect((await client.query(`SELECT count(*)::int n FROM public.inventory_ledger`)).rows[0].n).toBe(ledgerBefore);
   expect((await client.query(`SELECT count(*)::int n FROM public.audit_log WHERE id=$1`,[payload.operation_id])).rows[0].n).toBe(1);
  });
+ it('transfers a whole order only to a vacant table, preserving kitchen rows and source/target states', async () => {
+  await client.query("UPDATE public.roles SET permissions=(COALESCE(permissions,'[]'::jsonb)||'[\"approvals.review\",\"pos.order.transfer\"]'::jsonb) WHERE role='branch_manager'");
+  const occupied = await runAsPersist(client,ids.users.branch_manager,
+    'SELECT public.transfer_order_to_table($1,$2) result',[source,targetTable]);
+  expect(occupied.error?.message).toBeUndefined();
+  expect(occupied.rows[0].result).toMatchObject({success:false,error:'TARGET_TABLE_OCCUPIED'});
+  const vacant=(await client.query(
+    "INSERT INTO public.dining_tables(branch_id,name,status) VALUES($1,$2,'vacant') RETURNING id",
+    [ids.branchA,`whole-target-${randomUUID()}`])).rows[0].id;
+  const originalTable=(await client.query('SELECT table_id FROM public.orders WHERE id=$1',[source])).rows[0].table_id;
+  const sendsBefore=(await client.query('SELECT order_id,order_item_id,sent_quantity FROM public.order_kitchen_sends WHERE order_id=$1',[source])).rows;
+  const stockBefore=(await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n;
+  const transferred=await runAsPersist(client,ids.users.branch_manager,
+    'SELECT public.transfer_order_to_table($1,$2) result',[source,vacant]);
+  expect(transferred.error?.message).toBeUndefined();
+  expect(transferred.rows[0].result).toMatchObject({success:true,source_table_id:originalTable,target_table_id:vacant});
+  expect((await client.query('SELECT table_id FROM public.orders WHERE id=$1',[source])).rows[0].table_id).toBe(vacant);
+  expect((await client.query('SELECT status FROM public.dining_tables WHERE id=$1',[originalTable])).rows[0].status).toBe('vacant');
+  expect((await client.query('SELECT status FROM public.dining_tables WHERE id=$1',[vacant])).rows[0].status).toBe('occupied');
+  expect((await client.query('SELECT order_id,order_item_id,sent_quantity FROM public.order_kitchen_sends WHERE order_id=$1',[source])).rows).toEqual(sendsBefore);
+  expect((await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n).toBe(stockBefore);
+ });
+
+ it('rejects merging kitchen-sent source, then merges unsent lines with no second inventory or KDS event', async () => {
+  await client.query("UPDATE public.roles SET permissions=(COALESCE(permissions,'[]'::jsonb)||'[\"approvals.review\"]'::jsonb) WHERE role='branch_manager'");
+  const merge = () => runAsPersist(client,ids.users.branch_manager,
+    'SELECT public.perform_pos_order_action($1,$2,$3::jsonb,$4) result',
+    ['merge_order',source,JSON.stringify({target_order_id:target,target_table_id:targetTable}),'Combine two orders']);
+  const sent=await merge();
+  expect(sent.error?.message).toBeUndefined();
+  expect(sent.rows[0].result).toMatchObject({success:false,error:'SOURCE_HAS_SENT_ITEMS'});
+  await client.query('DELETE FROM public.order_kitchen_inventory_events WHERE order_id=$1',[source]);
+  await client.query('DELETE FROM public.order_kitchen_sends WHERE order_id=$1',[source]);
+  const stockBefore=(await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n;
+  const targetSendBefore=(await client.query('SELECT count(*)::int n FROM public.order_kitchen_sends WHERE order_id=$1',[target])).rows[0].n;
+  const merged=await merge();
+  expect(merged.error?.message).toBeUndefined();
+  expect(merged.rows[0].result,JSON.stringify(merged.rows[0].result)).toMatchObject({success:true,action:'merge_order',source_order_id:source,target_order_id:target,inventory_changed:false,kds_changed:false});
+  expect((await client.query('SELECT status FROM public.orders WHERE id=$1',[source])).rows[0].status).toBe('cancelled');
+  expect((await client.query('SELECT count(*)::int n FROM public.order_items WHERE order_id=$1',[source])).rows[0].n).toBe(0);
+  expect((await client.query('SELECT count(*)::int n FROM public.order_items WHERE order_id=$1',[target])).rows[0].n).toBe(2);
+  expect((await client.query('SELECT count(*)::int n FROM public.order_kitchen_sends WHERE order_id=$1',[target])).rows[0].n).toBe(targetSendBefore);
+  expect((await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n).toBe(stockBefore);
+ });
+
+ it('separates one unsent item quantity into a new quick order while conserving total and never re-sending kitchen', async () => {
+  await client.query("UPDATE public.roles SET permissions=(COALESCE(permissions,'[]'::jsonb)||'[\"approvals.review\"]'::jsonb) WHERE role='branch_manager'");
+  const split=()=>runAsPersist(client,ids.users.branch_manager,
+    'SELECT public.perform_pos_order_action($1,$2,$3::jsonb,$4) result',
+    ['split_order',source,JSON.stringify({order_item_id:line,quantity:1,target_kind:'quick',target_table_id:null}),'Separate single item']);
+  const sent=await split();
+  expect(sent.error?.message).toBeUndefined();
+  expect(sent.rows[0].result).toMatchObject({success:false,error:'ITEM_ALREADY_SENT'});
+  await client.query('DELETE FROM public.order_kitchen_inventory_events WHERE order_id=$1',[source]);
+  await client.query('DELETE FROM public.order_kitchen_sends WHERE order_id=$1',[source]);
+  const before=(await client.query('SELECT sum(total)::float8 v FROM public.orders WHERE id=ANY($1::uuid[])',[[source,target]])).rows[0].v;
+  const stockBefore=(await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n;
+  const result=await split();
+  expect(result.error?.message).toBeUndefined();
+  expect(result.rows[0].result,JSON.stringify(result.rows[0].result)).toMatchObject({success:true,action:'split_order',source_order_id:source,inventory_changed:false,kds_changed:false});
+  const newOrder=result.rows[0].result.target_order_id;
+  expect(newOrder).not.toBe(source);
+  expect((await client.query('SELECT order_type,status FROM public.orders WHERE id=$1',[newOrder])).rows[0]).toMatchObject({order_type:'takeaway',status:'open'});
+  expect((await client.query('SELECT quantity::float8 q FROM public.order_items WHERE id=$1',[line])).rows[0].q).toBe(2);
+  expect((await client.query('SELECT sum(quantity)::float8 q FROM public.order_items WHERE order_id=$1',[newOrder])).rows[0].q).toBe(1);
+  const after=(await client.query('SELECT sum(total)::float8 v FROM public.orders WHERE id=ANY($1::uuid[])',[[source,target,newOrder]])).rows[0].v;
+  expect(after).toBe(before);
+  expect((await client.query('SELECT count(*)::int n FROM public.order_kitchen_sends WHERE order_id=$1',[newOrder])).rows[0].n).toBe(0);
+  expect((await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n).toBe(stockBefore);
+ });
+
  it('moves two distinct selected lines atomically, preserves quantities and kitchen/inventory totals, and replays once', async () => {
   const extra = (await client.query(
    "INSERT INTO public.order_items(order_id,product_id,quantity,unit_price,total,notes) VALUES($1,$2,2,20,40,'second line') RETURNING id",
