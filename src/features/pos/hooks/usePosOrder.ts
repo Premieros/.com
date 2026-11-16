@@ -278,7 +278,7 @@ export function usePosOrder(input: UsePosOrderInput) {
         const invoiceNumber = await nextInvoiceNumber();
         const operationKey = pendingOfflineOperationKeyRef.current || createSaleOperationKey();
         pendingOfflineOperationKeyRef.current = operationKey;
-        const paidAmountToUse = base.paymentMethod === 'credit' ? 0 : base.paidAmount || base.total;
+        const paidAmountToUse = base.paymentMethod === 'credit' ? 0 : base.paidAmount;
         const { result, error } = await processSaleForOrder({
           p_client_operation_key: operationKey,
           p_invoice_number: invoiceNumber,
@@ -342,7 +342,7 @@ export function usePosOrder(input: UsePosOrderInput) {
 
       const invoiceNumber = previousAttempt?.payload.p_invoice_number || await nextInvoiceNumber();
       if (!previousAttempt && !isCurrentSettlementPreview(preview)) return false;
-      const paidAmountToUse = base.paymentMethod === 'credit' ? 0 : (base.paidAmount || preview.total);
+      const paidAmountToUse = base.paymentMethod === 'credit' ? 0 : base.paidAmount;
       const payload: ProcessSalePayload = previousAttempt?.payload ?? {
         p_client_operation_key: createSaleOperationKey(),
         p_invoice_number: invoiceNumber,
