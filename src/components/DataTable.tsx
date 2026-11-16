@@ -493,12 +493,49 @@ export function DataTable<T extends { id?: string }>({
   };
 
   if (loading) {
+    // Keep column headers and row dimensions on screen during the first
+    // authorized fetch. Do not show the previous user's or branch's rows.
+    const loadingColumns = columns.filter((col) => !hiddenColumns.has(col.key));
     return (
-      <div data-testid="table-loading" className="flex items-center justify-center py-16">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-8 w-8 border-3 border-ui-primary border-t-transparent" />
-          <p className="text-sm text-ui-subtle">Loading...</p>
+      <div data-testid="table-loading" role="status"
+        aria-label={isRtl ? 'جارٍ تحميل بيانات الجدول' : 'Loading table data'}
+        aria-busy="true" className="min-w-0" >
+        <div className="space-y-3 sm:hidden" aria-hidden="true">
+          {Array.from({ length: 5 }, (_, index) => (
+            <div key={index} className="h-20 animate-pulse rounded-xl border border-ui-border bg-ui-surface p-4">
+              <div className="mb-3 h-3 w-2/3 rounded bg-ui-page-alt" />
+              <div className="h-3 w-1/2 rounded bg-ui-page-alt" />
+            </div>
+          ))}
         </div>
+        <div data-testid="data-table-loading-skeleton"
+          className="hidden max-w-full overflow-x-auto rounded-xl border border-ui-border bg-ui-surface sm:block">
+          <table className="w-full min-w-max border-collapse text-start">
+            <thead className="bg-ui-page-alt">
+              <tr className="border-b border-ui-border">
+                {showCheckbox && <th className="w-10 px-4 py-3" aria-label={isRtl ? 'تحديد' : 'Select'} />}
+                {loadingColumns.map((column) => (
+                  <th key={column.key} className="whitespace-nowrap px-4 py-3 text-start text-xs font-extrabold text-ui-text">
+                    {column.header}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody aria-hidden="true">
+              {Array.from({ length: 7 }, (_, index) => (
+                <tr key={index} className="h-14 border-b border-ui-border last:border-b-0">
+                  {showCheckbox && <td className="px-4 py-3"><div className="h-4 w-4 animate-pulse rounded bg-ui-page-alt" /></td>}
+                  {loadingColumns.map((column, colIndex) => (
+                    <td key={column.key} className="px-4 py-3">
+                      <div className={`h-3 animate-pulse rounded bg-ui-page-alt ${colIndex % 3 === 0 ? 'w-28' : colIndex % 3 === 1 ? 'w-16' : 'w-24'}`} />
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <p className="sr-only">{isRtl ? 'جارٍ تحميل السجلات' : 'Loading records'}</p>
       </div>
     );
   }

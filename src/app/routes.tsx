@@ -79,6 +79,34 @@ function PageLoader() {
   return <PageLoadFallback />;
 }
 
+/**
+ * Lazy page modules may still need a network fetch on first entry. Keep the
+ * authenticated app chrome mounted instead of replacing the entire screen.
+ * No stale/sensitive records are shown until the scoped query resolves.
+ */
+function RouteContentFallback() {
+  return (
+    <section role="status" aria-label="Loading page content" data-testid="route-content-loading"
+      className="min-w-0 space-y-3" aria-busy="true">
+      <div className="flex min-h-12 items-center justify-between gap-4">
+        <div className="h-6 w-40 animate-pulse rounded-lg bg-ui-page-alt" />
+        <div className="h-9 w-36 animate-pulse rounded-lg bg-ui-page-alt" />
+      </div>
+      <div className="overflow-hidden rounded-xl border border-ui-border bg-ui-surface">
+        <div className="h-12 animate-pulse border-b border-ui-border bg-ui-page-alt/70" />
+        {Array.from({ length: 7 }, (_, index) => (
+          <div key={index} className="flex h-14 items-center gap-6 border-b border-ui-border px-5 last:border-b-0"
+            aria-hidden="true">
+            <div className="h-3 w-1/4 animate-pulse rounded bg-ui-page-alt" />
+            <div className="h-3 w-1/3 animate-pulse rounded bg-ui-page-alt" />
+            <div className="h-3 w-1/5 animate-pulse rounded bg-ui-page-alt" />
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function NoAccessPage() {
   return <div className="min-h-screen flex items-center justify-center bg-ui-page p-6"><div className="max-w-md rounded-2xl border border-ui-border bg-ui-surface p-6 text-center shadow-ui-sm"><h1 className="text-lg font-bold text-ui-text">لا توجد شاشة متاحة لهذا المستخدم</h1><p className="mt-2 text-sm text-ui-muted">يرجى مراجعة صلاحيات الدور وتعيين شاشة واحدة على الأقل.</p></div></div>;
 }
@@ -125,7 +153,7 @@ function ProtectedRoute({ children, permission, permissionsAny, fullscreen, supe
   if (permission && !can(permission)) return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
   if (permissionsAny && !permissionsAny.some((candidate) => can(candidate))) return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
   if (fullscreen) return <>{children}</>;
-  return <Layout>{children}</Layout>;
+  return <Layout><Suspense fallback={<RouteContentFallback />}>{children}</Suspense></Layout>;
 }
 
 function PublicRoute({ children }: { children: ReactNode }) {
