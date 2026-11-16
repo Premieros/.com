@@ -158,9 +158,6 @@ describe('partial table transfer against the full schema and actual guards', () 
   expect(result,JSON.stringify(result)).toMatchObject({ success:true,inventory_changed:false,kds_resent:false });
   expect(result.quantity_transfers).toHaveLength(2);
   expect((await client.query('SELECT quantity::float8 quantity FROM public.order_items WHERE id=$1',[line])).rows[0].quantity).toBe(2);
-  const lineRows = (await client.query(
-   'SELECT order_id,quantity::float8 quantity FROM public.order_items WHERE id=$1',[extra],
-  )).rows;
   // A full-line move may retain the original item ID; any replacement must
   // still belong to the destination and preserve its exact quantity.
   const secondMove = result.quantity_transfers!.find(x => x.source_item_id===extra)!;
