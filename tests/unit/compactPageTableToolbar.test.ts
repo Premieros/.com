@@ -43,7 +43,7 @@ describe('compact above-table page controls', () => {
     expect(sales).toContain('aria-expanded={showViewFilters}');
     expect(sales).toContain('showViewFilters && (');
     expect(sales).toContain('data-testid="sales-view-date"');
-    expect(sales).toContain('data-testid="sales-table-panel"');
+    expect(sales).toContain('testId="sales-table-panel"');
     expect(sales).toContain('onRowClick={openViewSale}');
     expect(sales).toContain('branch_ids: branchScope.selectedBranchIds');
   });
