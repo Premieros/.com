@@ -48,6 +48,18 @@ describe('Premier sidebar section organization', () => {
     });
   });
 
+  it('places POS in the top bar, avoiding a duplicate sidebar link', () => {
+    const layout = readFileSync('src/components/Layout.tsx', 'utf8');
+    expect(layout).toContain('data-testid="header-pos-shortcut"');
+    expect(layout).toContain('to={APP_ROUTES.pos}');
+    expect(layout).toContain("const canOpenPos = visibleItems.some((item) => item.id === 'pos')");
+    expect(layout).toContain("if (item.id === 'pos') return acc");
+    expect(layout).toContain("{canOpenPos && (");
+    expect(MENU_ITEMS.find((item) => item.id === 'pos')).toMatchObject({
+      route: '/pos', permission: 'pos.view',
+    });
+  });
+
   it('reorganizes without hiding, duplicating or modifying any link', () => {
     const ids = MENU_ITEMS.map((item) => item.id);
     expect(new Set(ids).size).toBe(ids.length);
