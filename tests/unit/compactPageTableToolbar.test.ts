@@ -16,7 +16,7 @@ describe('compact above-table page controls', () => {
   });
 
   it('compacts the shared title, buttons and whitespace without clipping actions', () => {
-    expect(header).toContain('gap-y-1.5 sm:flex-nowrap');
+    expect(header).toContain('sm:grid-cols-[minmax(0,1fr)_minmax(0,auto)]');
     expect(header).toContain('data-testid="page-header"');
     expect(header).toContain('overflow-x-auto overscroll-x-contain');
     expect(surface).toContain("'min-w-0 space-y-2'");
