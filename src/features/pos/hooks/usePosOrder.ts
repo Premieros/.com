@@ -388,25 +388,9 @@ export function usePosOrder(input: UsePosOrderInput) {
       base.setCheckoutOpen(false);
       base.setPaidAmount(0);
 
-      if (input.effSettings?.receipt_auto_print) {
-        const saleId = extended.sale_id || '';
-        const queued = await enqueueAutomaticReceiptPrint({
-          saleId,
-          receipt,
-          settings: input.effSettings,
-          lang,
-          isAr,
-        });
-        if (!queued.accepted) {
-          show(
-            isAr
-              ? `تم تحصيل الطلب ولكن تعذر إنشاء أمر طباعة الإيصال: ${queued.error || 'PRINT_QUEUE_FAILED'}`
-              : `Order settled, but receipt print job could not be queued: ${queued.error || 'PRINT_QUEUE_FAILED'}`,
-            'error',
-          );
-        }
-      }
-
+      // The financial transaction has already committed. Clear the settled
+      // workspace before attempting an optional printer side effect so a
+      // printer failure cannot leave a paid order looking unpaid.
       if (extended.order_completed) {
         base.resetWorkspace();
         show(t('saleCompleted'), 'success');
@@ -417,6 +401,33 @@ export function usePosOrder(input: UsePosOrderInput) {
             : 'Only sent items were settled. Unsent additions remain on the open order.',
           'success',
         );
+      }
+
+      if (input.effSettings?.receipt_auto_print) {
+        try {
+          const queued = await enqueueAutomaticReceiptPrint({
+            saleId: extended.sale_id || '',
+            receipt,
+            settings: input.effSettings,
+            lang,
+            isAr,
+          });
+          if (!queued.accepted) {
+            show(
+              isAr
+                ? `تم تحصيل الطلب ولكن تعذر إنشاء أمر طباعة الإيصال: ${queued.error || 'PRINT_QUEUE_FAILED'}`
+                : `Order settled, but receipt print job could not be queued: ${queued.error || 'PRINT_QUEUE_FAILED'}`,
+              'warning',
+            );
+          }
+        } catch {
+          show(
+            isAr
+              ? 'تم تحصيل الطلب بنجاح، لكن تعذرت الطباعة. يمكنك إعادة طباعة الإيصال دون إعادة التحصيل.'
+              : 'Payment succeeded but receipt printing failed. Reprint the receipt without taking payment again.',
+            'warning',
+          );
+        }
       }
       return true;
     } finally {
