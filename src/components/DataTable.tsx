@@ -37,6 +37,15 @@ interface DataTableProps<T> {
   templateFilename?: string;
   onImportFile?: (file: File) => void | Promise<void>;
   importAccept?: string;
+  /** Explicit numeric totals for visible branch-scoped and filtered rows. */
+  columnTotals?: Array<{
+    key: string;
+    label: string;
+    value: (row: T) => number;
+    format: (total: number) => ReactNode;
+  }>;
+  /** Set false for embedded detail tables. */
+  internalScroll?: boolean;
 }
 
 type ColumnFilterState = {
@@ -99,6 +108,8 @@ export function DataTable<T extends { id?: string }>({
   templateFilename,
   onImportFile,
   importAccept = '.xlsx,.xls,.csv',
+  columnTotals,
+  internalScroll = true,
 }: DataTableProps<T>) {
   const branchScope = useBranchScope();
   const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
@@ -219,6 +230,16 @@ export function DataTable<T extends { id?: string }>({
       return sortState.direction === 'asc' ? comparison : -comparison;
     });
   }, [columns, filteredData, sortState]);
+
+  const visibleTotals = useMemo(() => (columnTotals ?? [])
+    .filter((total) => visibleColumns.some((column) => column.key === total.key))
+    .map((total) => {
+      const sum = displayData.reduce((acc, row) => {
+        const value = total.value(row);
+        return Number.isFinite(value) ? acc + value : acc;
+      }, 0);
+      return { ...total, sum };
+    }), [columnTotals, displayData, visibleColumns]);
 
   const exportColumns = useMemo(
     () => visibleColumns.filter((col) => col.key !== 'actions'),
@@ -600,7 +621,7 @@ export function DataTable<T extends { id?: string }>({
         </div>
       )}
 
-      <div className="space-y-3 sm:hidden">
+      <div className={`space-y-3 sm:hidden ${internalScroll ? 'max-h-[clamp(240px,calc(100dvh-270px),720px)] overflow-y-auto overscroll-contain pe-1' : ''}`}>
         {enableColumnFilters && visibleColumns.some((col) => col.filterable !== false && col.key !== 'actions') && (
           <div data-testid="data-table-mobile-filters" className="ui-accent-card ui-accent-system flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto overscroll-x-contain rounded-xl border border-ui-border bg-ui-surface p-2 shadow-ui-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {visibleColumns.filter((col) => col.filterable !== false && col.key !== 'actions').map((col) => (
@@ -690,12 +711,12 @@ export function DataTable<T extends { id?: string }>({
         ))}
       </div>
 
-      <div className="ui-accent-top ui-accent-neutral hidden max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-ui-border bg-ui-surface shadow-ui-sm touch-pan-x [scrollbar-gutter:stable] sm:block">
+      <div data-testid="data-table-scroll" role="region" aria-label={isRtl ? 'صفوف الجدول القابلة للتمرير' : 'Scrollable table rows'} tabIndex={0} className={`ui-accent-top ui-accent-neutral hidden max-w-full overflow-auto overscroll-contain rounded-xl border border-ui-border bg-ui-surface shadow-ui-sm [scrollbar-gutter:stable] sm:block ${internalScroll ? 'max-h-[clamp(260px,calc(100dvh-260px),820px)]' : ''}`}>
         <table className="w-full min-w-max text-sm">
-          <thead>
-            <tr className="border-b border-ui-border bg-ui-page-alt/70">
+          <thead className="sticky top-0 z-20 bg-ui-page-alt">
+            <tr className="border-b border-ui-border bg-ui-page-alt">
               {showCheckbox && (
-                <th className="w-10 px-4 py-3">
+                <th className="sticky top-0 z-20 w-10 bg-ui-page-alt px-4 py-3">
                   <input type="checkbox" checked={!!allSelected} onChange={toggleAll}
                     className="h-4 w-4 rounded border-ui-border-strong text-ui-primary focus:ring-ui-ring" />
                 </th>
@@ -703,7 +724,7 @@ export function DataTable<T extends { id?: string }>({
               {visibleColumns.map((col) => (
                 <th
                   key={col.key}
-                  className={`whitespace-nowrap px-4 py-3 text-start text-xs font-bold uppercase tracking-wide text-ui-muted ${col.className || ''}`}
+                  className={`sticky top-0 z-20 whitespace-nowrap bg-ui-page-alt px-4 py-3 text-start text-xs font-extrabold uppercase tracking-wide text-ui-text ${col.className || ''}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span>{col.header}</span>
@@ -747,6 +768,14 @@ export function DataTable<T extends { id?: string }>({
             ))}
           </tbody>
         </table>
+      </div>
+      <div data-testid="data-table-footer" className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-ui-border px-2 py-2 text-xs font-semibold text-ui-muted" aria-live="polite">
+        <span>{isRtl ? 'الصفوف المعروضة' : 'Visible rows'}: <strong className="tabular-nums text-ui-text">{displayData.length}</strong></span>
+        {visibleTotals.map((total) => (
+          <span key={total.key} data-testid={`data-table-total-${total.key}`} className="inline-flex items-center gap-2">
+            {total.label}: <strong className="tabular-nums text-ui-text">{total.format(total.sum)}</strong>
+          </span>
+        ))}
       </div>
     </div>
   );
