@@ -425,47 +425,6 @@ export function usePosOrder(input: UsePosOrderInput) {
     setPaidAmount(0);
   }, []);
 
-  const transferOrderToTable = useCallback(async (targetOrderId: string, fromTableId: string, toTableId: string): Promise<boolean> => {
-    try {
-      const { error: ordErr } = await supabase
-        .from('orders')
-        .update({ table_id: toTableId, updated_at: new Date().toISOString() })
-        .eq('id', targetOrderId);
-
-      if (ordErr) {
-        show(ordErr.message, 'error');
-        return false;
-      }
-
-      await supabase
-        .from('dining_tables')
-        .update({ status: 'vacant', updated_at: new Date().toISOString() })
-        .eq('id', fromTableId);
-
-      await supabase
-        .from('dining_tables')
-        .update({ status: 'occupied', updated_at: new Date().toISOString() })
-        .eq('id', toTableId);
-
-      const { data: newTable } = await supabase
-        .from('dining_tables')
-        .select('*')
-        .eq('id', toTableId)
-        .maybeSingle();
-
-      if (activeOrderId === targetOrderId) {
-        setTableId(toTableId);
-        setActiveTable((newTable as DiningTable) || null);
-      }
-
-      show(isAr ? 'تم تحويل الطلب إلى الطاولة الجديدة بنجاح' : 'Order transferred successfully', 'success');
-      return true;
-    } catch (err) {
-      show(err instanceof Error ? err.message : 'Transfer failed', 'error');
-      return false;
-    }
-  }, [activeOrderId, isAr, show]);
-
   const transferOrderItemToTable = useCallback(async (lineKey: string, targetTableId: string): Promise<boolean> => {
     if (!activeOrderId || !activeTable) return false;
     const item = cart.find((entry) => cartLineKey(entry) === lineKey);
@@ -1082,7 +1041,7 @@ export function usePosOrder(input: UsePosOrderInput) {
     addToCart, updateQty, setQty, removeFromCart, clearCart, setItemDiscount, replaceCartLine,
     switchOrderType, holdOrder, sendToKitchen, printKitchenTicket, completeSale, printReceipt,
     detachTable, detachOrder, resetWorkspace,
-    resumeTableOrder, startTableOrder, transferOrderToTable, transferOrderItemToTable, applyItemsTransfer, voidSentItem,
+    resumeTableOrder, startTableOrder, transferOrderItemToTable, applyItemsTransfer, voidSentItem,
   };
 }
 
