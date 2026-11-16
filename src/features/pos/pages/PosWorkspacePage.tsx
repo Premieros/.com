@@ -1386,7 +1386,15 @@ export function PosWorkspacePage() {
         tables={tables}
         areas={diningAreas}
         ordersByTable={ordersByTable}
-        onOrderChanged={() => setReloadKey((value) => value + 1)}
+        onOrderChanged={(changedOrderId) => {
+          // A merged source order has closed; a moved order now belongs to
+          // another table. Do not let the cashier pay or edit a stale cart.
+          if (pos.activeOrderId === changedOrderId) {
+            pos.resetWorkspace();
+            setMobileOrderOpen(false);
+          }
+          setReloadKey((value) => value + 1);
+        }}
         onOperatorTransferred={() => setReloadKey((value) => value + 1)}
       />
       )}
