@@ -815,6 +815,10 @@ export function usePosOrder(input: UsePosOrderInput) {
     if (mutationLockRef.current || cart.length === 0 || completing) return false;
     if (!branchId) { show(t('selectBranchFirst'), 'error'); return false; }
     if (!activeShift) { show(t('shiftRequired'), 'error'); return false; }
+    if (paymentMethod !== 'credit' && total > 0 && paidAmount <= 0) {
+      show(isAr ? 'أدخل مبلغ التحصيل قبل تأكيد البيع.' : 'Enter a payment amount before confirming the sale.', 'error');
+      return false;
+    }
     if (paymentMethod === 'credit') {
       const creditCustomer = customers.find((customer) =>
         customer.id === customerId
