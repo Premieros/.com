@@ -16,7 +16,8 @@ interface TransferOrderModalProps {
   tables: DiningTable[];
   areas?: DiningArea[];
   ordersByTable: Record<string, Order[]>;
-  onConfirmTransfer?: (orderId: string, fromTableId: string, toTableId: string) => Promise<boolean>;
+  /** Notify the workspace to reload order/table snapshots after a committed structural change. */
+  onOrderChanged?: () => void;
   onOperatorTransferred?: () => void;
 }
 
@@ -28,6 +29,7 @@ export function TransferOrderModal({
   tables,
   areas = [],
   ordersByTable,
+  onOrderChanged,
   onOperatorTransferred,
 }: TransferOrderModalProps) {
   const { t, lang } = useLanguage();
@@ -157,6 +159,7 @@ export function TransferOrderModal({
       }
 
       if (data?.success) {
+        onOrderChanged?.();
         setPendingRequestId(null);
         setPendingStatus(null);
         setSelectedTargetId(null);
