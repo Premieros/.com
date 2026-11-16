@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Trash2, FileText, Edit2, RotateCcw, Eye, Printer } from 'lucide-react';
+import { Trash2, FileText, Edit2, RotateCcw, Eye, Printer, RefreshCw, CalendarDays } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -72,6 +72,8 @@ export function SalesPage() {
     pageSize: 100,
   });
   const [search, setSearch] = useState('');
+  const [displayStatus, setDisplayStatus] = useState<'all' | 'today' | 'completed' | 'returned' | 'other'>('all');
+  const [displayDate, setDisplayDate] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteSelectedConfirm, setDeleteSelectedConfirm] = useState(false);
@@ -116,9 +118,23 @@ export function SalesPage() {
     setCustomersBranchId(branchId);
   }
 
+  const localSaleDay = (value: string) => {
+    const date = new Date(value);
+    if (!Number.isFinite(date.getTime())) return '';
+    return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'),
+      String(date.getDate()).padStart(2, '0')].join('-');
+  };
+  const today = localSaleDay(new Date().toISOString());
+  // Presentation filters apply to the currently loaded, permission-scoped page.
+  // The repository query, financial actions and branch authorization remain unchanged.
   const filtered = items.filter((i) => {
-    if (!search) return true;
-    const s = search.toLowerCase();
+    if (displayStatus === 'today' && localSaleDay(i.created_at) !== today) return false;
+    if (displayStatus === 'completed' && i.status !== 'completed') return false;
+    if (displayStatus === 'returned' && i.status !== 'returned') return false;
+    if (displayStatus === 'other' && ['completed', 'returned'].includes(i.status)) return false;
+    if (displayDate && localSaleDay(i.created_at) !== displayDate) return false;
+    if (!search.trim()) return true;
+    const s = search.trim().toLowerCase();
     return (
       i.invoice_number?.toLowerCase().includes(s) ||
       i.source_order?.order_number?.toLowerCase().includes(s) ||
@@ -596,32 +612,24 @@ export function SalesPage() {
   const PAYMENT_LABELS: Record<string, string> = { cash: t('cash'), card: t('card'), transfer: t('transfer'), credit: t('credit') };
 
   const columns: Column<SaleRow>[] = [
-    { key: 'invoice_number', header: t('invoiceNumber'), render: (r) => (
-      <div className="flex items-start gap-2">
-        <FileText className="mt-0.5 w-4 h-4 text-brand-500" />
-        <div>
-          <div className="font-medium text-ui-text">{r.invoice_number}</div>
+    { key: 'invoice_number', header: t('invoiceNumber'), className: 'min-w-44', mobilePriority: true, render: (r) => (
+      <div className="flex items-center gap-3 min-w-0">
+        <FileText className="h-4 w-4 shrink-0 text-brand-500" />
+        <div className="min-w-0">
+          <div className="font-bold text-ui-text whitespace-nowrap" dir="auto">{r.invoice_number}</div>
           {r.source_order?.order_number && (
-            <div className="text-[11px] font-bold text-ui-subtle">
-              {isAr ? 'الطلب' : 'Order'}: {r.source_order.order_number}
+            <div className="text-xs font-medium text-ui-subtle whitespace-nowrap">
+              {isAr ? 'طلب' : 'Order'}: {r.source_order.order_number}
             </div>
           )}
         </div>
       </div>
     )},
-    { key: 'created_at', header: t('date'), render: (r) => <span className="text-sm text-ui-subtle">{formatDateTime(r.created_at, lang)}</span> },
-    { key: 'customer', header: t('customer'), render: (r) => r.customer?.name || '-' },
-    { key: 'branch', header: t('branch'), render: (r) => <BranchBadge name={branches.find((b) => b.id === r.branch_id)?.name || '-'} /> },
-    { key: 'total', header: t('total'), render: (r) => <span className="font-semibold text-ui-text">{formatCurrency(r.total, currency, lang)}</span> },
-    { key: 'paid_amount', header: isAr ? 'المدفوع' : 'Paid', render: (r) => formatCurrency(r.paid_amount, currency, lang) },
-    { key: 'payment_method', header: isAr ? 'طريقة الدفع' : 'Payment', render: (r) => (
-      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-ui-page-alt text-ui-muted">
-        {PAYMENT_LABELS[r.payment_method] || r.payment_method}
-      </span>
-    )},
-    { key: 'status', header: t('status'), render: (r) => (
-      <div className="flex items-center gap-1.5">
-        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+    { key: 'branch', header: t('branch'), className: 'min-w-36', render: (r) => <BranchBadge name={branches.find((b) => b.id === r.branch_id)?.name || '-'} /> },
+    { key: 'customer', header: t('customer'), className: 'min-w-40', render: (r) => <span className="block max-w-60 truncate font-medium" title={r.customer?.name || ''}>{r.customer?.name || '-'}</span> },
+    { key: 'status', header: t('status'), className: 'min-w-28', render: (r) => (
+      <div className="flex items-center gap-1.5 whitespace-nowrap">
+        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
           r.status === 'completed' ? 'bg-ui-success-soft text-ui-success' :
           r.status === 'returned' ? 'bg-ui-danger-soft text-ui-danger' :
           'bg-ui-warning-soft text-ui-warning'
@@ -629,12 +637,21 @@ export function SalesPage() {
           {r.status}
         </span>
         {r.refunded_amount > 0 && r.status !== 'returned' && (
-          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-ui-warning-soft text-ui-warning">
-            {isAr ? `مرتجع ${formatCurrency(r.refunded_amount, currency, lang)}` : `Refunded ${formatCurrency(r.refunded_amount, currency, lang)}`}
+          <span className="rounded-full bg-ui-warning-soft px-2 py-1 text-xs font-medium text-ui-warning">
+            {isAr ? 'مرتجع جزئي' : 'Partial refund'}
           </span>
         )}
       </div>
     )},
+    { key: 'order_type', header: isAr ? 'المصدر' : 'Source', className: 'min-w-28', render: (r) => <span className="text-ui-muted">{orderTypeLabelForSale(r.order_type) || '-'}</span> },
+    { key: 'total', header: t('total'), className: 'min-w-32 whitespace-nowrap text-end tabular-nums', mobilePriority: true, render: (r) => <span className="font-bold text-ui-text">{formatCurrency(r.total, currency, lang)}</span> },
+    { key: 'paid_amount', header: isAr ? 'المدفوع' : 'Paid', className: 'min-w-28 whitespace-nowrap text-end tabular-nums', render: (r) => formatCurrency(r.paid_amount, currency, lang) },
+    { key: 'payment_method', header: isAr ? 'طريقة الدفع' : 'Payment', className: 'min-w-28', render: (r) => (
+      <span className="whitespace-nowrap rounded-full bg-ui-page-alt px-2.5 py-1 text-xs font-medium text-ui-muted">
+        {PAYMENT_LABELS[r.payment_method] || r.payment_method}
+      </span>
+    )},
+    { key: 'created_at', header: isAr ? 'تاريخ ووقت الإنشاء' : 'Created at', className: 'min-w-44 whitespace-nowrap', render: (r) => <span className="text-sm text-ui-subtle tabular-nums">{formatDateTime(r.created_at, lang)}</span> },
     { key: 'actions', header: t('actions'), render: (r) => (
       <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
         {canPreviewReceipt && (
@@ -701,15 +718,68 @@ export function SalesPage() {
                 : null}
         </div>
       )}
-      <DesignPanel testId="sales-search-panel">
-        <DesignSearch value={search} onChange={setSearch} label={t('search')}
-          placeholder={isAr ? 'بحث برقم الفاتورة أو رقم الطلب أو اسم العميل...' : 'Search by invoice number, order number or customer...'} testId="sales-search" />
+      <DesignPanel testId="sales-search-panel" bodyClassName="p-4 sm:p-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0 flex-1 lg:max-w-xl">
+            <DesignSearch value={search} onChange={setSearch} label={t('search')}
+              placeholder={isAr ? 'رقم الفاتورة أو الطلب أو العميل...' : 'Invoice, order or customer...'} testId="sales-search" />
+          </div>
+          <div className="flex flex-wrap items-end gap-2">
+            <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted" htmlFor="sales-view-date">
+              <span>{isAr ? 'تاريخ الإنشاء' : 'Creation date'}</span>
+              <span className="inline-flex items-center gap-2 rounded-lg border border-ui-border bg-ui-surface px-3 py-2">
+                <CalendarDays className="h-4 w-4 text-ui-subtle" />
+                <input id="sales-view-date" data-testid="sales-view-date" type="date"
+                  className="min-w-0 bg-transparent text-sm text-ui-text outline-none"
+                  value={displayDate} onChange={(event) => setDisplayDate(event.target.value)} />
+              </span>
+            </label>
+            {(displayDate || search || displayStatus !== 'all') && (
+              <Button variant="outline" size="sm" onClick={() => { setDisplayDate(''); setSearch(''); setDisplayStatus('all'); }}>
+                {isAr ? 'مسح التصفية' : 'Clear filters'}
+              </Button>
+            )}
+            <Button variant="outline" size="sm" onClick={() => void reloadSales()} data-testid="sales-view-refresh">
+              <RefreshCw className="h-4 w-4" /> {isAr ? 'تحديث' : 'Refresh'}
+            </Button>
+          </div>
+        </div>
       </DesignPanel>
 
-      <DesignPanel testId="sales-table-panel">
-        <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')}
-          onRowClick={openViewSale} showCheckbox selectedIds={selectedIds} onSelectionChange={setSelectedIds} />
-        <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
+      <DesignPanel testId="sales-table-panel" bodyClassName="p-0">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ui-border px-4 py-3 sm:px-5">
+          <div className="flex max-w-full items-center gap-1 overflow-x-auto" role="group" aria-label={isAr ? 'عرض الفواتير حسب الحالة' : 'Invoice display filter'}>
+            {([
+              ['all', isAr ? 'الكل' : 'All'],
+              ['today', isAr ? 'اليوم' : 'Today'],
+              ['completed', isAr ? 'مكتملة' : 'Completed'],
+              ['returned', isAr ? 'مرتجعة' : 'Returned'],
+              ['other', isAr ? 'أخرى' : 'Other'],
+            ] as const).map(([key, label]) => (
+              <button key={key} type="button" data-testid={`sales-view-tab-${key}`}
+                aria-pressed={displayStatus === key}
+                onClick={() => setDisplayStatus(key)}
+                className={`shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                  displayStatus === key
+                    ? 'bg-brand-600/10 text-brand-600 dark:text-brand-400'
+                    : 'text-ui-muted hover:bg-ui-page-alt hover:text-ui-text'
+                }`}>
+                {label}
+              </button>
+            ))}
+          </div>
+          <span className="shrink-0 text-xs font-medium text-ui-subtle" data-testid="sales-view-count">
+            {isAr ? `المعروض: ${filtered.length} من ${items.length} محمّلة` : `Showing ${filtered.length} of ${items.length} loaded`}
+          </span>
+        </div>
+        <div className="min-w-0 px-3 py-3 sm:px-4 sales-invoices-layout [&_table]:w-full [&_thead_tr]:bg-ui-page-alt/60 [&_th]:px-4 [&_th]:py-4 [&_tbody_tr]:h-[68px] [&_tbody_tr]:hover:bg-ui-page-alt/60 [&_td]:px-4 [&_td]:py-4">
+          <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')}
+            onRowClick={openViewSale} showCheckbox selectedIds={selectedIds} onSelectionChange={setSelectedIds}
+            tableId="sales-invoices-layout" />
+        </div>
+        <div className="border-t border-ui-border px-4 py-3">
+          <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
+        </div>
       </DesignPanel>
 
       {/* Sale Detail / Edit Modal */}
