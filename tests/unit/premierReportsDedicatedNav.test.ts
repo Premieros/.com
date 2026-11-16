@@ -30,7 +30,9 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
     expect(layout).not.toContain("isReportsWorkspace ? 'text-violet-300'");
     expect(layout).not.toContain("isReportsWorkspace ? 'text-slate-300");
     expect(layout).not.toContain("isReportsWorkspace ? (isActive");
-    expect(layout).toContain("isActive ? 'bg-ui-primary text-ui-primary-fg");
+    // Nested detail routes share the same active styling as their parent.
+    expect(layout).toContain("isActive || location.pathname.startsWith(`${item.route}/`)");
+    expect(layout).toContain("? 'bg-ui-primary text-ui-primary-fg");
   });
 
   it('retains current reporting engines and places the report directory on the visual left', () => {

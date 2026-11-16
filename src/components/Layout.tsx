@@ -18,7 +18,7 @@ import { Logo } from './Logo';
 import { ApprovalInbox } from './ApprovalInbox';
 import { APP_ROUTES } from '@/core/navigation/routes';
 import { prefetchAppRoute } from '@/core/navigation/prefetch';
-import { MENU_GROUPS, MENU_ITEMS, type MenuIcon, type MenuGroup } from '@/core/navigation/menu.config';
+import { MENU_GROUPS, MENU_ITEMS, SIDEBAR_SECTION_ORDER, sidebarSectionForItem, type MenuIcon, type SidebarSection } from '@/core/navigation/menu.config';
 import { CommandPalette, CommandPaletteTrigger } from './CommandPalette';
 import { OfflineStatusIndicator } from './OfflineStatusIndicator';
 import { PageUtilityControls } from './PageUtilityControls';
@@ -85,23 +85,32 @@ export function Layout({ children }: { children: ReactNode }) {
     typeof window !== 'undefined' && window.localStorage.getItem('premier:desktop-sidebar-hidden') === '1',
   );
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = JSON.parse(window.localStorage.getItem('premier:nav-collapsed-groups') || '{}') as Record<string, boolean>;
-        if (Object.keys(saved).length > 0) return saved;
-      } catch {
-        // Fall back to the compact default below.
-      }
-    }
-    return {
+    const defaults: Record<string, boolean> = {
       main: false,
       centers: false,
       catalog: true,
+      reports: true,
+      inventory: true,
       operations: true,
       people: true,
       finance: true,
       admin: true,
     };
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = JSON.parse(window.localStorage.getItem('premier:nav-collapsed-groups') || '{}') as Record<string, unknown>;
+        // Preserve each user's existing choices while new headings start
+        // collapsed rather than unexpectedly expanding old saved menus.
+        if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
+          for (const key of Object.keys(defaults)) {
+            if (typeof saved[key] === 'boolean') defaults[key] = saved[key];
+          }
+        }
+      } catch {
+        // Use safe defaults if stored preferences are malformed.
+      }
+    }
+    return defaults;
   });
   const ar = lang === 'ar';
   const branchFilter = useBranchFilter();
@@ -133,17 +142,24 @@ export function Layout({ children }: { children: ReactNode }) {
       )
       .sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999));
   }, [can, user?.role, isAdmin, canAccessModule, canAccessPath, runtime]);
-  const grouped = useMemo(() => visibleItems.reduce<Record<MenuGroup, typeof visibleItems>>((acc, item) => {
-    (acc[item.group] ??= []).push(item);
+  const grouped = useMemo(() => visibleItems.reduce<Partial<Record<SidebarSection, typeof visibleItems>>>((acc, item) => {
+    const section = sidebarSectionForItem(item);
+    (acc[section] ??= []).push(item);
     return acc;
-  }, {} as Record<MenuGroup, typeof visibleItems>), [visibleItems]);
+  }, {}), [visibleItems]);
 
-  const activeMenuGroup = useMemo<MenuGroup | null>(() => {
+  const activeMenuGroup = useMemo<SidebarSection | null>(() => {
     const activeItem = visibleItems.find((item) =>
       location.pathname === item.route || location.pathname.startsWith(`${item.route}/`),
     );
-    return activeItem?.group ?? null;
+    return activeItem ? sidebarSectionForItem(activeItem) : null;
   }, [location.pathname, visibleItems]);
+
+  const sidebarSectionLabel = (group: SidebarSection) => {
+    if (group === 'reports') return ar ? 'التقارير' : 'Reports';
+    if (group === 'inventory') return ar ? 'المخزون والمشتريات' : 'Inventory & Purchasing';
+    return businessGroupLabel(runtime, group, ar ? 'ar' : 'en', MENU_GROUPS[group][ar ? 'ar' : 'en']);
+  };
 
   useEffect(() => {
     if (!activeMenuGroup) return;
@@ -338,17 +354,24 @@ export function Layout({ children }: { children: ReactNode }) {
             )}
           </section>
 
-          {(['main', 'catalog', 'centers', 'admin'] as MenuGroup[]).map((group) => {
+          {SIDEBAR_SECTION_ORDER.map((group) => {
             const items = grouped[group] ?? [];
             if (!items.length) return null;
             return (
               <section key={group} data-testid={`nav-group-${group}`} className="mb-2">
-                <button data-testid={`nav-group-toggle-${group}`} type="button" onClick={() => setCollapsed((v) => ({ ...v, [group]: !v[group] }))} className={`flex min-h-9 w-full items-center justify-between rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider transition text-ui-subtle hover:bg-ui-page-alt hover:text-ui-text`}>
-                  <span>{businessGroupLabel(runtime, group, ar ? 'ar' : 'en', MENU_GROUPS[group][ar ? 'ar' : 'en'])}</span>
-                  <ChevronDown className={`h-3.5 w-3.5 transition-transform duration-150 ${collapsed[group] ? 'rotate-90' : ''}`} />
+                <button
+                  data-testid={`nav-group-toggle-${group}`}
+                  type="button"
+                  onClick={() => setCollapsed((v) => ({ ...v, [group]: !v[group] }))}
+                  aria-expanded={!collapsed[group]}
+                  aria-controls={`nav-group-items-${group}`}
+                  className="flex min-h-9 w-full items-center justify-between rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-ui-subtle transition hover:bg-ui-page-alt hover:text-ui-text"
+                >
+                  <span className="min-w-0 truncate text-start">{sidebarSectionLabel(group)}</span>
+                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform duration-150 ${collapsed[group] ? 'rotate-90' : ''}`} />
                 </button>
                 {!collapsed[group] && (
-                  <div className="mt-0.5 space-y-0.5">
+                  <div id={`nav-group-items-${group}`} className="mt-0.5 space-y-0.5">
                     {items.map((item) => (
                       <NavLink
                         data-testid={`nav-item-${item.id}`}
@@ -358,7 +381,8 @@ export function Layout({ children }: { children: ReactNode }) {
                         onFocus={() => prefetchAppRoute(item.route)}
                         onTouchStart={() => prefetchAppRoute(item.route)}
                         onClick={() => setMobileOpen(false)}
-                        className={({ isActive }) => `group flex min-h-[38px] items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-all duration-150 ${isActive ? 'bg-ui-primary text-ui-primary-fg shadow-[0_4px_12px_rgba(91,43,216,0.18)]' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary'}`}
+                        aria-current={location.pathname === item.route || location.pathname.startsWith(`${item.route}/`) ? 'page' : undefined}
+                        className={({ isActive }) => `group flex min-h-[38px] items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-all duration-150 ${isActive || location.pathname.startsWith(`${item.route}/`) ? 'bg-ui-primary text-ui-primary-fg shadow-[0_4px_12px_rgba(91,43,216,0.18)]' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary'}`}
                       >
                         {ICONS[item.icon]}
                         <span className="flex-1 truncate">{businessMenuLabel(
