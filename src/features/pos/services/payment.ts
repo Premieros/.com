@@ -130,6 +130,11 @@ async function queueOfflineSale(p: ProcessSalePayload, allowNegative: boolean, s
   if (!hasValidOfflineSaleItems(p.p_items)) throw new Error('OFFLINE_SALE_INVALID_ITEMS');
   if (!p.p_shift_id) throw new Error('SHIFT_REQUIRED_OFFLINE');
   if (!p.p_warehouse_id?.trim()) throw new Error('WAREHOUSE_REQUIRED_OFFLINE_CAPTURE');
+  // Approvals require online server verification. Never persist these methods
+  // as a plain offline sale, even when connectivity drops after preflight.
+  if (p.p_payment_method === 'instapay' || p.p_payment_method === 'bank_transfer') {
+    throw new Error('MANUAL_PAYMENT_REQUIRES_ONLINE_APPROVAL');
+  }
 
   // If the connection dropped AFTER the initial preflight, its branch-wide
   // stock check cannot justify an offline sale in this pinned warehouse.
@@ -291,6 +296,9 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   const allowNegative = branchSettings?.allow_negative_stock ?? globalSettings?.allow_negative_stock ?? false;
 
   const explicitlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  if (explicitlyOffline && (p.p_payment_method === 'instapay' || p.p_payment_method === 'bank_transfer')) {
+    return { result: null, error: 'MANUAL_PAYMENT_REQUIRES_ONLINE_APPROVAL' };
+  }
   if (explicitlyOffline && !hasValidOfflineSaleItems(p.p_items)) {
     return { result: null, error: 'OFFLINE_SALE_INVALID_ITEMS' };
   }
@@ -334,6 +342,9 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   }
 
   const splitPayments = consumeArmedSplitTender();
+  if (splitPayments && (p.p_payment_method === 'instapay' || p.p_payment_method === 'bank_transfer')) {
+    return { result: null, error: 'SPLIT_MANUAL_PAYMENT_UNSUPPORTED' };
+  }
 
   // Split tender is intentionally online-only. It must never degrade into an
   // offline queue because that could produce partial financial truth.
@@ -344,6 +355,9 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   // Explicit offline sales are accepted only into the authoritative IndexedDB
   // outbox. They are pending reconciliation, not a server-confirmed payment.
   if (!splitPayments && typeof navigator !== 'undefined' && !navigator.onLine) {
+    if (p.p_payment_method === 'instapay' || p.p_payment_method === 'bank_transfer') {
+      return { result: null, error: 'MANUAL_PAYMENT_REQUIRES_ONLINE_APPROVAL' };
+    }
     try {
       const queuedId = await queueOfflineSale(p, allowNegative, explicitlyOffline);
       return {

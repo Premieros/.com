@@ -815,6 +815,10 @@ export function usePosOrder(input: UsePosOrderInput) {
     if (mutationLockRef.current || cart.length === 0 || completing) return false;
     if (!branchId) { show(t('selectBranchFirst'), 'error'); return false; }
     if (!activeShift) { show(t('shiftRequired'), 'error'); return false; }
+    if (paymentMethod !== 'credit' && total > 0 && paidAmount <= 0) {
+      show(isAr ? 'أدخل مبلغ التحصيل قبل تأكيد البيع.' : 'Enter a payment amount before confirming the sale.', 'error');
+      return false;
+    }
     if (paymentMethod === 'credit') {
       const creditCustomer = customers.find((customer) =>
         customer.id === customerId
@@ -865,7 +869,7 @@ export function usePosOrder(input: UsePosOrderInput) {
       const warehouseId = previousAttempt?.payload.p_warehouse_id ?? await fetchBranchWarehouseId(branchId, activeOrderId);
       const invoiceNumber = previousAttempt?.payload.p_invoice_number ?? await nextInvoiceNumber();
       const itemsPayload = cartToItems(cart);
-      const paidAmountToUse = paymentMethod === 'credit' ? 0 : paidAmount || total;
+      const paidAmountToUse = paymentMethod === 'credit' ? 0 : paidAmount;
       const binding = resolveOrderBindingForSave({
         activeOrderId,
         orderType,
