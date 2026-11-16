@@ -35,6 +35,6 @@ export function computePosTotals(input: PosTotalsInput): PosTotals {
   const taxRate = input.taxEnabled ? input.taxRate || 0 : 0;
   const taxAmount = (taxableAmount * taxRate) / 100;
   const total = taxableAmount + taxAmount;
-  const change = Math.max(0, (input.paymentMethod === 'credit' ? 0 : input.paidAmount || total) - total);
+  const change = Math.max(0, (input.paymentMethod === 'credit' ? 0 : input.paidAmount) - total);
   return { subtotal, discountValue, taxableAmount, taxAmount, total, change };
 }
