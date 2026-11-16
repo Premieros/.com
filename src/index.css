@@ -3,6 +3,8 @@
 @tailwind utilities;
 
 :root {
+  /* Shared fixed application header: never taller than 10% of viewport height. */
+  --premier-topbar-height: min(64px, 10vh);
   --brand-50: 242 245 253;
   --brand-100: 229 235 251;
   --brand-200: 201 215 248;
@@ -521,4 +523,9 @@
   .login-report-sheet {
     animation: none !important;
   }
+}
+
+/* Dynamic viewport units prevent browser chrome from inflating the reserved header space. */
+@supports (height: 100dvh) {
+  :root { --premier-topbar-height: min(64px, 10dvh); }
 }
