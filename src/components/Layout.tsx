@@ -369,7 +369,7 @@ export function Layout({ children }: { children: ReactNode }) {
                         onTouchStart={() => prefetchAppRoute(item.route)}
                         onClick={() => setMobileOpen(false)}
                         aria-current={location.pathname === item.route || location.pathname.startsWith(`${item.route}/`) ? 'page' : undefined}
-                        className={({ isActive }) => `group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-colors duration-150 ${isActive ? 'bg-ui-primary text-ui-primary-fg shadow-sm' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary'}`}
+                        className={({ isActive }) => `group flex min-h-11 items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold transition-colors duration-150 ${isActive || location.pathname.startsWith(`${item.route}/`) ? 'bg-ui-primary text-ui-primary-fg shadow-sm' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary'}`}
                       >
                         {ICONS[item.icon]}
                         <span className="flex-1 truncate">{businessMenuLabel(
