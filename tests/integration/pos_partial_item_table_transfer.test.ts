@@ -204,7 +204,10 @@ describe('partial table transfer against the full schema and actual guards', () 
    'INSERT INTO public.order_kitchen_inventory_events(branch_id,warehouse_id,order_id,order_item_id,kitchen_send_id,sent_quantity,total_cost,created_by) VALUES($1,$2,$3,$4,$5,2,6,$6)',
    [ids.branchA,ids.whA,source,extra,extraSend,ids.users.branch_manager],
   );
-  await client.query('UPDATE public.orders SET subtotal=100,total=94 WHERE id=$1',[source]);
+  await client.query('UPDATE public.orders SET subtotal=100,discount_amount=6,tax_amount=0,total=94 WHERE id=$1',[source]);
+  // The second seed order retained a 15%-tax total from the default fixture;
+  // normalize both original orders before asserting monetary conservation.
+  await client.query('UPDATE public.orders SET subtotal=20,discount_amount=0,tax_amount=0,total=20 WHERE id=$1',[target]);
   const balancesBefore = (await client.query(
    "SELECT sum(subtotal)::float8 subtotal,sum(discount_amount)::float8 discount,sum(total)::float8 total FROM public.orders WHERE id=ANY($1::uuid[])",
    [[source,target]],
