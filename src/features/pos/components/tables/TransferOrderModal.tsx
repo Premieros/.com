@@ -17,7 +17,7 @@ interface TransferOrderModalProps {
   areas?: DiningArea[];
   ordersByTable: Record<string, Order[]>;
   /** Notify the workspace to reload order/table snapshots after a committed structural change. */
-  onOrderChanged?: () => void;
+  onOrderChanged?: (orderId: string, action: 'merge_order' | 'transfer_order') => void;
   onOperatorTransferred?: () => void;
 }
 
@@ -159,7 +159,7 @@ export function TransferOrderModal({
       }
 
       if (data?.success) {
-        onOrderChanged?.();
+        onOrderChanged?.(order.id, actionType);
         setPendingRequestId(null);
         setPendingStatus(null);
         setSelectedTargetId(null);
