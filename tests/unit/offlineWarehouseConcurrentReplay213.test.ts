@@ -53,6 +53,18 @@ describe('issue #213: warehouse replay and concurrent checkout accounting', () =
     // atomic admission control or server-side oversell prevention.
   });
 
+  it('does not collapse distinct operations from one cashier sharing an invoice', () => {
+    const first = sale('sale-a', 'b1', 'wa', 2, 'INV-DUP', 'same-cashier');
+    const second = sale('sale-b', 'b1', 'wa', 3, 'INV-DUP', 'same-cashier');
+    expect(decideOfflineSaleInsert([first], second))
+      .toEqual({ id: 'sale-b', inserted: true });
+    const recorded = [movement('first-only', 'sale-a', 'b1', 'wa', 2)];
+    expect(available('b1', 'wa', [balance('b1', 'wa', 8)], [first, second], recorded))
+      .toMatchObject({ status: 'known', quantity: 3 });
+    expect(saleMovementIdsForCleanup(recorded, [first, second], 'sale-b', 'INV-DUP', 'b1'))
+      .toEqual([]);
+  });
+
   it('survives a restart between durable outbox and partial movement writes without double deduction', () => {
     const pending = sale('local-a', 'b1', 'wa', 4);
     const snapshots = [balance('b1', 'wa', 10)];
