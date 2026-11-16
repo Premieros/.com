@@ -22,7 +22,7 @@ import {
   WalletCards,
   MessageCircle,
   Trash2,
-  ReceiptText,
+  FileText,
 } from 'lucide-react';
 import { supabase, admin } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -547,7 +547,7 @@ export function SuperAdminConsolePage({ defaultTab }: SuperAdminConsoleProps = {
     { key: 'system_controls', label: ar ? 'التحكم في النظام ومستخدمي المنصة' : 'System Controls & Users', icon: <Sliders className="w-4 h-4" /> },
     { key: 'general', label: ar ? 'إعدادات المنشأة والمتجر المركزية' : 'Enterprise Settings', icon: <Store className="w-4 h-4" /> },
     { key: 'branches_override', label: ar ? 'تخصيصات الفروع' : 'Branch Overrides', icon: <SlidersHorizontal className="w-4 h-4" /> },
-    { key: 'tax_integrations', label: ar ? 'الربط الضريبي للفروع' : 'Branch Tax Integrations', icon: <ReceiptText className="w-4 h-4" /> },
+    { key: 'tax_integrations', label: ar ? 'الربط الضريبي للفروع' : 'Branch Tax Integrations', icon: <FileText className="w-4 h-4" /> },
     { key: 'roles', label: ar ? 'مصفوفة الأدوار والصلاحيات' : 'RBAC Roles & Matrix', icon: <ShieldCheck className="w-4 h-4" /> },
     { key: 'users_audit', label: ar ? 'المستخدمون وسجل التدقيق' : 'Users & Audit Log', icon: <Users className="w-4 h-4" /> },
     { key: 'health', label: ar ? 'صحة وتشخيص النظام' : 'System Diagnostics', icon: <Activity className="w-4 h-4" /> },
