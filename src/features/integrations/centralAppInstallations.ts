@@ -50,3 +50,30 @@ export async function changeCentralAppInstallation(
   // Read back from the server; never optimistically mark a denied write as success.
   return loadCentralInstalledApps(organizationId, branchId);
 }
+
+/**
+ * Import candidates are calculated solely from the operator's existing
+ * per-browser, per-branch catalog installs. Nothing is imported automatically.
+ */
+export function getPendingLegacyApps(local: InstalledAppMap, shared: InstalledAppMap): IntegrationAppId[] {
+  return INTEGRATION_APP_IDS.filter((id) => local[id] === true && shared[id] !== true);
+}
+
+/**
+ * Explicit operator-confirmed promotion of browser-local catalog selections to
+ * the shared branch registry. The database RLS remains the authorization
+ * boundary for every operation. Stop on the first failure and do not delete
+ * any browser-local entries so that failed/partial imports can be retried.
+ */
+export async function importConfirmedLegacyApps(
+  organizationId: string, branchId: string, userId: string,
+  local: InstalledAppMap, shared: InstalledAppMap,
+): Promise<InstalledAppMap> {
+  assertScope(organizationId, branchId);
+  let current = shared;
+  for (const appId of getPendingLegacyApps(local, current)) {
+    current = await changeCentralAppInstallation(organizationId, branchId, appId, userId, true);
+    if (current[appId] !== true) throw new Error('CENTRAL_INSTALL_NOT_CONFIRMED');
+  }
+  return current;
+}
