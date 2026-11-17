@@ -222,7 +222,7 @@ BEGIN
   END IF;
   RETURN NEW;
 END;
-$;
+$$;
 REVOKE ALL ON FUNCTION private.zatca_guard_outbox_audit()
   FROM PUBLIC, anon, authenticated, service_role;
 CREATE TRIGGER zatca_outbox_append_only_audit
