@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, Building2, CheckCircle2, ClipboardList,
-  ExternalLink, FileText, LockKeyhole, PlugZap, ShieldCheck, Store, Truck,
+  AlertTriangle, ArrowLeft, ArrowRight, ClipboardList,
+  ExternalLink, FileText, LockKeyhole, ShieldCheck, Store, Truck,
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { useLanguage } from '@/context/LanguageContext';
