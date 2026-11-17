@@ -32,13 +32,9 @@ describe('central integration catalog registry (disposable database only)', () =
       `select policyname, cmd from pg_policies
        where schemaname = 'public' and tablename = 'integration_app_installations'`,
     );
-    expect(policies.map(({ cmd }) => cmd).sort()).toEqual([
-      'DELETE', 'DELETE', 'INSERT', 'INSERT', 'SELECT', 'SELECT',
-    ]);
+    expect(policies.map(({ cmd }) => cmd).sort()).toEqual(['DELETE', 'INSERT', 'SELECT']);
     expect(policies.map(({ policyname }) => policyname).sort()).toEqual([
-      'integration_app_delete', 'integration_app_insert',
-      'integration_app_platform_delete', 'integration_app_platform_insert',
-      'integration_app_platform_read', 'integration_app_read',
+      'integration_app_delete', 'integration_app_insert', 'integration_app_read',
     ]);
     const { rows: checks } = await db.query<{ definition: string }>(
       `select pg_get_constraintdef(oid) as definition from pg_constraint
@@ -49,25 +45,25 @@ describe('central integration catalog registry (disposable database only)', () =
       definition.includes('jahez'))).toBe(true);
   });
 
-  it('limits platform admins to active users and explicitly granted branch access', async () => {
+  it('limits platform admins to active users with explicit branch access in the single policies', async () => {
     const { rows } = await db.query<{ policyname: string; expression: string }>(`
       select policyname,
         coalesce(qual, '') || ' ' || coalesce(with_check, '') as expression
       from pg_policies
       where schemaname = 'public'
         and tablename = 'integration_app_installations'
-        and policyname like 'integration_app_platform_%'
       order by policyname
     `);
     expect(rows).toHaveLength(3);
     for (const { expression } of rows) {
-      expect(expression).toContain("super_admin");
+      expect(expression).toContain('organization_members');
+      expect(expression).toContain('super_admin');
       expect(expression).toContain('user_branch_access');
       expect(expression).toContain('a.branch_id = integration_app_installations.branch_id');
       expect(expression).toContain('u.is_active');
       expect(expression).toContain('auth.uid()');
     }
-    expect(rows.find((row) => row.policyname === 'integration_app_platform_insert')?.expression)
+    expect(rows.find((row) => row.policyname === 'integration_app_insert')?.expression)
       .toContain('installed_by');
   });
 
