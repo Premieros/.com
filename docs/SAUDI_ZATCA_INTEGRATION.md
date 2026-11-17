@@ -93,6 +93,27 @@ vault, a transactional outbox with deduplication/reconciliation, monitoring,
 current ZATCA regulatory/API contract verification, sandbox conformance
 results and explicit per-tenant approval. Nothing is configured for live use.
 
+## Unsigned invoice XML draft and monetary mapping (current implementation)
+
+- `server/zatca/unsignedInvoiceDraft.ts` maps a limited illustrative **15% VAT**
+  sale into deterministic UBL-shaped XML using integer halalas and quantities
+  in thousandths. It validates scope fields, line IDs, money/discount bounds,
+  issue date shape, VAT identifier shape and XML escaping.
+- The result has `status: 'unsigned_draft'` and `submittable: false`.
+  It **cannot** be submitted to the gateway and is not ZATCA-compliant XML:
+  it is missing mandated profile metadata, full party details, tax-category
+  handling, tax-exemption references, invoice chaining, QR, signing, document
+  references, certified timestamp handling and other official requirements.
+- The function **does not issue or persist invoices**. Callers must supply a
+  durable, externally assigned invoice number, UUID and issue date; values
+  are never automatically invented from the browser clock.
+- Line-level rounding and discounts are an internal mapping prototype only.
+  Reconcile tax rounding/allowances against the official Saudi schemas and
+  authority validation suite before enabling any issuance.
+- This addition makes no database changes, no live network calls and no
+  claim of certification. Existing Premier sales/accounting flows are not
+  modified by this draft module.
+
 ## Required phases before live usage
 
 1. Verify official specifications and mandatory invoice fields for the
