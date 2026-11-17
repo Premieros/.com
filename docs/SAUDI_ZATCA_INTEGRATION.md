@@ -176,7 +176,7 @@ results and explicit per-tenant approval. Nothing is configured for live use.
 - Repository migration path is aligned to the **exact remote version**;
   do not replay this DDL under a second version.
 
-## Private sandbox outbox claiming and fenced completion (staged)
+## Private sandbox outbox claiming and fenced completion (applied 2026-11-17)
 
 - `private.zatca_claim_queued_v1(event_id)` atomically claims a single
   **sandbox** queue row using row locks and a fresh fencing token. It requires
@@ -196,8 +196,13 @@ results and explicit per-tenant approval. Nothing is configured for live use.
   connection is needed later; no connection or schedule is activated now.
 - Even an enabled production setting cannot be claimed by this version.
   No outbound HTTP calls, credentials, CSID or tax invoice issuance are made.
-- The private tables are already on canonical Supabase; this is an additive
-  function-only migration and leaves existing transactions unchanged.
+- Canonical Supabase project `hvqlkapynjfjikqithvd` accepted the reviewed
+  migration as version **`20261117142048`**. Read-only verification proved
+  both functions are `SECURITY INVOKER`, their execution privileges are
+  denied to `anon`, `authenticated`, and `service_role`, a nonexistent event
+  cannot be claimed, and all four ZATCA tables remain empty.
+- This additive migration introduced no real invoices or accounting changes.
+  The SQL filename is aligned to the recorded remote migration version.
 
 ## Required phases before live usage
 
