@@ -204,6 +204,33 @@ results and explicit per-tenant approval. Nothing is configured for live use.
 - This additive migration introduced no real invoices or accounting changes.
   The SQL filename is aligned to the recorded remote migration version.
 
+## Server-only EGS signing proof and vault contract — offline only
+
+- `server/zatca/egsOfflineSigning.ts` adds a **private, injectable vault
+  interface** for sandbox EGS P-256 signing material and independent,
+  server-verified certificate-binding readiness.
+- It cryptographically signs and verifies an arbitrary 32-byte test digest
+  using Node crypto. It rejects production, wrong tenant/branch/EGS, bad
+  digest, unverified certificate readiness, unsupported curve and mismatched
+  private/public keys. Tests create disposable in-memory keys only.
+- Output is explicitly `kind: 'offline_signature_proof'` with
+  `submittable: false`. The response never contains the private key or
+  credentials, and this proof is **not** accepted by the existing ZATCA
+  gateway or private outbox.
+- This proof is NOT the ZATCA official UBL XAdES/XMLDSig signature:
+  it does not canonicalize UBL, derive the ZATCA invoice hash/PIH, create
+  signed XML/QR cryptographic tags, validate CSID trust or certificate
+  revocation, or make any HTTP request. A generic P-256 ECDSA test over a
+  digest must not be mistaken for a compliant tax invoice signature.
+- An actual vault adapter needs independent identity authorization,
+  certificate-chain and validity verification, audit logging, access
+  rotation, tenant-scoped references and non-exportable key protection.
+  Do not place CSIDs, OTPs, keys or tokens in the repository or browser.
+- Official API/onboarding and signature specification versions must be
+  verified before implementing any live signed invoice transmission; no
+  authenticated Saudi tax tenant or official sandbox credentials are
+  available for a real integration test at this stage.
+
 ## Required phases before live usage
 
 1. Verify official specifications and mandatory invoice fields for the
