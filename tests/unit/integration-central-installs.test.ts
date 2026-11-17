@@ -11,7 +11,8 @@ vi.mock('@/lib/supabase', () => ({
   supabase: {
     from: (table: string) => {
       mock.calls.push({ action: 'from', arg: table });
-      type Query = { select: (projection: string) => Query; eq: (field: string, value: string) => Query; then: (resolve: (value: unknown) => unknown, reject: (error: unknown) => unknown) => Promise<unknown>; insert: (row: unknown) => Promise<{ error: typeof mock.writeError }>; delete: () => Query };\n      const query: Query = {
+      type Query = { select: (projection: string) => Query; eq: (field: string, value: string) => Query; then: (resolve: (value: unknown) => unknown, reject: (error: unknown) => unknown) => Promise<unknown>; insert: (row: unknown) => Promise<{ error: typeof mock.writeError }>; delete: () => Query };
+      const query: Query = {
         select: (projection: string) => {
           mock.calls.push({ action: 'select', arg: projection });
           return query;
