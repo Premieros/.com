@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle, ArrowLeft, ArrowRight, ClipboardList,
@@ -10,6 +10,10 @@ import { APP_ROUTES } from '@/core/navigation/routes';
 import { useAuth } from '@/context/AuthContext';
 import { useBranches } from '@/hooks/useBranches';
 import { readInstalledApps, updateLocalAppInstallation, type IntegrationAppId, type InstalledAppMap } from '../localAppInstallations';
+import { loadCentralInstalledApps, changeCentralAppInstallation } from '../centralAppInstallations';
+
+// Disabled until the reviewed migration is deployed and branch RLS is verified.
+const CENTRAL_INSTALLATIONS_ENABLED = import.meta.env.VITE_CENTRAL_INTEGRATIONS_ENABLED === 'true';
 
 type IntegrationSection = 'egypt' | 'saudi' | 'delivery';
 type Stage = 'foundation' | 'not_connected';
@@ -113,24 +117,68 @@ export function IntegrationsHubPage() {
   const [installedApps, setInstalledApps] = useState<InstalledAppMap>({});
   const [openedAppId, setOpenedAppId] = useState<IntegrationAppId | null>(null);
   const [installError, setInstallError] = useState('');
+  const [installLoading, setInstallLoading] = useState(false);
+  const [installBusy, setInstallBusy] = useState(false);
+  const [reloadCentral, setReloadCentral] = useState(0);
   const userId = user?.id ?? '';
+  const organizationId = selectedBranch?.organization_id ?? '';
+  const scopeKey = `${userId}:${selectedBranchId}:${organizationId}`;
+  const scopeRef = useRef(scopeKey);
+  scopeRef.current = scopeKey;
   useEffect(() => {
-    setInstalledApps(userId && selectedBranchId ? readInstalledApps(userId, selectedBranchId) : {});
+    let cancelled = false;
     setOpenedAppId(null);
     setInstallError('');
-  }, [userId, selectedBranchId]);
+    setInstalledApps({});
+    if (!userId || !selectedBranchId) {
+      setInstallLoading(false);
+      return;
+    }
+    if (!CENTRAL_INSTALLATIONS_ENABLED) {
+      setInstalledApps(readInstalledApps(userId, selectedBranchId));
+      setInstallLoading(false);
+      return;
+    }
+    setInstallLoading(true);
+    if (!organizationId) {
+      setInstallError(ar ? 'الفرع غير مرتبط بمؤسسة؛ التثبيت المركزي غير متاح.' : 'Branch organization missing; central installations unavailable.');
+      setInstallLoading(false);
+      return;
+    }
+    void loadCentralInstalledApps(organizationId, selectedBranchId)
+      .then((apps) => { if (!cancelled) setInstalledApps(apps); })
+      .catch(() => {
+        if (!cancelled) setInstallError(ar
+          ? 'تعذر تحميل التطبيقات المركزية. لا يمكن حفظ التثبيت حتى يعود الاتصال.'
+          : 'Could not load central installations. Changes are disabled until connection is restored.');
+      })
+      .finally(() => { if (!cancelled) setInstallLoading(false); });
+    return () => { cancelled = true; };
+  }, [userId, selectedBranchId, organizationId, ar, reloadCentral]);
 
-  function changeInstallation(appId: IntegrationAppId, install: boolean) {
-    if (!userId || !selectedBranchId) return;
+  async function changeInstallation(appId: IntegrationAppId, install: boolean) {
+    if (!userId || !selectedBranchId || installBusy || installLoading) return;
+    const operationScope = scopeKey;
+    setInstallBusy(true);
     try {
-      const state = updateLocalAppInstallation(userId, selectedBranchId, appId, install);
+      const state = CENTRAL_INSTALLATIONS_ENABLED
+        ? await changeCentralAppInstallation(organizationId, selectedBranchId, appId, userId, install)
+        : updateLocalAppInstallation(userId, selectedBranchId, appId, install);
+      if (scopeRef.current !== operationScope) return;
       setInstalledApps(state);
       setInstallError('');
       setOpenedAppId(install ? appId : null);
     } catch {
+      if (scopeRef.current !== operationScope) return;
       setInstallError(ar
-        ? 'تعذّر حفظ تثبيت التطبيق في هذا المتصفح. راجع أذونات التخزين.'
-        : 'Could not save the local installation. Check browser storage permissions.');
+        ? (CENTRAL_INSTALLATIONS_ENABLED
+          ? 'رفض الخادم العملية أو تعذر الاتصال. لم يُسجل تثبيت جديد.'
+          : 'تعذّر حفظ تثبيت التطبيق في هذا المتصفح. راجع أذونات التخزين.')
+        : (CENTRAL_INSTALLATIONS_ENABLED
+          ? 'Server rejected the operation or could not be reached. No install was confirmed.'
+          : 'Could not save the local installation. Check browser storage permissions.'));
+    } finally {
+      setInstallBusy(false);
     }
   }
 
@@ -218,9 +266,9 @@ export function IntegrationsHubPage() {
           : 'Install apps locally for this user and branch in this browser, then open setup steps. This is not a server-wide installation or a live provider connection. Never enter private keys or API secrets here.'}</p>
       </div>
 
-      {installError && <p role="alert" className="text-sm text-red-600">{installError}</p>}
+      {installError && <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-red-600"><span>{installError}</span>{CENTRAL_INSTALLATIONS_ENABLED && <button type="button" disabled={installLoading || installBusy} className="rounded-lg border border-ui-border px-3 py-2 text-ui-text disabled:opacity-50" onClick={() => setReloadCentral((value) => value + 1)}>{ar ? 'إعادة المحاولة' : 'Retry'}</button>}</div>}
       <div className="rounded-xl border border-ui-border bg-ui-surface p-3 text-sm text-ui-muted">
-        {ar ? 'تطبيقاتي المثبّتة على هذا المتصفح لهذا الفرع: ' : 'My local apps for this branch: '}
+        {CENTRAL_INSTALLATIONS_ENABLED ? (ar ? 'تطبيقات الفرع المثبّتة مركزيًا: ' : 'Shared installations for this branch: ') : (ar ? 'تطبيقاتي المثبّتة على هذا المتصفح لهذا الفرع: ' : 'My local apps for this branch: ')}
         <strong data-testid="installed-app-count">{Object.keys(installedApps).length}</strong>
       </div>
 
@@ -246,7 +294,7 @@ export function IntegrationsHubPage() {
                 {installedApps[item.id] ? (
                   <>
                     <span className="rounded-full border border-ui-border bg-ui-page-alt px-3 py-1 text-xs font-semibold text-ui-muted">
-                      {ar ? 'مثبّت محليًا · غير متصل' : 'Locally installed · not connected'}
+                      {CENTRAL_INSTALLATIONS_ENABLED ? (ar ? 'مثبّت للفرع · غير متصل' : 'Installed for branch · not connected') : (ar ? 'مثبّت محليًا · غير متصل' : 'Locally installed · not connected')}
                     </span>
                     <button type="button" className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white"
                       onClick={() => setOpenedAppId(openedAppId === item.id ? null : item.id)}
@@ -254,14 +302,14 @@ export function IntegrationsHubPage() {
                       {ar ? 'فتح التطبيق' : 'Open app'}
                     </button>
                     <button type="button" className="rounded-lg border border-ui-border px-3 py-2 text-sm text-ui-text"
-                      onClick={() => changeInstallation(item.id, false)} data-testid={`remove-integration-${item.id}`}>
+                      disabled={installLoading || installBusy || Boolean(installError && CENTRAL_INSTALLATIONS_ENABLED)} onClick={() => void changeInstallation(item.id, false)} data-testid={`remove-integration-${item.id}`}>
                       {ar ? 'إزالة' : 'Remove'}
                     </button>
                   </>
                 ) : (
-                  <button type="button" disabled={!userId || !selectedBranchId}
+                  <button type="button" disabled={!userId || !selectedBranchId || installLoading || installBusy || Boolean(installError && CENTRAL_INSTALLATIONS_ENABLED)}
                     className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                    onClick={() => changeInstallation(item.id, true)}
+                    onClick={() => void changeInstallation(item.id, true)}
                     data-testid={`install-integration-${item.id}`}>
                     {ar ? 'تثبيت التطبيق' : 'Install app'}
                   </button>
@@ -271,8 +319,8 @@ export function IntegrationsHubPage() {
                 <div className="mt-4 rounded-xl border border-ui-border bg-ui-page-alt p-3 text-sm" data-testid={`setup-integration-${item.id}`}>
                   <strong className="text-ui-text">{ar ? 'إعداد التطبيق' : 'App setup'}</strong>
                   <p className="mt-1 leading-6 text-ui-muted">{ar
-                    ? 'تمت إضافته إلى هذا المتصفح فقط. للربط الحقيقي يلزم موصّل خلفي معتمد وبيانات اعتماد آمنة واختبار اتصال رسمي.'
-                    : 'Added only in this browser. Live setup requires a reviewed server connector, secure provider credentials and a verified connection test.'}</p>
+                    ? (CENTRAL_INSTALLATIONS_ENABLED ? 'تم تسجيل التطبيق للفرع مركزيًا، لكنه غير متصل. يلزم موصّل خلفي آمن واختبار رسمي.' : 'تمت إضافته إلى هذا المتصفح فقط. للربط الحقيقي يلزم موصّل خلفي معتمد وبيانات اعتماد آمنة واختبار اتصال رسمي.')
+                    : (CENTRAL_INSTALLATIONS_ENABLED ? 'Installed for this branch, but not connected. Live setup needs a reviewed backend connector and verified connection test.' : 'Added only in this browser. Live setup requires a reviewed server connector, secure provider credentials and a verified connection test.')}</p>
                   <p className="mt-2 text-xs text-ui-muted">{ar ? item.detailAr : item.detailEn}</p>
                 </div>
               )}

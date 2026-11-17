@@ -1851,6 +1851,7 @@
     "dining_areas",
     "dining_tables",
     "expenses",
+    "integration_app_installations",
     "inventory",
     "inventory_movements",
     "inventory_unit_batches",
