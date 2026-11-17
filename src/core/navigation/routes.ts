@@ -70,6 +70,7 @@ export const APP_ROUTES = {
   approvals: '/approvals',
   auditLog: '/audit-log',
   settings: '/settings',
+  integrations: '/settings/integrations',
   basicSettings: '/settings/basic',
   systemHealth: '/system-health',
   importExport: '/import-export',
