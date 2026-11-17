@@ -42,13 +42,7 @@ with check (
           or (u.role = 'super_admin' and u.branch_id is null)
         )
     )
-    or exists (
-      select 1 from public.users u
-      join public.user_branch_access a on a.user_id = u.id
-      where u.id = (select auth.uid()) and u.is_active
-        and u.role = 'super_admin'
-        and a.branch_id = integration_app_installations.branch_id
-    )
+    or (select public.is_platform_admin())
   )
 );
 
