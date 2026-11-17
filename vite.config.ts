@@ -5,8 +5,9 @@ import path from 'path';
 export default defineConfig({
   // Vercel serves the SPA at root. A relative base breaks direct nested routes:
   // /settings/integrations would resolve ./assets to /settings/assets.
-  // GitHub Pages explicitly sets VITE_BASE_PATH='./' in deploy.yml.
-  base: process.env.VITE_BASE_PATH || '/',
+  // Vercel sets VERCEL=1; GitHub Pages explicitly opts into './'.
+  // Local/GitHub Pages compatibility retains the legacy relative base.
+  base: process.env.VITE_BASE_PATH || (process.env.VERCEL ? '/' : './'),
   plugins: [react()],
   resolve: {
     alias: {
