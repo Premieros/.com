@@ -101,6 +101,27 @@ describe('ZATCA private tenant-scoped persistence (CI disposable database only)'
         .rejects.toThrow(/ZATCA_ISSUED_DOCUMENT_IMMUTABLE/);
       await db.query('ROLLBACK TO SAVEPOINT immutable_invoice');
 
+      await db.query('SAVEPOINT downgrade_doc');
+      await expect(db.query("update private.zatca_documents set status='draft' where id=$1",
+        [documentId])).rejects.toThrow(/ZATCA_DOCUMENT_STATUS_DOWNGRADE_FORBIDDEN/);
+      await db.query('ROLLBACK TO SAVEPOINT downgrade_doc');
+
+      await db.query('SAVEPOINT delete_doc');
+      await expect(db.query('delete from private.zatca_documents where id=$1',
+        [documentId])).rejects.toThrow(/ZATCA_DOCUMENT_DELETE_FORBIDDEN/);
+      await db.query('ROLLBACK TO SAVEPOINT delete_doc');
+
+      await db.query('SAVEPOINT wrong_outbox_transition');
+      await expect(db.query(`update private.zatca_submission_outbox
+        set state='accepted' where document_id=$1`,[documentId]))
+        .rejects.toThrow(/ZATCA_OUTBOX_INVALID_TRANSITION/);
+      await db.query('ROLLBACK TO SAVEPOINT wrong_outbox_transition');
+
+      await db.query('SAVEPOINT delete_outbox');
+      await expect(db.query('delete from private.zatca_submission_outbox where document_id=$1',
+        [documentId])).rejects.toThrow(/ZATCA_OUTBOX_DELETE_FORBIDDEN/);
+      await db.query('ROLLBACK TO SAVEPOINT delete_outbox');
+
       const { rows }=await db.query<{ state:string }>(`select state
         from private.zatca_submission_outbox where document_id=$1`,[documentId]);
       expect(rows).toEqual([{ state: 'queued' }]);
