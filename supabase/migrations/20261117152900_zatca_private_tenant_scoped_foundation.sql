@@ -193,7 +193,7 @@ CREATE TRIGGER zatca_document_no_delete
   FOR EACH ROW EXECUTE FUNCTION private.zatca_guard_document_identity();
 
 CREATE FUNCTION private.zatca_guard_outbox_audit()
-RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog AS $
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog AS $$
 BEGIN
   IF TG_OP = 'DELETE' THEN
     RAISE EXCEPTION 'ZATCA_OUTBOX_DELETE_FORBIDDEN' USING ERRCODE = '23514';
