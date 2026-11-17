@@ -72,7 +72,11 @@ function milliToQuantity(value: number): string {
 }
 
 function xmlValue(value: string): string {
-  if (/[\u0000-\u0008\u000b\u000c\u000e-\u001f\ufffe\uffff]/u.test(value)) {
+  if ([...value].some((char) => {
+    const code = char.charCodeAt(0);
+    return (code < 32 && code !== 9 && code !== 10 && code !== 13) ||
+      code === 0xfffe || code === 0xffff;
+  })) {
     throw new Error('ZATCA_DRAFT_INVALID_XML_CHARACTER');
   }
   return value.replace(/&/g, '&amp;').replace(/</g, '&lt;')
