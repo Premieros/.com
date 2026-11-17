@@ -176,6 +176,29 @@ results and explicit per-tenant approval. Nothing is configured for live use.
 - Repository migration path is aligned to the **exact remote version**;
   do not replay this DDL under a second version.
 
+## Private sandbox outbox claiming and fenced completion (staged)
+
+- `private.zatca_claim_queued_v1(event_id)` atomically claims a single
+  **sandbox** queue row using row locks and a fresh fencing token. It requires
+  the tenant/branch/EGS to match, enabled sandbox settings, onboarding and
+  compliance flags, an EGS marked ready, signed invoice vault reference,
+  hash, issuance timestamp and positive counter.
+- The claim is one-shot: `attempt_count = 0`; expired or uncertain leases
+  are **never automatically requeued**. A human-reviewed reconciliation
+  workflow will be required before any resubmission.
+- `private.zatca_complete_claim_v1(event_id,fence_token,state,http,reason)`
+  atomically records a completion only for the matching leased token and
+  advances the linked document status in the same transaction. Invalid
+  channel/document state pairs and stale tokens fail closed.
+- Both functions are `SECURITY INVOKER` and explicitly denied to
+  `anon`, `authenticated`, and `service_role`; they are **not** public
+  REST/RPC interfaces. A separate trusted, audited PostgreSQL worker
+  connection is needed later; no connection or schedule is activated now.
+- Even an enabled production setting cannot be claimed by this version.
+  No outbound HTTP calls, credentials, CSID or tax invoice issuance are made.
+- The private tables are already on canonical Supabase; this is an additive
+  function-only migration and leaves existing transactions unchanged.
+
 ## Required phases before live usage
 
 1. Verify official specifications and mandatory invoice fields for the
