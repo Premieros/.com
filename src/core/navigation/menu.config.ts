@@ -45,6 +45,7 @@ export const MENU_ITEMS: MenuItemConfig[] = [
   { id: 'people-center', route: APP_ROUTES.peopleCenter, icon: 'customers', labelKey: 'customers', label: { ar: 'مركز الأطراف', en: 'People Center' }, permissionsAny: ['customers.view', 'suppliers.view'], group: 'centers' },
   { id: 'finance-center', route: APP_ROUTES.financeCenter, icon: 'accounts', labelKey: 'reports', label: { ar: 'المركز المالي', en: 'Finance Center' }, permissionsAny: ['accounts.view', 'expenses.view', 'sales.view', 'shifts.view', 'reports.view', 'reports.financial', 'reports.costing'], group: 'centers' },
   { id: 'administration-center', route: APP_ROUTES.administrationCenter, icon: 'settings', labelKey: 'settings', label: { ar: 'مركز الإدارة', en: 'Administration Center' }, permissionsAny: ['branches.manage', 'users.view', 'roles.permissions.manage', 'approvals.review', 'audit.view', 'settings.manage'], group: 'centers' },
+  { id: 'integrations-hub', route: APP_ROUTES.integrations, icon: 'settings', labelKey: 'settings', label: { ar: 'التكاملات والربط', en: 'Integrations Hub' }, permission: 'settings.manage', group: 'centers' },
 
   { id: 'products', route: APP_ROUTES.products, icon: 'products', labelKey: 'products', permission: 'products.view', group: 'catalog' },
   { id: 'raw-materials', route: APP_ROUTES.rawMaterials, icon: 'rawMaterials', labelKey: 'rawMaterials', permission: 'raw_materials.view', group: 'catalog' },
