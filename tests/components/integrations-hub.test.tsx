@@ -34,7 +34,7 @@ describe('Integrations Hub screen', () => {
     expect(screen.getByRole('heading', { name: 'التكاملات والربط' })).toBeInTheDocument();
     expect(screen.getByTestId('integration-eta-einvoice')).toHaveTextContent('تطوير أولي — غير متصل');
     expect(screen.getByTestId('integration-eta-ereceipt')).toHaveTextContent('غير متصل');
-    expect(screen.getByText(/لا يتم إرسال فواتير أو استيراد طلبات/)).toBeInTheDocument();
+    expect(screen.getByText(/ليس تثبيتًا مركزيًا على الخادم ولا اتصالًا/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('tab', { name: 'الضرائب السعودية' }));
     expect(screen.getByTestId('integration-zatca-clearance')).toHaveTextContent('غير متصل');
