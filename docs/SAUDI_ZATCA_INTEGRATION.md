@@ -127,6 +127,29 @@ results and explicit per-tenant approval. Nothing is configured for live use.
 - Official QR/tag specifications and signing must be verified and
   implemented before production; no live ZATCA submissions occur here.
 
+## Durable submission state and fencing contract (not yet wired to database)
+
+- `server/zatca/durableOutboxWorker.ts` adds a **server-only** coordination
+  contract for a database-backed queued invoice, atomic claim, opaque fencing
+  token and single outbound attempt. It delegates all actual network activity
+  to the previously reviewed ZATCA gateway.
+- Required states are `queued`, `leased`, `accepted`, `rejected`,
+  `needs_reconciliation`, `blocked`. Unknown outcomes are **held for
+  reconciliation**, not automatically retried. A failed durable completion
+  write propagates an error and must trigger operator alerting.
+- The interface **does not implement a persistent outbox**. A later reviewed
+  migration must enforce invoice/outbox creation in one DB transaction,
+  immutable payload hash and document identity, uniqueness scoped by tenant,
+  branch and EGS, atomic compare-and-swap claims, fencing-token checks on
+  completion, retention and audit policies. A crashed worker's lease MUST NOT
+  be re-queued without checking possible prior authority acceptance.
+- Do not reuse the existing ERP event outbox as a tax authority outbox without
+  separate schema and lifecycle review: it has a different event consumer and
+  is not proven to satisfy invoice issue/signature atomicity.
+- No production table, RLS, function or data was changed. **Explicit owner
+  approval for a database schema migration is required** before wiring this
+  contract to Supabase. The ZATCA production connection remains disabled.
+
 ## Required phases before live usage
 
 1. Verify official specifications and mandatory invoice fields for the
