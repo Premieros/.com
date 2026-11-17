@@ -93,6 +93,40 @@ vault, a transactional outbox with deduplication/reconciliation, monitoring,
 current ZATCA regulatory/API contract verification, sandbox conformance
 results and explicit per-tenant approval. Nothing is configured for live use.
 
+## Unsigned invoice XML draft and monetary mapping (current implementation)
+
+- `server/zatca/unsignedInvoiceDraft.ts` maps a limited illustrative **15% VAT**
+  sale into deterministic UBL-shaped XML using integer halalas and quantities
+  in thousandths. It validates scope fields, line IDs, money/discount bounds,
+  issue date shape, VAT identifier shape and XML escaping.
+- The result has `status: 'unsigned_draft'` and `submittable: false`.
+  It **cannot** be submitted to the gateway and is not ZATCA-compliant XML:
+  it is missing mandated profile metadata, full party details, tax-category
+  handling, tax-exemption references, invoice chaining, QR, signing, document
+  references, certified timestamp handling and other official requirements.
+- The function **does not issue or persist invoices**. Callers must supply a
+  durable, externally assigned invoice number, UUID and issue date; values
+  are never automatically invented from the browser clock.
+- Line-level rounding and discounts are an internal mapping prototype only.
+  Reconcile tax rounding/allowances against the official Saudi schemas and
+  authority validation suite before enabling any issuance.
+- This addition makes no database changes, no live network calls and no
+  claim of certification. Existing Premier sales/accounting flows are not
+  modified by this draft module.
+
+## Non-compliant QR preview (tags 1–5 only)
+
+- `server/zatca/unsignedQrPreview.ts` encodes the informational TLV
+  tags (seller name, VAT identifier, UTC timestamp, tax-inclusive amount and
+  VAT amount) into Base64 for **offline tests only**.
+- It validates UTF-8 byte lengths, dates and monetary amount shapes.
+- The return value is explicitly `status: 'unsigned_preview'` and
+  `submittable: false`. It omits phase-2 cryptographic tags and does not
+  generate an approved printable QR code. Do **not** display it as a final
+  Saudi tax invoice QR or pass it to customers.
+- Official QR/tag specifications and signing must be verified and
+  implemented before production; no live ZATCA submissions occur here.
+
 ## Required phases before live usage
 
 1. Verify official specifications and mandatory invoice fields for the
