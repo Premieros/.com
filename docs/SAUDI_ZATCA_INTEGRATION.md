@@ -46,6 +46,25 @@ the applicable onboarding, device/certificate setup and testing.
   before issuance; simplified invoices route to reporting only after issuance,
   and neither proceeds without country/onboarding/signing readiness.
 
+## Organization/branch/EGS onboarding gate (in progress)
+
+- `src/features/invoicing/saudi/zatcaOnboardingReadiness.ts` provides an
+  offline, non-credential-bearing prerequisite check. It **does not verify**
+  VAT registration validity, CSID provenance, signing validity, official
+  XML/QR rules, ZATCA sandbox certification, or successful submission.
+- Configuration must be **tenant + branch + EGS device** specific. The
+  jurisdiction is the legal registration country, **not** the browser locale.
+- `sandbox` and `production` are separate operating environments.
+  Production readiness requires a separate recorded approval.
+- Credentials, signing keys, onboarding OTPs and CSIDs must stay in a
+  server-side secrets store. Only readiness booleans can reach clients.
+- Until the backend audit/authorization, immutable invoice/outbox, ZATCA
+  onboarding, signing and official compliance tests exist, there is **no live
+  ZATCA integration** and no automatic invoice transmission.
+- Before implementing HTTP endpoints or claiming legal compliance, review
+  current official ZATCA/Fatoora technical specifications with the owner;
+  the current authoritative versions have not been verified in this change.
+
 ## Required phases before live usage
 
 1. Verify official specifications and mandatory invoice fields for the
