@@ -28,7 +28,7 @@ describe('Saudi unsigned UBL draft (never submittable)', () => {
     });
     expect(a.xml).toContain('<cbc:PayableAmount currencyID="SAR">27.60</cbc:PayableAmount>');
     expect(a.xml).toContain('<cbc:TaxAmount currencyID="SAR">3.60</cbc:TaxAmount>');
-    expect(a.xml).toContain('<cbc:DiscountAmount').toBe(false);
+    expect(a.xml).not.toContain('<cbc:DiscountAmount');
   });
 
   it('handles fractional quantity and line-level halala rounding', () => {
