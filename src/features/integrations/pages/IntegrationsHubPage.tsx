@@ -119,6 +119,7 @@ export function IntegrationsHubPage() {
   const [installError, setInstallError] = useState('');
   const [installLoading, setInstallLoading] = useState(false);
   const [installBusy, setInstallBusy] = useState(false);
+  const [reloadCentral, setReloadCentral] = useState(0);
   const userId = user?.id ?? '';
   const organizationId = selectedBranch?.organization_id ?? '';
   const scopeKey = `${userId}:${selectedBranchId}:${organizationId}`;
@@ -153,7 +154,7 @@ export function IntegrationsHubPage() {
       })
       .finally(() => { if (!cancelled) setInstallLoading(false); });
     return () => { cancelled = true; };
-  }, [userId, selectedBranchId, organizationId, ar]);
+  }, [userId, selectedBranchId, organizationId, ar, reloadCentral]);
 
   async function changeInstallation(appId: IntegrationAppId, install: boolean) {
     if (!userId || !selectedBranchId || installBusy || installLoading) return;
@@ -177,7 +178,7 @@ export function IntegrationsHubPage() {
           ? 'Server rejected the operation or could not be reached. No install was confirmed.'
           : 'Could not save the local installation. Check browser storage permissions.'));
     } finally {
-      if (scopeRef.current === operationScope) setInstallBusy(false);
+      setInstallBusy(false);
     }
   }
 
@@ -265,7 +266,7 @@ export function IntegrationsHubPage() {
           : 'Install apps locally for this user and branch in this browser, then open setup steps. This is not a server-wide installation or a live provider connection. Never enter private keys or API secrets here.'}</p>
       </div>
 
-      {installError && <p role="alert" className="text-sm text-red-600">{installError}</p>}
+      {installError && <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-red-600"><span>{installError}</span>{CENTRAL_INSTALLATIONS_ENABLED && <button type="button" disabled={installLoading || installBusy} className="rounded-lg border border-ui-border px-3 py-2 text-ui-text disabled:opacity-50" onClick={() => setReloadCentral((value) => value + 1)}>{ar ? 'إعادة المحاولة' : 'Retry'}</button>}</div>}
       <div className="rounded-xl border border-ui-border bg-ui-surface p-3 text-sm text-ui-muted">
         {CENTRAL_INSTALLATIONS_ENABLED ? (ar ? 'تطبيقات الفرع المثبّتة مركزيًا: ' : 'Shared installations for this branch: ') : (ar ? 'تطبيقاتي المثبّتة على هذا المتصفح لهذا الفرع: ' : 'My local apps for this branch: ')}
         <strong data-testid="installed-app-count">{Object.keys(installedApps).length}</strong>
