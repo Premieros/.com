@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   AlertTriangle, ArrowLeft, ArrowRight, ClipboardList,
@@ -9,12 +9,13 @@ import { useLanguage } from '@/context/LanguageContext';
 import { APP_ROUTES } from '@/core/navigation/routes';
 import { useAuth } from '@/context/AuthContext';
 import { useBranches } from '@/hooks/useBranches';
+import { readInstalledApps, updateLocalAppInstallation, type IntegrationAppId, type InstalledAppMap } from '../localAppInstallations';
 
 type IntegrationSection = 'egypt' | 'saudi' | 'delivery';
 type Stage = 'foundation' | 'not_connected';
 
 interface IntegrationTile {
-  id: string;
+  id: IntegrationAppId;
   ar: string;
   en: string;
   detailAr: string;
@@ -109,6 +110,30 @@ export function IntegrationsHubPage() {
   const selectedBranchId = eligibleBranches.some((branch) => branch.id === requestedBranchId)
     ? requestedBranchId : eligibleBranches[0]?.id ?? '';
   const selectedBranch = eligibleBranches.find((branch) => branch.id === selectedBranchId);
+  const [installedApps, setInstalledApps] = useState<InstalledAppMap>({});
+  const [openedAppId, setOpenedAppId] = useState<IntegrationAppId | null>(null);
+  const [installError, setInstallError] = useState('');
+  const userId = user?.id ?? '';
+  useEffect(() => {
+    setInstalledApps(userId && selectedBranchId ? readInstalledApps(userId, selectedBranchId) : {});
+    setOpenedAppId(null);
+    setInstallError('');
+  }, [userId, selectedBranchId]);
+
+  function changeInstallation(appId: IntegrationAppId, install: boolean) {
+    if (!userId || !selectedBranchId) return;
+    try {
+      const state = updateLocalAppInstallation(userId, selectedBranchId, appId, install);
+      setInstalledApps(state);
+      setInstallError('');
+      setOpenedAppId(install ? appId : null);
+    } catch {
+      setInstallError(ar
+        ? 'تعذّر حفظ تثبيت التطبيق في هذا المتصفح. راجع أذونات التخزين.'
+        : 'Could not save the local installation. Check browser storage permissions.');
+    }
+  }
+
   const sections: Array<{ key: IntegrationSection; ar: string; en: string; icon: typeof FileText }> = [
     { key: 'egypt', ar: 'الضرائب المصرية', en: 'Egyptian Tax', icon: FileText },
     { key: 'saudi', ar: 'الضرائب السعودية', en: 'Saudi ZATCA', icon: ShieldCheck },
@@ -189,8 +214,14 @@ export function IntegrationsHubPage() {
       <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-ui-text" role="status">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
         <p>{ar
-          ? 'هذه شاشة متابعة وتجهيز، وليست لوحة اتصال مباشر بالهيئات أو تطبيقات التوصيل. لا يتم إرسال فواتير أو استيراد طلبات من مزوّد خارجي، ولا ينبغي إدخال مفاتيح API أو شهادات هنا.'
-          : 'This is a readiness dashboard, not a live integration console. No tax invoices are submitted and no third-party delivery orders are imported. Do not paste API keys or certificates here.'}</p>
+          ? 'يمكنك تثبيت التطبيقات لهذا المستخدم والفرع على هذا المتصفح فقط، ثم فتح خطوات تجهيزها. هذا ليس تثبيتًا مركزيًا على الخادم ولا اتصالًا بالهيئة أو مزوّد التوصيل. لا تُدخل أي مفاتيح API أو شهادات هنا.'
+          : 'Install apps locally for this user and branch in this browser, then open setup steps. This is not a server-wide installation or a live provider connection. Never enter private keys or API secrets here.'}</p>
+      </div>
+
+      {installError && <p role="alert" className="text-sm text-red-600">{installError}</p>}
+      <div className="rounded-xl border border-ui-border bg-ui-surface p-3 text-sm text-ui-muted">
+        {ar ? 'تطبيقاتي المثبّتة على هذا المتصفح لهذا الفرع: ' : 'My local apps for this branch: '}
+        <strong data-testid="installed-app-count">{Object.keys(installedApps).length}</strong>
       </div>
 
       <section
@@ -211,6 +242,40 @@ export function IntegrationsHubPage() {
                 </span>
               </div>
               <p className="text-sm leading-7 text-ui-muted">{ar ? item.detailAr : item.detailEn}</p>
+              <div className="mt-4 flex flex-wrap items-center gap-2">
+                {installedApps[item.id] ? (
+                  <>
+                    <span className="rounded-full border border-ui-border bg-ui-page-alt px-3 py-1 text-xs font-semibold text-ui-muted">
+                      {ar ? 'مثبّت محليًا · غير متصل' : 'Locally installed · not connected'}
+                    </span>
+                    <button type="button" className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white"
+                      onClick={() => setOpenedAppId(openedAppId === item.id ? null : item.id)}
+                      data-testid={`open-integration-${item.id}`}>
+                      {ar ? 'فتح التطبيق' : 'Open app'}
+                    </button>
+                    <button type="button" className="rounded-lg border border-ui-border px-3 py-2 text-sm text-ui-text"
+                      onClick={() => changeInstallation(item.id, false)} data-testid={`remove-integration-${item.id}`}>
+                      {ar ? 'إزالة' : 'Remove'}
+                    </button>
+                  </>
+                ) : (
+                  <button type="button" disabled={!userId || !selectedBranchId}
+                    className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                    onClick={() => changeInstallation(item.id, true)}
+                    data-testid={`install-integration-${item.id}`}>
+                    {ar ? 'تثبيت التطبيق' : 'Install app'}
+                  </button>
+                )}
+              </div>
+              {openedAppId === item.id && installedApps[item.id] && (
+                <div className="mt-4 rounded-xl border border-ui-border bg-ui-page-alt p-3 text-sm" data-testid={`setup-integration-${item.id}`}>
+                  <strong className="text-ui-text">{ar ? 'إعداد التطبيق' : 'App setup'}</strong>
+                  <p className="mt-1 leading-6 text-ui-muted">{ar
+                    ? 'تمت إضافته إلى هذا المتصفح فقط. للربط الحقيقي يلزم موصّل خلفي معتمد وبيانات اعتماد آمنة واختبار اتصال رسمي.'
+                    : 'Added only in this browser. Live setup requires a reviewed server connector, secure provider credentials and a verified connection test.'}</p>
+                  <p className="mt-2 text-xs text-ui-muted">{ar ? item.detailAr : item.detailEn}</p>
+                </div>
+              )}
             </article>
           ))}
         </div>
