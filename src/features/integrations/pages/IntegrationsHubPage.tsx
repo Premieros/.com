@@ -7,6 +7,8 @@ import {
 import { PageHeader } from '@/components/PageHeader';
 import { useLanguage } from '@/context/LanguageContext';
 import { APP_ROUTES } from '@/core/navigation/routes';
+import { useAuth } from '@/context/AuthContext';
+import { useBranches } from '@/hooks/useBranches';
 
 type IntegrationSection = 'egypt' | 'saudi' | 'delivery';
 type Stage = 'foundation' | 'not_connected';
@@ -96,8 +98,17 @@ export const INTEGRATION_TILES: Record<IntegrationSection, IntegrationTile[]> = 
 
 export function IntegrationsHubPage() {
   const { lang } = useLanguage();
+  const { user } = useAuth();
+  const { branches, loading: branchesLoading, error: branchesError } = useBranches();
   const ar = lang === 'ar';
   const [section, setSection] = useState<IntegrationSection>('egypt');
+  const [requestedBranchId, setRequestedBranchId] = useState('');
+  const eligibleBranches = user?.branch_id && user.role !== 'super_admin'
+    ? branches.filter((branch) => branch.id === user.branch_id)
+    : branches;
+  const selectedBranchId = eligibleBranches.some((branch) => branch.id === requestedBranchId)
+    ? requestedBranchId : eligibleBranches[0]?.id ?? '';
+  const selectedBranch = eligibleBranches.find((branch) => branch.id === selectedBranchId);
   const sections: Array<{ key: IntegrationSection; ar: string; en: string; icon: typeof FileText }> = [
     { key: 'egypt', ar: 'الضرائب المصرية', en: 'Egyptian Tax', icon: FileText },
     { key: 'saudi', ar: 'الضرائب السعودية', en: 'Saudi ZATCA', icon: ShieldCheck },
@@ -112,6 +123,44 @@ export function IntegrationsHubPage() {
           ? 'مركز متابعة الضرائب المصرية والسعودية وتطبيقات التوصيل'
           : 'Track Egyptian and Saudi tax integrations and delivery platforms'}
       />
+      <section className="rounded-2xl border border-ui-border bg-ui-surface p-4 sm:p-5" aria-label={ar ? 'نطاق الفرع' : 'Branch scope'}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="font-bold text-ui-text">{ar ? 'الفرع المحدد للتكامل' : 'Integration branch'}</h2>
+            <p className="mt-1 text-xs text-ui-muted">{ar
+              ? 'اختر الفرع لمراجعة متطلبات ربطه. لا يعني اختيار الفرع وجود اتصال خارجي.'
+              : 'Choose the branch to review its setup requirements. A selection does not indicate a live connection.'}</p>
+          </div>
+          {eligibleBranches.length > 0 ? (
+            <label className="flex min-w-48 flex-col gap-1 text-xs font-semibold text-ui-muted">
+              {ar ? 'الفرع' : 'Branch'}
+              <select
+                aria-label={ar ? 'اختيار فرع التكامل' : 'Select integration branch'}
+                value={selectedBranchId}
+                onChange={(event) => setRequestedBranchId(event.target.value)}
+                className="min-h-11 rounded-xl border border-ui-border bg-ui-page px-3 text-sm text-ui-text"
+              >
+                {eligibleBranches.map((branch) => (
+                  <option key={branch.id} value={branch.id}>{branch.name}</option>
+                ))}
+              </select>
+            </label>
+          ) : (
+            <span className="text-sm text-ui-muted" role="status">
+              {branchesLoading ? (ar ? 'تحميل الفروع...' : 'Loading branches...') :
+                branchesError ? (ar ? 'تعذر جلب الفروع؛ لا يمكن تحديد نطاق الربط.' : 'Could not load branches; connection scope unavailable.') :
+                (ar ? 'لا توجد فروع متاحة للحساب.' : 'No branches available to this account.')}
+            </span>
+          )}
+        </div>
+        {selectedBranch && (
+          <p className="mt-3 text-xs text-ui-muted" data-testid="integration-branch-scope">
+            {ar ? 'نطاق العرض الحالي: ' : 'Current view scope: '}<strong>{selectedBranch.name}</strong>
+            {' · '}{ar ? 'الجاهزية التالية إرشادية وغير متحقَّق منها للفرع.' : 'The following readiness items are guidance, not verified branch status.'}
+          </p>
+        )}
+      </section>
+
       <div className="flex flex-wrap gap-2" role="tablist" aria-label={ar ? 'فئات التكامل' : 'Integration categories'}>
         {sections.map((item) => {
           const Icon = item.icon;
@@ -165,6 +214,36 @@ export function IntegrationsHubPage() {
             </article>
           ))}
         </div>
+
+        {selectedBranch && (
+          <div className="rounded-2xl border border-ui-border bg-ui-surface p-5" data-testid="integration-readiness-plan">
+            <h3 className="mb-3 font-bold text-ui-text">
+              {ar ? `خطة تجهيز فرع: ${selectedBranch.name}` : `Setup plan for: ${selectedBranch.name}`}
+            </h3>
+            <p className="mb-3 text-xs text-ui-muted">
+              {ar ? 'هذه متطلبات تحضيرية، وليست مهام مكتملة أو نتيجة اختبار اتصال.' : 'These are preparation requirements, not completed tasks or connection test results.'}
+            </p>
+            <ol className="list-decimal space-y-2 ps-5 text-sm leading-7 text-ui-muted">
+              {(section === 'egypt'
+                ? [
+                    ar ? 'التحقق من تسجيل المنشأة والفرع لدى مصلحة الضرائب المصرية.' : 'Confirm ETA legal-entity and branch registration.',
+                    ar ? 'تهيئة التوقيع الرقمي ومفاتيح الاتصال داخل خدمة خلفية آمنة.' : 'Provision server-side signing and ETA credentials securely.',
+                    ar ? 'اختبار الفواتير والإيصالات مع البيئة الرسمية قبل إصدار مستندات حقيقية.' : 'Run official eInvoice and eReceipt conformance tests.',
+                  ]
+                : section === 'saudi'
+                  ? [
+                      ar ? 'توثيق المنشأة والرقم الضريبي وربط جهاز EGS بالفرع.' : 'Verify Saudi VAT details and branch EGS enrollment.',
+                      ar ? 'إتمام شهادات CSID والتوقيع وفق UBL وQR المعتمدين.' : 'Complete CSID, compliant signed UBL XML and QR.',
+                      ar ? 'اختبار Clearance وReporting رسميًا ثم تفعيل الإنتاج لكل عميل.' : 'Pass official clearance/reporting tests before per-tenant production activation.',
+                    ]
+                  : [
+                      ar ? 'الحصول على اعتماد تكامل API من تطبيق التوصيل المطلوب.' : 'Obtain approved API access from the delivery platform.',
+                      ar ? 'تجهيز ربط الأصناف والأسعار والفروع دون تخزين الأسرار بالمتصفح.' : 'Map menu, prices and branch scope using server-side credentials.',
+                      ar ? 'اختبار استقبال الطلبات ومنع التكرار وإلغاء الطلبات قبل التشغيل.' : 'Test webhook order intake, deduplication and cancellations.',
+                    ]).map((step) => <li key={step}>{step}</li>)}
+            </ol>
+          </div>
+        )}
 
         {section !== 'delivery' ? (
           <div className="rounded-2xl border border-ui-border bg-ui-surface p-5">
