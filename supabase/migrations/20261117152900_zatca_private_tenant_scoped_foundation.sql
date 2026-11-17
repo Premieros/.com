@@ -147,6 +147,20 @@ CREATE TABLE private.zatca_submission_outbox (
 CREATE FUNCTION private.zatca_guard_document_identity()
 RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog AS $$
 BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'ZATCA_DOCUMENT_DELETE_FORBIDDEN'
+      USING ERRCODE = '23514';
+  END IF;
+  IF OLD.status NOT IN ('draft', 'prepared') AND
+     NEW.status IN ('draft', 'prepared') THEN
+    RAISE EXCEPTION 'ZATCA_DOCUMENT_STATUS_DOWNGRADE_FORBIDDEN'
+      USING ERRCODE = '23514';
+  END IF;
+  IF OLD.status IN ('cleared', 'reported', 'cancelled') AND
+     NEW.status IS DISTINCT FROM OLD.status THEN
+    RAISE EXCEPTION 'ZATCA_DOCUMENT_FINAL_STATUS_IMMUTABLE'
+      USING ERRCODE = '23514';
+  END IF;
   IF OLD.status NOT IN ('draft', 'prepared') AND (
      NEW.organization_id IS DISTINCT FROM OLD.organization_id OR
      NEW.branch_id IS DISTINCT FROM OLD.branch_id OR
@@ -172,6 +186,48 @@ REVOKE ALL ON FUNCTION private.zatca_guard_document_identity() FROM PUBLIC, anon
 CREATE TRIGGER zatca_document_immutable_after_signing
   BEFORE UPDATE ON private.zatca_documents
   FOR EACH ROW EXECUTE FUNCTION private.zatca_guard_document_identity();
+
+-- Disallow erasing documents and outbox events, even as DB owner.
+CREATE TRIGGER zatca_document_no_delete
+  BEFORE DELETE ON private.zatca_documents
+  FOR EACH ROW EXECUTE FUNCTION private.zatca_guard_document_identity();
+
+CREATE FUNCTION private.zatca_guard_outbox_audit()
+RETURNS trigger LANGUAGE plpgsql SET search_path = pg_catalog AS $
+BEGIN
+  IF TG_OP = 'DELETE' THEN
+    RAISE EXCEPTION 'ZATCA_OUTBOX_DELETE_FORBIDDEN' USING ERRCODE = '23514';
+  END IF;
+  IF NEW.document_id IS DISTINCT FROM OLD.document_id OR
+     NEW.organization_id IS DISTINCT FROM OLD.organization_id OR
+     NEW.branch_id IS DISTINCT FROM OLD.branch_id OR
+     NEW.environment IS DISTINCT FROM OLD.environment OR
+     NEW.egs_device_id IS DISTINCT FROM OLD.egs_device_id OR
+     NEW.channel IS DISTINCT FROM OLD.channel OR
+     NEW.created_at IS DISTINCT FROM OLD.created_at THEN
+    RAISE EXCEPTION 'ZATCA_OUTBOX_SCOPE_IMMUTABLE' USING ERRCODE = '23514';
+  END IF;
+  IF (
+    OLD.state IN ('accepted', 'rejected', 'needs_reconciliation', 'blocked')
+    AND NEW.state IS DISTINCT FROM OLD.state
+  ) OR (
+    OLD.state = 'queued'
+    AND NEW.state NOT IN ('queued', 'leased', 'blocked')
+  ) OR (
+    OLD.state = 'leased'
+    AND NEW.state NOT IN
+      ('leased', 'accepted', 'rejected', 'needs_reconciliation', 'blocked')
+  ) THEN
+    RAISE EXCEPTION 'ZATCA_OUTBOX_INVALID_TRANSITION' USING ERRCODE = '23514';
+  END IF;
+  RETURN NEW;
+END;
+$;
+REVOKE ALL ON FUNCTION private.zatca_guard_outbox_audit()
+  FROM PUBLIC, anon, authenticated, service_role;
+CREATE TRIGGER zatca_outbox_append_only_audit
+  BEFORE UPDATE OR DELETE ON private.zatca_submission_outbox
+  FOR EACH ROW EXECUTE FUNCTION private.zatca_guard_outbox_audit();
 
 CREATE INDEX zatca_outbox_work_scan_idx
   ON private.zatca_submission_outbox (state, created_at, id);
