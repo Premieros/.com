@@ -150,6 +150,32 @@ results and explicit per-tenant approval. Nothing is configured for live use.
   approval for a database schema migration is required** before wiring this
   contract to Supabase. The ZATCA production connection remains disabled.
 
+## Production persistence foundation checkpoint — 2026-11-17
+
+- The owner approved ZATCA-only private database tables. Canonical Supabase
+  `hvqlkapynjfjikqithvd` accepted migration version
+  **`20261117134752`** named `zatca_private_tenant_scoped_foundation`.
+- Created only `private.zatca_branch_settings`,
+  `private.zatca_egs_devices`, `private.zatca_documents`, and
+  `private.zatca_submission_outbox`. All four have RLS enabled and
+  no direct grants to `anon`, `authenticated` or `service_role`.
+- Production read-only verification found **zero rows** in each table and
+  all new constraints validated; existing sales, accounting and inventory
+  rows were untouched by this additive migration.
+- Composite relationships and database triggers block organization/branch/
+  EGS mismatches, repeated document/action keys, deletion of tax audit
+  records, and unauthorized rewriting of issued document identity.
+- Existing `server/zatca/durableOutboxWorker.ts` is **not yet connected**
+  to these tables. No privileged claim/complete RPC has been deployed;
+  no invoice can be sent or issued via this new persistence layer.
+- Remaining production blockers: authenticated private backend API,
+  durable invoice+outbox atomic creation with verified signing/counters,
+  secure CSID vault and EGS onboarding, official UBL/QR/signature validation,
+  recovery/reconciliation procedures, official sandbox acceptance and
+  separate per-tenant production enablement.
+- Repository migration path is aligned to the **exact remote version**;
+  do not replay this DDL under a second version.
+
 ## Required phases before live usage
 
 1. Verify official specifications and mandatory invoice fields for the
