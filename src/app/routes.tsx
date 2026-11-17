@@ -71,6 +71,7 @@ const PermissionsPage = lazy(() => import('../features/admin/pages/PermissionsPa
 const ApprovalCenterPage = lazy(() => import('../features/admin/pages/ApprovalCenterPage').then(m => ({ default: m.ApprovalCenterPage })));
 const AuditLogPage = lazy(() => import('../features/reporting/pages/AuditLogPage').then(m => ({ default: m.AuditLogPage })));
 const SettingsControlCenterPage = lazy(() => import('../features/admin/pages/SettingsControlCenterPage').then(m => ({ default: m.SettingsControlCenterPage })));
+const IntegrationsHubPage = lazy(() => import('../features/integrations/pages/IntegrationsHubPage').then(m => ({ default: m.IntegrationsHubPage })));
 const SuperAdminConsolePage = lazy(() => import('../features/admin/pages/SuperAdminConsolePage').then(m => ({ default: m.SuperAdminConsolePage })));
 const SystemHealthPage = lazy(() => import('../features/admin/pages/SystemHealthPage').then(m => ({ default: m.SystemHealthPage })));
 const ImportExportCenterPage = lazy(() => import('../features/import-export/pages/ImportExportCenterPage').then(m => ({ default: m.ImportExportCenterPage })));
@@ -258,6 +259,7 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.approvals} element={<ProtectedRoute permission="approvals.review"><ApprovalCenterPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.auditLog} element={<ProtectedRoute permission="audit.view"><AuditLogPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.settings} element={<ProtectedRoute permission="settings.manage"><SettingsControlCenterPage /></ProtectedRoute>} />
+        <Route path={APP_ROUTES.integrations} element={<ProtectedRoute permission="settings.manage"><IntegrationsHubPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.superAdmin} element={<ProtectedRoute superAdminOnly><SuperAdminConsolePage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.basicSettings} element={<ProtectedRoute permission="settings.manage"><Navigate to={APP_ROUTES.settings} replace /></ProtectedRoute>} />
         <Route path={APP_ROUTES.systemHealth} element={<ProtectedRoute permission="settings.manage"><SystemHealthPage /></ProtectedRoute>} />
