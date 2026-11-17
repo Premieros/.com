@@ -47,7 +47,7 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-REVOKE ALL ON FUNCTION private.zatca_check_branch_ownership() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION private.zatca_check_branch_ownership() FROM PUBLIC, anon, authenticated, service_role;
 CREATE TRIGGER zatca_settings_branch_scope_guard
   BEFORE INSERT OR UPDATE OF organization_id, branch_id
   ON private.zatca_branch_settings
@@ -168,7 +168,7 @@ BEGIN
   RETURN NEW;
 END;
 $$;
-REVOKE ALL ON FUNCTION private.zatca_guard_document_identity() FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION private.zatca_guard_document_identity() FROM PUBLIC, anon, authenticated, service_role;
 CREATE TRIGGER zatca_document_immutable_after_signing
   BEFORE UPDATE ON private.zatca_documents
   FOR EACH ROW EXECUTE FUNCTION private.zatca_guard_document_identity();
@@ -185,6 +185,6 @@ ALTER TABLE private.zatca_documents ENABLE ROW LEVEL SECURITY;
 ALTER TABLE private.zatca_submission_outbox ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON TABLE private.zatca_branch_settings,
   private.zatca_egs_devices, private.zatca_documents,
-  private.zatca_submission_outbox FROM PUBLIC, anon, authenticated;
+  private.zatca_submission_outbox FROM PUBLIC, anon, authenticated, service_role;
 -- No grants to service_role yet: future RPCs must perform authenticated,
 -- tenant-scoped operations with explicit reviewed permissions.
