@@ -209,6 +209,17 @@ export function SettingsControlCenterPage() {
         ) : undefined}
       />
 
+      <Link
+        to={APP_ROUTES.integrations}
+        data-testid="settings-integrations-link"
+        className="flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-600/5 p-4 text-sm font-bold text-ui-text hover:bg-brand-600/10"
+      >
+        <span className="flex items-center gap-2"><Smartphone className="h-5 w-5 text-brand-600" />
+          {isAr ? 'التكاملات والربط — الضرائب المصرية والسعودية وتطبيقات التوصيل' : 'Integrations Hub — Egypt, Saudi Arabia and delivery apps'}
+        </span>
+        <span className="text-brand-600">{isAr ? 'فتح الشاشة' : 'Open'}</span>
+      </Link>
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4 md:gap-6">
         <div data-testid="settings-section-rail" className="flex gap-2 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:col-span-1 md:block md:space-y-1 md:overflow-visible md:pb-0">
           {SECTIONS.map((sec) => (

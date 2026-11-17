@@ -1,4 +1,4 @@
-import { ArrowLeftRight, Building2, FileClock, KeyRound, Settings, ShieldCheck, Users, Workflow } from 'lucide-react';
+import { ArrowLeftRight, Building2, FileClock, KeyRound, PlugZap, Settings, ShieldCheck, Users, Workflow } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { CenterGrid, type CenterTileItem } from '@/components/design/CenterTile';
 import { useLanguage } from '@/context/LanguageContext';
@@ -19,6 +19,7 @@ export function AdministrationCenterPage() {
     { id: 'data', ar: 'الاستيراد والتصدير', en: 'Import / Export', descriptionAr: 'إدخال وإخراج البيانات من مكان واحد.', descriptionEn: 'Import and export operational data.', route: APP_ROUTES.importExport, permission: can('settings.manage'), icon: ArrowLeftRight, accent: 'system' },
     { id: 'kitchen-stations', ar: 'محطات المطبخ', en: 'Kitchen Stations', descriptionAr: 'إعداد المحطات فقط دون تغيير مسار الطباعة أو الإرسال.', descriptionEn: 'Configure stations without changing print or dispatch runtime.', route: APP_ROUTES.kitchenStations, permission: can('settings.manage'), icon: Workflow, accent: 'system' },
     { id: 'settings', ar: 'الإعدادات', en: 'Settings', descriptionAr: 'إعدادات الفرع والضريبة واليوم المالي والمظهر.', descriptionEn: 'Branch, tax, business-day and appearance settings.', route: APP_ROUTES.settings, permission: can('settings.manage'), icon: Settings, accent: 'system' },
+    { id: 'integrations', ar: 'التكاملات والربط', en: 'Integrations Hub', descriptionAr: 'الضرائب المصرية والسعودية وتطبيقات التوصيل، مع حالة الربط الحقيقية.', descriptionEn: 'Egyptian and Saudi taxes and delivery platforms with truthful connection status.', route: APP_ROUTES.integrations, permission: can('settings.manage'), icon: PlugZap, accent: 'system' },
   ];
 
   return (
