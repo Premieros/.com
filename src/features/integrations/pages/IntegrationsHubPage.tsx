@@ -10,7 +10,7 @@ import { APP_ROUTES } from '@/core/navigation/routes';
 import { useAuth } from '@/context/AuthContext';
 import { useBranches } from '@/hooks/useBranches';
 import { readInstalledApps, updateLocalAppInstallation, type IntegrationAppId, type InstalledAppMap } from '../localAppInstallations';
-import { loadCentralInstalledApps, changeCentralAppInstallation } from '../centralAppInstallations';
+import { loadCentralInstalledApps, changeCentralAppInstallation, getPendingLegacyApps, importConfirmedLegacyApps } from '../centralAppInstallations';
 
 // Disabled until the reviewed migration is deployed and branch RLS is verified.
 const CENTRAL_INSTALLATIONS_ENABLED = import.meta.env.VITE_CENTRAL_INTEGRATIONS_ENABLED === 'true';
@@ -120,6 +120,8 @@ export function IntegrationsHubPage() {
   const [installLoading, setInstallLoading] = useState(false);
   const [installBusy, setInstallBusy] = useState(false);
   const [reloadCentral, setReloadCentral] = useState(0);
+  const [legacyApps, setLegacyApps] = useState<InstalledAppMap>({});
+  const [showImportReview, setShowImportReview] = useState(false);
   const userId = user?.id ?? '';
   const organizationId = selectedBranch?.organization_id ?? '';
   const scopeKey = `${userId}:${selectedBranchId}:${organizationId}`;
@@ -130,6 +132,8 @@ export function IntegrationsHubPage() {
     setOpenedAppId(null);
     setInstallError('');
     setInstalledApps({});
+    setShowImportReview(false);
+    setLegacyApps(userId && selectedBranchId ? readInstalledApps(userId, selectedBranchId) : {});
     if (!userId || !selectedBranchId) {
       setInstallLoading(false);
       return;
@@ -177,6 +181,34 @@ export function IntegrationsHubPage() {
         : (CENTRAL_INSTALLATIONS_ENABLED
           ? 'Server rejected the operation or could not be reached. No install was confirmed.'
           : 'Could not save the local installation. Check browser storage permissions.'));
+    } finally {
+      setInstallBusy(false);
+    }
+  }
+
+  const pendingLegacyApps = CENTRAL_INSTALLATIONS_ENABLED
+    ? getPendingLegacyApps(legacyApps, installedApps)
+    : [];
+
+  async function confirmLegacyImport() {
+    if (!CENTRAL_INSTALLATIONS_ENABLED || !showImportReview || !userId || !organizationId ||
+        !selectedBranchId || installBusy || installLoading || installError) return;
+    const operationScope = scopeKey;
+    setInstallBusy(true);
+    try {
+      const state = await importConfirmedLegacyApps(
+        organizationId, selectedBranchId, userId, legacyApps, installedApps,
+      );
+      if (scopeRef.current !== operationScope) return;
+      setInstalledApps(state);
+      setShowImportReview(false);
+      setInstallError('');
+    } catch {
+      if (scopeRef.current !== operationScope) return;
+      setShowImportReview(false);
+      setInstallError(ar
+        ? 'لم يكتمل استيراد التطبيقات. قد يكون بعضها محفوظًا؛ أعد تحميل قائمة الفرع للتحقق قبل إعادة المحاولة.'
+        : 'Import could not finish. Some apps may have been saved; reload the branch list to verify before retrying.');
     } finally {
       setInstallBusy(false);
     }
@@ -261,9 +293,13 @@ export function IntegrationsHubPage() {
 
       <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-ui-text" role="status">
         <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-        <p>{ar
-          ? 'يمكنك تثبيت التطبيقات لهذا المستخدم والفرع على هذا المتصفح فقط، ثم فتح خطوات تجهيزها. هذا ليس تثبيتًا مركزيًا على الخادم ولا اتصالًا بالهيئة أو مزوّد التوصيل. لا تُدخل أي مفاتيح API أو شهادات هنا.'
-          : 'Install apps locally for this user and branch in this browser, then open setup steps. This is not a server-wide installation or a live provider connection. Never enter private keys or API secrets here.'}</p>
+        <p>{CENTRAL_INSTALLATIONS_ENABLED
+          ? (ar
+            ? 'يُحفظ تثبيت التطبيقات مركزيًا للفرع. هذا لا يعني اتصالًا خارجيًا أو تفعيل إصدار مستندات ضريبية. لا تُدخل مفاتيح API أو شهادات هنا.'
+            : 'App installations are shared for the branch. This does not activate external connections or tax submissions. Do not enter API keys or certificates here.')
+          : (ar
+            ? 'يمكنك تثبيت التطبيقات لهذا المستخدم والفرع على هذا المتصفح فقط، ثم فتح خطوات تجهيزها. هذا ليس تثبيتًا مركزيًا على الخادم ولا اتصالًا بالهيئة أو مزوّد التوصيل. لا تُدخل أي مفاتيح API أو شهادات هنا.'
+            : 'Install apps locally for this user and branch in this browser, then open setup steps. This is not a server-wide installation or a live provider connection. Never enter private keys or API secrets here.')}</p>
       </div>
 
       {installError && <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-red-600"><span>{installError}</span>{CENTRAL_INSTALLATIONS_ENABLED && <button type="button" disabled={installLoading || installBusy} className="rounded-lg border border-ui-border px-3 py-2 text-ui-text disabled:opacity-50" onClick={() => setReloadCentral((value) => value + 1)}>{ar ? 'إعادة المحاولة' : 'Retry'}</button>}</div>}
@@ -271,6 +307,44 @@ export function IntegrationsHubPage() {
         {CENTRAL_INSTALLATIONS_ENABLED ? (ar ? 'تطبيقات الفرع المثبّتة مركزيًا: ' : 'Shared installations for this branch: ') : (ar ? 'تطبيقاتي المثبّتة على هذا المتصفح لهذا الفرع: ' : 'My local apps for this branch: ')}
         <strong data-testid="installed-app-count">{Object.keys(installedApps).length}</strong>
       </div>
+
+      {CENTRAL_INSTALLATIONS_ENABLED && !installLoading && !installError && pendingLegacyApps.length > 0 && (
+        <section className="rounded-xl border border-ui-border bg-ui-surface p-4 space-y-3" data-testid="legacy-integration-import">
+          <h2 className="font-bold text-ui-text">
+            {ar ? 'تطبيقات محفوظة سابقًا على هذا المتصفح' : 'Previously saved apps on this browser'}
+          </h2>
+          <p className="text-sm text-ui-muted">
+            {ar
+              ? `يوجد ${pendingLegacyApps.length} تطبيقات محلية غير مثبتة مركزيًا لهذا الفرع. استيرادها يجعلها ظاهرة لجميع المستخدمين المخوّلين في الفرع، ولا يُنشئ اتصالًا بمزوّد الخدمة.`
+              : `${pendingLegacyApps.length} browser-local apps are not yet shared for this branch. Importing makes them visible to authorized branch users, without connecting to providers.`}
+          </p>
+          {!showImportReview ? (
+            <button type="button" className="rounded-lg border border-ui-border px-3 py-2 text-sm font-semibold text-ui-text"
+              onClick={() => setShowImportReview(true)} disabled={installBusy} data-testid="review-legacy-integration-import">
+              {ar ? 'مراجعة الاستيراد' : 'Review import'}
+            </button>
+          ) : (
+            <div className="space-y-3" data-testid="confirm-legacy-integration-import">
+              <p className="text-sm font-semibold text-ui-text">{ar ? 'سيُشارك ما يلي مع مستخدمي الفرع:' : 'These apps will be shared with branch users:'}</p>
+              <ul className="list-disc ps-5 text-sm text-ui-muted">
+                {pendingLegacyApps.map((appId) => (
+                  <li key={appId}>{Object.values(INTEGRATION_TILES).flat().find((item) => item.id === appId)?.[ar ? 'ar' : 'en'] ?? appId}</li>
+                ))}
+              </ul>
+              <div className="flex flex-wrap gap-2">
+                <button type="button" className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
+                  onClick={() => void confirmLegacyImport()} disabled={installBusy || installLoading} data-testid="execute-legacy-integration-import">
+                  {ar ? 'تأكيد الاستيراد للفرع' : 'Confirm branch import'}
+                </button>
+                <button type="button" className="rounded-lg border border-ui-border px-3 py-2 text-sm text-ui-text"
+                  onClick={() => setShowImportReview(false)} disabled={installBusy}>
+                  {ar ? 'إلغاء' : 'Cancel'}
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
 
       <section
         id="integrations-content"
