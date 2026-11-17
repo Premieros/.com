@@ -6,6 +6,20 @@ import { readFileSync } from 'node:fs';
 vi.mock('@/context/LanguageContext', () => ({
   useLanguage: () => ({ lang: 'ar', t: (key: string) => key }),
 }));
+const branchContext = vi.hoisted(() => ({
+  user: { id: 'user-1', role: 'super_admin', branch_id: null as string | null },
+  branches: [
+    { id: 'branch-a', name: 'فرع القاهرة' },
+    { id: 'branch-b', name: 'فرع الرياض' },
+  ],
+}));
+
+vi.mock('@/context/AuthContext', () => ({
+  useAuth: () => ({ user: branchContext.user }),
+}));
+vi.mock('@/hooks/useBranches', () => ({
+  useBranches: () => ({ branches: branchContext.branches, loading: false, error: null }),
+}));
 vi.mock('@/components/PageHeader', () => ({
   PageHeader: ({ title, subtitle }: { title: string; subtitle: string }) => (
     <header><h1>{title}</h1><p>{subtitle}</p></header>
@@ -44,6 +58,21 @@ describe('Integrations Hub screen', () => {
     render(<MemoryRouter><IntegrationsHubPage /></MemoryRouter>);
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /إرسال|تفعيل الاتصال/ })).not.toBeInTheDocument();
+  });
+
+  it('selects a branch without implying official authority readiness', () => {
+    render(<MemoryRouter><IntegrationsHubPage /></MemoryRouter>);
+    expect(screen.getByTestId('integration-branch-scope')).toHaveTextContent('فرع القاهرة');
+    expect(screen.getByTestId('integration-readiness-plan')).toHaveTextContent('فرع القاهرة');
+    fireEvent.change(screen.getByRole('combobox', { name: 'اختيار فرع التكامل' }), {
+      target: { value: 'branch-b' },
+    });
+    expect(screen.getByTestId('integration-branch-scope')).toHaveTextContent('فرع الرياض');
+    fireEvent.click(screen.getByRole('tab', { name: 'الضرائب السعودية' }));
+    expect(screen.getByTestId('integration-readiness-plan')).toHaveTextContent('شهادات CSID');
+    expect(screen.getByTestId('integration-zatca-clearance')).toHaveTextContent('غير متصل');
+    fireEvent.click(screen.getByRole('tab', { name: 'تطبيقات التوصيل' }));
+    expect(screen.getByTestId('integration-readiness-plan')).toHaveTextContent('منع التكرار');
   });
 
   it('protects the route with settings permission and exposes it in settings, sidebar and admin center', () => {
