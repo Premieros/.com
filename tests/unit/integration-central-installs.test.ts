@@ -40,6 +40,7 @@ vi.mock('@/lib/supabase', () => ({
 
 import {
   loadCentralInstalledApps, changeCentralAppInstallation,
+  getPendingLegacyApps, importConfirmedLegacyApps,
 } from '@/features/integrations/centralAppInstallations';
 
 const org = '11111111-1111-4111-8111-111111111111';
@@ -86,5 +87,41 @@ describe('central integration installation service', () => {
     await expect(changeCentralAppInstallation(org, branch, 'arbitrary' as 'talabat', user, true))
       .rejects.toThrow('UNKNOWN_INTEGRATION_APP');
     expect(mock.calls).toHaveLength(0);
+  });
+});
+
+describe('explicit browser-local import', () => {
+  it('filters out apps already registered centrally and ignores unknown IDs', () => {
+    expect(getPendingLegacyApps(
+      { talabat: true, jahez: true, mystery: true } as unknown as { talabat: true; jahez: true },
+      { talabat: true },
+    )).toEqual(['jahez']);
+  });
+
+  it('imports only after the explicit action and confirms the server readback', async () => {
+    expect(getPendingLegacyApps({ talabat: true }, {})).toEqual(['talabat']);
+    expect(mock.calls).toHaveLength(0);
+    mock.rows = [{ app_id: 'talabat' }];
+    const state = await importConfirmedLegacyApps(org, branch, user, { talabat: true }, {});
+    expect(state).toEqual({ talabat: true });
+    expect(mock.calls.filter((call) => call.action === 'insert')).toHaveLength(1);
+  });
+
+  it('does not reinsert already registered apps', async () => {
+    const state = await importConfirmedLegacyApps(org, branch, user, { talabat: true }, { talabat: true });
+    expect(state).toEqual({ talabat: true });
+    expect(mock.calls).toHaveLength(0);
+  });
+
+  it('fails closed if the server fails to confirm an imported app', async () => {
+    await expect(importConfirmedLegacyApps(org, branch, user, { talabat: true }, {}))
+      .rejects.toThrow('CENTRAL_INSTALL_NOT_CONFIRMED');
+    expect(mock.calls.filter((call) => call.action === 'insert')).toHaveLength(1);
+  });
+
+  it('does not report a successful import when RLS rejects the operation', async () => {
+    mock.writeError = { code: '42501', message: 'RLS denied' };
+    await expect(importConfirmedLegacyApps(org, branch, user, { jahez: true }, {}))
+      .rejects.toMatchObject({ code: '42501' });
   });
 });
