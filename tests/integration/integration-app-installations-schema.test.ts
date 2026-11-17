@@ -62,6 +62,7 @@ describe('central integration catalog registry (disposable database only)', () =
       expect(expression).toContain('a.branch_id = integration_app_installations.branch_id');
       expect(expression).toContain('u.is_active');
       expect(expression).toContain('auth.uid()');
+      expect(expression).toContain('is_platform_admin()');
     }
     expect(rows.find((row) => row.policyname === 'integration_app_insert')?.expression)
       .toContain('installed_by');
