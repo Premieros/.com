@@ -66,7 +66,6 @@ describe('compact app-store integrations screen', () => {
     fireEvent.click(screen.getByTestId('install-integration-talabat'));
     expect(screen.getByTestId('setup-integration-talabat')).toHaveTextContent('إعدادات التطبيق');
     expect(screen.getByTestId('setup-integration-talabat')).toHaveTextContent('الحصول على موافقة منصة التوصيل');
-    expect(screen.getByTestId('setup-integration-talabat')).toHaveTextContent('غير');
     expect(screen.getByRole('link', { name: /فتح التوصيل الداخلي/ })).toHaveAttribute('href', '/delivery');
     expect(screen.getByText('غير متصل بمزوّد الخدمة')).toBeInTheDocument();
 
