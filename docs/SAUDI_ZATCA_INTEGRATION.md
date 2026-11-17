@@ -114,6 +114,19 @@ results and explicit per-tenant approval. Nothing is configured for live use.
   claim of certification. Existing Premier sales/accounting flows are not
   modified by this draft module.
 
+## Non-compliant QR preview (tags 1–5 only)
+
+- `server/zatca/unsignedQrPreview.ts` encodes the informational TLV
+  tags (seller name, VAT identifier, UTC timestamp, tax-inclusive amount and
+  VAT amount) into Base64 for **offline tests only**.
+- It validates UTF-8 byte lengths, dates and monetary amount shapes.
+- The return value is explicitly `status: 'unsigned_preview'` and
+  `submittable: false`. It omits phase-2 cryptographic tags and does not
+  generate an approved printable QR code. Do **not** display it as a final
+  Saudi tax invoice QR or pass it to customers.
+- Official QR/tag specifications and signing must be verified and
+  implemented before production; no live ZATCA submissions occur here.
+
 ## Required phases before live usage
 
 1. Verify official specifications and mandatory invoice fields for the
