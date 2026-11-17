@@ -28,7 +28,7 @@ export interface UnsignedSaudiQrPreview {
 }
 
 function validateXmlLikeText(value: string, label: string): void {
-  if (typeof value !== 'string' || !value.trim() || /[\u0000-\u001f]/u.test(value)) {
+  if (typeof value !== 'string' || !value.trim() || [...value].some((char) => char.charCodeAt(0) < 32)) {
     throw new Error(`ZATCA_QR_INVALID_${label}`);
   }
 }
