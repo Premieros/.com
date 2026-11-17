@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  AlertTriangle, ArrowLeft, ArrowRight, ClipboardList,
-  ExternalLink, FileText, LockKeyhole, ShieldCheck, Store, Truck,
+  ArrowLeft, ArrowRight, Check, ChevronLeft, ChevronRight,
+  FileText, LayoutGrid, Search, Settings2, ShieldCheck, Store, Truck,
 } from 'lucide-react';
 import { PageHeader } from '@/components/PageHeader';
 import { useLanguage } from '@/context/LanguageContext';
@@ -106,7 +106,8 @@ export function IntegrationsHubPage() {
   const { user } = useAuth();
   const { branches, loading: branchesLoading, error: branchesError } = useBranches();
   const ar = lang === 'ar';
-  const [section, setSection] = useState<IntegrationSection>('egypt');
+  const [section, setSection] = useState<IntegrationSection | 'all' | 'installed'>('all');
+  const [search, setSearch] = useState('');
   const [requestedBranchId, setRequestedBranchId] = useState('');
   const eligibleBranches = user?.branch_id && user.role !== 'super_admin'
     ? branches.filter((branch) => branch.id === user.branch_id)
@@ -214,265 +215,285 @@ export function IntegrationsHubPage() {
     }
   }
 
-  const sections: Array<{ key: IntegrationSection; ar: string; en: string; icon: typeof FileText }> = [
-    { key: 'egypt', ar: 'الضرائب المصرية', en: 'Egyptian Tax', icon: FileText },
-    { key: 'saudi', ar: 'الضرائب السعودية', en: 'Saudi ZATCA', icon: ShieldCheck },
-    { key: 'delivery', ar: 'تطبيقات التوصيل', en: 'Delivery Apps', icon: Truck },
-  ];
+  const allApps = Object.values(INTEGRATION_TILES).flat();
+  const activeApp = allApps.find((app) => app.id === openedAppId);
+  const filteredApps = allApps.filter((app) => {
+    const matchesCategory = section === 'all' || section === 'installed'
+      ? section !== 'installed' || Boolean(installedApps[app.id])
+      : INTEGRATION_TILES[section].some((candidate) => candidate.id === app.id);
+    const matchesSearch = (app.ar + ' ' + app.en + ' ' + app.id).toLowerCase().includes(search.trim().toLowerCase());
+    return matchesCategory && matchesSearch;
+  });
+
+  const categories = [
+    { key: 'all', ar: 'اكتشف', en: 'Discover' },
+    { key: 'installed', ar: 'تطبيقاتي', en: 'My apps' },
+    { key: 'egypt', ar: 'الضرائب المصرية', en: 'Egyptian Tax' },
+    { key: 'saudi', ar: 'الضرائب السعودية', en: 'Saudi ZATCA' },
+    { key: 'delivery', ar: 'تطبيقات التوصيل', en: 'Delivery Apps' },
+  ] as const;
+
+  function appCategory(appId: IntegrationAppId) {
+    if (INTEGRATION_TILES.egypt.some((app) => app.id === appId)) return ar ? 'الضرائب المصرية' : 'Egyptian Tax';
+    if (INTEGRATION_TILES.saudi.some((app) => app.id === appId)) return ar ? 'الضرائب السعودية' : 'Saudi Tax';
+    return ar ? 'تطبيقات التوصيل' : 'Delivery Apps';
+  }
+
+  function appIcon(appId: IntegrationAppId) {
+    const iconClass = 'h-9 w-9';
+    if (INTEGRATION_TILES.egypt.some((app) => app.id === appId)) return <FileText className={iconClass} />;
+    if (INTEGRATION_TILES.saudi.some((app) => app.id === appId)) return <ShieldCheck className={iconClass} />;
+    return <Truck className={iconClass} />;
+  }
+
+  function setupSteps(appId: IntegrationAppId) {
+    if (INTEGRATION_TILES.egypt.some((app) => app.id === appId)) {
+      return ar
+        ? ['تسجيل المنشأة والفرع لدى مصلحة الضرائب المصرية', 'تجهيز التوقيع الرقمي والاعتماد في خدمة خلفية آمنة', 'اجتياز اختبار الفواتير أو الإيصالات في البيئة الرسمية']
+        : ['Register the organization and branch with ETA', 'Provision secure server-side digital signing credentials', 'Pass official invoice or receipt tests'];
+    }
+    if (INTEGRATION_TILES.saudi.some((app) => app.id === appId)) {
+      return ar
+        ? ['التحقق من الرقم الضريبي وبيانات الفرع', 'إكمال تسجيل EGS وشهادات CSID في الخادم', 'اختبار التوقيع والتوافق قبل Clearance أو Reporting']
+        : ['Verify VAT and branch information', 'Register EGS and CSID securely on the server', 'Test compliant signing before clearance or reporting'];
+    }
+    return ar
+      ? ['الحصول على موافقة منصة التوصيل وتوثيق API', 'ربط المنتجات والأسعار والفروع عبر خدمة خلفية', 'اختبار الطلبات والإلغاء ومنع التكرار']
+      : ['Get provider approval and API documentation', 'Map products, pricing and branches through a backend', 'Test new orders, cancellation and deduplication'];
+  }
+
+  const backIcon = ar ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />;
 
   return (
-    <div className="space-y-6" data-testid="integrations-hub">
-      <PageHeader
-        title={ar ? 'التكاملات والربط' : 'Integrations Hub'}
-        subtitle={ar
-          ? 'مركز متابعة الضرائب المصرية والسعودية وتطبيقات التوصيل'
-          : 'Track Egyptian and Saudi tax integrations and delivery platforms'}
-      />
-      <section className="rounded-2xl border border-ui-border bg-ui-surface p-4 sm:p-5" aria-label={ar ? 'نطاق الفرع' : 'Branch scope'}>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="font-bold text-ui-text">{ar ? 'الفرع المحدد للتكامل' : 'Integration branch'}</h2>
-            <p className="mt-1 text-xs text-ui-muted">{ar
-              ? 'اختر الفرع لمراجعة متطلبات ربطه. لا يعني اختيار الفرع وجود اتصال خارجي.'
-              : 'Choose the branch to review its setup requirements. A selection does not indicate a live connection.'}</p>
+    <div className="space-y-5" data-testid="integrations-hub">
+      <PageHeader title={ar ? 'متجر التطبيقات' : 'App Store'}
+        subtitle={ar ? 'اكتشف تطبيقات Premier وثبّتها حسب الفرع' : 'Discover and install apps for each Premier branch'} />
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ui-border bg-ui-surface px-4 py-3">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-brand-600/10 text-brand-600">
+            <LayoutGrid className="h-6 w-6" />
           </div>
-          {eligibleBranches.length > 0 ? (
-            <label className="flex min-w-48 flex-col gap-1 text-xs font-semibold text-ui-muted">
-              {ar ? 'الفرع' : 'Branch'}
-              <select
-                aria-label={ar ? 'اختيار فرع التكامل' : 'Select integration branch'}
-                value={selectedBranchId}
-                onChange={(event) => setRequestedBranchId(event.target.value)}
-                className="min-h-11 rounded-xl border border-ui-border bg-ui-page px-3 text-sm text-ui-text"
-              >
-                {eligibleBranches.map((branch) => (
-                  <option key={branch.id} value={branch.id}>{branch.name}</option>
-                ))}
-              </select>
-            </label>
-          ) : (
-            <span className="text-sm text-ui-muted" role="status">
-              {branchesLoading ? (ar ? 'تحميل الفروع...' : 'Loading branches...') :
-                branchesError ? (ar ? 'تعذر جلب الفروع؛ لا يمكن تحديد نطاق الربط.' : 'Could not load branches; connection scope unavailable.') :
-                (ar ? 'لا توجد فروع متاحة للحساب.' : 'No branches available to this account.')}
-            </span>
+          <div className="min-w-0">
+            <p className="font-bold text-ui-text">{ar ? 'تطبيقات Premier' : 'Premier Apps'}</p>
+            <p className="text-xs text-ui-muted" data-testid="integration-branch-scope">
+              {selectedBranch ? selectedBranch.name : (ar ? 'اختر فرعًا' : 'Select a branch')}
+              {' · '}{Object.keys(installedApps).length} {ar ? 'مثبّت' : 'installed'}
+            </p>
+          </div>
+        </div>
+        {eligibleBranches.length > 0 ? (
+          <select aria-label={ar ? 'اختيار فرع التكامل' : 'Select integration branch'}
+            value={selectedBranchId} onChange={(event) => setRequestedBranchId(event.target.value)}
+            className="min-h-10 max-w-full rounded-xl border border-ui-border bg-ui-page px-3 text-sm text-ui-text">
+            {eligibleBranches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+          </select>
+        ) : (
+          <span className="text-sm text-ui-muted" role="status">
+            {branchesLoading ? (ar ? 'تحميل الفروع...' : 'Loading branches...') :
+              branchesError ? (ar ? 'تعذر تحميل الفروع' : 'Branches unavailable') :
+                (ar ? 'لا توجد فروع' : 'No branches')}
+          </span>
+        )}
+      </div>
+
+      {installError && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 rounded-xl border border-red-500/30 bg-red-500/5 p-3 text-sm text-red-600">
+          <span>{installError}</span>
+          {CENTRAL_INSTALLATIONS_ENABLED && (
+            <button type="button" disabled={installLoading || installBusy}
+              className="rounded-lg border border-ui-border px-3 py-2 text-ui-text"
+              onClick={() => setReloadCentral((value) => value + 1)}>
+              {ar ? 'إعادة المحاولة' : 'Retry'}
+            </button>
           )}
         </div>
-        {selectedBranch && (
-          <p className="mt-3 text-xs text-ui-muted" data-testid="integration-branch-scope">
-            {ar ? 'نطاق العرض الحالي: ' : 'Current view scope: '}<strong>{selectedBranch.name}</strong>
-            {' · '}{ar ? 'الجاهزية التالية إرشادية وغير متحقَّق منها للفرع.' : 'The following readiness items are guidance, not verified branch status.'}
-          </p>
-        )}
-      </section>
-
-      <div className="flex flex-wrap gap-2" role="tablist" aria-label={ar ? 'فئات التكامل' : 'Integration categories'}>
-        {sections.map((item) => {
-          const Icon = item.icon;
-          return (
-            <button
-              key={item.key}
-              id={`integrations-tab-${item.key}`}
-              role="tab"
-              type="button"
-              aria-selected={section === item.key}
-              aria-controls="integrations-content"
-              onClick={() => setSection(item.key)}
-              className={`inline-flex min-h-11 items-center gap-2 rounded-xl px-4 py-2 text-sm font-bold transition-colors border ${
-                section === item.key
-                  ? 'border-brand-600 bg-brand-600 text-white'
-                  : 'border-ui-border bg-ui-surface text-ui-text hover:bg-ui-page-alt'
-              }`}
-            >
-              <Icon className="h-4 w-4" />
-              {ar ? item.ar : item.en}
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="flex items-start gap-3 rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-sm text-ui-text" role="status">
-        <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-        <p>{CENTRAL_INSTALLATIONS_ENABLED
-          ? (ar
-            ? 'يُحفظ تثبيت التطبيقات مركزيًا للفرع. هذا لا يعني اتصالًا خارجيًا أو تفعيل إصدار مستندات ضريبية. لا تُدخل مفاتيح API أو شهادات هنا.'
-            : 'App installations are shared for the branch. This does not activate external connections or tax submissions. Do not enter API keys or certificates here.')
-          : (ar
-            ? 'يمكنك تثبيت التطبيقات لهذا المستخدم والفرع على هذا المتصفح فقط، ثم فتح خطوات تجهيزها. هذا ليس تثبيتًا مركزيًا على الخادم ولا اتصالًا بالهيئة أو مزوّد التوصيل. لا تُدخل أي مفاتيح API أو شهادات هنا.'
-            : 'Install apps locally for this user and branch in this browser, then open setup steps. This is not a server-wide installation or a live provider connection. Never enter private keys or API secrets here.')}</p>
-      </div>
-
-      {installError && <div role="alert" className="flex flex-wrap items-center gap-3 text-sm text-red-600"><span>{installError}</span>{CENTRAL_INSTALLATIONS_ENABLED && <button type="button" disabled={installLoading || installBusy} className="rounded-lg border border-ui-border px-3 py-2 text-ui-text disabled:opacity-50" onClick={() => setReloadCentral((value) => value + 1)}>{ar ? 'إعادة المحاولة' : 'Retry'}</button>}</div>}
-      <div className="rounded-xl border border-ui-border bg-ui-surface p-3 text-sm text-ui-muted">
-        {CENTRAL_INSTALLATIONS_ENABLED ? (ar ? 'تطبيقات الفرع المثبّتة مركزيًا: ' : 'Shared installations for this branch: ') : (ar ? 'تطبيقاتي المثبّتة على هذا المتصفح لهذا الفرع: ' : 'My local apps for this branch: ')}
-        <strong data-testid="installed-app-count">{Object.keys(installedApps).length}</strong>
-      </div>
-
-      {CENTRAL_INSTALLATIONS_ENABLED && !installLoading && !installError && pendingLegacyApps.length > 0 && (
-        <section className="rounded-xl border border-ui-border bg-ui-surface p-4 space-y-3" data-testid="legacy-integration-import">
-          <h2 className="font-bold text-ui-text">
-            {ar ? 'تطبيقات محفوظة سابقًا على هذا المتصفح' : 'Previously saved apps on this browser'}
-          </h2>
-          <p className="text-sm text-ui-muted">
-            {ar
-              ? `يوجد ${pendingLegacyApps.length} تطبيقات محلية غير مثبتة مركزيًا لهذا الفرع. استيرادها يجعلها ظاهرة لجميع المستخدمين المخوّلين في الفرع، ولا يُنشئ اتصالًا بمزوّد الخدمة.`
-              : `${pendingLegacyApps.length} browser-local apps are not yet shared for this branch. Importing makes them visible to authorized branch users, without connecting to providers.`}
-          </p>
-          {!showImportReview ? (
-            <button type="button" className="rounded-lg border border-ui-border px-3 py-2 text-sm font-semibold text-ui-text"
-              onClick={() => setShowImportReview(true)} disabled={installBusy} data-testid="review-legacy-integration-import">
-              {ar ? 'مراجعة الاستيراد' : 'Review import'}
-            </button>
-          ) : (
-            <div className="space-y-3" data-testid="confirm-legacy-integration-import">
-              <p className="text-sm font-semibold text-ui-text">{ar ? 'سيُشارك ما يلي مع مستخدمي الفرع:' : 'These apps will be shared with branch users:'}</p>
-              <ul className="list-disc ps-5 text-sm text-ui-muted">
-                {pendingLegacyApps.map((appId) => (
-                  <li key={appId}>{Object.values(INTEGRATION_TILES).flat().find((item) => item.id === appId)?.[ar ? 'ar' : 'en'] ?? appId}</li>
-                ))}
-              </ul>
-              <div className="flex flex-wrap gap-2">
-                <button type="button" className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                  onClick={() => void confirmLegacyImport()} disabled={installBusy || installLoading} data-testid="execute-legacy-integration-import">
-                  {ar ? 'تأكيد الاستيراد للفرع' : 'Confirm branch import'}
-                </button>
-                <button type="button" className="rounded-lg border border-ui-border px-3 py-2 text-sm text-ui-text"
-                  onClick={() => setShowImportReview(false)} disabled={installBusy}>
-                  {ar ? 'إلغاء' : 'Cancel'}
-                </button>
-              </div>
-            </div>
-          )}
-        </section>
       )}
 
-      <section
-        id="integrations-content"
-        role="tabpanel"
-        aria-labelledby={`integrations-tab-${section}`}
-        className="space-y-4"
-      >
-        <div className="grid gap-4 md:grid-cols-2">
-          {INTEGRATION_TILES[section].map((item) => (
-            <article key={item.id} className="rounded-2xl border border-ui-border bg-ui-surface p-5 shadow-ui-sm" data-testid={`integration-${item.id}`}>
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h2 className="font-bold text-ui-text">{ar ? item.ar : item.en}</h2>
-                <span className="rounded-full border border-ui-border bg-ui-page-alt px-3 py-1 text-xs font-semibold text-ui-muted">
-                  {item.stage === 'foundation'
-                    ? (ar ? 'تطوير أولي — غير متصل' : 'Foundation — not connected')
-                    : (ar ? 'غير متصل' : 'Not connected')}
-                </span>
+      {activeApp ? (
+        <section data-testid={'app-detail-' + activeApp.id} className="space-y-5">
+          <button type="button" onClick={() => setOpenedAppId(null)}
+            className="inline-flex items-center gap-1 rounded-lg px-2 py-2 text-sm font-semibold text-ui-muted hover:bg-ui-page-alt hover:text-ui-text">
+            {backIcon} {ar ? 'كل التطبيقات' : 'All apps'}
+          </button>
+          <div className="rounded-3xl border border-ui-border bg-ui-surface p-5 sm:p-7">
+            <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-[1.7rem] bg-brand-600/10 text-brand-600 shadow-ui-sm">
+                {appIcon(activeApp.id)}
               </div>
-              <p className="text-sm leading-7 text-ui-muted">{ar ? item.detailAr : item.detailEn}</p>
-              <div className="mt-4 flex flex-wrap items-center gap-2">
-                {installedApps[item.id] ? (
-                  <>
-                    <span className="rounded-full border border-ui-border bg-ui-page-alt px-3 py-1 text-xs font-semibold text-ui-muted">
-                      {CENTRAL_INSTALLATIONS_ENABLED ? (ar ? 'مثبّت للفرع · غير متصل' : 'Installed for branch · not connected') : (ar ? 'مثبّت محليًا · غير متصل' : 'Locally installed · not connected')}
-                    </span>
-                    <button type="button" className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white"
-                      onClick={() => setOpenedAppId(openedAppId === item.id ? null : item.id)}
-                      data-testid={`open-integration-${item.id}`}>
-                      {ar ? 'فتح التطبيق' : 'Open app'}
-                    </button>
-                    <button type="button" className="rounded-lg border border-ui-border px-3 py-2 text-sm text-ui-text"
-                      disabled={installLoading || installBusy || Boolean(installError && CENTRAL_INSTALLATIONS_ENABLED)} onClick={() => void changeInstallation(item.id, false)} data-testid={`remove-integration-${item.id}`}>
-                      {ar ? 'إزالة' : 'Remove'}
-                    </button>
-                  </>
-                ) : (
-                  <button type="button" disabled={!userId || !selectedBranchId || installLoading || installBusy || Boolean(installError && CENTRAL_INSTALLATIONS_ENABLED)}
-                    className="rounded-lg bg-brand-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-50"
-                    onClick={() => void changeInstallation(item.id, true)}
-                    data-testid={`install-integration-${item.id}`}>
-                    {ar ? 'تثبيت التطبيق' : 'Install app'}
+              <div className="flex-1 space-y-1">
+                <h2 className="text-2xl font-bold text-ui-text">{ar ? activeApp.ar : activeApp.en}</h2>
+                <p className="text-sm text-ui-muted">{appCategory(activeApp.id)}</p>
+                <p className="text-sm font-semibold text-ui-muted">{ar ? 'غير متصل بمزوّد الخدمة' : 'Provider not connected'}</p>
+              </div>
+              {installedApps[activeApp.id] ? (
+                <div className="flex flex-wrap gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-xl bg-brand-600/10 px-3 py-2 text-sm font-bold text-brand-600">
+                    <Check className="h-4 w-4" />{ar ? 'مثبّت' : 'Installed'}
+                  </span>
+                  <button type="button" data-testid={'remove-integration-' + activeApp.id}
+                    disabled={installBusy || installLoading || Boolean(installError && CENTRAL_INSTALLATIONS_ENABLED)}
+                    onClick={() => void changeInstallation(activeApp.id, false)}
+                    className="rounded-xl border border-ui-border px-4 py-2 text-sm font-semibold text-ui-text disabled:opacity-50">
+                    {ar ? 'إزالة' : 'Remove'}
                   </button>
+                </div>
+              ) : (
+                <button type="button" data-testid={'install-integration-' + activeApp.id}
+                  disabled={!userId || !selectedBranchId || installBusy || installLoading || Boolean(installError && CENTRAL_INSTALLATIONS_ENABLED)}
+                  onClick={() => void changeInstallation(activeApp.id, true)}
+                  className="rounded-xl bg-brand-600 px-6 py-3 text-sm font-bold text-white disabled:opacity-50">
+                  {ar ? 'تثبيت' : 'Install'}
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-ui-border bg-ui-surface p-5">
+            <h3 className="mb-2 text-lg font-bold text-ui-text">{ar ? 'حول التطبيق' : 'About this app'}</h3>
+            <p className="text-sm leading-7 text-ui-muted">{ar ? activeApp.detailAr : activeApp.detailEn}</p>
+          </div>
+
+          {installedApps[activeApp.id] && (
+            <section data-testid={'setup-integration-' + activeApp.id}
+              className="space-y-4 rounded-2xl border border-ui-border bg-ui-surface p-5">
+              <div className="flex items-center gap-2">
+                <Settings2 className="h-5 w-5 text-brand-600" />
+                <h3 className="text-lg font-bold text-ui-text">{ar ? 'إعدادات التطبيق' : 'App settings'}</h3>
+              </div>
+              <p className="text-sm text-ui-muted">
+                {ar
+                  ? 'التطبيق مثبت؛ إعدادات الربط الفني ستتوفر هنا عند تجهيز موصّل الخدمة. لا توجد بيانات اعتماد مطلوبة في هذه الشاشة.'
+                  : 'App installed. Provider configuration will be available here once a secure connector is ready; no credentials are entered on this screen.'}
+              </p>
+              <div className="rounded-xl bg-ui-page-alt p-4">
+                <h4 className="mb-3 font-semibold text-ui-text">{ar ? 'خطوات تجهيز هذا التطبيق' : 'App setup checklist'}</h4>
+                <ol className="list-decimal space-y-2 ps-5 text-sm leading-7 text-ui-muted">
+                  {setupSteps(activeApp.id).map((step) => <li key={step}>{step}</li>)}
+                </ol>
+              </div>
+              <p className="text-xs text-ui-muted">
+                {CENTRAL_INSTALLATIONS_ENABLED
+                  ? (ar ? 'التثبيت محفوظ لهذا الفرع مركزيًا، لكنه لا يفعّل الاتصال الخارجي.' : 'Installation is stored centrally for this branch, but does not enable provider connectivity.')
+                  : (ar ? 'التثبيت محفوظ في هذا المتصفح فقط.' : 'Installation is saved on this browser only.')}
+              </p>
+              {INTEGRATION_TILES.delivery.some((app) => app.id === activeApp.id) && (
+                <Link to={APP_ROUTES.delivery} className="inline-flex items-center gap-2 text-sm font-semibold text-brand-600">
+                  <Store className="h-4 w-4" />{ar ? 'فتح التوصيل الداخلي' : 'Open internal delivery'}
+                  {ar ? <ArrowLeft className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
+                </Link>
+              )}
+            </section>
+          )}
+        </section>
+      ) : (
+        <>
+          <div className="relative">
+            <Search className="pointer-events-none absolute start-4 top-1/2 h-5 w-5 -translate-y-1/2 text-ui-muted" />
+            <input type="search" value={search} onChange={(event) => setSearch(event.target.value)}
+              aria-label={ar ? 'البحث عن تطبيق' : 'Search apps'}
+              placeholder={ar ? 'ابحث عن تطبيق...' : 'Search apps...'}
+              className="h-12 w-full rounded-2xl border border-ui-border bg-ui-surface pe-4 ps-12 text-sm text-ui-text outline-none focus:border-brand-600" />
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label={ar ? 'فئات التطبيقات' : 'App categories'}>
+            {categories.map((category) => (
+              <button type="button" role="tab" key={category.key}
+                aria-selected={section === category.key}
+                onClick={() => setSection(category.key)}
+                className={'shrink-0 rounded-full px-4 py-2 text-sm font-semibold transition-colors ' +
+                  (section === category.key ? 'bg-brand-600 text-white' : 'border border-ui-border bg-ui-surface text-ui-text hover:bg-ui-page-alt')}>
+                {ar ? category.ar : category.en}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="font-bold text-ui-text">
+              {ar ? categories.find((item) => item.key === section)?.ar : categories.find((item) => item.key === section)?.en}
+            </h2>
+            <span className="text-xs text-ui-muted" data-testid="installed-app-count">
+              {Object.keys(installedApps).length} {ar ? 'تطبيقات مثبتة' : 'installed'}
+            </span>
+          </div>
+
+          {installLoading ? (
+            <p className="rounded-xl bg-ui-surface p-6 text-center text-ui-muted" role="status">
+              {ar ? 'جاري تحميل التطبيقات...' : 'Loading apps...'}
+            </p>
+          ) : filteredApps.length === 0 ? (
+            <div className="rounded-2xl border border-ui-border bg-ui-surface p-10 text-center" data-testid="empty-app-results">
+              <LayoutGrid className="mx-auto mb-3 h-9 w-9 text-ui-muted" />
+              <p className="font-semibold text-ui-text">{ar ? 'لا توجد تطبيقات مطابقة' : 'No matching apps'}</p>
+              <p className="mt-1 text-sm text-ui-muted">{ar ? 'جرّب بحثًا آخر أو تصنيفًا مختلفًا' : 'Try another search or category'}</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5" data-testid="apps-catalog-grid">
+              {filteredApps.map((app) => (
+                <button type="button" key={app.id} onClick={() => setOpenedAppId(app.id)}
+                  data-testid={'integration-' + app.id}
+                  aria-label={(ar ? 'تفاصيل تطبيق ' : 'App details ') + (ar ? app.ar : app.en)}
+                  className="group flex min-w-0 flex-col items-start gap-3 rounded-2xl border border-ui-border bg-ui-surface p-4 text-start shadow-ui-sm transition hover:-translate-y-0.5 hover:border-brand-600/40 hover:shadow-md focus-visible:outline focus-visible:outline-2 focus-visible:outline-brand-600">
+                  <div className="flex h-16 w-16 items-center justify-center rounded-[1.25rem] bg-brand-600/10 text-brand-600 transition group-hover:scale-105">
+                    {appIcon(app.id)}
+                  </div>
+                  <div className="w-full min-w-0">
+                    <p className="truncate text-sm font-bold text-ui-text" title={ar ? app.ar : app.en}>{ar ? app.ar : app.en}</p>
+                    <p className="mt-1 truncate text-xs text-ui-muted">{appCategory(app.id)}</p>
+                  </div>
+                  <span className={'mt-auto inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold ' +
+                    (installedApps[app.id] ? 'bg-brand-600/10 text-brand-600' : 'bg-ui-page-alt text-ui-muted')}>
+                    {installedApps[app.id] ? <Check className="h-3 w-3" /> : null}
+                    {installedApps[app.id] ? (ar ? 'مثبّت' : 'Installed') : (ar ? 'متاح' : 'Available')}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+
+          {CENTRAL_INSTALLATIONS_ENABLED && !installLoading && !installError && pendingLegacyApps.length > 0 && (
+            <details className="rounded-2xl border border-ui-border bg-ui-surface p-4" data-testid="legacy-integration-import">
+              <summary className="cursor-pointer text-sm font-semibold text-ui-text">
+                {ar ? 'استيراد تطبيقاتي السابقة من هذا المتصفح' : 'Import my previous browser apps'}
+                {' · '}{pendingLegacyApps.length}
+              </summary>
+              <div className="mt-3 space-y-3">
+                <p className="text-sm text-ui-muted">
+                  {ar ? 'يتطلب الاستيراد تأكيدك، وتظل صلاحيات الفرع مطبقة.' : 'Import requires your confirmation and branch authorization.'}
+                </p>
+                {!showImportReview ? (
+                  <button type="button" onClick={() => setShowImportReview(true)}
+                    data-testid="review-legacy-integration-import"
+                    className="rounded-lg border border-ui-border px-4 py-2 text-sm font-semibold text-ui-text">
+                    {ar ? 'مراجعة' : 'Review'}
+                  </button>
+                ) : (
+                  <div data-testid="confirm-legacy-integration-import" className="space-y-3">
+                    <ul className="list-disc space-y-1 ps-5 text-sm text-ui-muted">
+                      {pendingLegacyApps.map((id) => <li key={id}>{ar ? allApps.find((app) => app.id === id)?.ar : allApps.find((app) => app.id === id)?.en}</li>)}
+                    </ul>
+                    <button type="button" onClick={() => void confirmLegacyImport()} disabled={installBusy}
+                      data-testid="execute-legacy-integration-import"
+                      className="rounded-xl bg-brand-600 px-4 py-2 text-sm font-bold text-white disabled:opacity-50">
+                      {ar ? 'تأكيد الاستيراد للفرع' : 'Confirm branch import'}
+                    </button>
+                    <button type="button" onClick={() => setShowImportReview(false)} disabled={installBusy}
+                      className="ms-2 rounded-xl border border-ui-border px-4 py-2 text-sm text-ui-text">
+                      {ar ? 'إلغاء' : 'Cancel'}
+                    </button>
+                  </div>
                 )}
               </div>
-              {openedAppId === item.id && installedApps[item.id] && (
-                <div className="mt-4 rounded-xl border border-ui-border bg-ui-page-alt p-3 text-sm" data-testid={`setup-integration-${item.id}`}>
-                  <strong className="text-ui-text">{ar ? 'إعداد التطبيق' : 'App setup'}</strong>
-                  <p className="mt-1 leading-6 text-ui-muted">{ar
-                    ? (CENTRAL_INSTALLATIONS_ENABLED ? 'تم تسجيل التطبيق للفرع مركزيًا، لكنه غير متصل. يلزم موصّل خلفي آمن واختبار رسمي.' : 'تمت إضافته إلى هذا المتصفح فقط. للربط الحقيقي يلزم موصّل خلفي معتمد وبيانات اعتماد آمنة واختبار اتصال رسمي.')
-                    : (CENTRAL_INSTALLATIONS_ENABLED ? 'Installed for this branch, but not connected. Live setup needs a reviewed backend connector and verified connection test.' : 'Added only in this browser. Live setup requires a reviewed server connector, secure provider credentials and a verified connection test.')}</p>
-                  <p className="mt-2 text-xs text-ui-muted">{ar ? item.detailAr : item.detailEn}</p>
-                </div>
-              )}
-            </article>
-          ))}
-        </div>
+            </details>
+          )}
 
-        {selectedBranch && (
-          <div className="rounded-2xl border border-ui-border bg-ui-surface p-5" data-testid="integration-readiness-plan">
-            <h3 className="mb-3 font-bold text-ui-text">
-              {ar ? `خطة تجهيز فرع: ${selectedBranch.name}` : `Setup plan for: ${selectedBranch.name}`}
-            </h3>
-            <p className="mb-3 text-xs text-ui-muted">
-              {ar ? 'هذه متطلبات تحضيرية، وليست مهام مكتملة أو نتيجة اختبار اتصال.' : 'These are preparation requirements, not completed tasks or connection test results.'}
-            </p>
-            <ol className="list-decimal space-y-2 ps-5 text-sm leading-7 text-ui-muted">
-              {(section === 'egypt'
-                ? [
-                    ar ? 'التحقق من تسجيل المنشأة والفرع لدى مصلحة الضرائب المصرية.' : 'Confirm ETA legal-entity and branch registration.',
-                    ar ? 'تهيئة التوقيع الرقمي ومفاتيح الاتصال داخل خدمة خلفية آمنة.' : 'Provision server-side signing and ETA credentials securely.',
-                    ar ? 'اختبار الفواتير والإيصالات مع البيئة الرسمية قبل إصدار مستندات حقيقية.' : 'Run official eInvoice and eReceipt conformance tests.',
-                  ]
-                : section === 'saudi'
-                  ? [
-                      ar ? 'توثيق المنشأة والرقم الضريبي وربط جهاز EGS بالفرع.' : 'Verify Saudi VAT details and branch EGS enrollment.',
-                      ar ? 'إتمام شهادات CSID والتوقيع وفق UBL وQR المعتمدين.' : 'Complete CSID, compliant signed UBL XML and QR.',
-                      ar ? 'اختبار Clearance وReporting رسميًا ثم تفعيل الإنتاج لكل عميل.' : 'Pass official clearance/reporting tests before per-tenant production activation.',
-                    ]
-                  : [
-                      ar ? 'الحصول على اعتماد تكامل API من تطبيق التوصيل المطلوب.' : 'Obtain approved API access from the delivery platform.',
-                      ar ? 'تجهيز ربط الأصناف والأسعار والفروع دون تخزين الأسرار بالمتصفح.' : 'Map menu, prices and branch scope using server-side credentials.',
-                      ar ? 'اختبار استقبال الطلبات ومنع التكرار وإلغاء الطلبات قبل التشغيل.' : 'Test webhook order intake, deduplication and cancellations.',
-                    ]).map((step) => <li key={step}>{step}</li>)}
-            </ol>
-          </div>
-        )}
-
-        {section !== 'delivery' ? (
-          <div className="rounded-2xl border border-ui-border bg-ui-surface p-5">
-            <h3 className="mb-3 flex items-center gap-2 font-bold text-ui-text">
-              <ClipboardList className="h-5 w-5 text-brand-600" />
-              {ar ? 'المطلوب قبل التفعيل الرسمي' : 'Requirements before activation'}
-            </h3>
-            <ul className="list-disc space-y-2 ps-5 text-sm leading-7 text-ui-muted">
-              <li>{ar ? 'إعداد حساب المنشأة والرقم الضريبي لكل دولة وفرع بشكل معتمد.' : 'Verified legal tax registration and authorized branch information.'}</li>
-              <li>{ar ? 'إدارة الأسرار والشهادات داخل خادم آمن، وليس في متصفح الكاشير.' : 'Keep signing credentials and certificates in a secure server vault.'}</li>
-              <li>{ar ? 'اختبار التوقيع والملفات وإجراءات الهيئة الرسمية قبل إرسال أي مستند.' : 'Validate signed documents and official authority workflows before submission.'}</li>
-            </ul>
-          </div>
-        ) : (
-          <div className="rounded-2xl border border-ui-border bg-ui-surface p-5">
-            <h3 className="mb-3 flex items-center gap-2 font-bold text-ui-text">
-              <Store className="h-5 w-5 text-brand-600" />
-              {ar ? 'الطلبات الداخلية والتوصيل' : 'Internal delivery orders'}
-            </h3>
-            <p className="mb-4 text-sm leading-7 text-ui-muted">
-              {ar
-                ? 'يمكن متابعة مسار التوصيل الداخلي الموجود بالفعل في Premier. هذا لا يعني وجود ربط مع تطبيقات التوصيل الخارجية.'
-                : 'Premier already has an internal delivery order workflow. This does not mean external delivery platforms are connected.'}
-            </p>
-            <Link to={APP_ROUTES.delivery} className="inline-flex items-center gap-2 rounded-xl border border-ui-border bg-ui-page-alt px-4 py-2 text-sm font-semibold text-ui-text hover:bg-ui-page">
-              {ar ? 'فتح التوصيل الداخلي' : 'Open internal delivery'}
-              {ar ? <ArrowLeft className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
-            </Link>
-          </div>
-        )}
-      </section>
-
-      <div className="flex flex-wrap items-center gap-3 rounded-xl border border-ui-border bg-ui-page-alt p-4 text-sm text-ui-muted">
-        <LockKeyhole className="h-5 w-5 shrink-0" />
-        <span>{ar
-          ? 'تفعيل أي موصّل حقيقي يحتاج خدمة خلفية ومفاتيح مزوّد موثّقة واختبارات صلاحيات.'
-          : 'Enabling any live connector requires a trusted server adapter, verified provider credentials and authorization tests.'}</span>
-        <Link to={APP_ROUTES.settings} className="ms-auto inline-flex items-center gap-1 font-bold text-brand-600 hover:underline">
-          {ar ? 'إعدادات النظام' : 'System settings'}
-          <ExternalLink className="h-4 w-4" />
-        </Link>
-      </div>
+          <p className="text-xs leading-6 text-ui-muted">
+            {CENTRAL_INSTALLATIONS_ENABLED
+              ? (ar ? 'التثبيت خاص بالفرع، ولا يعني وجود اتصال بالجهات الضريبية أو منصات التوصيل.' : 'Installation is shared by branch; tax authorities and delivery providers remain disconnected.')
+              : (ar ? 'التثبيت محفوظ على هذا المتصفح فقط؛ لا توجد اتصالات خارجية مفعلة.' : 'Installations are browser-local; external providers remain disconnected.')}
+          </p>
+        </>
+      )}
     </div>
   );
 }
