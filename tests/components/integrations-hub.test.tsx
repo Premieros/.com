@@ -75,6 +75,20 @@ describe('Integrations Hub screen', () => {
     expect(screen.getByTestId('integration-readiness-plan')).toHaveTextContent('منع التكرار');
   });
 
+  it('installs, opens and removes a delivery application locally without claiming a connection', () => {
+    localStorage.clear();
+    render(<MemoryRouter><IntegrationsHubPage /></MemoryRouter>);
+    fireEvent.click(screen.getByRole('tab', { name: 'تطبيقات التوصيل' }));
+    fireEvent.click(screen.getByTestId('install-integration-talabat'));
+    expect(screen.getByTestId('integration-talabat')).toHaveTextContent('مثبّت محليًا · غير متصل');
+    expect(screen.getByTestId('installed-app-count')).toHaveTextContent('1');
+    expect(screen.getByTestId('setup-integration-talabat')).toHaveTextContent('المتصفح فقط');
+    expect(screen.getByTestId('integration-hungerstation')).toHaveTextContent('غير متصل');
+    fireEvent.click(screen.getByTestId('remove-integration-talabat'));
+    expect(screen.getByTestId('installed-app-count')).toHaveTextContent('0');
+    expect(screen.getByTestId('install-integration-talabat')).toBeInTheDocument();
+  });
+
   it('protects the route with settings permission and exposes it in settings, sidebar and admin center', () => {
     const routes = readFileSync('src/app/routes.tsx', 'utf8');
     const nav = readFileSync('src/core/navigation/menu.config.ts', 'utf8');
