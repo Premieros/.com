@@ -72,7 +72,10 @@ export async function signEgsOfflineDigestProof(
   vault: EgsSigningVault,
 ): Promise<EgsOfflineSignatureProof> {
   if (!validScope(scope)) throw new Error('ZATCA_EGS_SANDBOX_SCOPE_REQUIRED');
-  if (!(digest instanceof Uint8Array) || digest.byteLength !== 32) {
+  // Buffer may originate in a different JS realm under test runners.
+  // ArrayBuffer.isView accepts byte views across realms; exclude DataView.
+  if (!ArrayBuffer.isView(digest) || digest.BYTES_PER_ELEMENT !== 1 ||
+      digest.byteLength !== 32) {
     throw new Error('ZATCA_EGS_INVALID_TEST_DIGEST');
   }
   const material = await vault.getSigningMaterial(scope);
