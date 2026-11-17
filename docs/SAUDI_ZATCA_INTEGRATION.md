@@ -65,6 +65,34 @@ the applicable onboarding, device/certificate setup and testing.
   current official ZATCA/Fatoora technical specifications with the owner;
   the current authoritative versions have not been verified in this change.
 
+## Implemented server-only HTTP boundary (PR in progress)
+
+- `server/zatca/zatcaGateway.ts` is an **unwired server-only adapter** for
+  sending already signed and validated invoice payloads to the configured
+  ZATCA clearance/reporting endpoints. It validates the approved ZATCA host
+  and the sandbox/production path separation, requires separate production
+  approval, and obtains credentials from an injected server-only callback.
+- Uses the ZATCA invoice submission request shape (UUID, invoice hash and
+  Base64 encoded signed UBL). Neither the shape nor version headers are a
+  claim of conformance; confirm them against the **current official guide**
+  before an authorized integration test.
+- HTTP 200 is not accepted as success unless the channel-specific authority
+  response explicitly indicates `CLEARED` with a cleared invoice, or
+  `REPORTED` for the reporting channel.
+- Failed/unknown network outcomes are returned as **retry_required**;
+  there is **no automatic replay** because any ambiguous result must be
+  reconciled against a durable transactional outbox before resubmission.
+- These tests use an injected mock HTTP transport and fake credentials.
+  They do not contact ZATCA or create valid cryptographic invoices.
+
+**Still required before a real invoice can be submitted:** authenticated
+server-only endpoint, tenant/role/branch/EGS authorization, legally verified
+invoice fields, UBL 2.1 validation, digital signing, UUID/counter/hash-chain,
+QR, timestamp rules, compliance and production CSIDs, encrypted credential
+vault, a transactional outbox with deduplication/reconciliation, monitoring,
+current ZATCA regulatory/API contract verification, sandbox conformance
+results and explicit per-tenant approval. Nothing is configured for live use.
+
 ## Required phases before live usage
 
 1. Verify official specifications and mandatory invoice fields for the
