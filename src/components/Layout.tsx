@@ -265,7 +265,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
 
         <div className="relative flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-1.5" data-testid="app-header-utilities">
-          <div className="min-w-0 max-w-[140px] shrink overflow-hidden xl:max-w-[180px]" data-testid="header-branch-wrapper"><BranchScopeSelector compact /></div>
+          <div className="min-w-0 max-w-[135px] shrink xl:max-w-[180px]" data-testid="header-branch-wrapper"><BranchScopeSelector compact /></div>
           <div className="hidden shrink-0 xl:flex"><OfflineStatusIndicator /></div>
           <ApprovalInbox ar={ar} />
           {canViewFloorPlan && (
