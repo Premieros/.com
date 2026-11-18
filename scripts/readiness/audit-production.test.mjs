@@ -1,0 +1,59 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { assertTarget, classifyReadiness, READINESS_QUERIES } from './audit-production.mjs';
+
+const clean = () => ({
+  schema: { unprotected_tables:0, anon_readable_tables:0 },
+  integrity: { orphan_items:0, orphan_payments:0, orphan_lines:0, duplicate_invoices:0 },
+  accounting: { unbalanced:0, unbalanced_posted:0, empty_entries:0 },
+  inventory: { negatives:0, negatives_with_fifo_debt:0,
+    negatives_without_fifo_debt:0, unsettled_fifo_debts:0 },
+  accounts: { active_without_auth:0, branches_without_members:0 }
+});
+
+test('clean aggregate passes technical checks but does not claim full production readiness', () => {
+  const result = classifyReadiness(clean());
+  assert.equal(result.decision, 'TECHNICAL_CHECKS_PASS');
+  assert.ok(result.unverified.includes('backup_restore_and_RPO_RTO'));
+  assert.ok(result.unverified.includes('cashier_sale_refund_and_shift_on_isolated_environment'));
+});
+
+test('negative balances tied to FIFO debt are a review item, not an automatic stock reset', () => {
+  const data = clean();
+  data.inventory.negatives = 146;
+  data.inventory.negatives_with_fifo_debt = 146;
+  data.inventory.unsettled_fifo_debts = 6459;
+  const result = classifyReadiness(data);
+  assert.equal(result.decision, 'REVIEW_REQUIRED');
+  assert.equal(result.checks.find(x => x.id === 'negatives_without_fifo_debt').status, 'PASS');
+  assert.equal(result.checks.find(x => x.id === 'negative_raw_balances').status, 'REVIEW');
+});
+
+test('inconsistent negatives or unbalanced accounting stop technical approval', () => {
+  const data = clean();
+  data.inventory.negatives_without_fifo_debt = 1;
+  data.accounting.unbalanced_posted = 1;
+  const result = classifyReadiness(data);
+  assert.equal(result.decision, 'NO_GO');
+});
+
+test('rejects arbitrary project and database connections before connecting', () => {
+  const ref='hvqlkapynjfjikqithvd';
+  const env={SUPABASE_PROJECT_REF:ref,SUPABASE_DB_URL:'postgresql://postgres:secret@db.hvqlkapynjfjikqithvd.supabase.co/postgres'};
+  assert.throws(() => assertTarget([],env), /PROJECT_CONFIRMATION_REQUIRED/);
+  assert.throws(() => assertTarget(['--confirm-project=another'],env), /PROJECT_CONFIRMATION_REQUIRED/);
+  assert.throws(() => assertTarget(['--confirm-project='+ref],{
+    ...env,SUPABASE_DB_URL:'postgresql://postgres:secret@db.unrelated.supabase.co/postgres'
+  }), /WRONG_PROJECT_CONNECTION/);
+  assert.equal(assertTarget(['--confirm-project='+ref],env).ref,ref);
+});
+
+test('audit queries do not contain data mutation and cover critical integrity invariants', () => {
+  assert.deepEqual(Object.keys(READINESS_QUERIES), ['schema','integrity','accounting','inventory','accounts']);
+  for (const sql of Object.values(READINESS_QUERIES)) {
+    assert.match(sql, /select/i);
+    assert.doesNotMatch(sql, /\b(insert|update|delete|alter|drop|truncate|create)\s+(into|table|from|public|private|auth)\b/i);
+  }
+  assert.match(READINESS_QUERIES.inventory, /raw_fifo_debts/);
+  assert.match(READINESS_QUERIES.accounting, /journal_entry_lines/);
+});

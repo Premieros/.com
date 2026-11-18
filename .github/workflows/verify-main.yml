@@ -41,6 +41,8 @@ jobs:
       - name: Typecheck application and test suites
         run: npm run typecheck:all
       - run: npm run test:unit
+      - name: Verify read-only production readiness audit invariants (no production connection)
+        run: node --test scripts/readiness/audit-production.test.mjs
       - run: npm run build
 
   db:
