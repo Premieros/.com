@@ -3,7 +3,7 @@ import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity, AlertTriangle, ArrowLeft, ArrowLeftRight, ArrowRight, BarChart3, BadgeDollarSign, Boxes, BookOpenText, Building2, Calculator, ChefHat,
   ChevronDown, ClipboardCheck, FileSpreadsheet, FileText, FlaskConical,
-  Globe, HandCoins, Landmark, Layers, LayoutDashboard, LogOut, Menu, Moon, NotebookPen,
+  Globe, HandCoins, Landmark, Layers, LayoutDashboard, LayoutGrid, LogOut, Menu, Moon, NotebookPen,
   Package, Receipt, Scale, ScrollText, Settings, ShoppingCart, SlidersHorizontal, Store, Sun,
   Tags, Timer, Trash2, Truck, UserCog, Users, Wallet, Warehouse, X,
 } from 'lucide-react';
@@ -166,6 +166,7 @@ export function Layout({ children }: { children: ReactNode }) {
     if (group === 'customers') return ar ? 'العملاء' : 'Customers';
     if (group === 'reports') return ar ? 'التقارير' : 'Reports';
     if (group === 'inventory') return ar ? 'المخزون' : 'Inventory';
+    if (group === 'marketplace') return ar ? 'متجر التطبيقات' : 'Marketplace';
     if (group === 'catalog') return ar ? 'القائمة والمنتجات' : 'Menu';
     if (group === 'centers') return ar ? 'الإدارة' : 'Manage';
     if (group === 'admin') return ar ? 'إدارة المنصة' : 'Administration';
@@ -386,7 +387,7 @@ export function Layout({ children }: { children: ReactNode }) {
             // Orders (Sales Invoices) and Customers are one-click primary
             // destinations, not nested accordions. Other sections keep their
             // existing expand/collapse behavior and Premier visual styling.
-            if (group === 'orders' || group === 'customers') {
+            if (group === 'orders' || group === 'customers' || group === 'marketplace') {
               const item = items[0];
               return (
                 <section key={group} data-testid={`nav-group-${group}`} className="mb-1">
@@ -399,8 +400,10 @@ export function Layout({ children }: { children: ReactNode }) {
                     onClick={() => setMobileOpen(false)}
                     className={({ isActive }) => `group flex min-h-[48px] items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors ${isActive ? 'bg-[#D0D0D5] font-bold text-[#191a20] dark:bg-ui-page-alt dark:text-ui-text' : 'text-[#24252b] hover:bg-[#e5e5eb] dark:text-ui-muted dark:hover:bg-ui-page-alt'}`}
                   >
-                    {ICONS[item.icon]}
-                    <span className="flex-1 truncate">{businessMenuLabel(
+                    {group === 'marketplace' ? <LayoutGrid className="h-5 w-5 shrink-0" /> : ICONS[item.icon]}
+                    <span className="flex-1 truncate">{group === 'marketplace'
+                      ? (ar ? 'متجر التطبيقات' : 'Marketplace')
+                      : businessMenuLabel(
                       runtime, item.id, ar ? 'ar' : 'en',
                       item.label ? item.label[ar ? 'ar' : 'en'] : t(item.labelKey),
                     )}</span>
