@@ -150,18 +150,18 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
   }
 
   return (
-    <div ref={ref} className="relative">
+    <div ref={ref} className="relative min-w-0">
       <button
         data-testid="branch-scope-indicator"
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className={`flex items-center gap-2 rounded-xl border border-ui-border bg-ui-surface px-3 py-1.5 text-xs font-semibold text-ui-text transition hover:bg-ui-page-alt ${
+        className={`flex w-full min-w-0 items-center gap-1.5 rounded-xl border border-ui-border bg-ui-surface px-2 py-1.5 text-xs font-semibold text-ui-text transition hover:bg-ui-page-alt ${
           compact ? 'max-w-[210px]' : 'max-w-[260px]'
         }`}
       >
         {scope.isAggregate ? <Layers3 className="h-4 w-4 shrink-0 text-ui-primary" /> : <Building2 className="h-4 w-4 shrink-0 text-ui-primary" />}
-        <span className="truncate">{label}</span>
+        <span className="min-w-0 flex-1 truncate text-start">{label}</span>
         <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-ui-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
