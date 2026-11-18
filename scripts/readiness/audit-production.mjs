@@ -25,13 +25,17 @@ export const READINESS_QUERIES = {
     "count(*) filter(where lines=0) as empty_entries from sums"
   ].join(' '),
   inventory: [
-    "with debt as (select branch_id,raw_material_id,sum(greatest(debt_quantity-settled_quantity,0)) remaining",
-    "from public.raw_fifo_debts group by 1,2) select",
-    "count(*) filter(where r.quantity<0) as negatives,",
-    "count(*) filter(where r.quantity<0 and coalesce(d.remaining,0)>0) as negatives_with_fifo_debt,",
-    "count(*) filter(where r.quantity<0 and coalesce(d.remaining,0)=0) as negatives_without_fifo_debt,",
-    "(select count(*) from public.raw_fifo_debts where debt_quantity>settled_quantity) as unsettled_fifo_debts",
-    "from public.raw_material_inventory r left join debt d on d.branch_id=r.branch_id and d.raw_material_id=r.raw_material_id"
+    "with batches as (select branch_id,raw_material_id,sum(quantity) qty",
+    "from public.raw_material_batches group by branch_id,raw_material_id),",
+    "balances as (select r.branch_id,r.raw_material_id,r.quantity,coalesce(b.qty,0) batch_quantity",
+    "from public.raw_material_inventory r left join batches b",
+    "on b.branch_id=r.branch_id and b.raw_material_id=r.raw_material_id) select",
+    "count(*) filter(where quantity<0) as negatives,",
+    "count(*) filter(where abs(quantity-batch_quantity)>0.0001) as raw_batch_balance_mismatches,",
+    "count(*) filter(where quantity<0 and batch_quantity>=0) as negative_balance_batch_disagreements,",
+    "(select count(*) from public.raw_material_batches where quantity<0) as negative_raw_batches,",
+    "(select count(*) from public.raw_fifo_debts where debt_quantity>coalesce(settled_quantity,0)) as unsettled_fifo_debts",
+    "from balances"
   ].join(' '),
   accounts: [
     "select",
@@ -60,8 +64,12 @@ export function classifyReadiness(snapshot) {
   check('unbalanced_journal_entries', snapshot.accounting.unbalanced, 'BLOCKER');
   check('unbalanced_posted_journals', snapshot.accounting.unbalanced_posted, 'BLOCKER');
   check('journal_entries_without_lines', snapshot.accounting.empty_entries, 'BLOCKER');
-  check('negatives_without_fifo_debt', snapshot.inventory.negatives_without_fifo_debt, 'BLOCKER');
+  // Legacy FIFO debt records were intentionally deleted. Their absence is not an
+  // inconsistency; compare live stock against its batches, not historical debts.
+  check('raw_batch_balance_mismatches', snapshot.inventory.raw_batch_balance_mismatches, 'BLOCKER');
+  check('negative_balance_batch_disagreements', snapshot.inventory.negative_balance_batch_disagreements, 'BLOCKER');
   check('negative_raw_balances', snapshot.inventory.negatives, 'REVIEW');
+  check('negative_raw_batches', snapshot.inventory.negative_raw_batches, 'REVIEW');
   check('unsettled_fifo_debts', snapshot.inventory.unsettled_fifo_debts, 'REVIEW');
   check('active_profiles_without_auth', snapshot.accounts.active_without_auth, 'REVIEW');
   check('branches_without_active_members', snapshot.accounts.branches_without_members, 'REVIEW');
@@ -76,7 +84,8 @@ export function classifyReadiness(snapshot) {
       'offline_retries_and_concurrent_idempotency',
       'printer_KDS_tax_provider_hardware',
       'security_definer_RPC_review',
-      'performance_load_and_alerts'
+      'performance_load_and_alerts',
+      'legacy_negative_stock_physical_reconciliation'
     ]
   };
 }
