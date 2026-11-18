@@ -476,13 +476,13 @@ export function RolesTab() {
   }
 
   return (
-    <div className="space-y-4" data-testid="permissions-contract-workspace">
-      <Card className="p-4 sm:p-5">
-        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-4">
+    <div className="space-y-6" data-testid="permissions-contract-workspace">
+      <div className="py-2">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="font-bold text-xl text-ui-text flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-brand-600 dark:text-brand-400" />
-              {isAr ? 'الأدوار والصلاحيات التشغيلية' : 'Operational Roles & Permissions'}
+              <ShieldCheck className="h-5 w-5 text-ui-primary" />
+              {isAr ? 'الأدوار' : 'Roles'}
             </h1>
             <p className="mt-1 text-sm text-ui-subtle max-w-3xl">
               {isAr
@@ -497,11 +497,11 @@ export function RolesTab() {
             </Button>
           )}
         </div>
-      </Card>
+      </div>
 
-      <Card className="p-3 sm:p-4">
+      <div>
         <div
-          className="flex gap-2 overflow-x-auto pb-1"
+          className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
           role="tablist"
           aria-label={isAr ? 'الأدوار' : 'Roles'}
         >
@@ -524,13 +524,13 @@ export function RolesTab() {
                   setSelectedRole(role);
                   setPermissionSearch('');
                 }}
-                className={`shrink-0 rounded-xl border px-3 py-2 text-start transition ${
+                className={`flex min-h-[78px] w-full flex-col justify-center rounded-xl border px-5 py-4 text-start shadow-ui-sm transition-colors ${
                   active
-                    ? 'border-brand-500 bg-brand-50 text-brand-700 dark:bg-brand-950/30 dark:text-brand-300'
+                    ? 'border-ui-primary bg-ui-primary-soft text-ui-primary dark:bg-brand-950/30 dark:text-brand-300'
                     : 'border-ui-border bg-ui-surface text-ui-text hover:bg-ui-page-alt'
                 }`}
               >
-                <span className="block text-sm font-semibold">
+                <span className="block text-base font-semibold">
                   {roleMeta[role]?.[lang] || role}
                 </span>
                 <span className="block text-[11px] text-ui-subtle mt-0.5">
@@ -543,7 +543,7 @@ export function RolesTab() {
             );
           })}
         </div>
-      </Card>
+      </div>
 
       {currentRole && (
         <Card className="p-4 sm:p-5">
