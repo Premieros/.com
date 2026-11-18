@@ -508,7 +508,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
       <footer
         data-testid="app-bottom-footer"
-        className={`fixed bottom-0 start-0 end-0 z-[55] border-t border-ui-border bg-ui-surface/95 shadow-[0_-8px_28px_rgba(0,0,0,0.08)] backdrop-blur-xl transition-all duration-200 print:hidden ${desktopSidebarHidden ? 'lg:start-0' : 'lg:start-[260px]'} ${mobileOpen ? 'hidden lg:block' : ''}`}
+        className={`fixed bottom-0 start-0 end-0 z-[55] border-t border-ui-border bg-ui-surface/95 shadow-[0_-8px_28px_rgba(0,0,0,0.08)] backdrop-blur-xl transition-all duration-200 print:hidden ${desktopSidebarHidden ? 'lg:start-0' : 'lg:start-[272px]'} ${mobileOpen ? 'hidden lg:block' : ''}`}
       >
         <div data-testid="app-bottom-toolbar" className="flex h-12 items-center border-b border-ui-border px-3 sm:h-14 sm:px-5 md:border-b-0">
           <PageUtilityControls />
