@@ -20,7 +20,7 @@ export function PageHeader({ title, subtitle, actions, breadcrumbs }: PageHeader
   const embedded = useEmbeddedCenterPage();
   if (embedded) return actions ? <div data-testid="page-actions" className="flex min-w-0 flex-wrap items-center gap-2 py-2">{actions}</div> : null;
   return (
-    <div data-testid="page-header" className="mb-1 grid min-w-0 grid-cols-1 items-center gap-x-4 gap-y-2 sm:min-h-12 sm:grid-cols-[minmax(0,1fr)_minmax(0,auto)]">
+    <div data-testid="page-header" className="mb-5 grid min-w-0 grid-cols-1 items-center gap-x-5 gap-y-3 sm:min-h-16 sm:grid-cols-[minmax(0,1fr)_minmax(0,auto)]">
       <div className="min-w-0">
         {breadcrumbs && breadcrumbs.length > 0 && (
           <nav data-testid="page-breadcrumbs" aria-label="Breadcrumbs" className="mb-0.5 flex flex-wrap items-center gap-1 text-xs">
@@ -39,8 +39,8 @@ export function PageHeader({ title, subtitle, actions, breadcrumbs }: PageHeader
             })}
           </nav>
         )}
-        <h1 data-testid="page-title" className="text-base font-extrabold tracking-tight text-ui-text sm:text-lg">{title}</h1>
-        {subtitle && <p data-testid="page-description" className="mt-0.5 text-xs font-medium leading-4 text-ui-muted">{subtitle}</p>}
+        <h1 data-testid="page-title" className="text-xl font-semibold tracking-normal text-ui-text sm:text-2xl">{title}</h1>
+        {subtitle && <p data-testid="page-description" className="mt-1 text-sm font-normal leading-5 text-ui-muted">{subtitle}</p>}
       </div>
       {actions && (
         <div
@@ -62,7 +62,7 @@ export function Card({ children, className = '', ...rest }: CardProps) {
   return (
     <div
       className={clsx(
-        'ui-accent-card ui-accent-neutral rounded-xl border border-ui-border bg-ui-surface shadow-ui-sm transition-all duration-150',
+        'rounded-xl border border-ui-border bg-ui-surface shadow-ui-sm transition-all duration-150',
         className
       )}
       {...rest}
@@ -95,7 +95,7 @@ export function StatCard({ title, value, icon, color = 'navy', trend }: StatCard
   const c = colorMap[color] || colorMap.navy;
 
   return (
-    <Card className={clsx('p-5 hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-200', c.accent)}>
+    <Card className={clsx('p-5 hover:shadow-ui-md transition-shadow duration-200', c.accent)}>
       <div className="flex items-center justify-between">
         <div>
           <p className="text-sm font-semibold text-ui-muted">{title}</p>
