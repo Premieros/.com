@@ -89,7 +89,7 @@ export function Layout({ children }: { children: ReactNode }) {
       main: false,
       orders: true,
       customers: true,
-      centers: false,
+      centers: true,
       catalog: true,
       reports: true,
       inventory: true,
@@ -165,7 +165,10 @@ export function Layout({ children }: { children: ReactNode }) {
     if (group === 'orders') return ar ? 'الطلبات' : 'Orders';
     if (group === 'customers') return ar ? 'العملاء' : 'Customers';
     if (group === 'reports') return ar ? 'التقارير' : 'Reports';
-    if (group === 'inventory') return ar ? 'المخزون والمشتريات' : 'Inventory & Purchasing';
+    if (group === 'inventory') return ar ? 'المخزون' : 'Inventory';
+    if (group === 'catalog') return ar ? 'القائمة والمنتجات' : 'Menu';
+    if (group === 'centers') return ar ? 'الإدارة' : 'Manage';
+    if (group === 'admin') return ar ? 'إدارة المنصة' : 'Administration';
     return businessGroupLabel(runtime, group, ar ? 'ar' : 'en', MENU_GROUPS[group][ar ? 'ar' : 'en']);
   };
 
@@ -208,8 +211,8 @@ export function Layout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div dir={ar ? 'rtl' : 'ltr'} className="min-h-screen bg-ui-page text-ui-text overflow-x-hidden" data-testid="app-shell">
-      <header data-testid="app-header" className={`fixed top-0 start-0 end-0 z-[60] flex h-[64px] items-center justify-between gap-3 liquid-glass-header px-4 shadow-ui-sm transition-all duration-200 sm:px-6 ${desktopSidebarHidden ? 'lg:start-0' : 'lg:start-[260px]'}`}>
+    <div dir={ar ? 'rtl' : 'ltr'} className="premier-backoffice min-h-screen bg-ui-page text-ui-text overflow-x-hidden" data-testid="app-shell">
+      <header data-testid="app-header" className={`fixed top-0 start-0 end-0 z-[60] flex h-[68px] items-center justify-between gap-3 border-b border-ui-border bg-ui-surface px-4 shadow-none transition-all duration-200 sm:px-6 ${desktopSidebarHidden ? 'lg:start-0' : 'lg:start-[272px]'}`}>
         <div className="flex min-w-0 items-center gap-2 sm:gap-3">
           <button data-testid="sidebar-open" type="button" onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-ui-muted hover:bg-ui-page-alt lg:hidden" aria-label={ar ? 'فتح القائمة' : 'Open sidebar'}>
             <Menu className="h-5 w-5" />
@@ -301,8 +304,8 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <aside data-testid="app-sidebar" className={`fixed top-0 bottom-0 start-0 z-50 w-[260px] liquid-glass border-e border-ui-border shadow-ui-md transition-transform duration-200 ease-[var(--ui-ease)] ${mobileOpen ? 'translate-x-0' : ar ? 'translate-x-full' : '-translate-x-full'} ${desktopSidebarHidden ? (ar ? 'lg:translate-x-full' : 'lg:-translate-x-full') : 'lg:translate-x-0'}`}>
-        <div className="flex h-14 items-center justify-between border-b border-ui-border px-5">
+      <aside data-testid="app-sidebar" className={`fixed top-0 bottom-0 start-0 z-50 w-[272px] border-e border-ui-border bg-[#F5F5F9] text-[#191a20] shadow-none dark:bg-ui-surface transition-transform duration-200 ease-[var(--ui-ease)] ${mobileOpen ? 'translate-x-0' : ar ? 'translate-x-full' : '-translate-x-full'} ${desktopSidebarHidden ? (ar ? 'lg:translate-x-full' : 'lg:-translate-x-full') : 'lg:translate-x-0'}`}>
+        <div className="flex h-[68px] items-center justify-between px-5">
           <Logo variant="horizontal" size={28} tone="mono" showTagline={false} className="text-ui-primary" />
           <button data-testid="sidebar-close" type="button" onClick={() => setMobileOpen(false)} className="rounded-lg p-2 text-ui-muted hover:bg-ui-page-alt lg:hidden" aria-label={ar ? 'إغلاق القائمة' : 'Close sidebar'}><X className="h-5 w-5" /></button>
           <button
@@ -316,7 +319,7 @@ export function Layout({ children }: { children: ReactNode }) {
             <X className="h-4 w-4" />
           </button>
         </div>
-        <nav data-testid="app-navigation" className="h-[calc(100%-56px)] overflow-y-auto px-3 py-4">
+        <nav data-testid="app-navigation" className="h-[calc(100%-68px)] overflow-y-auto px-2 py-5">
           <section data-testid="mobile-sidebar-controls" className="mb-4 grid gap-3 rounded-2xl border border-ui-border bg-ui-surface/80 p-3 lg:hidden">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ui-primary-soft text-sm font-black text-ui-primary">
@@ -394,7 +397,7 @@ export function Layout({ children }: { children: ReactNode }) {
                     onFocus={() => prefetchAppRoute(item.route)}
                     onTouchStart={() => prefetchAppRoute(item.route)}
                     onClick={() => setMobileOpen(false)}
-                    className={({ isActive }) => `group flex min-h-[38px] items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-all duration-150 ${isActive ? 'bg-ui-primary text-ui-primary-fg shadow-[0_4px_12px_rgba(91,43,216,0.18)]' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary'}`}
+                    className={({ isActive }) => `group flex min-h-[48px] items-center gap-3 rounded-lg px-4 text-sm font-medium transition-colors ${isActive ? 'bg-[#D0D0D5] font-bold text-[#191a20] dark:bg-ui-page-alt dark:text-ui-text' : 'text-[#24252b] hover:bg-[#e5e5eb] dark:text-ui-muted dark:hover:bg-ui-page-alt'}`}
                   >
                     {ICONS[item.icon]}
                     <span className="flex-1 truncate">{businessMenuLabel(
@@ -413,13 +416,16 @@ export function Layout({ children }: { children: ReactNode }) {
                   onClick={() => setCollapsed((v) => ({ ...v, [group]: !v[group] }))}
                   aria-expanded={!collapsed[group]}
                   aria-controls={`nav-group-items-${group}`}
-                  className="flex min-h-9 w-full items-center justify-between rounded-lg px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-ui-subtle transition hover:bg-ui-page-alt hover:text-ui-text"
+                  className="flex min-h-[48px] w-full items-center justify-between rounded-lg px-4 py-2 text-sm font-semibold text-[#24252b] transition hover:bg-[#e5e5eb] dark:text-ui-text dark:hover:bg-ui-page-alt"
                 >
-                  <span className="min-w-0 truncate text-start">{sidebarSectionLabel(group)}</span>
-                  <ChevronDown className={`h-3.5 w-3.5 shrink-0 transition-transform duration-150 ${collapsed[group] ? 'rotate-90' : ''}`} />
+                  <span className="flex min-w-0 items-center gap-3 text-start">
+                    <span className="shrink-0">{ICONS[items[0]?.icon] || <LayoutDashboard className="h-5 w-5" />}</span>
+                    <span className="truncate">{sidebarSectionLabel(group)}</span>
+                  </span>
+                  <ChevronDown className={`h-4 w-4 shrink-0 transition-transform duration-150 ${collapsed[group] ? '-rotate-90' : ''}`} />
                 </button>
                 {!collapsed[group] && (
-                  <div id={`nav-group-items-${group}`} className="mt-0.5 space-y-0.5">
+                  <div id={`nav-group-items-${group}`} className="mt-0.5 space-y-0.5 pb-2">
                     {items.map((item) => (
                       <NavLink
                         data-testid={`nav-item-${item.id}`}
@@ -430,9 +436,8 @@ export function Layout({ children }: { children: ReactNode }) {
                         onTouchStart={() => prefetchAppRoute(item.route)}
                         onClick={() => setMobileOpen(false)}
                         aria-current={location.pathname === item.route || location.pathname.startsWith(`${item.route}/`) ? 'page' : undefined}
-                        className={({ isActive }) => `group flex min-h-[38px] items-center gap-2.5 rounded-lg px-3 text-sm font-medium transition-all duration-150 ${isActive || location.pathname.startsWith(`${item.route}/`) ? 'bg-ui-primary text-ui-primary-fg shadow-[0_4px_12px_rgba(91,43,216,0.18)]' : 'text-ui-muted hover:bg-ui-primary-soft hover:text-ui-primary'}`}
+                        className={({ isActive }) => `group flex min-h-[42px] items-center gap-2.5 rounded-lg ps-12 pe-3 text-sm transition-colors ${isActive || location.pathname.startsWith(`${item.route}/`) ? 'bg-[#c8c8cd] font-bold text-[#17171d] dark:bg-ui-page-alt dark:text-ui-text' : 'font-medium text-[#34343a] hover:bg-[#e5e5eb] dark:text-ui-muted dark:hover:bg-ui-page-alt'}`}
                       >
-                        {ICONS[item.icon]}
                         <span className="flex-1 truncate">{businessMenuLabel(
                           runtime,
                           item.id,
@@ -451,7 +456,7 @@ export function Layout({ children }: { children: ReactNode }) {
 
       {mobileOpen && <button data-testid="mobile-sidebar-backdrop" type="button" className="fixed inset-0 z-40 bg-ui-text/20 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} aria-label={ar ? 'إغلاق' : 'Close'} />}
 
-      <div data-testid="app-content-shell" className={`min-h-screen pt-[64px] transition-all duration-200 ${desktopSidebarHidden ? 'lg:ms-0' : 'lg:ms-[260px]'}`}>
+      <div data-testid="app-content-shell" className={`min-h-screen pt-[68px] transition-all duration-200 ${desktopSidebarHidden ? 'lg:ms-0' : 'lg:ms-[272px]'}`}>
         <ReturnContextBanner />
         {branchScope.isAggregate && (
           <div data-testid="aggregate-branch-action-banner" className="border-b border-ui-warning/30 bg-ui-warning/10 px-4 py-2.5 sm:px-6 lg:px-7">
@@ -488,10 +493,10 @@ export function Layout({ children }: { children: ReactNode }) {
             </div>
           </div>
         )}
-        <main data-testid="app-main" className="min-h-[calc(100vh-64px)] bg-ui-page px-4 pb-36 pt-3 sm:px-6 sm:pb-24 sm:pt-3 lg:px-7 lg:pb-24 lg:pt-3">
+        <main data-testid="app-main" className="min-h-[calc(100vh-68px)] bg-ui-page px-4 pb-36 pt-6 sm:px-6 sm:pb-24 sm:pt-7 lg:px-9 lg:pb-24 lg:pt-8">
           <div
             data-testid="design-content-surface"
-            className={`min-h-[calc(100vh-64px)] w-full min-w-0 space-y-3 ${fullWidthContent ? 'max-w-none' : 'mx-auto max-w-[1600px]'}`}
+            className={`min-h-[calc(100vh-68px)] w-full min-w-0 space-y-5 ${fullWidthContent ? 'max-w-none' : 'mx-auto max-w-[1600px]'}`}
           >
             {children}
           </div>
