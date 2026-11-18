@@ -387,7 +387,7 @@ export function Layout({ children }: { children: ReactNode }) {
             // Orders (Sales Invoices) and Customers are one-click primary
             // destinations, not nested accordions. Other sections keep their
             // existing expand/collapse behavior and Premier visual styling.
-            if (group === 'orders' || group === 'customers' || group === 'marketplace') {
+            if (group === 'orders' || group === 'customers' || group === 'main' || group === 'marketplace') {
               const item = items[0];
               return (
                 <section key={group} data-testid={`nav-group-${group}`} className="mb-1">
