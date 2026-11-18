@@ -177,8 +177,8 @@ export function ReportsCenterPage() {
     : (lang === 'ar' ? 'اختر تقريرًا' : 'Choose a report');
   const isAr = lang === 'ar';
   const reportList = (
-    <div className="overflow-hidden rounded-xl border border-[#d9ddec] bg-white shadow-sm dark:border-ui-border dark:bg-ui-surface" data-testid="premier-reports-directory">
-      <div className="border-b border-ui-border bg-gradient-to-l from-violet-50/80 to-ui-surface p-3 dark:from-violet-950/20 dark:to-ui-surface">
+    <div className="overflow-hidden rounded-xl border border-ui-border bg-ui-surface shadow-ui-sm" data-testid="premier-reports-directory">
+      <div className="border-b border-ui-border bg-ui-surface p-3">
         <div className="mb-3 flex items-center justify-between gap-2">
           <span className="text-sm font-black text-ui-text">{isAr ? 'المفضلة والتقارير' : 'Favorites & reports'}</span>
           <Star className="h-5 w-5 text-amber-500" aria-hidden="true" />
@@ -261,18 +261,18 @@ export function ReportsCenterPage() {
   );
 
   return (
-    <section className="space-y-3" dir={isAr ? 'rtl' : 'ltr'} data-testid="unified-reports-center">
-      <header className="relative z-20 rounded-xl border border-ui-border bg-ui-surface p-3 shadow-ui-sm" data-testid="reports-compact-toolbar">
+    <section className="space-y-5" dir={isAr ? 'rtl' : 'ltr'} data-testid="unified-reports-center">
+      <header className="relative z-20 rounded-xl border-b border-ui-border bg-ui-surface px-1 py-4" data-testid="reports-compact-toolbar">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
-            <h1 className="flex items-center gap-2 text-xl font-black text-ui-text">
+            <h1 className="flex items-center gap-2 text-2xl font-semibold text-ui-text">
               <BarChart3 className="h-6 w-6 text-ui-primary" />{isAr ? 'التقارير' : 'Reports'}
             </h1>
-            <p className="text-xs text-ui-muted">{isAr ? 'ملخص مجمع مباشر — افتح التقرير للحصول على كل تفاصيله' : 'Live summary — open a report to see its complete details'}</p>
+            <p className="mt-1 text-sm text-ui-muted">{isAr ? 'ملخص مجمع مباشر — افتح التقرير للحصول على كل تفاصيله' : 'Live summary — open a report to see its complete details'}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <span className="max-w-52 truncate rounded-lg bg-ui-page-alt px-3 py-2 text-xs font-semibold text-ui-text" data-testid="reports-selected-type" title={chosenLabel}>{chosenLabel}</span>
-            <span className="max-w-56 truncate rounded-lg bg-ui-page-alt px-3 py-2 text-xs text-ui-muted" data-testid="reports-applied-range">
+            <span className="max-w-52 truncate rounded-lg border border-ui-border bg-ui-surface px-3 py-2 text-xs font-semibold text-ui-text" data-testid="reports-selected-type" title={chosenLabel}>{chosenLabel}</span>
+            <span className="max-w-56 truncate rounded-lg border border-ui-border bg-ui-surface px-3 py-2 text-xs text-ui-muted" data-testid="reports-applied-range">
               {draftFrom} — {draftTo}
             </span>
             {permittedOperational.some(report => report.key === 'component_consumption' || report.key === 'raw_material_consumption' || report.key === 'top_consumed_components') && (
@@ -300,7 +300,7 @@ export function ReportsCenterPage() {
               <LayoutGrid className="h-4 w-4" />{isAr ? 'أنواع التقارير' : 'Report types'}
             </button>
             <button type="button" onClick={applyOverviewDates} disabled={!defaultReport} data-testid="apply-overview-dates"
-              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-ui-primary px-4 text-xs font-bold text-ui-primary-fg">
+              className="inline-flex h-10 items-center gap-1.5 rounded-lg bg-ui-primary px-4 text-sm font-bold text-ui-primary-fg shadow-ui-sm">
               {isAr ? 'عرض التقرير التفصيلي' : 'View detailed report'}
             </button>
           </div>
