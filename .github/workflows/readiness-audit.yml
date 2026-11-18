@@ -1,0 +1,23 @@
+name: Readiness audit tests
+on:
+  pull_request:
+    paths:
+      - 'scripts/readiness/**'
+      - '.github/workflows/readiness-audit.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/readiness/**'
+      - '.github/workflows/readiness-audit.yml'
+permissions:
+  contents: read
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Test production readiness classification without production access
+        run: node --test scripts/readiness/audit-production.test.mjs scripts/readiness/audit-legacy-fifo-deletion.test.mjs
