@@ -265,7 +265,7 @@ export function Layout({ children }: { children: ReactNode }) {
         </div>
 
         <div className="relative flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-1.5" data-testid="app-header-utilities">
-          <div className="min-w-0 max-w-[135px] shrink xl:max-w-[180px]" data-testid="header-branch-wrapper"><BranchScopeSelector compact /></div>
+          <div className="hidden min-w-0 max-w-[135px] shrink lg:block xl:max-w-[180px]" data-testid="header-branch-wrapper"><BranchScopeSelector compact /></div>
           <div className="hidden shrink-0 xl:flex"><OfflineStatusIndicator /></div>
           <ApprovalInbox ar={ar} />
           {canViewFloorPlan && (
@@ -285,7 +285,7 @@ export function Layout({ children }: { children: ReactNode }) {
             disabled={!canOpenSettings}
             aria-label={canOpenSettings ? (ar ? 'فتح الإعدادات' : 'Open settings') : (ar ? 'هوية المستخدم' : 'User identity')}
             title={canOpenSettings ? (ar ? 'الإعدادات' : 'Settings') : undefined}
-            className={`flex min-w-0 shrink-0 items-center gap-2 rounded-xl p-1.5 transition-colors ${canOpenSettings ? 'hover:bg-ui-page-alt' : 'cursor-default'}`}
+            className={`hidden min-w-0 shrink-0 items-center gap-2 rounded-xl p-1.5 transition-colors lg:flex ${canOpenSettings ? 'hover:bg-ui-page-alt' : 'cursor-default'}`}
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-ui-primary-soft text-xs font-bold text-ui-primary">{(user?.full_name || user?.email || 'A').slice(0, 1).toUpperCase()}</div>
             <div className="hidden min-w-0 max-w-32 text-start 2xl:block">
@@ -296,10 +296,10 @@ export function Layout({ children }: { children: ReactNode }) {
           <button data-testid="language-toggle" type="button" onClick={() => setLang(ar ? 'en' : 'ar')} className="hidden shrink-0 items-center gap-1 rounded-xl border border-ui-border p-2 text-xs font-semibold text-ui-muted transition-colors hover:bg-ui-page-alt lg:flex">
             <Globe className="h-3.5 w-3.5" /><span className="hidden 2xl:inline">{ar ? 'العربية' : 'English'}</span>
           </button>
-          <button data-testid="theme-toggle" type="button" onClick={toggleTheme} className="shrink-0 rounded-xl p-2 text-ui-muted transition-colors hover:bg-ui-page-alt hover:text-ui-text" aria-label={ar ? 'تغيير المظهر' : 'Toggle theme'}>
+          <button data-testid="theme-toggle" type="button" onClick={toggleTheme} className="hidden shrink-0 rounded-xl p-2 text-ui-muted transition-colors hover:bg-ui-page-alt hover:text-ui-text lg:block" aria-label={ar ? 'تغيير المظهر' : 'Toggle theme'}>
             {theme === 'light' ? <Moon className="h-4.5 w-4.5" /> : <Sun className="h-4.5 w-4.5" />}
           </button>
-          <button data-testid="sign-out-button" type="button" onClick={signOut} className="shrink-0 rounded-xl p-2 text-ui-subtle transition-colors hover:bg-ui-danger-soft hover:text-ui-danger" aria-label={ar ? 'تسجيل الخروج' : 'Sign out'}>
+          <button data-testid="sign-out-button" type="button" onClick={signOut} className="hidden shrink-0 rounded-xl p-2 text-ui-subtle transition-colors hover:bg-ui-danger-soft hover:text-ui-danger lg:block" aria-label={ar ? 'تسجيل الخروج' : 'Sign out'}>
             <LogOut className="h-4.5 w-4.5" />
           </button>
         </div>
