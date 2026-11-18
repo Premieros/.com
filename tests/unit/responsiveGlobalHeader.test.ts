@@ -11,7 +11,7 @@ describe('compact RTL/LTR global header', () => {
     expect(layout).toContain('data-testid="app-header-utilities"');
     expect(layout).toContain('flex min-w-0 flex-1 items-center justify-end');
     expect(layout).toContain('data-testid="header-branch-wrapper"');
-    expect(layout).toContain('max-w-[135px] shrink xl:max-w-[180px]');
+    expect(layout).toContain('max-w-[135px] shrink lg:block xl:max-w-[180px]');
     expect(layout).toContain('data-testid="header-pos-shortcut"');
   });
 
@@ -22,6 +22,8 @@ describe('compact RTL/LTR global header', () => {
     expect(layout).toContain('data-testid="sign-out-button"');
     expect(layout).toContain('data-testid="theme-toggle"');
     expect(layout).toContain('data-testid="mobile-sidebar-controls"');
+    expect(layout).toContain('lg:flex');
+    expect(layout).toContain('lg:block');
     expect(search).toContain('hidden xl:inline');
     expect(search).toContain('2xl:inline');
     expect(search).toContain('OPEN_COMMAND_PALETTE_EVENT');
