@@ -6,8 +6,8 @@ const clean = () => ({
   schema: { unprotected_tables:0, anon_readable_tables:0 },
   integrity: { orphan_items:0, orphan_payments:0, orphan_lines:0, duplicate_invoices:0 },
   accounting: { unbalanced:0, unbalanced_posted:0, empty_entries:0 },
-  inventory: { negatives:0, negatives_with_fifo_debt:0,
-    negatives_without_fifo_debt:0, unsettled_fifo_debts:0 },
+  inventory: { negatives:0, negative_raw_batches:0, raw_batch_balance_mismatches:0,
+    negative_balance_batch_disagreements:0, unsettled_fifo_debts:0 },
   accounts: { active_without_auth:0, branches_without_members:0 }
 });
 
@@ -18,23 +18,30 @@ test('clean aggregate passes technical checks but does not claim full production
   assert.ok(result.unverified.includes('cashier_sale_refund_and_shift_on_isolated_environment'));
 });
 
-test('negative balances tied to FIFO debt are a review item, not an automatic stock reset', () => {
-  const data = clean();
-  data.inventory.negatives = 146;
-  data.inventory.negatives_with_fifo_debt = 146;
-  data.inventory.unsettled_fifo_debts = 6459;
-  const result = classifyReadiness(data);
-  assert.equal(result.decision, 'REVIEW_REQUIRED');
-  assert.equal(result.checks.find(x => x.id === 'negatives_without_fifo_debt').status, 'PASS');
-  assert.equal(result.checks.find(x => x.id === 'negative_raw_balances').status, 'REVIEW');
+test('deleted historical debts do not turn consistent negative stock into a blocker', () => {
+  const data=clean();
+  data.inventory.negatives=146;
+  data.inventory.negative_raw_batches=6424;
+  const result=classifyReadiness(data);
+  assert.equal(result.decision,'REVIEW_REQUIRED');
+  assert.equal(result.checks.find(x=>x.id==='raw_batch_balance_mismatches').status,'PASS');
+  assert.equal(result.checks.find(x=>x.id==='negative_raw_balances').status,'REVIEW');
+  assert.ok(result.unverified.includes('legacy_negative_stock_physical_reconciliation'));
 });
 
-test('inconsistent negatives or unbalanced accounting stop technical approval', () => {
-  const data = clean();
-  data.inventory.negatives_without_fifo_debt = 1;
-  data.accounting.unbalanced_posted = 1;
-  const result = classifyReadiness(data);
-  assert.equal(result.decision, 'NO_GO');
+test('stock/batch discrepancy or unbalanced accounting blocks technical approval', () => {
+  const data=clean();
+  data.inventory.raw_batch_balance_mismatches=1;
+  data.accounting.unbalanced_posted=1;
+  const result=classifyReadiness(data);
+  assert.equal(result.decision,'NO_GO');
+});
+
+test('new outstanding FIFO debts stay visible after historical deletion', () => {
+  const data=clean();
+  data.inventory.unsettled_fifo_debts=1;
+  const result=classifyReadiness(data);
+  assert.equal(result.decision,'REVIEW_REQUIRED');
 });
 
 test('rejects arbitrary project and database connections before connecting', () => {
@@ -55,5 +62,6 @@ test('audit queries do not contain data mutation and cover critical integrity in
     assert.doesNotMatch(sql, /\b(insert|update|delete|alter|drop|truncate|create)\s+(into|table|from|public|private|auth)\b/i);
   }
   assert.match(READINESS_QUERIES.inventory, /raw_fifo_debts/);
+  assert.match(READINESS_QUERIES.inventory, /raw_material_batches/);
   assert.match(READINESS_QUERIES.accounting, /journal_entry_lines/);
 });
