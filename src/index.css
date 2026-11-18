@@ -3,16 +3,16 @@
 @tailwind utilities;
 
 :root {
-  --brand-50: 242 245 253;
-  --brand-100: 229 235 251;
-  --brand-200: 201 215 248;
-  --brand-300: 156 182 242;
-  --brand-400: 102 142 234;
-  --brand-500: 42 96 223;
-  --brand-600: 30 76 184;
-  --brand-700: 26 62 147;
-  --brand-800: 22 50 116;
-  --brand-900: 18 39 89;
+  --brand-50: 248 245 255;
+  --brand-100: 240 230 255;
+  --brand-200: 221 199 251;
+  --brand-300: 187 151 242;
+  --brand-400: 153 93 231;
+  --brand-500: 109 31 191;
+  --brand-600: 77 0 158;
+  --brand-700: 65 0 132;
+  --brand-800: 51 0 106;
+  --brand-900: 38 0 83;
 
   --navy-50: 240 243 250;
   --navy-100: 219 227 243;
@@ -39,18 +39,18 @@
 
   /* Premier unified solid design tokens (Enterprise ERP & Touch POS) */
   /* === Identity === */
-  --ui-primary: 37 99 235;
-  --ui-primary-hover: 29 78 216;
-  --ui-primary-active: 30 64 175;
-  --ui-primary-soft: 239 246 255;
+  --ui-primary: 77 0 158;
+  --ui-primary-hover: 65 0 132;
+  --ui-primary-active: 54 0 110;
+  --ui-primary-soft: 246 239 255;
   --ui-primary-fg: 255 255 255;
   --ui-accent: var(--brand-600);
 
   /* === Surfaces (Comfort-neutral, layered, opaque) === */
-  --ui-surface: 252 252 253;
-  --ui-surface-raised: 248 250 252;
-  --ui-page: 245 247 250;
-  --ui-page-alt: 238 242 247;
+  --ui-surface: 255 255 255;
+  --ui-surface-raised: 255 255 255;
+  --ui-page: 255 255 255;
+  --ui-page-alt: 245 245 249;
 
   /* === Accent strips / section identity === */
   --ui-strip-blue: 59 130 246;
@@ -62,12 +62,12 @@
   --ui-strip-neutral: 100 116 139;
 
   /* === Borders === */
-  --ui-border: 218 225 234;
-  --ui-border-strong: 190 201 214;
+  --ui-border: 225 226 233;
+  --ui-border-strong: 196 198 208;
 
   /* === Text === */
-  --ui-text: 15 23 42;
-  --ui-muted: 55 65 81;
+  --ui-text: 27 29 38;
+  --ui-muted: 77 79 92;
   --ui-subtle: 100 116 139;
 
   /* === Semantic === */
@@ -90,20 +90,20 @@
 
   /* === Radius === */
   --ui-radius-sm: 8px;
-  --ui-radius: 12px;
-  --ui-radius-lg: 16px;
+  --ui-radius: 10px;
+  --ui-radius-lg: 12px;
   --ui-radius-xl: 20px;
   --ui-radius-2xl: 24px;
 
   /* === Shadows === */
-  --ui-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-  --ui-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.08), 0 1px 2px -1px rgba(0, 0, 0, 0.08);
+  --ui-shadow-sm: 0 1px 5px rgba(24, 22, 40, 0.045);
+  --ui-shadow: 0 3px 13px rgba(24, 22, 40, 0.07);
   --ui-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
   --ui-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
   --ui-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
 
   /* === Focus ring === */
-  --ui-ring: 37 99 235;
+  --ui-ring: 109 31 191;
 
   /* === Spacing scale (logical) === */
   --ui-space-1: 4px;
@@ -520,5 +520,73 @@
   .login-chart-bar,
   .login-report-sheet {
     animation: none !important;
+  }
+}
+
+/*
+ * Premier backoffice design foundation.
+ * Inspired by the supplied light administrative UI references, but uses
+ * Premier branding, navigation, authorization and existing business logic.
+ */
+.premier-backoffice [data-testid='app-sidebar'] {
+  --ui-muted: 45 46 54;
+}
+.premier-backoffice [data-testid='app-navigation'] a,
+.premier-backoffice [data-testid='app-navigation'] button {
+  text-decoration: none;
+}
+.premier-backoffice [data-testid='app-navigation'] :is(a, button):focus-visible {
+  outline: 2px solid rgb(var(--ui-primary));
+  outline-offset: -2px;
+}
+.premier-backoffice [data-testid='app-main'] [data-testid='page-header'] {
+  margin-bottom: 1.25rem;
+}
+.premier-backoffice [data-testid='app-main'] [data-testid='data-table'] {
+  border: 1px solid rgb(var(--ui-border));
+  border-radius: 12px;
+  background: rgb(var(--ui-surface));
+  box-shadow: 0 5px 20px rgba(30, 26, 45, 0.06);
+  overflow: hidden;
+}
+.premier-backoffice [data-testid='data-table-toolbar'] {
+  margin-bottom: 0;
+  padding: 14px 16px;
+  border-bottom: 1px solid rgb(var(--ui-border));
+}
+.premier-backoffice [data-testid='data-table'] thead {
+  background: rgb(var(--ui-surface));
+}
+.premier-backoffice [data-testid='data-table'] th {
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: rgb(var(--ui-text));
+  padding-block: 1rem;
+}
+.premier-backoffice [data-testid='data-table'] td {
+  font-size: 0.8125rem;
+  padding-block: 1rem;
+}
+.premier-backoffice [data-testid='data-table'] tr {
+  border-bottom: 1px solid rgb(var(--ui-border));
+}
+.premier-backoffice [data-testid='data-table'] tbody tr:hover {
+  background: rgb(var(--ui-page-alt) / 0.75);
+}
+.premier-backoffice [data-testid='data-table'] input[type='checkbox'] {
+  accent-color: rgb(var(--ui-primary));
+}
+.premier-backoffice .ui-accent-card,
+.premier-backoffice .ui-accent-top {
+  background: rgb(var(--ui-surface));
+}
+@media print {
+  .premier-backoffice [data-testid='app-sidebar'],
+  .premier-backoffice [data-testid='app-header'] {
+    display: none !important;
+  }
+  .premier-backoffice [data-testid='app-content-shell'] {
+    margin-inline-start: 0 !important;
+    padding-top: 0 !important;
   }
 }
