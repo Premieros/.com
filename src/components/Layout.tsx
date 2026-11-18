@@ -213,8 +213,8 @@ export function Layout({ children }: { children: ReactNode }) {
 
   return (
     <div dir={ar ? 'rtl' : 'ltr'} className="premier-backoffice min-h-screen bg-ui-page text-ui-text overflow-x-hidden" data-testid="app-shell">
-      <header data-testid="app-header" className={`fixed top-0 start-0 end-0 z-[60] flex h-[68px] items-center justify-between gap-3 border-b border-ui-border bg-ui-surface px-4 shadow-none transition-all duration-200 sm:px-6 ${desktopSidebarHidden ? 'lg:start-0' : 'lg:start-[272px]'}`}>
-        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+      <header data-testid="app-header" className={`fixed top-0 start-0 end-0 z-[60] flex h-[68px] min-w-0 items-center justify-between gap-2 border-b border-ui-border bg-ui-surface px-4 shadow-none transition-all duration-200 sm:px-6 ${desktopSidebarHidden ? 'lg:start-0' : 'lg:start-[272px]'}`}>
+        <div className="flex shrink-0 items-center gap-1 sm:gap-2" data-testid="app-header-navigation">
           <button data-testid="sidebar-open" type="button" onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-ui-muted hover:bg-ui-page-alt lg:hidden" aria-label={ar ? 'فتح القائمة' : 'Open sidebar'}>
             <Menu className="h-5 w-5" />
           </button>
@@ -243,7 +243,7 @@ export function Layout({ children }: { children: ReactNode }) {
               title={ar ? 'رجوع' : 'Back'}
             >
               {ar ? <ArrowRight className="h-4 w-4" /> : <ArrowLeft className="h-4 w-4" />}
-              <span className="hidden sm:inline">{ar ? 'رجوع' : 'Back'}</span>
+              <span className="hidden 2xl:inline">{ar ? 'رجوع' : 'Back'}</span>
             </button>
           )}
           <CommandPaletteTrigger />
@@ -259,14 +259,14 @@ export function Layout({ children }: { children: ReactNode }) {
               className={`flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl border border-ui-border bg-ui-surface px-2.5 text-xs font-bold text-ui-text shadow-ui-xs transition hover:bg-ui-page-alt active:scale-95 sm:px-3 ${isPosRoute ? 'border-ui-primary text-ui-primary' : ''}`}
             >
               <ShoppingCart className="h-4 w-4 shrink-0" />
-              <span className="hidden sm:inline">{ar ? 'نقطة البيع' : 'Point of Sale'}</span>
+              <span className="hidden xl:inline">{ar ? 'نقطة البيع' : 'Point of Sale'}</span>
             </NavLink>
           )}
         </div>
 
-        <div className="relative flex items-center gap-1.5 sm:gap-2">
-          <BranchScopeSelector compact />
-          <div className="hidden sm:flex"><OfflineStatusIndicator /></div>
+        <div className="relative flex min-w-0 flex-1 items-center justify-end gap-1 sm:gap-1.5" data-testid="app-header-utilities">
+          <div className="hidden min-w-0 max-w-[135px] shrink lg:block xl:max-w-[180px]" data-testid="header-branch-wrapper"><BranchScopeSelector compact /></div>
+          <div className="hidden shrink-0 xl:flex"><OfflineStatusIndicator /></div>
           <ApprovalInbox ar={ar} />
           {canViewFloorPlan && (
             <button data-testid="active-orders-button" type="button" onPointerEnter={() => prefetchAppRoute(APP_ROUTES.floorPlan)} onFocus={() => prefetchAppRoute(APP_ROUTES.floorPlan)} onTouchStart={() => prefetchAppRoute(APP_ROUTES.floorPlan)} onClick={() => navigate(APP_ROUTES.floorPlan)} className="relative rounded-xl p-2 text-ui-muted transition-colors hover:bg-ui-page-alt hover:text-ui-text" aria-label={ar ? 'الطلبات النشطة' : 'Active orders'}>
@@ -274,7 +274,7 @@ export function Layout({ children }: { children: ReactNode }) {
               {activeOrderCount > 0 && <span data-testid="active-orders-count" className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ui-danger px-1 text-[9px] font-bold text-ui-primary-fg">{activeOrderCount}</span>}
             </button>
           )}
-          <div className="hidden h-6 w-px bg-ui-border sm:block" />
+          <div className="hidden h-6 w-px shrink-0 bg-ui-border 2xl:block" />
           <button
             data-testid="user-menu-button"
             type="button"
@@ -285,21 +285,21 @@ export function Layout({ children }: { children: ReactNode }) {
             disabled={!canOpenSettings}
             aria-label={canOpenSettings ? (ar ? 'فتح الإعدادات' : 'Open settings') : (ar ? 'هوية المستخدم' : 'User identity')}
             title={canOpenSettings ? (ar ? 'الإعدادات' : 'Settings') : undefined}
-            className={`flex items-center gap-2.5 rounded-xl p-1.5 pe-2 transition-colors ${canOpenSettings ? 'hover:bg-ui-page-alt' : 'cursor-default'}`}
+            className={`hidden min-w-0 shrink-0 items-center gap-2 rounded-xl p-1.5 transition-colors lg:flex ${canOpenSettings ? 'hover:bg-ui-page-alt' : 'cursor-default'}`}
           >
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-ui-primary-soft text-xs font-bold text-ui-primary">{(user?.full_name || user?.email || 'A').slice(0, 1).toUpperCase()}</div>
-            <div className="hidden text-start sm:block">
-              <p className="text-sm font-semibold leading-tight text-ui-text">{user?.full_name || user?.email || (ar ? 'مدير النظام' : 'System Admin')}</p>
-              <p className="text-[10px] leading-tight text-ui-subtle">{user?.role || 'admin'}</p>
+            <div className="hidden min-w-0 max-w-32 text-start 2xl:block">
+              <p className="truncate whitespace-nowrap text-sm font-semibold leading-tight text-ui-text">{user?.full_name || user?.email || (ar ? 'مدير النظام' : 'System Admin')}</p>
+              <p className="truncate whitespace-nowrap text-[10px] leading-tight text-ui-subtle">{user?.role || 'admin'}</p>
             </div>
           </button>
-          <button data-testid="language-toggle" type="button" onClick={() => setLang(ar ? 'en' : 'ar')} className="hidden items-center gap-1.5 rounded-xl border border-ui-border px-2.5 py-1.5 text-xs font-semibold text-ui-muted transition-colors hover:bg-ui-page-alt sm:flex">
-            <Globe className="h-3.5 w-3.5" /><span className="hidden md:inline">{ar ? 'العربية' : 'English'}</span>
+          <button data-testid="language-toggle" type="button" onClick={() => setLang(ar ? 'en' : 'ar')} className="hidden shrink-0 items-center gap-1 rounded-xl border border-ui-border p-2 text-xs font-semibold text-ui-muted transition-colors hover:bg-ui-page-alt lg:flex">
+            <Globe className="h-3.5 w-3.5" /><span className="hidden 2xl:inline">{ar ? 'العربية' : 'English'}</span>
           </button>
-          <button data-testid="theme-toggle" type="button" onClick={toggleTheme} className="rounded-xl p-2 text-ui-muted transition-colors hover:bg-ui-page-alt hover:text-ui-text" aria-label={ar ? 'تغيير المظهر' : 'Toggle theme'}>
+          <button data-testid="theme-toggle" type="button" onClick={toggleTheme} className="hidden shrink-0 rounded-xl p-2 text-ui-muted transition-colors hover:bg-ui-page-alt hover:text-ui-text lg:block" aria-label={ar ? 'تغيير المظهر' : 'Toggle theme'}>
             {theme === 'light' ? <Moon className="h-4.5 w-4.5" /> : <Sun className="h-4.5 w-4.5" />}
           </button>
-          <button data-testid="sign-out-button" type="button" onClick={signOut} className="rounded-xl p-2 text-ui-subtle transition-colors hover:bg-ui-danger-soft hover:text-ui-danger" aria-label={ar ? 'تسجيل الخروج' : 'Sign out'}>
+          <button data-testid="sign-out-button" type="button" onClick={signOut} className="hidden shrink-0 rounded-xl p-2 text-ui-subtle transition-colors hover:bg-ui-danger-soft hover:text-ui-danger lg:block" aria-label={ar ? 'تسجيل الخروج' : 'Sign out'}>
             <LogOut className="h-4.5 w-4.5" />
           </button>
         </div>

@@ -139,13 +139,13 @@ export function CommandPaletteTrigger() {
     <button
       type="button"
       onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT))}
-      className="hidden h-9 items-center gap-2 rounded-xl border border-ui-border bg-ui-surface px-2.5 text-xs font-semibold text-ui-muted transition hover:bg-ui-page-alt hover:text-ui-text md:flex"
+      className="hidden h-9 shrink-0 items-center gap-1 rounded-xl border border-ui-border bg-ui-surface px-2.5 text-xs font-semibold text-ui-muted transition hover:bg-ui-page-alt hover:text-ui-text md:flex"
       aria-label={ar ? 'فتح البحث السريع' : 'Open command search'}
       title={ar ? 'بحث سريع (Ctrl+K)' : 'Quick search (Ctrl+K)'}
     >
       <Search className="h-4 w-4" />
-      <span>{ar ? 'بحث' : 'Search'}</span>
-      <kbd className="rounded border border-ui-border bg-ui-page-alt px-1.5 py-0.5 text-[10px] text-ui-subtle">Ctrl K</kbd>
+      <span className="hidden xl:inline">{ar ? 'بحث' : 'Search'}</span>
+      <kbd className="hidden rounded border border-ui-border bg-ui-page-alt px-1.5 py-0.5 text-[10px] text-ui-subtle 2xl:inline">Ctrl K</kbd>
     </button>
   );
 }
