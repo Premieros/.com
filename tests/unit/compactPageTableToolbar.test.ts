@@ -10,8 +10,8 @@ const dataTable = read('src/components/DataTable.tsx');
 
 describe('compact above-table page controls', () => {
   it('preserves Premier global app header dimensions and actions', () => {
-    expect(layout).toContain('h-[64px]');
-    expect(layout).toContain('pt-[64px]');
+    expect(layout).toContain('h-[68px]');
+    expect(layout).toContain('pt-[68px]');
     expect(layout).toContain('data-testid="header-pos-shortcut"');
   });
 
@@ -20,7 +20,7 @@ describe('compact above-table page controls', () => {
     expect(header).toContain('data-testid="page-header"');
     expect(header).toContain('sm:overflow-x-auto sm:overscroll-x-contain');
     expect(surface).toContain("'min-w-0 space-y-2'");
-    expect(layout).toContain('lg:pt-3');
+    expect(layout).toContain('lg:pt-8');
   });
 
   it('scrolls rows inside a bounded table while keeping bold column labels and the footer visible', () => {

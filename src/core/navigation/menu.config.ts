@@ -59,13 +59,14 @@ export const MENU_ITEMS: MenuItemConfig[] = [
  * Sidebar-only grouping. Existing routes and permission gates remain the
  * source of truth; this only reorganizes already-visible links.
  */
-export type SidebarSection = MenuGroup | 'orders' | 'customers' | 'reports' | 'inventory';
+export type SidebarSection = MenuGroup | 'orders' | 'customers' | 'reports' | 'inventory' | 'marketplace';
 
 export const SIDEBAR_SECTION_ORDER: readonly SidebarSection[] = [
-  'main', 'orders', 'customers', 'reports', 'inventory', 'catalog', 'centers', 'admin',
+  'main', 'orders', 'customers', 'reports', 'inventory', 'catalog', 'centers', 'marketplace', 'admin',
 ] as const;
 
 export function sidebarSectionForItem(item: Pick<MenuItemConfig, 'id' | 'group'>): SidebarSection {
+  if (item.id === 'integrations-hub') return 'marketplace';
   if (item.id === 'sales-invoices') return 'orders';
   if (item.id === 'customers') return 'customers';
   if (item.id === 'reports') return 'reports';

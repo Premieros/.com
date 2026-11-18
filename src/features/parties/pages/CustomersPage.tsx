@@ -66,6 +66,7 @@ export function CustomersPage() {
     pageSize: 100,
   });
   const [search, setSearch] = useState('');
+  const [customerView, setCustomerView] = useState<'all' | 'registered' | 'qr' | 'outstanding'>('all');
   const [qrGuests, setQrGuests] = useState<QrCustomerHistory[]>([]);
   const [qrLoading, setQrLoading] = useState(false);
   const [qrLoadError, setQrLoadError] = useState('');
@@ -129,7 +130,13 @@ export function CustomersPage() {
     ...qrGuests.filter((guest) => branchScope.selectedBranchSet.has(guest.branch_id)).map(toQrCustomerRow),
   ], [items, qrGuests, branchScope.scopeKey]);
   const term = search.trim().toLowerCase();
-  const filtered = allRows.filter((c) => !term || c.name.toLowerCase().includes(term) || c.phone?.includes(term));
+  const matchesCustomerView = (customer: CustomerViewRow) =>
+    customerView === 'all' ||
+    (customerView === 'registered' && !isQrGuest(customer)) ||
+    (customerView === 'qr' && isQrGuest(customer)) ||
+    (customerView === 'outstanding' && !isQrGuest(customer) && balanceFor(customer) > 0);
+  const filtered = allRows.filter((c) => matchesCustomerView(c) &&
+    (!term || c.name.toLowerCase().includes(term) || c.phone?.includes(term)));
   const openAdd = () => { setEditing(null); setBusinessAttributes({}); setForm({ name: '', name_en: '', phone: '', email: '', address: '', tax_number: '', balance: 0, notes: '', branch_id: branchFilter || '' }); setModalOpen(true); };
   const openEdit = (c: Customer) => { setEditing(c); setBusinessAttributes(((c as Customer & { business_attributes?: Record<string, unknown> }).business_attributes) || {}); setForm({ name: c.name, name_en: c.name_en || '', phone: c.phone || '', email: c.email || '', address: c.address || '', tax_number: c.tax_number || '', balance: c.balance, notes: c.notes || '', branch_id: c.branch_id || branchFilter || '' }); setModalOpen(true); };
 
@@ -205,10 +212,6 @@ export function CustomersPage() {
     <DesignSurface testId="customers-page">
       <DesignPageHeader title={customerLabel} actions={
         <>
-          <DesignSearch value={search} onChange={setSearch}
-            placeholder={lang === 'ar' ? 'بحث باسم العميل أو الهاتف' : 'Search customer name or phone'}
-            label={t('search')} testId="customers-search"
-            className="w-40 sm:w-64" />
           {can('customers.manage') && (
             <Button size="sm" onClick={openAdd} data-testid="customers-add">
               <Plus className="w-4 h-4" /> {t('add')}
@@ -217,6 +220,26 @@ export function CustomersPage() {
         </>
       } />
       <DesignPanel testId="customers-table-panel" bodyClassName="p-2 sm:p-3">
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-ui-border pb-3">
+          <div className="flex max-w-full gap-4 overflow-x-auto" role="tablist" aria-label={lang === 'ar' ? 'عرض العملاء' : 'Customer views'}>
+            {([
+              { key: 'all', ar: 'الكل', en: 'All' },
+              { key: 'registered', ar: 'المسجلون', en: 'Registered' },
+              { key: 'qr', ar: 'عملاء QR', en: 'QR guests' },
+              { key: 'outstanding', ar: 'أرصدة مستحقة', en: 'Outstanding' },
+            ] as const).map((tab) => (
+              <button type="button" role="tab" key={tab.key}
+                aria-selected={customerView === tab.key}
+                onClick={() => setCustomerView(tab.key)}
+                className={`shrink-0 border-b-2 px-1 py-2 text-sm font-semibold transition-colors ${customerView === tab.key ? 'border-ui-primary text-ui-text' : 'border-transparent text-ui-muted hover:text-ui-text'}`}>
+                {tab[lang]}
+              </button>
+            ))}
+          </div>
+          <DesignSearch value={search} onChange={setSearch}
+            placeholder={lang === 'ar' ? 'بحث بالاسم أو الهاتف' : 'Search name or phone'}
+            label={t('search')} testId="customers-search" className="w-full sm:w-64" />
+        </div>
         {qrLoading && <p role="status" className="mb-2 text-xs text-ui-muted">{lang === 'ar' ? 'جارٍ تحميل عملاء QR...' : 'Loading QR customers...'}</p>}
         {qrLoadError && <p role="alert" className="mb-2 text-xs text-ui-danger">
           {lang === 'ar' ? 'تعذر تحميل عملاء QR؛ تظهر سجلات العملاء المسجلين فقط. ' : 'Could not load QR customers; showing registered customers only. '}{qrLoadError}
@@ -243,9 +266,8 @@ export function CustomersPage() {
               ...all,
               ...qrGuests.filter((guest) => branchScope.selectedBranchSet.has(guest.branch_id)).map(toQrCustomerRow),
             ];
-            return term
-              ? combined.filter((customer) => customer.name.toLowerCase().includes(term) || customer.phone?.includes(term))
-              : combined;
+            return combined.filter((customer) => matchesCustomerView(customer) &&
+              (!term || customer.name.toLowerCase().includes(term) || customer.phone?.includes(term)));
           }}
           templateFilename="customers-template"
         />

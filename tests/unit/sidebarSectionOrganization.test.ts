@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 describe('Premier sidebar section organization', () => {
   it('keeps the visual sections in a predictable order', () => {
     expect(SIDEBAR_SECTION_ORDER).toEqual([
-      'main', 'orders', 'customers', 'reports', 'inventory', 'catalog', 'centers', 'admin',
+      'main', 'orders', 'customers', 'reports', 'inventory', 'catalog', 'centers', 'marketplace', 'admin',
     ]);
   });
 
@@ -30,6 +30,7 @@ describe('Premier sidebar section organization', () => {
     expect(group('products')).toBe('catalog');
     expect(group('raw-materials')).toBe('catalog');
     expect(group('finance-center')).toBe('centers');
+    expect(group('integrations-hub')).toBe('marketplace');
     expect(MENU_ITEMS.find((item) => item.id === 'sales-invoices')).toMatchObject({
       route: '/sales', permission: 'sales.view',
     });

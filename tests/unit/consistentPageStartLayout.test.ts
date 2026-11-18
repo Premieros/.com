@@ -7,7 +7,7 @@ describe('consistent page opening layout in Premier', () => {
   it('places page title and actions in stable responsive header zones', () => {
     const header = read('src/components/PageHeader.tsx');
     expect(header).toContain('sm:grid-cols-[minmax(0,1fr)_minmax(0,auto)]');
-    expect(header).toContain('sm:min-h-12');
+    expect(header).toContain('sm:min-h-16');
     expect(header).toContain('data-testid="page-title"');
     expect(header).toContain('data-testid="page-actions"');
     expect(header).toContain('sm:justify-end');
@@ -25,7 +25,7 @@ describe('consistent page opening layout in Premier', () => {
   it('preserves the fixed application header and existing table-scroll design', () => {
     const layout = read('src/components/Layout.tsx');
     const table = read('src/components/DataTable.tsx');
-    expect(layout).toContain('h-[64px]');
+    expect(layout).toContain('h-[68px]');
     expect(layout).toContain('data-testid="header-pos-shortcut"');
     expect(table).toContain('data-testid="data-table-scroll"');
     expect(table).toContain('sticky top-0 z-20');
