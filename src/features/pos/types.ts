@@ -77,6 +77,8 @@ export interface PosRealtimeData {
 }
 
 export interface PosItemTransferRequest {
+  /** True creates an independent guest bill on the source table. */
+  split_bill?: boolean;
   operation_id: string;
   quantities: Array<{
     order_item_id: string;
