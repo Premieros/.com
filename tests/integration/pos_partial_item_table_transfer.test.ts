@@ -517,7 +517,8 @@ describe('partial table transfer against the full schema and actual guards', () 
    [source,oldReadyAt]
   );
   const sourceTable=(await client.query('SELECT table_id FROM public.orders WHERE id=$1',[source])).rows[0].table_id as string;
-  const before=(await client.query('SELECT count(*)::int n FROM public.order_kitchen_inventory_events')).rows[0].n;
+  const before=(await client.query('SELECT sum(sent_quantity)::float8 qty,sum(total_cost)::float8 cost FROM public.order_kitchen_inventory_events')).rows[0];
+  const ledgerBefore=(await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n;
   const payload={operation_id:randomUUID(),split_bill:true,quantities:[{order_item_id:line,quantity:1,expected}]};
   const res=await runAsPersist(client,ids.users.cashier,
     'SELECT public.transfer_order_items_to_table($1,ARRAY[$2::uuid],$3,$4::jsonb) result',
@@ -541,7 +542,11 @@ describe('partial table transfer against the full schema and actual guards', () 
   expect(forged.error?.message).toContain('PERMISSION_DENIED:pos.kds_update');
   await client.query("SELECT set_config('app.pos_item_transfer_target_order_id','',true),set_config('app.pos_item_transfer_source_order_id','',true),set_config('app.pos_item_transfer_branch_id','',true)");
 
-  expect((await client.query('SELECT count(*)::int n FROM public.order_kitchen_inventory_events')).rows[0].n).toBe(before);
+  const after=(await client.query('SELECT sum(sent_quantity)::float8 qty,sum(total_cost)::float8 cost FROM public.order_kitchen_inventory_events')).rows[0];
+  // Partial split creates an additional lineage event row, but conserves
+  // original quantities/cost. It does not post another stock deduction.
+  expect(after).toEqual(before);
+  expect((await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n).toBe(ledgerBefore);
  });
 
 });
