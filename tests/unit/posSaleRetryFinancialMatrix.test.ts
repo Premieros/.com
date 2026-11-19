@@ -16,7 +16,7 @@ const makeSale=(key='op:checkout-1'):OfflineSaleQueueItem=>({
 describe('POS durable retry isolation across financial operation dimensions',()=>{
  it('accepts a true retry with a different generated invoice and object-key ordering',()=>{
   const saved=makeSale();const incoming={...makeSale(),id:'queued-2',invoice_number:'INV-2',
-   payload:{p_invoice_number:'INV-2',...makeSale().payload}};
+   payload:{...makeSale().payload,p_invoice_number:'INV-2'}};
   expect(decideOfflineSaleInsert([saved],incoming)).toEqual({id:'queued-1',inserted:false});
  });
  it.each([
