@@ -26,7 +26,7 @@ describe('POS financial scenario matrix - checkout totals',()=>{
     items:[{quantity:2,unit_price:50,discount_amount:5},{quantity:1,unit_price:20,discount_amount:0}],
     discountType:'percent' as const,discountAmount:10,paidAmount:130
   },{subtotal:115,discountValue:11.5,taxableAmount:103.5,taxAmount:14.49,total:117.99,change:12.01}]
- ] as const)('%s',(_name,changes,expected)=>{
+ ])('%s',(_name,changes,expected)=>{
   const actual=total(changes);
   for(const [key,value] of Object.entries(expected))
     expect(actual[key as keyof typeof actual]).toBeCloseTo(value,8);
