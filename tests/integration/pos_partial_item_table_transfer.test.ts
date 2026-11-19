@@ -450,6 +450,8 @@ describe('partial table transfer against the full schema and actual guards', () 
   const sql='SELECT public.transfer_order_items_to_table($1,$2::uuid[],$3,$4::jsonb) result';
   const doSplit=(request=payload,targetTableId=srcTable)=>runAsPersist(client,ids.users.cashier,sql,
     [source,[line,extra],targetTableId,JSON.stringify(request)]);
+  const wrongTable=await doSplit({...payload,operation_id:randomUUID()},targetTable);
+  expect(wrongTable.rows[0].result).toMatchObject({success:false,error:'SPLIT_BILL_REQUIRES_SOURCE_TABLE'});
   const first=await doSplit();
   expect(first.error?.message).toBeUndefined();
   const moved=first.rows[0].result as PosItemTransferResult & {split_bill?:boolean,target_order_id?:string};
@@ -476,8 +478,6 @@ describe('partial table transfer against the full schema and actual guards', () 
   expect(unchanged).toBe(2);
   const conflicted=await doSplit({...payload,split_bill:false});
   expect(conflicted.rows[0].result).toMatchObject({success:false,error:'TRANSFER_OPERATION_CONFLICT'});
-  const wrongTable=await doSplit({...payload,operation_id:randomUUID()},targetTable);
-  expect(wrongTable.rows[0].result).toMatchObject({success:false,error:'SPLIT_BILL_REQUIRES_SOURCE_TABLE'});
  });
 
 });
