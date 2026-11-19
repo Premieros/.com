@@ -45,6 +45,12 @@ export const ACCESS_QUERIES = {
     left join auth.users a on a.id=x.user_id
     left join public.users u on u.id=x.user_id
     left join public.branches b on b.id=x.branch_id`,
+  super_admin_scope: `select
+    (select count(*) from public.users
+     where role='super_admin' and branch_id is not null) as non_global_super_admin_profiles,
+    (select count(*) from public.user_branch_access x
+     join public.users u on u.id=x.user_id
+     where u.role='super_admin') as super_admin_direct_branch_links`,
   policies: `select
     (select count(*) from pg_class c join pg_namespace n on n.oid=c.relnamespace
       where n.nspname='public' and c.relkind='r' and not c.relrowsecurity) as public_without_rls,
@@ -62,7 +68,7 @@ function nonnegative(value){
 }
 
 export function classifyAccess(s){
-  if(!s||!s.identities||!s.memberships||!s.branch_access||!s.policies)
+  if(!s||!s.identities||!s.memberships||!s.branch_access||!s.super_admin_scope||!s.policies)
     throw Error('INVALID_SNAPSHOT');
   const checks = [
     ['active_missing_auth', s.identities.active_missing_auth, 'BLOCKER'],
@@ -73,6 +79,8 @@ export function classifyAccess(s){
     ['links_without_auth', s.branch_access.links_without_auth, 'BLOCKER'],
     ['links_without_profile', s.branch_access.links_without_profile, 'BLOCKER'],
     ['links_without_branch', s.branch_access.links_without_branch, 'BLOCKER'],
+    ['non_global_super_admin_profiles', s.super_admin_scope.non_global_super_admin_profiles, 'BLOCKER'],
+    ['super_admin_direct_branch_links', s.super_admin_scope.super_admin_direct_branch_links, 'BLOCKER'],
     ['public_without_rls', s.policies.public_without_rls, 'BLOCKER'],
     ['anon_readable_tables', s.policies.anon_readable_tables, 'BLOCKER'],
     ['anonymous_security_definer_functions', s.policies.anonymous_security_definer_functions, 'REVIEW']
