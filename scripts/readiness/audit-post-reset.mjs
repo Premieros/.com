@@ -93,7 +93,7 @@ export async function auditPostReset(args=process.argv.slice(2), env=process.env
   await client.connect();
   let started=false;
   try {
-    await client.query('BEGIN TRANSACTION READ ONLY ISOLATION LEVEL REPEATABLE READ');
+    await client.query('BEGIN TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY');
     started=true;
     await client.query("SET LOCAL statement_timeout = '12000ms'");
     const counts={};
