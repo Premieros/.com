@@ -20,8 +20,8 @@ const disposable=!!url&&/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url
    await db.query("select set_config('app.register_branch','on',true)");
    await db.query("insert into public.users(id,email,full_name,role,branch_id,is_active) values($1,$2,'CI Rollover Admin','super_admin',$3,true)",[admin,email,branch]);
    await db.query("select set_config('app.user_id',$1,true),set_config('app.jwt',$2,true),set_config('app.register_branch','off',true)",[admin,JSON.stringify({sub:admin,role:'authenticated'})]);
-   const d=await db.query<{day:string}>("select (now() at time zone 'Africa/Cairo')::date::text day");
-   const day=d.rows[0].day;
+   const d=await db.query<{business_day:string}>("select (now() at time zone 'Africa/Cairo')::date::text as business_day");
+   const day=d.rows[0].business_day;
    await db.query("insert into public.business_day_state(branch_id,business_date,started_at) values($1,$2,now()-interval '10 minutes')",[branch,day]);
    await db.query("insert into public.shifts(id,branch_id,cashier_id,status,opened_at,opening_amount) values($1,$2,$3,'open',now()-interval '10 minutes',0)",[shift,branch,admin]);
    const result=await db.query<{result:{success:boolean,error?:string,report:Record<string,unknown>,daily_close_id:string,rolled_over:boolean,shift_preserved:boolean}}>(
