@@ -1,4 +1,4 @@
-# Premier OS — delivery acceptance pack (19 Nov 2026)
+> **Post-reset update (19 Nov 2026):** After the owner-approved operational reset, the earlier 146 negative balances/6,424 negative batch rows and cancelled CI check remarks below are historical, **not current production readings**. For the authoritative new zero-operations baseline and current delivery blockers, see [post-reset-customer-handoff-2026-11-19.md](post-reset-customer-handoff-2026-11-19.md). The release commit `cecf839a8b8870b6bc708ac50b6f72b459d4c002` subsequently passed all seven GitHub checks. The 29/3 identity and membership gaps remain unresolved.\n\n# Premier OS — delivery acceptance pack (19 Nov 2026)
 
 **Current decision: NOT READY for unconditional customer handoff.**
 This is a transparent, reproducible handoff package, not a release certificate. Production is the Supabase project `hvqlkapynjfjikqithvd`; repository `Premieros/.com`; application `https://premieros-sage.vercel.app/#/login`. Commit at start of audit: `28a2c91c0055e399777a5d600fa86539fad7cc4f`.
