@@ -5,6 +5,7 @@ const clean=()=>({
  identities:{active_missing_auth:0,email_match_different_identity:0,missing_privileged_profiles:0},
  memberships:{active_members_missing_auth:0,branches_without_active_org_member:0},
  branch_access:{links_without_auth:0,links_without_profile:0,links_without_branch:0},
+ super_admin_scope:{non_global_super_admin_profiles:0,super_admin_direct_branch_links:0},
  policies:{public_without_rls:0,anon_readable_tables:0,anonymous_security_definer_functions:0}
 });
 test('all passed access checks do not grant customer handoff or write permission',()=>{
@@ -40,4 +41,12 @@ test('SQL is SELECT-only and outputs no employee emails',()=>{
  }
  assert.match(ACCESS_QUERIES.identities,/auth\.users/);
  assert.match(ACCESS_QUERIES.branch_access,/user_branch_access/);
+});
+
+test('super-admin must stay global without branch binding or direct grant',()=>{
+ const s=clean();s.super_admin_scope.super_admin_direct_branch_links=1;
+ assert.equal(classifyAccess(s).decision,'BLOCKED');
+ s.super_admin_scope.super_admin_direct_branch_links=0;
+ s.super_admin_scope.non_global_super_admin_profiles=1;
+ assert.equal(classifyAccess(s).decision,'BLOCKED');
 });

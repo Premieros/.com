@@ -1,3 +1,5 @@
+> **19 Nov 2026 scope correction:** The user confirmed super administrators are global and never bound to a branch. A single unnecessary direct grant for `developer` was removed in a guarded production transaction. Post-change verification: four `super_admin` profiles, zero non-null `branch_id` and zero direct `user_branch_access` grants. User roles, credentials and other branch permissions unchanged. The read-only release audit now checks both conditions. The 29 active unmatched Auth profiles, three unowned branches, and signup review remain unresolved.
+
 # Premier OS — identity and permission acceptance (19 Nov 2026)
 
 Project: `hvqlkapynjfjikqithvd`. This procedure is **read-only** until a real human has validated account ownership and approved provisioning. No credentials, emails, token values, or raw user IDs belong in public issue comments.

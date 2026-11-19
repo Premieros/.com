@@ -24,6 +24,8 @@ export const REQUIRED_ACCESS_CHECKS = [
   'links_without_auth',
   'links_without_profile',
   'links_without_branch',
+  'non_global_super_admin_profiles',
+  'super_admin_direct_branch_links',
   'public_without_rls',
   'anon_readable_tables',
   'anonymous_security_definer_functions'
