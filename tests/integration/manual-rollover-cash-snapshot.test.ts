@@ -15,7 +15,7 @@ const disposable=!!url&&/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url
    await db.query("insert into public.roles(role,name_ar,name_en,permissions,scope,is_active) values('super_admin','مدير النظام','Super Admin','[]'::jsonb,'global',true) on conflict(role) do nothing");
    await db.query("insert into public.organizations(id,name,slug) values($1,'CI Rollover',$2)",[org,`ci-rollover-${tag}`]);
    await db.query("insert into public.branches(id,name,organization_id,is_active) values($1,'CI Rollover Branch',$2,true)",[branch,org]);
-   await db.query("insert into public.branch_settings(branch_id,business_day_mode,business_day_start,business_day_end,auto_close_shift_at_day_end) values($1,'fixed_time','00:00','00:00',false)",[branch]);
+   await db.query("insert into public.branch_settings(branch_id,business_day_mode,business_day_start,business_day_end,auto_close_shift_at_day_end) values($1,'fixed_time','00:00','00:00',false) on conflict(branch_id) do update set business_day_mode='fixed_time',business_day_start='00:00',business_day_end='00:00',auto_close_shift_at_day_end=false",[branch]);
    await db.query("insert into auth.users(id,email,created_at,updated_at) values($1,$2,now(),now())",[admin,email]);
    await db.query("select set_config('app.register_branch','on',true)");
    await db.query("insert into public.users(id,email,full_name,role,branch_id,is_active) values($1,$2,'CI Rollover Admin','super_admin',$3,true)",[admin,email,branch]);
