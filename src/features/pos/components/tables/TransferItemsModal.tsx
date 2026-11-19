@@ -89,7 +89,6 @@ export function TransferItemsModal({
   const targets = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tables.filter((table) =>
-      table.id !== sourceTable?.id &&
       (!q || table.name.toLowerCase().includes(q)),
     );
   }, [tables, sourceTable?.id, query]);
@@ -100,6 +99,7 @@ export function TransferItemsModal({
       p_order_id: orderId!, p_order_item_ids: lines.map((line) => line.orderItemId), p_target_table_id: selectedTableId!,
       p_transfer: {
         operation_id: crypto.randomUUID(),
+        split_bill: selectedTableId === sourceTable?.id,
         quantities: lines.map(({ orderItemId, saved }) => ({
           order_item_id: orderItemId, quantity: Number(quantities[orderItemId] ?? saved.quantity), expected: transferExpectedLine(saved),
         })),
@@ -136,7 +136,7 @@ export function TransferItemsModal({
   if (!open || (!pending && (!orderId || !sourceTable || lines.length === 0))) return null;
 
   return (
-    <Modal open={open} onClose={close} title={isAr ? 'نقل الأصناف إلى طاولة أخرى' : 'Move items to another table'} size="lg">
+    <Modal open={open} onClose={close} title={isAr ? 'نقل الأصناف أو فصل حساب على نفس الطاولة' : 'Move items or split a guest bill'} size="lg">
       <div className="space-y-4">
         <div className="rounded-2xl border border-ui-border bg-ui-page-alt p-3">
           <p className="text-xs font-black text-ui-text">
@@ -172,6 +172,11 @@ export function TransferItemsModal({
           />
         </div>
 
+        <p className="text-xs font-bold text-ui-subtle">
+          {isAr
+            ? 'اختر طاولة أخرى لنقل الأصناف، أو اختر الطاولة الحالية لإنشاء حساب مستقل لعميل آخر دون إعادة إرسال المطبخ.'
+            : 'Choose another table to move items, or the current table to create a separate guest bill without resending kitchen items.'}
+        </p>
         <div className="max-h-[320px] overflow-y-auto pr-1">
           {loadingTables ? (
             <div className="py-8 text-center text-xs font-bold text-ui-muted">{isAr ? 'جاري تحميل الطاولات...' : 'Loading tables...'}</div>
@@ -180,6 +185,7 @@ export function TransferItemsModal({
               {targets.map((table) => {
                 const selected = selectedTableId === table.id;
                 const occupied = table.status === 'occupied';
+                const sameTable = table.id === sourceTable?.id;
                 return (
                   <button
                     key={table.id}
@@ -194,7 +200,7 @@ export function TransferItemsModal({
                       {selected ? <CheckCircle2 className="h-4 w-4 shrink-0 text-ui-success" /> : <UtensilsCrossed className="h-4 w-4 shrink-0 text-ui-subtle" />}
                     </div>
                     <p className={`mt-2 truncate text-[10px] font-black ${occupied ? 'text-ui-warning' : 'text-ui-success'}`}>
-                      {occupied ? (isAr ? 'مشغولة — إضافة للطلب الحالي' : 'Occupied — add to current order') : (isAr ? 'متاحة — إنشاء طلب جديد' : 'Vacant — create new order')}
+                      {sameTable ? (isAr ? 'نفس الطاولة — حساب مستقل جديد' : 'Same table — separate guest bill') : occupied ? (isAr ? 'مشغولة — إضافة للطلب الحالي' : 'Occupied — add to current order') : (isAr ? 'متاحة — إنشاء طلب جديد' : 'Vacant — create new order')}
                     </p>
                   </button>
                 );
@@ -209,7 +215,7 @@ export function TransferItemsModal({
           <Button variant="secondary" onClick={close} disabled={loading || !!pending}>{isAr ? 'إلغاء' : 'Cancel'}</Button>
           <Button variant="primary" onClick={() => void perform()} disabled={loading || (!pending && (!selectedTableId || !validQuantities))}>
             <ArrowRightLeft className="h-4 w-4" />
-            {pending && !loading ? (isAr ? 'التحقق وإعادة المحاولة' : 'Verify and retry') : (isAr ? 'نقل المحدد' : 'Move selected')}
+            {pending && !loading ? (isAr ? 'التحقق وإعادة المحاولة' : 'Verify and retry') : (selectedTableId === sourceTable?.id ? (isAr ? 'فصل في حساب مستقل' : 'Create separate bill') : (isAr ? 'نقل المحدد' : 'Move selected'))}
           </Button>
         </div>
       </div>
