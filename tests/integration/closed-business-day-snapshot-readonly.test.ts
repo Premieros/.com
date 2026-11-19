@@ -61,6 +61,34 @@ const isLocal=!!url&&/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url);
     'select count(*)::text count from public.daily_closes where branch_id=$1 and business_date=$2::date',
     [branch,day]);
    expect(closeCount.rows[0].count).toBe('1');
+
+   // A two-day historical range must use saved snapshots directly, without
+   // initializing the current business-day state or recasting cash expenses.
+   const day2='2026-11-13';
+   const next={...expected,business_date:day2,gross_sales:80,net_sales:80,
+     invoice_count:2,cash_after_outflows:50,
+     payment_methods:[{method:'cash',sales_total:50},{method:'card',sales_total:30}]};
+   await db.query(
+    "insert into public.daily_closes(branch_id,business_date,closed_by,report_snapshot) values($1,$2,$3,$4::jsonb)",
+    [branch,day2,admin,JSON.stringify(next)]
+   );
+   const firstRange=await db.query<{report:{rows:Array<Record<string,unknown>>}}>(
+    'select public.get_day_closing_range_report($1,$2::date,$3::date) report',
+    [branch,day,day2]
+   );
+   expect(firstRange.rows[0].report.rows).toHaveLength(2);
+   const rows=firstRange.rows[0].report.rows;
+   expect(rows[0]).toMatchObject({business_date:day,gross_sales:120,invoice_count:5,snapshot:true,daily_close_status:'closed'});
+   expect(rows[1]).toMatchObject({business_date:day2,gross_sales:80,net_sales:80,invoice_count:2,cash:50,card:30,snapshot:true,daily_close_status:'closed'});
+   const stateAfterRange=await db.query<{count:string}>(
+    'select count(*)::text count from public.business_day_state where branch_id=$1',[branch]);
+   expect(stateAfterRange.rows[0].count).toBe('0');
+   const secondRange=await db.query<{report:{rows:Array<Record<string,unknown>>}}>(
+    'select public.get_day_closing_range_report($1,$2::date,$3::date) report',
+    [branch,day,day2]
+   );
+   expect(secondRange.rows[0].report.rows).toEqual(rows);
+
   } finally {await db.query('ROLLBACK');}
  });
 });
