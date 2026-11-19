@@ -20,4 +20,4 @@ jobs:
         with:
           node-version: 22
       - name: Test production readiness classification without production access
-        run: node --test scripts/readiness/audit-production.test.mjs scripts/readiness/audit-legacy-fifo-deletion.test.mjs scripts/readiness/evaluate-handoff.test.mjs
+        run: node --test scripts/readiness/audit-production.test.mjs scripts/readiness/audit-legacy-fifo-deletion.test.mjs scripts/readiness/evaluate-handoff.test.mjs scripts/readiness/audit-post-reset.test.mjs
