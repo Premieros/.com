@@ -66,6 +66,29 @@ const isLocal=!!url&&/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url);
    expect(Number(rows.rows[0].tender_sum)).toBe(20);
    expect(Number(rows.rows[0].stock_qty)).toBe(4);
    expect(Number(rows.rows[0].journal_delta)).toBeCloseTo(0,5);
+   const item=await db.query<{id:string}>(
+    'select id from public.sale_items where sale_id=$1',[saleId]);
+   expect(item.rows).toHaveLength(1);
+   const refunded=await db.query<{result:{success?:boolean,error?:string,split_refund?:boolean}}>(
+    "select public.process_refund($1,$2::jsonb,'CI split refund') result",
+    [saleId,JSON.stringify([{sale_item_id:item.rows[0].id,quantity:1}])]);
+   expect(refunded.rows[0].result?.success,JSON.stringify(refunded.rows[0].result)).toBe(true);
+   expect(refunded.rows[0].result?.split_refund).toBe(true);
+   const afterRefund=await db.query<{restored_qty:string,tender_refunded:string,reclass_count:string,journal_delta:string}>(`
+     select
+      (select quantity::text from public.inventory where warehouse_id=$1 and product_id=$2) restored_qty,
+      (select coalesce(sum(refunded_amount),0)::text from public.sale_payments where sale_id=$3) tender_refunded,
+      (select count(*)::text from public.journal_entries j where j.reference_type='refund_split_tender_reclass'
+       and j.branch_id=$4) reclass_count,
+      (select coalesce(sum(l.debit-l.credit),0)::text from public.journal_entry_lines l
+       join public.journal_entries j on j.id=l.journal_entry_id
+       where j.branch_id=$4 and j.reference_type in
+       ('sale','refund','sale_split_tender_reclass','refund_split_tender_reclass')) journal_delta
+   `,[warehouse,product,saleId,branch]);
+   expect(Number(afterRefund.rows[0].restored_qty)).toBe(5);
+   expect(Number(afterRefund.rows[0].tender_refunded)).toBe(20);
+   expect(Number(afterRefund.rows[0].reclass_count)).toBe(1);
+   expect(Number(afterRefund.rows[0].journal_delta)).toBeCloseTo(0,5);
   }finally{await db.query('ROLLBACK');}
  });
 });
