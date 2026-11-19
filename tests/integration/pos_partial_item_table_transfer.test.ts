@@ -540,4 +540,43 @@ describe('partial table transfer against the full schema and actual guards', () 
   expect((await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n).toBe(before);
  });
 
+ it('preserves cooking-ready state when an already-sent item becomes a separate guest bill',async()=>{
+  const oldReadyAt=(await client.query("SELECT (now()-interval '12 minutes')::text ready_at")).rows[0].ready_at;
+  await client.query(
+   "UPDATE public.orders SET kitchen_status='ready',kitchen_ready_at=$2::timestamptz WHERE id=$1",
+   [source,oldReadyAt]
+  );
+  const sourceTable=(await client.query('SELECT table_id FROM public.orders WHERE id=$1',[source])).rows[0].table_id as string;
+  const before=(await client.query('SELECT sum(sent_quantity)::float8 qty,sum(total_cost)::float8 cost FROM public.order_kitchen_inventory_events')).rows[0];
+  const ledgerBefore=(await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n;
+  const payload={operation_id:randomUUID(),split_bill:true,quantities:[{order_item_id:line,quantity:1,expected}]};
+  const res=await runAsPersist(client,ids.users.cashier,
+    'SELECT public.transfer_order_items_to_table($1,ARRAY[$2::uuid],$3,$4::jsonb) result',
+    [source,line,sourceTable,JSON.stringify(payload)]
+  );
+  expect(res.error?.message).toBeUndefined();
+  const transfer=res.rows[0].result as PosItemTransferResult & {target_order_id:string};
+  expect(transfer,JSON.stringify(transfer)).toMatchObject({success:true,split_bill:true,kds_resent:false,inventory_changed:false});
+  const targetState=(await client.query(
+    'SELECT kitchen_status,kitchen_ready_at::text ready_at FROM public.orders WHERE id=$1',
+    [transfer.target_order_id]
+  )).rows[0];
+  expect(targetState).toMatchObject({kitchen_status:'ready',ready_at:oldReadyAt});
+  // The same cashier must not be able to forge a ready KDS state by issuing
+  // direct SQL or faking the public transfer session settings.
+  await client.query("SELECT set_config('app.pos_item_transfer_target_order_id',$1,true)",[target]);
+  await client.query("SELECT set_config('app.pos_item_transfer_source_order_id',$1,true)",[source]);
+  await client.query("SELECT set_config('app.pos_item_transfer_branch_id',$1,true)",[ids.branchA]);
+  const forged=await runAsPersist(client,ids.users.cashier,
+    "UPDATE public.orders SET kitchen_status='ready' WHERE id=$1",[target]);
+  expect(forged.error?.message).toContain('PERMISSION_DENIED:pos.kds_update');
+  await client.query("SELECT set_config('app.pos_item_transfer_target_order_id','',true),set_config('app.pos_item_transfer_source_order_id','',true),set_config('app.pos_item_transfer_branch_id','',true)");
+
+  const after=(await client.query('SELECT sum(sent_quantity)::float8 qty,sum(total_cost)::float8 cost FROM public.order_kitchen_inventory_events')).rows[0];
+  // Partial split creates an additional lineage event row, but conserves
+  // original quantities/cost. It does not post another stock deduction.
+  expect(after).toEqual(before);
+  expect((await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n).toBe(ledgerBefore);
+ });
+
 });
