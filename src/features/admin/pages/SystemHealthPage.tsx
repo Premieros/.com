@@ -10,6 +10,7 @@ import { getAllOfflineSales } from '@/core/offline/offlineStorage';
 import { formatNumber } from '@/lib/format';
 import { AdminDataManagementPanel } from './AdminDataManagementPanel';
 import { BranchHealthPulsePanel } from '../components/BranchHealthPulsePanel';
+import { PosOperationalTrendPanel } from '../components/PosOperationalTrendPanel';
 
 type Status = 'ok' | 'warning' | 'error' | 'checking';
 type Check = { key: string; ar: string; en: string; status: Status; detail: string; count?: number };
@@ -300,6 +301,8 @@ export function SystemHealthPage() {
           ))}
         </div>
       </Card>
+
+      <PosOperationalTrendPanel />
 
       <BranchHealthPulsePanel />
 
