@@ -539,7 +539,8 @@ BEGIN
   END IF;
 
   END IF;
-  IF TG_TABLE_NAME='orders' AND TG_OP='UPDATE'
+  IF TG_TABLE_NAME='orders' THEN
+  IF TG_OP='UPDATE'
      AND public.can_permission('pos.order.transfer')
      AND public.user_may_access_branch(OLD.branch_id)
      AND OLD.kitchen_status='pending'
@@ -563,6 +564,7 @@ BEGIN
        WHERE s.order_id=OLD.id AND s.sent_quantity>0
      ) THEN RETURN NEW;
   END IF;
+  END IF; -- never read OLD.branch_id on order_items / send triggers
 
   IF TG_TABLE_NAME='orders' THEN
   IF TG_OP='UPDATE'
