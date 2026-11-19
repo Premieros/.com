@@ -15,6 +15,20 @@ export const REQUIRED_EVIDENCE = [
   'operations_rollback_monitoring'
 ];
 
+export const REQUIRED_ACCESS_CHECKS = [
+  'active_missing_auth',
+  'email_match_different_identity',
+  'missing_privileged_profiles',
+  'active_members_missing_auth',
+  'branches_without_active_org_member',
+  'links_without_auth',
+  'links_without_profile',
+  'links_without_branch',
+  'public_without_rls',
+  'anon_readable_tables',
+  'anonymous_security_definer_functions'
+];
+
 export function evaluateHandoff(audit, evidence, access) {
   if (!audit || typeof audit !== 'object' || !Array.isArray(audit.checks))
     throw Error('INVALID_AUDIT');
@@ -28,8 +42,15 @@ export function evaluateHandoff(audit, evidence, access) {
     throw Error('WRONG_ACCESS_PROJECT');
   if (!access.checked_at || Number.isNaN(Date.parse(access.checked_at)))
     throw Error('INVALID_ACCESS_TIMESTAMP');
-  if (access.checks.some(c => !['PASS','REVIEW','BLOCKER'].includes(c.status)))
-    throw Error('INVALID_ACCESS_CHECK');
+  if (access.checks.length !== REQUIRED_ACCESS_CHECKS.length ||
+      new Set(access.checks.map(c=>c.id)).size !== REQUIRED_ACCESS_CHECKS.length ||
+      REQUIRED_ACCESS_CHECKS.some(id=>!access.checks.some(c=>c.id===id)))
+    throw Error('ACCESS_CHECKS_INCOMPLETE');
+  if (access.checks.some(c =>
+    !['PASS','REVIEW','BLOCKER'].includes(c.status) ||
+    !Number.isSafeInteger(Number(c.count)) || Number(c.count)<0 ||
+    ((Number(c.count)===0)!==(c.status==='PASS'))
+  )) throw Error('INVALID_ACCESS_CHECK');
   const accessBlocking = access.checks
     .filter(c => c.status !== 'PASS')
     .map(c => c.id);
