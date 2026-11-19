@@ -480,4 +480,32 @@ describe('partial table transfer against the full schema and actual guards', () 
   expect(conflicted.rows[0].result).toMatchObject({success:false,error:'TRANSFER_OPERATION_CONFLICT'});
  });
 
+ it('carries kitchen warehouse to an independent same-table guest bill so a sent item is eligible for settlement',async()=>{
+  await client.query(
+   'INSERT INTO public.branch_settings(branch_id,tax_enabled,tax_rate) VALUES($1,false,0) ON CONFLICT(branch_id) DO UPDATE SET tax_enabled=false,tax_rate=0',
+   [ids.branchA]
+  );
+  await client.query('UPDATE public.orders SET inventory_warehouse_id=$2,subtotal=60,discount_amount=6,tax_amount=0,total=54 WHERE id=$1',
+    [source,ids.whA]);
+  const tableId=(await client.query('SELECT table_id FROM public.orders WHERE id=$1',[source])).rows[0].table_id;
+  const request={operation_id:randomUUID(),split_bill:true,quantities:[{order_item_id:line,quantity:1,expected}]};
+  const split=await runAsPersist(client,ids.users.cashier,
+   'SELECT public.transfer_order_items_to_table($1,ARRAY[$2::uuid],$3,$4::jsonb) result',
+   [source,line,tableId,JSON.stringify(request)]);
+  expect(split.error?.message).toBeUndefined();
+  const result=split.rows[0].result as PosItemTransferResult & {target_order_id?:string};
+  expect(result,JSON.stringify(result)).toMatchObject({success:true,split_bill:true,inventory_changed:false,kds_resent:false});
+  const targetBill=result.target_order_id!;
+  const order=(await client.query('SELECT table_id,inventory_warehouse_id,status,total::float8 amount FROM public.orders WHERE id=$1',[targetBill])).rows[0];
+  expect(order).toMatchObject({table_id:tableId,inventory_warehouse_id:ids.whA,status:'open'});
+  const preview=(await client.query('SELECT public._build_order_settlement_preview($1) result',[targetBill])).rows[0].result;
+  expect(preview,JSON.stringify(preview)).toMatchObject({success:true});
+  expect(Number(preview.pending_quantity)).toBe(1);
+  const before=(await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n;
+  const prepared=(await client.query('SELECT public._prepare_kitchen_sale_settlement($1,$2,$3,$4::jsonb) result',
+     [targetBill,ids.branchA,ids.whA,JSON.stringify(preview.items)])).rows[0].result;
+  expect(prepared,JSON.stringify(prepared)).toMatchObject({success:true});
+  expect((await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n).toBe(before);
+ });
+
 });
