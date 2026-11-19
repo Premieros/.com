@@ -1519,7 +1519,9 @@ describe('Architecture V2 P-A safety baseline', () => {
     expect(Number(state?.unclassified ?? -1)).toBe(0);
     // Append-only reclassification intentionally removed legacy direct mutators.
     expect(Number(state?.posted_reclassification ?? -1)).toBe(0);
-    expect(Number(state?.same_transaction_finalization ?? -1)).toBeGreaterThanOrEqual(1);
+    // The split-sale and split-refund flows now append balanced journals instead
+    // of deleting core journal lines, eliminating the final direct-finalization mutators.
+    expect(Number(state?.same_transaction_finalization ?? -1)).toBe(0);
     // Transitional journal rewrite writers must be retired.
     expect(Number(state?.transitional_reconciliation ?? -1)).toBe(0);
     expect(Number(state?.historical_repair ?? -1)).toBeGreaterThanOrEqual(1);
