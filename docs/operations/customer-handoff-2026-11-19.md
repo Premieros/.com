@@ -36,7 +36,7 @@ node scripts/readiness/audit-production.mjs --confirm-project=hvqlkapynjfjikqith
 {"restore_rehearsal":{"result":"PASS","owner":"actual responsible person","reference":"link or ticket to signed evidence","checked_at":"2026-11-19T08:00:00Z"}}
 ```
 Add real values for *all* keys; never fill missing evidence with invented passes. Keep sensitive logs and credentials out of committed evidence.
-3. Run `node scripts/readiness/evaluate-handoff.mjs readiness-audit.json handoff-evidence.json`. Exit 0 = all audit checks PASS and signed evidence present; exit 2 = not ready; exit 1 = invalid inputs. This tool **does not modify production**, and even a PASS requires the release owner to approve the precise target, legal requirements, support arrangement, and delivery record.
+3. Also run the read-only identity audit to produce `identity-access-audit.json`, then use `node scripts/readiness/evaluate-handoff.mjs readiness-audit.json handoff-evidence.json identity-access-audit.json`. Exit 0 = all audit checks PASS and signed evidence present; exit 2 = not ready; exit 1 = invalid inputs. This tool **does not modify production**, and even a PASS requires the release owner to approve the precise target, legal requirements, support arrangement, and delivery record.
 
 ## Client-facing handover checklist
 - Product URL and release commit, named customer organization and assigned initial admin.

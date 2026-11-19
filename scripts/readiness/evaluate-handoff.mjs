@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Offline release handoff gate: no DB connection, writes, or external calls.
-// Usage: node scripts/readiness/evaluate-handoff.mjs readiness-audit.json evidence.json
+// Usage: node scripts/readiness/evaluate-handoff.mjs readiness-audit.json evidence.json identity-access-audit.json
 import { readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 
@@ -15,11 +15,45 @@ export const REQUIRED_EVIDENCE = [
   'operations_rollback_monitoring'
 ];
 
-export function evaluateHandoff(audit, evidence) {
+export const REQUIRED_ACCESS_CHECKS = [
+  'active_missing_auth',
+  'email_match_different_identity',
+  'missing_privileged_profiles',
+  'active_members_missing_auth',
+  'branches_without_active_org_member',
+  'links_without_auth',
+  'links_without_profile',
+  'links_without_branch',
+  'public_without_rls',
+  'anon_readable_tables',
+  'anonymous_security_definer_functions'
+];
+
+export function evaluateHandoff(audit, evidence, access) {
   if (!audit || typeof audit !== 'object' || !Array.isArray(audit.checks))
     throw Error('INVALID_AUDIT');
   if (audit.project_ref !== 'hvqlkapynjfjikqithvd')
     throw Error('WRONG_PROJECT');
+  // Identity/permission acceptance is independent of stock/accounting readiness.
+  // Fail closed when access evidence is absent, stale/invalidly structured or for another project.
+  if (!access || typeof access !== 'object' || !Array.isArray(access.checks))
+    throw Error('ACCESS_AUDIT_REQUIRED');
+  if (access.project_ref !== audit.project_ref)
+    throw Error('WRONG_ACCESS_PROJECT');
+  if (!access.checked_at || Number.isNaN(Date.parse(access.checked_at)))
+    throw Error('INVALID_ACCESS_TIMESTAMP');
+  if (access.checks.length !== REQUIRED_ACCESS_CHECKS.length ||
+      new Set(access.checks.map(c=>c.id)).size !== REQUIRED_ACCESS_CHECKS.length ||
+      REQUIRED_ACCESS_CHECKS.some(id=>!access.checks.some(c=>c.id===id)))
+    throw Error('ACCESS_CHECKS_INCOMPLETE');
+  if (access.checks.some(c =>
+    !['PASS','REVIEW','BLOCKER'].includes(c.status) ||
+    !Number.isSafeInteger(Number(c.count)) || Number(c.count)<0 ||
+    ((Number(c.count)===0)!==(c.status==='PASS'))
+  )) throw Error('INVALID_ACCESS_CHECK');
+  const accessBlocking = access.checks
+    .filter(c => c.status !== 'PASS')
+    .map(c => c.id);
   const checks = audit.checks;
   if (checks.some(c => !['PASS','REVIEW','BLOCKER'].includes(c.status)))
     throw Error('INVALID_CHECK');
@@ -32,10 +66,12 @@ export function evaluateHandoff(audit, evidence) {
       typeof record.checked_at !== 'string' || !/^\d{4}-\d{2}-\d{2}T/.test(record.checked_at);
   });
   return {
-    decision: blocking.length === 0 && incomplete.length === 0 &&
-      audit.decision === 'TECHNICAL_CHECKS_PASS' ? 'DELIVERY_GATE_PASS' : 'NOT_READY',
+    decision: blocking.length === 0 && accessBlocking.length === 0 &&
+      incomplete.length === 0 && audit.decision === 'TECHNICAL_CHECKS_PASS' &&
+      access.decision === 'TECHNICAL_ACCESS_CHECKS_PASS' ? 'DELIVERY_GATE_PASS' : 'NOT_READY',
     project_ref:audit.project_ref,
     blocking_checks:blocking,
+    blocking_access_checks:accessBlocking,
     missing_evidence:incomplete,
     // Passing this gate documents evidence; it never authorizes database writes.
     production_mutations_authorized:false
@@ -44,10 +80,12 @@ export function evaluateHandoff(audit, evidence) {
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1]) {
   try {
-    const [auditPath, evidencePath] = process.argv.slice(2);
-    if (!auditPath || !evidencePath) throw Error('INPUT_FILES_REQUIRED');
-    const [audit, evidence] = await Promise.all([auditPath,evidencePath].map(async p=>JSON.parse(await readFile(p,'utf8'))));
-    const result = evaluateHandoff(audit,evidence);
+    const [auditPath, evidencePath, accessPath] = process.argv.slice(2);
+    if (!auditPath || !evidencePath || !accessPath) throw Error('INPUT_FILES_REQUIRED');
+    const [audit, evidence, access] = await Promise.all(
+      [auditPath,evidencePath,accessPath].map(async p=>JSON.parse(await readFile(p,'utf8')))
+    );
+    const result = evaluateHandoff(audit,evidence,access);
     process.stdout.write(JSON.stringify(result,null,2)+'\n');
     process.exitCode = result.decision === 'DELIVERY_GATE_PASS' ? 0 : 2;
   } catch {
