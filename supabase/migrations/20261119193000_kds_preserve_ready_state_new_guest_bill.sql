@@ -330,6 +330,24 @@ BEGIN
       updated_at=now()
   WHERE id=v_target_order_id;
 
+  -- Trusted transaction-only proof for an automatic transfer of kitchen
+  -- state. Authenticated roles have no INSERT/UPDATE on this private table;
+  -- a caller-supplied session setting alone is never sufficient.
+  IF v_target_created AND v_moved_sent_count>0
+     AND v_order.kitchen_status IN ('cooking','ready') THEN
+    INSERT INTO private.pos_partial_transfer_context(backend_pid,transaction_id,context)
+    VALUES(pg_backend_pid(),txid_current(),jsonb_build_object(
+      'kds_transfer_status_copy',true,
+      'actor_id',auth.uid(),
+      'branch_id',v_order.branch_id,
+      'source_order_id',p_order_id,
+      'target_order_id',v_target_order_id,
+      'source_status',v_order.kitchen_status,
+      'source_ready_at',v_order.kitchen_ready_at))
+    ON CONFLICT(backend_pid,transaction_id) DO UPDATE
+    SET context=EXCLUDED.context;
+  END IF;
+
   IF v_moved_sent_count > 0 THEN
     -- KDS reads order-level kitchen_status but item-level send rows. A moved
     -- sent line must therefore keep the target order visible without creating
@@ -369,6 +387,12 @@ BEGIN
       WHERE id=p_order_id
         AND status IN ('open','held');
     END IF;
+  END IF;
+
+  IF v_target_created AND v_moved_sent_count>0
+     AND v_order.kitchen_status IN ('cooking','ready') THEN
+    DELETE FROM private.pos_partial_transfer_context
+    WHERE backend_pid=pg_backend_pid() AND transaction_id=txid_current();
   END IF;
 
   UPDATE public.dining_tables
@@ -447,6 +471,291 @@ BEGIN
   RETURN CASE WHEN v_request IS NOT NULL THEN v_result||jsonb_build_object('snapshot',public._pos_transfer_pair_snapshot(p_order_id,v_target_order_id)) ELSE v_result END;
 EXCEPTION WHEN OTHERS THEN
   RETURN jsonb_build_object('success',false,'error','TRANSACTION_FAILED','detail',SQLERRM);
+END;
+$function$
+;
+
+-- Narrowly allow a status copy proven by the private transfer context,
+-- never by public GUCs alone. Direct KDS status updates remain permissioned.
+CREATE OR REPLACE FUNCTION public.enforce_pos_permission_mutation()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_partial jsonb;
+  v_uid uuid := auth.uid();
+  v_is_service_role boolean := COALESCE(current_setting('role', true), '') = 'service_role';
+  v_print_only_mutation boolean := false;
+  v_item_transfer_context boolean := false;
+  v_sent_item_void_context boolean := false;
+  v_pos_action_context boolean := false;
+BEGIN
+  IF v_is_service_role OR v_uid IS NULL THEN
+    IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_TABLE_NAME='order_items' AND TG_OP IN ('INSERT','UPDATE') THEN
+    v_partial:=public._pos_partial_transfer_context(NEW.order_id,NEW.id);
+    IF v_partial IS NOT NULL THEN
+      IF TG_OP='INSERT' AND NEW.id=(v_partial->>'new_item_id')::uuid
+        AND NEW.quantity=(v_partial->>'quantity')::numeric
+        AND NEW.discount_amount=(v_partial->>'discount')::numeric
+        AND NEW.bonus_quantity=(v_partial->>'bonus')::numeric
+        AND NEW.total=(v_partial->>'total')::numeric
+        AND EXISTS(SELECT 1 FROM public.order_items i WHERE i.id=(v_partial->>'source_item_id')::uuid
+          AND (to_jsonb(i)-ARRAY['id','quantity','discount_amount','bonus_quantity','total'])
+            =(to_jsonb(NEW)-ARRAY['id','quantity','discount_amount','bonus_quantity','total'])) THEN RETURN NEW;
+      ELSIF TG_OP='UPDATE' AND NEW.id=(v_partial->>'source_item_id')::uuid
+        AND OLD.quantity=(v_partial->>'source_quantity')::numeric
+        AND NEW.quantity=OLD.quantity-(v_partial->>'quantity')::numeric
+        AND NEW.discount_amount=OLD.discount_amount-(v_partial->>'discount')::numeric
+        AND NEW.bonus_quantity=OLD.bonus_quantity-(v_partial->>'bonus')::numeric
+        AND NEW.total=OLD.total-(v_partial->>'total')::numeric
+        AND (to_jsonb(NEW)-ARRAY['quantity','discount_amount','bonus_quantity','total'])
+          =(to_jsonb(OLD)-ARRAY['quantity','discount_amount','bonus_quantity','total'])
+        AND EXISTS(SELECT 1 FROM public.order_items i WHERE i.id=(v_partial->>'new_item_id')::uuid AND i.order_id=OLD.order_id AND i.quantity=(v_partial->>'quantity')::numeric)
+        THEN RETURN NEW;
+      END IF;
+    END IF;
+  END IF;
+
+  IF TG_TABLE_NAME='order_kitchen_sends' THEN
+  IF TG_OP IN ('INSERT','UPDATE') THEN
+    v_partial:=public._pos_partial_transfer_context(NEW.order_id,NEW.order_item_id);
+    IF v_partial IS NOT NULL AND NEW.sent_quantity=COALESCE((SELECT sum(sent_quantity-voided_quantity)
+      FROM public.order_kitchen_inventory_events WHERE order_item_id=NEW.order_item_id AND order_id=NEW.order_id),0) THEN
+      IF TG_OP='INSERT' AND NEW.order_item_id=(v_partial->>'new_item_id')::uuid
+        AND NEW.sent_quantity=(v_partial->>'sent_quantity')::numeric
+        AND EXISTS(SELECT 1 FROM public.order_kitchen_sends s WHERE s.order_item_id=(v_partial->>'source_item_id')::uuid
+          AND s.branch_id=NEW.branch_id AND s.sent_by IS NOT DISTINCT FROM NEW.sent_by AND s.sent_at=NEW.sent_at) THEN RETURN NEW;
+      ELSIF TG_OP='UPDATE' AND NEW.order_item_id=(v_partial->>'source_item_id')::uuid
+        AND NEW.sent_quantity=OLD.sent_quantity-(v_partial->>'sent_quantity')::numeric
+        AND (to_jsonb(NEW)-'sent_quantity')=(to_jsonb(OLD)-'sent_quantity') THEN RETURN NEW;
+      END IF;
+    END IF;
+  END IF;
+
+  END IF;
+  IF TG_TABLE_NAME='orders' AND TG_OP='UPDATE'
+     AND public.can_permission('pos.order.transfer')
+     AND public.user_may_access_branch(OLD.branch_id)
+     AND OLD.kitchen_status='pending'
+     AND NEW.kitchen_status IN ('cooking','ready')
+     AND (to_jsonb(NEW)-ARRAY['kitchen_status','kitchen_sent_at','kitchen_ready_at','updated_at'])
+       = (to_jsonb(OLD)-ARRAY['kitchen_status','kitchen_sent_at','kitchen_ready_at','updated_at'])
+     AND COALESCE(current_setting('app.pos_item_transfer_target_order_id',true),'')=OLD.id::text
+     AND EXISTS (
+       SELECT 1 FROM private.pos_partial_transfer_context pc
+       WHERE pc.backend_pid=pg_backend_pid() AND pc.transaction_id=txid_current()
+         AND pc.context->>'kds_transfer_status_copy'='true'
+         AND pc.context->>'actor_id'=auth.uid()::text
+         AND pc.context->>'branch_id'=OLD.branch_id::text
+         AND pc.context->>'target_order_id'=OLD.id::text
+         AND pc.context->>'source_order_id'=COALESCE(current_setting('app.pos_item_transfer_source_order_id',true),'')
+         AND pc.context->>'source_status'=NEW.kitchen_status
+         AND (pc.context->>'source_ready_at')::timestamptz IS NOT DISTINCT FROM NEW.kitchen_ready_at
+     )
+     AND EXISTS (
+       SELECT 1 FROM public.order_kitchen_sends s
+       WHERE s.order_id=OLD.id AND s.sent_quantity>0
+     ) THEN RETURN NEW;
+  END IF;
+
+  IF TG_TABLE_NAME='orders' THEN
+  IF TG_OP='UPDATE'
+    AND public.can_permission('pos.order.transfer') AND public.user_may_access_branch(OLD.branch_id)
+    AND COALESCE(current_setting('app.pos_item_transfer_branch_id',true),'')=OLD.branch_id::text
+    AND OLD.id::text IN (COALESCE(current_setting('app.pos_item_transfer_source_order_id',true),''),COALESCE(current_setting('app.pos_item_transfer_target_order_id',true),''))
+    AND (to_jsonb(NEW)-ARRAY['kitchen_status','kitchen_sent_at','kitchen_ready_at','updated_at'])=(to_jsonb(OLD)-ARRAY['kitchen_status','kitchen_sent_at','kitchen_ready_at','updated_at'])
+    AND (
+      (NEW.kitchen_status='pending' AND NOT EXISTS(SELECT 1 FROM public.order_kitchen_sends WHERE order_id=OLD.id AND sent_quantity>0))
+      OR (NEW.kitchen_status='sent' AND EXISTS(SELECT 1 FROM public.order_kitchen_sends WHERE order_id=OLD.id AND sent_quantity>0))
+      OR (NEW.kitchen_status='served' AND EXISTS(SELECT 1 FROM public.order_kitchen_sends WHERE order_id=OLD.id AND sent_quantity>0)
+        AND NOT EXISTS(SELECT 1 FROM public.order_kitchen_sends oks LEFT JOIN public.order_kitchen_served_quantities ksb ON ksb.order_id=oks.order_id AND ksb.order_item_id=oks.order_item_id
+          WHERE oks.order_id=OLD.id AND oks.sent_quantity>COALESCE(ksb.served_quantity,0)))
+    ) THEN RETURN NEW; END IF;
+  END IF;
+
+  IF TG_TABLE_NAME='sales' THEN
+    IF TG_OP='INSERT' AND NOT public.can_permission('pos.payment.take') THEN
+      RAISE EXCEPTION 'PERMISSION_DENIED:pos.payment.take';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_TABLE_NAME='order_kitchen_sends' THEN
+    v_sent_item_void_context :=
+      public._sent_item_void_context_matches(
+        CASE WHEN TG_OP='DELETE' THEN OLD.order_id ELSE NEW.order_id END,
+        CASE WHEN TG_OP='DELETE' THEN OLD.order_item_id ELSE NEW.order_item_id END
+      );
+    IF NOT public.can_permission('pos.send_kitchen')
+       AND NOT v_sent_item_void_context THEN
+      RAISE EXCEPTION 'PERMISSION_DENIED:pos.send_kitchen';
+    END IF;
+    IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_TABLE_NAME='orders' THEN
+    IF TG_OP='INSERT' THEN
+      IF NOT public.can_permission('pos.order.create') THEN RAISE EXCEPTION 'PERMISSION_DENIED:pos.order.create'; END IF;
+      RETURN NEW;
+    END IF;
+    IF TG_OP='DELETE' THEN
+      IF NOT public.can_permission('pos.cancel_order') THEN RAISE EXCEPTION 'PERMISSION_DENIED:pos.cancel_order'; END IF;
+      RETURN OLD;
+    END IF;
+
+    v_print_only_mutation :=
+      (NEW.print_status IS DISTINCT FROM OLD.print_status OR NEW.printed_at IS DISTINCT FROM OLD.printed_at)
+      AND (to_jsonb(NEW)-ARRAY['print_status','printed_at','updated_at']::text[])
+        = (to_jsonb(OLD)-ARRAY['print_status','printed_at','updated_at']::text[]);
+    IF v_print_only_mutation THEN
+      IF NOT public.can_permission('pos.receipt.print') THEN RAISE EXCEPTION 'PERMISSION_DENIED:pos.receipt.print'; END IF;
+      RETURN NEW;
+    END IF;
+
+    IF NEW.kitchen_status IS DISTINCT FROM OLD.kitchen_status
+       AND (to_jsonb(NEW)-ARRAY['kitchen_status','kitchen_sent_at','kitchen_ready_at','updated_at']::text[])
+         = (to_jsonb(OLD)-ARRAY['kitchen_status','kitchen_sent_at','kitchen_ready_at','updated_at']::text[]) THEN
+      IF OLD.kitchen_status='pending'
+         AND NEW.kitchen_status='sent'
+         AND public.can_permission('pos.send_kitchen')
+         AND EXISTS(SELECT 1 FROM public.order_kitchen_sends s WHERE s.order_id=OLD.id) THEN
+        RETURN NEW;
+      END IF;
+
+      -- A served order may receive later additions. This is still a
+      -- send-to-kitchen transition, not broad KDS management. Allow it only
+      -- when an authoritative served baseline exists and cumulative sent
+      -- quantity now exceeds that baseline for at least one line.
+      IF OLD.kitchen_status='served'
+         AND NEW.kitchen_status='sent'
+         AND public.can_permission('pos.send_kitchen')
+         AND EXISTS(
+           SELECT 1
+           FROM public.order_kitchen_sends s
+           JOIN public.order_kitchen_served_quantities ksb
+             ON ksb.order_id = OLD.id
+            AND ksb.order_item_id = s.order_item_id
+           WHERE s.order_id = OLD.id
+             AND COALESCE(s.sent_quantity,0) > COALESCE(ksb.served_quantity,0)
+         ) THEN
+        RETURN NEW;
+      END IF;
+      IF NOT public.can_permission('pos.kds_update') THEN RAISE EXCEPTION 'PERMISSION_DENIED:pos.kds_update'; END IF;
+      RETURN NEW;
+    END IF;
+
+    IF NEW.station IS DISTINCT FROM OLD.station
+       AND (to_jsonb(NEW)-ARRAY['station','updated_at']::text[])=(to_jsonb(OLD)-ARRAY['station','updated_at']::text[]) THEN
+      IF NOT public.can_permission('pos.kds_update') THEN RAISE EXCEPTION 'PERMISSION_DENIED:pos.kds_update'; END IF;
+      RETURN NEW;
+    END IF;
+
+    IF NEW.status IS DISTINCT FROM OLD.status THEN
+      IF NEW.status='cancelled' AND NOT public.can_permission('pos.cancel_order') THEN
+        -- Empty-source cancellation created by the exact item-transfer RPC is structural,
+        -- not a user void/cancel action.
+        IF NOT (
+          COALESCE(current_setting('app.pos_item_transfer_source_order_id',true),'')=OLD.id::text
+          AND public.can_permission('pos.order.transfer')
+        )
+        -- A signed sent-item Void may structurally close its own now-empty order.
+        -- This does not grant the caller generic pos.cancel_order authority.
+        AND NOT public._sent_item_void_context_matches(OLD.id,NULL) THEN
+          RAISE EXCEPTION 'PERMISSION_DENIED:pos.cancel_order';
+        END IF;
+      ELSIF NEW.status='completed' THEN
+        IF NOT public.can_permission('pos.payment.take') THEN RAISE EXCEPTION 'PERMISSION_DENIED:pos.payment.take'; END IF;
+        v_pos_action_context :=
+          public._pos_action_context_matches(OLD.id,'pos.payment.take');
+        IF NOT public.can_permission('pos.order.edit')
+           AND NOT v_pos_action_context
+           AND (to_jsonb(NEW)-ARRAY['status','payment_status','payment_at','updated_at']::text[])
+             IS DISTINCT FROM (to_jsonb(OLD)-ARRAY['status','payment_status','payment_at','updated_at']::text[]) THEN
+          RAISE EXCEPTION 'PERMISSION_DENIED:pos.order.edit';
+        END IF;
+      ELSIF NEW.status IN ('open','held') AND NOT public.can_permission('pos.hold') THEN
+        RAISE EXCEPTION 'PERMISSION_DENIED:pos.hold';
+      END IF;
+    END IF;
+
+    IF NEW.table_id IS DISTINCT FROM OLD.table_id
+       AND OLD.table_id IS NOT NULL
+       AND NOT public.can_permission('pos.order.transfer') THEN
+      RAISE EXCEPTION 'PERMISSION_DENIED:pos.order.transfer';
+    END IF;
+
+    v_sent_item_void_context :=
+      public._sent_item_void_context_matches(OLD.id, NULL);
+
+    v_pos_action_context :=
+      public._pos_action_context_matches(OLD.id,'pos.payment.take')
+      OR public._pos_action_context_matches(OLD.id,'pos.send_kitchen')
+      OR public._pos_action_context_matches(OLD.id,'pos.cancel_order');
+
+    IF NEW.status IS NOT DISTINCT FROM OLD.status
+       AND NEW.table_id IS NOT DISTINCT FROM OLD.table_id
+       AND NOT public.can_permission('pos.order.edit')
+       AND NOT v_sent_item_void_context
+       AND NOT v_pos_action_context THEN
+      -- Recalculation/status bookkeeping inside the exact item transfer is permitted
+      -- by transfer permission without broad edit permission.
+      IF NOT (
+        (
+          COALESCE(current_setting('app.pos_item_transfer_source_order_id',true),'')=OLD.id::text
+          OR COALESCE(current_setting('app.pos_item_transfer_target_order_id',true),'')=OLD.id::text
+        )
+        AND public.can_permission('pos.order.transfer')
+      ) THEN
+        RAISE EXCEPTION 'PERMISSION_DENIED:pos.order.edit';
+      END IF;
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_TABLE_NAME='order_items' THEN
+    IF TG_OP='INSERT' THEN
+      IF NOT public.can_permission('pos.order.create') AND NOT public.can_permission('pos.order.edit') THEN
+        RAISE EXCEPTION 'PERMISSION_DENIED:pos.order.edit';
+      END IF;
+      RETURN NEW;
+    END IF;
+    v_sent_item_void_context :=
+      public._sent_item_void_context_matches(OLD.order_id, OLD.id);
+
+    IF TG_OP='DELETE' THEN
+      IF NOT public.can_permission('pos.void')
+         AND NOT v_sent_item_void_context THEN
+        RAISE EXCEPTION 'PERMISSION_DENIED:pos.void';
+      END IF;
+      RETURN OLD;
+    END IF;
+
+    IF NEW.order_id IS DISTINCT FROM OLD.order_id THEN
+      v_item_transfer_context :=
+        COALESCE(current_setting('app.pos_item_transfer_source_order_id',true),'')=OLD.order_id::text
+        AND COALESCE(current_setting('app.pos_item_transfer_target_order_id',true),'')=NEW.order_id::text
+        AND COALESCE(current_setting('app.pos_item_transfer_item_ids',true),'') LIKE '%' || OLD.id::text || '%'
+        AND public.can_permission('pos.order.transfer');
+
+      IF NOT v_item_transfer_context AND NOT public.can_permission('pos.order.split') THEN
+        RAISE EXCEPTION 'PERMISSION_DENIED:pos.order.split';
+      END IF;
+    ELSIF NOT public.can_permission('pos.order.edit')
+       AND NOT v_sent_item_void_context THEN
+      RAISE EXCEPTION 'PERMISSION_DENIED:pos.order.edit';
+    END IF;
+    RETURN NEW;
+  END IF;
+
+  IF TG_OP='DELETE' THEN RETURN OLD; END IF;
+  RETURN NEW;
 END;
 $function$
 ;
