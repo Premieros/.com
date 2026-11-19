@@ -13,6 +13,7 @@ import { subscribePosRealtime } from '@/features/pos/services/posRealtime';
 import type { KitchenQueueItem, KitchenStation } from '@/lib/types';
 import { KitchenCompletedHistory } from '../components/KitchenCompletedHistory';
 import { useQrNotificationTone } from '@/features/qr/useQrNotificationTone';
+import { hasGenuinelyNewKitchenSend, kitchenSentLineKeys, type KitchenTransferNotice } from '../utils/kitchenSendNotice';
 
 function elapsedColor(seconds: number): string {
   if (seconds > 600) return 'text-ui-danger font-bold';
@@ -62,6 +63,9 @@ export function KitchenDisplayPage() {
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [orderContext, setOrderContext] = useState<Record<string, { table_name: string | null; operator_name: string | null }>>({});
   const previousKitchenOrders = useRef<Set<string> | null>(null);
+  const previousQueueReadAt = useRef<number | null>(null);
+  const [transferNotices, setTransferNotices] = useState<KitchenTransferNotice[]>([]);
+  const [noticeError, setNoticeError] = useState(false);
   const [newOrderSignal, setNewOrderSignal] = useState(0);
   const bell = useQrNotificationTone(newOrderSignal, soundEnabled && canViewKds, 'once');
   const statusWritesRef = useRef(new Set<string>());
@@ -85,13 +89,39 @@ export function KitchenDisplayPage() {
     }
   }, [branchFilter, canViewKds]);
 
+  const loadNotices = useCallback(async () => {
+    if (!branchFilter || !canViewKds) {
+      setTransferNotices([]);
+      setNoticeError(false);
+      return;
+    }
+    try {
+      const { data, error } = await supabase.rpc('get_kitchen_transfer_notices', {
+        p_branch_id: branchFilter,
+        p_station: station || null,
+        p_limit: 24,
+      });
+      if (error) throw error;
+      const result = data as { success?: boolean; rows?: KitchenTransferNotice[] } | null;
+      if (!result?.success || !Array.isArray(result.rows)) throw new Error('KDS_TRANSFER_NOTICES_UNAVAILABLE');
+      setTransferNotices(result.rows);
+      setNoticeError(false);
+    } catch {
+      // Notices are supplemental; a failure must not disguise the main KDS
+      // queue or erase already-sent work.
+      setNoticeError(true);
+    }
+  }, [branchFilter, canViewKds, station]);
+
   const load = useCallback(async () => {
+    const readStartedAt = Date.now();
     setLoading(true);
     try {
       if (!branchFilter || !canViewKds) {
         setItems([]);
         setOrderContext({});
         previousKitchenOrders.current = null;
+        previousQueueReadAt.current = null;
         setLoadError(userFacingErrorMessage(!canViewKds ? 'POS_KDS_VIEW_REQUIRED' : 'BRANCH_REQUIRED', ar ? 'ar' : 'en'));
         return;
       }
@@ -104,14 +134,16 @@ export function KitchenDisplayPage() {
       });
       if (error) throw error;
       const newItems = (data ?? []) as KitchenQueueItem[];
-      const currentIds = new Set(newItems.map(item => `${item.order_id}:${item.station}`));
-      const previousIds = previousKitchenOrders.current;
-      // Ring only for genuinely new tickets, never on initial load or on a poll.
-      if (previousIds && [...currentIds].some(id => !previousIds.has(id))) {
+      const currentIds = kitchenSentLineKeys(newItems);
+      if (hasGenuinelyNewKitchenSend(previousKitchenOrders.current, newItems, previousQueueReadAt.current)) {
         setNewOrderSignal(signal => signal + 1);
       }
+      // Sent-at survives reassignment and quantity splitting. A new order ID
+      // alone must never cause another cooking bell or printer dispatch.
       previousKitchenOrders.current = currentIds;
+      previousQueueReadAt.current = readStartedAt;
       setItems(newItems);
+      void loadNotices();
 
       const orderIds = [...new Set(newItems.map((item) => item.order_id).filter(Boolean))];
       if (orderIds.length === 0) {
@@ -143,9 +175,13 @@ export function KitchenDisplayPage() {
     } finally {
       setLoading(false);
     }
-  }, [branchFilter, station, canViewKds]);
+  }, [branchFilter, station, canViewKds, loadNotices]);
 
-  useEffect(() => { previousKitchenOrders.current = null; }, [branchFilter, station]);
+  useEffect(() => {
+    previousKitchenOrders.current = null;
+    previousQueueReadAt.current = null;
+    setTransferNotices([]);
+  }, [branchFilter, station]);
 
   useEffect(() => { void loadStations(); }, [loadStations]);
   useEffect(() => { void load(); }, [load]);
@@ -230,6 +266,32 @@ export function KitchenDisplayPage() {
             {ar
               ? 'تظل الطلبات غير المكتملة ظاهرة حتى يتم تحديث حالتها بواسطة مستخدم مخوّل. يتم تمييز الطلبات المتأخرة فقط.'
               : 'Unfinished orders remain visible until an authorized operator updates their status. Overdue orders are highlighted only.'}
+          </p>
+        )}
+
+        {view === 'active' && canViewKds && transferNotices.length > 0 && (
+          <section data-testid="kds-transfer-notices" className="rounded-xl border border-ui-info/30 bg-ui-info-soft p-3">
+            <h3 className="mb-2 text-xs font-black text-ui-text">
+              {ar ? 'تغييرات الطاولات والحسابات — لا تحتاج إعادة تحضير' : 'Table / bill changes — no new cooking needed'}
+            </h3>
+            <ul className="space-y-1">
+              {transferNotices.slice(0,8).map(notice => (
+                <li key={`${notice.event_id}:${notice.product_name}:${notice.station}`}
+                    className="text-xs font-semibold text-ui-text">
+                  {ar
+                    ? `${notice.product_name} ×${notice.quantity}: ${notice.split_bill ? 'فصل حساب' : 'نقل'} من ${notice.source_table || '—'} إلى ${notice.target_table || '—'} (${notice.target_order_number || '—'})`
+                    : `${notice.product_name} ×${notice.quantity}: ${notice.split_bill ? 'separate bill' : 'moved'} from ${notice.source_table || '—'} to ${notice.target_table || '—'} (${notice.target_order_number || '—'})`}
+                </li>
+              ))}
+            </ul>
+            <p className="mt-2 text-[11px] text-ui-subtle">
+              {ar ? 'تغيير مكان التقديم أو الحساب لا ينشئ تذكرة طبخ جديدة.' : 'Changing seating or bill ownership does not create a new kitchen ticket.'}
+            </p>
+          </section>
+        )}
+        {view === 'active' && noticeError && canViewKds && (
+          <p role="status" className="text-xs text-ui-warning">
+            {ar ? 'تعذر تحديث إشعارات النقل؛ الطلبات الأصلية ما زالت ظاهرة.' : 'Transfer notices could not refresh; original kitchen tickets remain visible.'}
           </p>
         )}
 

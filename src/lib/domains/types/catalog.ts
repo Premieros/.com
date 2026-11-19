@@ -196,7 +196,7 @@ export interface KitchenQueueItem {
   guest_count: number | null;
   notes: string | null;
   created_at: string;
-  items: { product_name: string; quantity: number; modifiers: string | null; notes: string | null }[];
+  items: { order_item_id?: string | null; sent_at?: string | null; product_name: string; quantity: number; modifiers: string | null; notes: string | null }[];
   elapsed_seconds: number;
 }
 
