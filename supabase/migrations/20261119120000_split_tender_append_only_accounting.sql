@@ -264,7 +264,7 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'TRANSACTION_FAILED', 'detail', SQLERRM);
   END;
 END;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.process_refund(p_sale_id uuid, p_items jsonb DEFAULT NULL::jsonb, p_reason text DEFAULT NULL::text)
@@ -457,5 +457,5 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'TRANSACTION_FAILED', 'detail', SQLERRM);
   END;
 END;
-$function$
+$function$;
 
