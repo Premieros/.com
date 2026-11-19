@@ -25,6 +25,7 @@ interface PosTablesSidebarProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
   onSelectTable: (table: DiningTable) => void;
+  onSelectOrder?: (order: Order) => void;
   onTransferOrder?: (order: Order, table: DiningTable) => void;
   onStartQuick?: () => void;
   onStartDelivery?: () => void;
@@ -49,6 +50,7 @@ export function PosTablesSidebar(props: PosTablesSidebarProps) {
     collapsed,
     onToggleCollapse,
     onSelectTable,
+    onSelectOrder,
     onTransferOrder,
     onStartQuick,
     onStartDelivery,
@@ -69,6 +71,7 @@ export function PosTablesSidebar(props: PosTablesSidebarProps) {
   const [countModalOpen, setCountModalOpen] = useState(false);
   const [mainAreaCount, setMainAreaCount] = useState(50);
   const [savingCount, setSavingCount] = useState(false);
+  const [billSelectionTable, setBillSelectionTable] = useState<DiningTable | null>(null);
 
   useEffect(() => {
     const handleExternalFlowStart = () => setFlowStarted(true);
@@ -329,7 +332,11 @@ export function PosTablesSidebar(props: PosTablesSidebarProps) {
                 kitchenSendsByOrder={kitchenSendsByOrder}
                 currency={currency}
                 isSelected={activeTableId === table.id}
-                onSelect={onSelectTable}
+                onSelect={(selectedTable) => {
+                  if (onSelectOrder && (ordersByTable[selectedTable.id] || []).length > 1) {
+                    setBillSelectionTable(selectedTable);
+                  } else onSelectTable(selectedTable);
+                }}
                 onTransfer={onTransferOrder}
               />
             ))}
@@ -337,6 +344,27 @@ export function PosTablesSidebar(props: PosTablesSidebarProps) {
         ) : <div className="py-16 text-center text-sm font-bold text-ui-muted">{isAr ? 'لا توجد طاولات مطابقة' : 'No matching tables'}</div>}
       </div>
 
+      <Modal
+        open={!!billSelectionTable}
+        onClose={() => setBillSelectionTable(null)}
+        title={billSelectionTable
+          ? (isAr ? `حسابات طاولة ${billSelectionTable.name}` : `Bills on table ${billSelectionTable.name}`)
+          : ''}
+        size="sm"
+      >
+        <div className="space-y-3" data-testid="pos-sidebar-multiple-bills">
+          <p className="text-xs text-ui-subtle">{isAr
+            ? 'كل عميل له حساب مستقل على الطاولة نفسها. اختر الحساب المطلوب ولا تسدد حساب عميل آخر.'
+            : 'Each guest has an independent bill on this table. Choose the intended bill.'}</p>
+          {(billSelectionTable ? ordersByTable[billSelectionTable.id] || [] : []).map((bill) => (
+            <Button key={bill.id} variant="outline" className="w-full justify-between"
+              onClick={() => { setBillSelectionTable(null); onSelectOrder?.(bill); }}>
+              <span>#{bill.order_number}</span>
+              <span>{Number(bill.total).toFixed(2)}</span>
+            </Button>
+          ))}
+        </div>
+      </Modal>
       <Modal
         open={countModalOpen}
         onClose={() => setCountModalOpen(false)}
