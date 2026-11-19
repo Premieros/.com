@@ -1,6 +1,11 @@
 -- Operations observability, separate from customer-entered data validation.
 -- No writes to sales, tenders, accounting, inventory or daily close.
 -- Only aggregate counters (no employee, customer, invoice or UUID data).
+-- Keep the one-hour posted-journal scan indexed as the ledger grows.
+CREATE INDEX IF NOT EXISTS idx_journal_entries_posted_recent_health
+  ON public.journal_entries(created_at)
+  WHERE posting_status='POSTED';
+
 CREATE TABLE IF NOT EXISTS private.pos_operational_health_samples (
   bucket_start timestamptz NOT NULL,
   metric_code text NOT NULL CHECK (metric_code IN (
