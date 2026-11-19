@@ -498,6 +498,8 @@ describe('partial table transfer against the full schema and actual guards', () 
   const targetBill=result.target_order_id!;
   const order=(await client.query('SELECT table_id,inventory_warehouse_id,status,total::float8 amount FROM public.orders WHERE id=$1',[targetBill])).rows[0];
   expect(order).toMatchObject({table_id:tableId,inventory_warehouse_id:ids.whA,status:'open'});
+  await client.query("SELECT set_config('app.user_id',$1,true),set_config('app.jwt',$2,true)",
+    [ids.users.cashier,JSON.stringify({sub:ids.users.cashier,role:'authenticated'})]);
   const preview=(await client.query('SELECT public._build_order_settlement_preview($1) result',[targetBill])).rows[0].result;
   expect(preview,JSON.stringify(preview)).toMatchObject({success:true});
   expect(Number(preview.pending_quantity)).toBe(1);
