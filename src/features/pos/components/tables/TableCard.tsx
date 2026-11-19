@@ -41,7 +41,8 @@ export function TableCard({ table, orders, itemsByOrder, kitchenSendsByOrder, cu
     return { status: 'open' as TableOperationalStatus, label: isAr ? 'مشغولة' : 'Occupied', tone: 'text-ui-warning bg-ui-warning-soft border-ui-warning/35', cardTone: 'border-ui-warning/60 bg-ui-warning/10', elapsed };
   }, [activeOrder, table.status, itemsByOrder, kitchenSendsByOrder, isAr]);
 
-  const itemCount = activeOrder ? (itemsByOrder[activeOrder.id] || []).reduce((sum, item) => sum + (Number(item.quantity) || 0), 0) : 0;
+  const itemCount = orders.reduce((sum, order) => sum + (itemsByOrder[order.id] || []).reduce((n, item) => n + (Number(item.quantity) || 0), 0), 0);
+  const combinedAmount = orders.reduce((sum, order) => sum + (Number(order.total) || 0), 0);
 
   return (
     <div onClick={() => onSelect(table)} role="button" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onSelect(table)} className={`group relative min-h-[132px] cursor-pointer select-none rounded-xl border p-3 text-start shadow-ui-sm transition ${isSelected ? 'border-ui-primary bg-ui-primary/10 ring-2 ring-ui-primary shadow-ui-md' : `${statusInfo.cardTone} hover:border-ui-primary hover:shadow-ui-md`}`}>
@@ -51,13 +52,13 @@ export function TableCard({ table, orders, itemsByOrder, kitchenSendsByOrder, cu
       </div>
       <div className="mt-2 flex items-center justify-between gap-1">
         <span className={`truncate rounded-md border px-1.5 py-0.5 text-[10px] font-black ${statusInfo.tone}`}>{statusInfo.label}</span>
-        {activeOrder && <span className="truncate text-[10px] font-bold text-ui-muted">#{activeOrder.order_number}</span>}
+        {activeOrder && <span className="truncate text-[10px] font-bold text-ui-muted">#{activeOrder.order_number}{orders.length > 1 ? ` · ${orders.length} ${isAr ? 'حسابات' : 'bills'}` : ''}</span>}
       </div>
       {activeOrder ? (
         <div className="mt-2 border-t border-ui-border/70 pt-1.5">
           <div className="flex items-center justify-between gap-1 text-[10px]">
             <span className="font-bold text-ui-muted">{itemCount} {isAr ? 'صنف' : 'items'}</span>
-            <span className="font-black text-ui-text">{formatCurrency(activeOrder.total, currency, lang)}</span>
+            <span className="font-black text-ui-text">{formatCurrency(combinedAmount, currency, lang)}</span>
           </div>
           <div className="mt-1 flex items-center gap-1 text-[10px] text-ui-muted">
             <span className="flex shrink-0 items-center gap-1"><Clock className="h-2.5 w-2.5" />{statusInfo.elapsed} {isAr ? 'د' : 'm'}</span>

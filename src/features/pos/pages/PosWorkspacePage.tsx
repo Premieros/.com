@@ -969,6 +969,7 @@ export function PosWorkspacePage() {
             collapsed={tablesCollapsed}
             onToggleCollapse={() => setTablesCollapsed((prev) => !prev)}
             onSelectTable={handleSidebarSelectTable}
+            onSelectOrder={(selectedOrder) => openOrderWorkspace(selectedOrder.id)}
             onTransferOrder={(ord, tb) => {
               setTransferOrder(ord);
               setTransferSourceTable(tb);

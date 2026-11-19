@@ -418,4 +418,66 @@ describe('partial table transfer against the full schema and actual guards', () 
   expect((await client.query('SELECT sum(quantity)::float8 q FROM public.order_items WHERE order_id=$1',[target])).rows[0].q).toBe(4);
   expect((await client.query('SELECT count(*)::int n FROM public.order_kitchen_inventory_events WHERE transfer_origin_event_id=$1',[originalEvent])).rows[0].n).toBe(1);
  });
+ it('creates independent guest bills on one table from two same-product lines, conserving sent kitchen and total',async()=>{
+  await client.query(
+   'INSERT INTO public.branch_settings(branch_id,tax_enabled,tax_rate) VALUES($1,false,0) ON CONFLICT(branch_id) DO UPDATE SET tax_enabled=false,tax_rate=0',
+   [ids.branchA]
+  );
+  const extra=(await client.query(
+   "INSERT INTO public.order_items(order_id,product_id,quantity,unit_price,total,notes) VALUES($1,$2,2,20,40,'other guest same product') RETURNING id",
+   [source,productId]
+  )).rows[0].id as string;
+  const sendId=(await client.query(
+   'INSERT INTO public.order_kitchen_sends(branch_id,order_id,order_item_id,sent_quantity,sent_by) VALUES($1,$2,$3,2,$4) RETURNING id',
+   [ids.branchA,source,extra,ids.users.branch_manager]
+  )).rows[0].id;
+  await client.query(
+   'INSERT INTO public.order_kitchen_inventory_events(branch_id,warehouse_id,order_id,order_item_id,kitchen_send_id,sent_quantity,total_cost,created_by) VALUES($1,$2,$3,$4,$5,2,6,$6)',
+   [ids.branchA,ids.whA,source,extra,sendId,ids.users.branch_manager]
+  );
+  await client.query('UPDATE public.orders SET subtotal=100,discount_amount=6,tax_amount=0,total=94 WHERE id=$1',[source]);
+  const srcTable=(await client.query('SELECT table_id FROM public.orders WHERE id=$1',[source])).rows[0].table_id as string;
+  const extraExpected=(await client.query(
+   "SELECT jsonb_build_object('quantity',quantity,'product_id',product_id,'unit_name',unit_name,'unit_price',unit_price,'discount_amount',discount_amount,'bonus_quantity',bonus_quantity,'notes',COALESCE(notes,''),'modifier_option_ids',COALESCE(to_jsonb(modifier_option_ids),'[]')) expected FROM public.order_items WHERE id=$1",[extra]
+  )).rows[0].expected;
+  const stockBefore=(await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n;
+  const sendBefore=(await client.query('SELECT sum(sent_quantity)::float8 n FROM public.order_kitchen_sends WHERE order_id=$1',[source])).rows[0].n;
+  const origTotal=(await client.query('SELECT total::float8 n FROM public.orders WHERE id=$1',[source])).rows[0].n;
+  const payload={operation_id:randomUUID(),split_bill:true,quantities:[
+    {order_item_id:line,quantity:1,expected},
+    {order_item_id:extra,quantity:2,expected:extraExpected}
+  ]};
+  const sql='SELECT public.transfer_order_items_to_table($1,$2::uuid[],$3,$4::jsonb) result';
+  const doSplit=(request=payload,targetTableId=srcTable)=>runAsPersist(client,ids.users.cashier,sql,
+    [source,[line,extra],targetTableId,JSON.stringify(request)]);
+  const wrongTable=await doSplit({...payload,operation_id:randomUUID()},targetTable);
+  expect(wrongTable.rows[0].result).toMatchObject({success:false,error:'SPLIT_BILL_REQUIRES_SOURCE_TABLE'});
+  const first=await doSplit();
+  expect(first.error?.message).toBeUndefined();
+  const moved=first.rows[0].result as PosItemTransferResult & {split_bill?:boolean,target_order_id?:string};
+  expect(moved,JSON.stringify(moved)).toMatchObject({success:true,split_bill:true,moved_item_count:2,inventory_changed:false,kds_resent:false});
+  const billId=moved.target_order_id!;
+  expect(billId).not.toBe(source);
+  expect(billId).not.toBe(target);
+  const sibling=(await client.query('SELECT table_id,order_type,status,total::float8 amount FROM public.orders WHERE id=$1',[billId])).rows[0];
+  expect(sibling).toMatchObject({table_id:srcTable,order_type:'dine_in',status:'open'});
+  const sameTable=(await client.query("SELECT id FROM public.orders WHERE table_id=$1 AND status IN ('open','held')",[srcTable])).rows;
+  expect(sameTable).toHaveLength(2);
+  const total=(await client.query('SELECT sum(total)::float8 n FROM public.orders WHERE id=ANY($1::uuid[])',[[source,billId]])).rows[0].n;
+  expect(total).toBeCloseTo(origTotal,2);
+  const movedItems=(await client.query('SELECT product_id,quantity::float8 qty FROM public.order_items WHERE order_id=$1',[billId])).rows;
+  expect(movedItems).toHaveLength(2);
+  expect(movedItems.every(r=>r.product_id===productId)).toBe(true);
+  expect(movedItems.reduce((sum,r)=>sum+r.qty,0)).toBe(3);
+  const totalSends=(await client.query('SELECT sum(sent_quantity)::float8 n FROM public.order_kitchen_sends WHERE order_id=ANY($1::uuid[])',[[source,billId]])).rows[0].n;
+  expect(totalSends).toBe(sendBefore);
+  expect((await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n).toBe(stockBefore);
+  const retry=await doSplit();expect(retry.error).toBeUndefined();
+  expect(retry.rows[0].result).toMatchObject({success:true,replayed:true,target_order_id:billId});
+  const unchanged=(await client.query("SELECT count(*)::int n FROM public.orders WHERE table_id=$1 AND status IN ('open','held')",[srcTable])).rows[0].n;
+  expect(unchanged).toBe(2);
+  const conflicted=await doSplit({...payload,split_bill:false});
+  expect(conflicted.rows[0].result).toMatchObject({success:false,error:'TRANSFER_OPERATION_CONFLICT'});
+ });
+
 });

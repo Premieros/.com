@@ -176,8 +176,8 @@ export function TransferOrderModal({
       setErrorMsg(
         data?.error === 'SOURCE_HAS_SENT_ITEMS'
           ? (isAr
-            ? 'لا يمكن دمج طلب يحتوي أصنافًا مرسلة للمطبخ حاليًا حتى لا يتغير سجل KDS. استخدم نقل الطاولة للطلب كاملًا أو أكمل الطلب كما هو.'
-            : 'A source order with sent kitchen items cannot currently be merged because the KDS snapshot is immutable. Transfer the whole table order instead or finish it separately.')
+            ? 'لا يمكن دمج الأصناف المرسلة عبر الدمج الإداري المباشر. افتح الطلب، واضغط «تحديد كل الأصناف المحفوظة»، ثم «نقل»، واختر الطاولة المستهدفة؛ تنتقل سجلات المطبخ دون خصم مخزون جديد.'
+            : 'Sent kitchen items cannot use the legacy manager merge. Open the order, select all saved lines, choose Move, and select the destination table. Kitchen history follows without deducting inventory again.')
           : userFacingErrorMessage(data ?? (isAr ? 'تعذر تنفيذ العملية.' : 'Could not execute the action.'), isAr ? 'ar' : 'en'),
       );
     } finally {

@@ -302,6 +302,22 @@ export function CurrentOrderPanel({
           )}
         </div>
 
+        {perms.canTransferOrder && orderType === 'dine_in' && !!activeOrderId && !!activeTable && cart.some((item) =>
+          !!item.order_item_id && orderItems.some((saved) =>
+            saved.id === item.order_item_id && transferLineIsSaved(item, saved))) && (
+          <button
+            type="button"
+            data-testid="pos-select-all-saved-transfer-lines"
+            onClick={() => setSelectedLineKeys(new Set(cart.filter((item) =>
+              !!item.order_item_id && orderItems.some((saved) =>
+                saved.id === item.order_item_id && transferLineIsSaved(item, saved))
+            ).map(cartLineKey)))}
+            className="mt-2 rounded-lg border border-ui-border bg-ui-page-alt px-3 py-2 text-[11px] font-bold text-ui-text"
+          >
+            {isAr ? 'تحديد كل الأصناف المحفوظة للنقل أو دمج الطاولات' : 'Select all saved items for transfer or table merge'}
+          </button>
+        )}
+
         {selectedItems.length > 0 && (
           <div className="mt-2 flex items-center gap-2 rounded-xl border border-ui-primary/30 bg-ui-primary-soft p-2">
             <div className="min-w-0 flex-1">
