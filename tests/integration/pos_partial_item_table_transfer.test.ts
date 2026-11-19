@@ -112,6 +112,36 @@ describe('partial table transfer against the full schema and actual guards', () 
   expect((await client.query(`SELECT count(*)::int n FROM public.order_kitchen_inventory_events`)).rows[0].n).toBe(beforeSend);
   expect((await client.query(`SELECT count(*)::int n FROM public.inventory_ledger`)).rows[0].n).toBe(ledgerBefore);
   expect((await client.query(`SELECT count(*)::int n FROM public.audit_log WHERE id=$1`,[payload.operation_id])).rows[0].n).toBe(1);
+  // KDS transfer notices are read-only, branch/permission scoped, and
+  // originate from the exact transfer audit event. No re-send occurs.
+  await client.query("UPDATE public.roles SET permissions=COALESCE(permissions,'[]'::jsonb)||'[\"pos.kds_view\"]'::jsonb WHERE role='cashier'");
+  const notice=await runAsPersist(client,ids.users.cashier,
+    "SELECT public.get_kitchen_transfer_notices($1,NULL,24) result",[ids.branchA]);
+  expect(notice.error?.message).toBeUndefined();
+  const notices=notice.rows[0].result as { success: boolean; rows: Array<{event_id:string;product_name:string;quantity:number;source_table:string;target_table:string}>};
+  expect(notices.success).toBe(true);
+  expect(notices.rows).toEqual(expect.arrayContaining([
+    expect.objectContaining({event_id:payload.operation_id,product_name:'Partial water',quantity:1})
+  ]));
+  const originalSentAt=(await client.query(
+    'SELECT sent_at::text sent_at FROM public.order_kitchen_sends WHERE order_item_id=$1',[line]
+  )).rows[0].sent_at;
+  const movedSentAt=(await client.query(
+    'SELECT sent_at::text sent_at FROM public.order_kitchen_sends WHERE order_item_id=$1',[newLine]
+  )).rows[0].sent_at;
+  expect(movedSentAt).toBe(originalSentAt);
+  await client.query("UPDATE public.orders SET kitchen_status='sent' WHERE id=ANY($1::uuid[])",[[source,target]]);
+  const queue=await runAsPersist(client,ids.users.cashier,
+    'SELECT * FROM public.get_kitchen_queue(NULL,$1)',[ids.branchA]);
+  expect(queue.error?.message).toBeUndefined();
+  const targetTicket=queue.rows.find(row=>row.order_id===target);
+  expect(targetTicket).toBeTruthy();
+  expect(targetTicket.items.some((item:{order_item_id:string;sent_at:string})=>
+    item.order_item_id===newLine && Number.isFinite(Date.parse(item.sent_at)))).toBe(true);
+  expect((await client.query(
+    "SELECT has_function_privilege('anon','public.get_kitchen_transfer_notices(uuid,text,integer)','EXECUTE') granted"
+  )).rows[0].granted).toBe(false);
+
  });
  it('transfers a whole order only to a vacant table, preserving kitchen rows and source/target states', async () => {
   await client.query("UPDATE public.roles SET permissions=(COALESCE(permissions,'[]'::jsonb)||'[\"approvals.review\",\"pos.order.transfer\"]'::jsonb) WHERE role='branch_manager'");
