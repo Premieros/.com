@@ -73,9 +73,23 @@ export function classifyReadiness(snapshot) {
   check('unsettled_fifo_debts', snapshot.inventory.unsettled_fifo_debts, 'REVIEW');
   check('active_profiles_without_auth', snapshot.accounts.active_without_auth, 'REVIEW');
   check('branches_without_active_members', snapshot.accounts.branches_without_members, 'REVIEW');
+  // Do not interpret pre-existing employee records or inventory-opening inputs
+  // as software defects. Keep their remediation visible for customer onboarding.
+  const customerDataIds = new Set([
+    'negative_raw_balances', 'negative_raw_batches',
+    'active_profiles_without_auth', 'branches_without_active_members'
+  ]);
+  const technical = checks.filter(c => !customerDataIds.has(c.id));
+  const customerData = checks.filter(c => customerDataIds.has(c.id));
+  const technicalDecision = technical.some(c => c.status === 'BLOCKER') ? 'NO_GO' :
+    technical.some(c => c.status === 'REVIEW') ? 'REVIEW_REQUIRED' : 'TECHNICAL_CHECKS_PASS';
   return {
-    decision: checks.some(c => c.status === 'BLOCKER') ? 'NO_GO' :
-      checks.some(c => c.status === 'REVIEW') ? 'REVIEW_REQUIRED' : 'TECHNICAL_CHECKS_PASS',
+    decision: technicalDecision,
+    // "Technical checks" means DB integrity and structure, not a full release certification.
+    technical_integrity_decision: technicalDecision,
+    customer_data_decision: customerData.some(c => c.status !== 'PASS') ?
+      'CUSTOMER_DATA_REVIEW' : 'CUSTOMER_DATA_CLEAN',
+    customer_data_checks: customerData.map(c => c.id),
     checks,
     // The presence of WAL archiving does NOT prove a usable backup or successful restore.
     unverified: [

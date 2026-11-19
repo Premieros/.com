@@ -23,7 +23,8 @@ test('deleted historical debts do not turn consistent negative stock into a bloc
   data.inventory.negatives=146;
   data.inventory.negative_raw_batches=6424;
   const result=classifyReadiness(data);
-  assert.equal(result.decision,'REVIEW_REQUIRED');
+  assert.equal(result.decision,'TECHNICAL_CHECKS_PASS');
+  assert.equal(result.customer_data_decision,'CUSTOMER_DATA_REVIEW');
   assert.equal(result.checks.find(x=>x.id==='raw_batch_balance_mismatches').status,'PASS');
   assert.equal(result.checks.find(x=>x.id==='negative_raw_balances').status,'REVIEW');
   assert.ok(result.unverified.includes('legacy_negative_stock_physical_reconciliation'));
@@ -64,4 +65,20 @@ test('audit queries do not contain data mutation and cover critical integrity in
   assert.match(READINESS_QUERIES.inventory, /raw_fifo_debts/);
   assert.match(READINESS_QUERIES.inventory, /raw_material_batches/);
   assert.match(READINESS_QUERIES.accounting, /journal_entry_lines/);
+});
+
+test('legacy account setup problems are reported without failing software integrity',()=>{
+ const data=clean();
+ data.accounts.active_without_auth=29;
+ data.accounts.branches_without_members=3;
+ const result=classifyReadiness(data);
+ assert.equal(result.decision,'TECHNICAL_CHECKS_PASS');
+ assert.equal(result.customer_data_decision,'CUSTOMER_DATA_REVIEW');
+ assert.equal(result.checks.find(c=>c.id==='active_profiles_without_auth').status,'REVIEW');
+});
+test('actual database integrity failure still blocks technical readiness despite clean user records',()=>{
+ const data=clean();data.integrity.orphan_payments=1;
+ const result=classifyReadiness(data);
+ assert.equal(result.decision,'NO_GO');
+ assert.equal(result.customer_data_decision,'CUSTOMER_DATA_CLEAN');
 });

@@ -59,7 +59,15 @@ export function evaluateHandoff(audit, evidence, access) {
   const checks = audit.checks;
   if (checks.some(c => !['PASS','REVIEW','BLOCKER'].includes(c.status)))
     throw Error('INVALID_CHECK');
-  const blocking = checks.filter(c => c.status === 'BLOCKER' || c.status === 'REVIEW').map(c => c.id);
+  const customerDataIds = new Set([
+    'negative_raw_balances','negative_raw_batches',
+    'active_profiles_without_auth','branches_without_active_members'
+  ]);
+  const dataReview = checks.filter(c => c.status !== 'PASS' && customerDataIds.has(c.id)).map(c => c.id);
+  const technicalIssues = checks.filter(c => c.status !== 'PASS' && !customerDataIds.has(c.id)).map(c => c.id);
+  // The all-in customer-onboarding gate stays conservative. A customer-data issue
+  // must never be mislabeled as a technical code/structure failure.
+  const blocking = [...technicalIssues,...dataReview];
   const incomplete = REQUIRED_EVIDENCE.filter(name => {
     const record = evidence?.[name];
     return !record || record.result !== 'PASS' ||
@@ -72,6 +80,12 @@ export function evaluateHandoff(audit, evidence, access) {
       incomplete.length === 0 && audit.decision === 'TECHNICAL_CHECKS_PASS' &&
       access.decision === 'TECHNICAL_ACCESS_CHECKS_PASS' ? 'DELIVERY_GATE_PASS' : 'NOT_READY',
     project_ref:audit.project_ref,
+    software_integrity_status:technicalIssues.length === 0 &&
+      audit.decision === 'TECHNICAL_CHECKS_PASS' ? 'TECHNICAL_INTEGRITY_PASS' : 'TECHNICAL_INTEGRITY_REVIEW',
+    // A passing DB integrity gate is not proof of a complete software acceptance test.
+    customer_data_status:dataReview.length === 0 ? 'CUSTOMER_DATA_CLEAN' : 'CUSTOMER_DATA_REVIEW',
+    technical_issues:technicalIssues,
+    customer_data_issues:dataReview,
     blocking_checks:blocking,
     blocking_access_checks:accessBlocking,
     missing_evidence:incomplete,

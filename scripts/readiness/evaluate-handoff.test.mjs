@@ -58,3 +58,23 @@ test('empty, incomplete or internally inconsistent access reports fail closed',(
  const d=access();d.checks[0].status='BLOCKER';d.checks[0].count=0;
  assert.throws(()=>evaluateHandoff(audit(),evidence(),d),/INVALID_ACCESS_CHECK/);
 });
+
+test('software integrity is independent from customer-entered account and inventory records',()=>{
+ const a=audit();a.checks.push(
+  {id:'active_profiles_without_auth',status:'REVIEW',count:29},
+  {id:'branches_without_active_members',status:'REVIEW',count:3},
+  {id:'negative_raw_balances',status:'REVIEW',count:5}
+ );
+ const result=evaluateHandoff(a,evidence(),access());
+ assert.equal(result.software_integrity_status,'TECHNICAL_INTEGRITY_PASS');
+ assert.equal(result.customer_data_status,'CUSTOMER_DATA_REVIEW');
+ assert.deepEqual(result.technical_issues,[]);
+ assert.equal(result.decision,'NOT_READY'); // customer onboarding still requires clean setup
+});
+test('real technical integrity failures remain separate from customer input issues',()=>{
+ const a=audit();a.decision='NO_GO';a.checks.push({id:'orphan_payments',status:'BLOCKER',count:1});
+ const result=evaluateHandoff(a,evidence(),access());
+ assert.equal(result.software_integrity_status,'TECHNICAL_INTEGRITY_REVIEW');
+ assert.deepEqual(result.technical_issues,['orphan_payments']);
+ assert.equal(result.customer_data_status,'CUSTOMER_DATA_CLEAN');
+});

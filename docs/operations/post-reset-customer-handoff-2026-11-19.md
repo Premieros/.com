@@ -1,3 +1,5 @@
+> **Clarification (19 Nov 2026): SOFTWARE DELIVERY and CUSTOMER-DATA ONBOARDING ARE DISTINCT.** Legacy/manual data-entry problems (unmatched historical profiles, incomplete organization memberships, or opening-stock inputs) do **not automatically constitute software defects** and must not invalidate a passing build, database integrity tests, security regression tests, or automated POS cycle. The read-only readiness audit now exposes `technical_integrity_decision` and `customer_data_decision` separately. The handoff evaluator exposes `software_integrity_status` and `customer_data_status` separately; its existing `decision` concerns **unconditional customer operational acceptance**, not whether the software package is technically deliverable. Security weaknesses in executable privileges, tenant isolation, and authorization **are** software defects if tests prove them, and remain independently reviewable. Hardware, restores and signed customer acceptance must never be declared complete without actual evidence.
+
 # Premier OS — post-reset customer handoff (19 November 2026)
 
 **Decision:** CLEAN OPERATING BASELINE; **NOT YET ACCEPTED FOR LIVE CUSTOMER HANDOFF**.
