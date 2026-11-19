@@ -66,6 +66,23 @@ const isLocal=!!url&&/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url);
    expect(Number(rows.rows[0].tender_sum)).toBe(20);
    expect(Number(rows.rows[0].stock_qty)).toBe(4);
    expect(Number(rows.rows[0].journal_delta)).toBeCloseTo(0,5);
+   // A balanced journal alone is not enough: verify cash 8 and bank 12
+   // after the append-only adjustment to the original cash collection of 20.
+   const allocation=await db.query<{cash_net:string,bank_net:string}>(`
+     select
+      coalesce(sum(l.debit-l.credit) filter (
+       where l.account_id=public.resolve_account_key($1,'cash')),0)::text cash_net,
+      coalesce(sum(l.debit-l.credit) filter (
+       where l.account_id=public.resolve_account_key($1,'bank')),0)::text bank_net
+     from public.journal_entry_lines l
+     join public.journal_entries j on j.id=l.journal_entry_id
+     where j.branch_id=$1
+       and j.reference_type in ('sale','sale_split_tender_reclass')
+       and j.reference_id=$2
+   `,[branch,saleId]);
+   expect(Number(allocation.rows[0].cash_net)).toBeCloseTo(8,5);
+   expect(Number(allocation.rows[0].bank_net)).toBeCloseTo(12,5);
+
    const item=await db.query<{id:string}>(
     'select id from public.sale_items where sale_id=$1',[saleId]);
    expect(item.rows).toHaveLength(1);
