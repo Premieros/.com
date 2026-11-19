@@ -1,8 +1,8 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {evaluateHandoff,REQUIRED_EVIDENCE} from './evaluate-handoff.mjs';
+import {evaluateHandoff,REQUIRED_EVIDENCE,REQUIRED_ACCESS_CHECKS} from './evaluate-handoff.mjs';
 const audit = () => ({project_ref:'hvqlkapynjfjikqithvd',decision:'TECHNICAL_CHECKS_PASS',checks:[{id:'ledger',status:'PASS',count:0}]});
-const access = () => ({project_ref:'hvqlkapynjfjikqithvd',checked_at:'2026-11-19T09:00:00Z',decision:'TECHNICAL_ACCESS_CHECKS_PASS',checks:[{id:'active_missing_auth',status:'PASS',count:0}]});
+const access = () => ({project_ref:'hvqlkapynjfjikqithvd',checked_at:'2026-11-19T09:00:00Z',decision:'TECHNICAL_ACCESS_CHECKS_PASS',checks:REQUIRED_ACCESS_CHECKS.map(id=>({id,status:'PASS',count:0}))});
 const evidence = () => Object.fromEntries(REQUIRED_EVIDENCE.map(k=>[k,{result:'PASS',owner:'QA',reference:'signed-test-report',checked_at:'2026-11-19T08:00:00Z'}]));
 test('does not certify delivery without operational evidence',()=> {
  const result=evaluateHandoff(audit(),{},access());
@@ -32,11 +32,11 @@ test('missing independent identity audit fails closed',()=>{
 test('unmatched active staff, bad tenant membership and privileged RPC review block handoff',()=>{
  const a=access();
  a.decision='BLOCKED';
- a.checks=[
-  {id:'active_missing_auth',status:'BLOCKER',count:29},
-  {id:'branches_without_active_org_member',status:'BLOCKER',count:3},
-  {id:'anonymous_security_definer_functions',status:'REVIEW',count:1}
- ];
+ for(const [id,count,status] of [
+   ['active_missing_auth',29,'BLOCKER'],
+   ['branches_without_active_org_member',3,'BLOCKER'],
+   ['anonymous_security_definer_functions',1,'REVIEW']
+ ])Object.assign(a.checks.find(x=>x.id===id),{count,status});
  const result=evaluateHandoff(audit(),evidence(),a);
  assert.equal(result.decision,'NOT_READY');
  assert.deepEqual(result.blocking_access_checks,[
@@ -48,4 +48,13 @@ test('access project mismatch and malformed audit never pass',()=>{
  assert.throws(()=>evaluateHandoff(audit(),evidence(),{...access(),checked_at:'bad'}),/INVALID_ACCESS_TIMESTAMP/);
  const a=access();a.checks[0].status='MAGIC';
  assert.throws(()=>evaluateHandoff(audit(),evidence(),a),/INVALID_ACCESS_CHECK/);
+});
+
+test('empty, incomplete or internally inconsistent access reports fail closed',()=>{
+ const a=access();a.checks=[];
+ assert.throws(()=>evaluateHandoff(audit(),evidence(),a),/ACCESS_CHECKS_INCOMPLETE/);
+ const b=access();b.checks[0].count=29;
+ assert.throws(()=>evaluateHandoff(audit(),evidence(),b),/INVALID_ACCESS_CHECK/);
+ const d=access();d.checks[0].status='BLOCKER';d.checks[0].count=0;
+ assert.throws(()=>evaluateHandoff(audit(),evidence(),d),/INVALID_ACCESS_CHECK/);
 });
