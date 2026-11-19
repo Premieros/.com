@@ -531,6 +531,16 @@ describe('partial table transfer against the full schema and actual guards', () 
     [transfer.target_order_id]
   )).rows[0];
   expect(targetState).toMatchObject({kitchen_status:'ready',ready_at:oldReadyAt});
+  // The same cashier must not be able to forge a ready KDS state by issuing
+  // direct SQL or faking the public transfer session settings.
+  await client.query("SELECT set_config('app.pos_item_transfer_target_order_id',$1,true)",[target]);
+  await client.query("SELECT set_config('app.pos_item_transfer_source_order_id',$1,true)",[source]);
+  await client.query("SELECT set_config('app.pos_item_transfer_branch_id',$1,true)",[ids.branchA]);
+  const forged=await runAsPersist(client,ids.users.cashier,
+    "UPDATE public.orders SET kitchen_status='ready' WHERE id=$1",[target]);
+  expect(forged.error?.message).toContain('PERMISSION_DENIED:pos.kds_update');
+  await client.query("SELECT set_config('app.pos_item_transfer_target_order_id','',true),set_config('app.pos_item_transfer_source_order_id','',true),set_config('app.pos_item_transfer_branch_id','',true)");
+
   expect((await client.query('SELECT count(*)::int n FROM public.order_kitchen_inventory_events')).rows[0].n).toBe(before);
  });
 
