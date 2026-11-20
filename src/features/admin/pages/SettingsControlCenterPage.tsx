@@ -614,6 +614,14 @@ export function SettingsControlCenterPage() {
                 </div>
               </div>
 
+              {(branchForm.allow_negative_stock ?? undefined) !== (branchSettingsMap[targetBranchId]?.allow_negative_stock ?? undefined) && (
+                <p role="status" className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-ui-text">
+                  {isAr
+                    ? '⚠️ تغيير سياسة البيع بالسالب لم يُحفظ بعد. اضغط «حفظ إعدادات المخزون» بالأسفل ليطبّق على الفرع.'
+                    : '⚠️ The stock policy change is not saved yet. Press “Save Inventory Settings” below to apply it to this branch.'}
+                </p>
+              )}
+
               <div className="pt-4 border-t border-ui-border grid gap-4 sm:grid-cols-2">
                 <Input
                   label={isAr ? 'حد تنبيه انخفاض المخزون للفرع' : 'Branch Low Stock Alert Threshold'}
