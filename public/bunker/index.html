@@ -198,6 +198,12 @@
       footer .row{display:grid}
     }
   </style>
+<style>
+  .bunker-social-row{display:flex;align-items:center;justify-content:center;flex-wrap:wrap;gap:14px;margin:28px auto 8px}
+  .bunker-social-row:empty{display:none}
+  .bunker-social-row a{display:inline-flex;align-items:center;gap:8px;padding:10px 15px;border:1px solid rgba(241,225,195,.3);border-radius:999px;color:#f1e1c3;text-decoration:none;font-size:12px;font-weight:700}
+  .bunker-social-row a:hover{background:#f1e1c3;color:#111}
+  </style>
 </head>
 <body>
   <header>
@@ -347,7 +353,28 @@
       </div>
       <div class="mini">© <span id="year"></span> BUNKER. Demo branch website.</div>
     </div>
-  </footer>
+  <div id="bunkerSocial" class="bunker-social-row" aria-label="Find BUNKER on social media"></div>
+<script>
+(async function(){
+const allowed=['facebook','instagram','tiktok','whatsapp','website'];
+try {
+ const response=await fetch('https://hvqlkapynjfjikqithvd.supabase.co/rest/v1/rpc/branch_website_links_public',{
+  method:'POST',headers:{'apikey':'sb_publishable_9W6651rcdIsyBoegwGe_qw_MvCPRIPK','Content-Type':'application/json'},
+  body:JSON.stringify({p_slug:'bunker'})
+ });
+ if(!response.ok)return;
+ const values=await response.json(), node=document.getElementById('bunkerSocial');
+ for(const name of allowed){
+  const value=values && values[name];if(typeof value!=='string')continue;
+  let url;try{url=new URL(value)}catch{continue}
+  if(url.protocol!=='https:')continue;
+  const a=document.createElement('a');a.href=url.href;a.target='_blank';a.rel='noopener noreferrer';a.textContent=name==='website'?'Website':name[0].toUpperCase()+name.slice(1);
+  node.appendChild(a);
+ }
+}catch{}
+})();
+</script>
+</footer>
 
   <button id="editToggle" class="edit-toggle" type="button">✦ Edit website</button>
   <div id="editBackdrop" class="edit-panel-backdrop"></div>
