@@ -298,7 +298,7 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   let allowNegative = branchSettings?.allow_negative_stock ?? globalSettings?.allow_negative_stock ?? false;
   if (!explicitlyOffline) {
     const { data: serverAllowsNegative, error: policyError } = await supabase.rpc(
-      'effective_allow_negative_stock', { p_branch_id: p.p_branch_id },
+      'pos_branch_negative_stock_policy', { p_branch_id: p.p_branch_id },
     );
     if (policyError) {
       // Don't misreport an unknown policy as "negative stock disabled".
