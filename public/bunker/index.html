@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" dir="ltr">
+<html lang="en" dir="ltr" data-bunker-theme="dark">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
@@ -210,6 +210,68 @@
   .bunker-social-row a[data-network=whatsapp]::before{content:"◉"}
   .bunker-social-row a[data-network=website]::before{content:"↗"}
   </style>
+<style>
+/* Published branch theme. Premium imagery and layout remain unchanged in both modes. */
+html[data-bunker-theme="light"] body{
+ background:#faf6ef;color:#29221b;
+}
+html[data-bunker-theme="light"] header{
+ background:rgba(250,246,239,.94);border-bottom-color:#d9cbb7;
+}
+html[data-bunker-theme="light"] .brand,
+html[data-bunker-theme="light"] .nav-links a:not(.btn){color:#33261b}
+html[data-bunker-theme="light"] .btn{
+ background:#34261b;border-color:#34261b;color:#fff6e7;box-shadow:0 10px 28px #5e41232a;
+}
+html[data-bunker-theme="light"] .btn:hover{background:#5b422a}
+html[data-bunker-theme="light"] .btn.secondary{
+ background:transparent;border-color:#795f43;color:#302318;box-shadow:none;
+}
+html[data-bunker-theme="light"] .hero .hero-content,
+html[data-bunker-theme="light"] .hero .hero-content .hero-sub,
+html[data-bunker-theme="light"] .hero .hero-content .hero-copy,
+html[data-bunker-theme="light"] .hero .hero-content .hero-wordmark{
+ color:#f7ecdc;
+}
+html[data-bunker-theme="light"] .hero .btn{background:#f1e1c3;color:#24180f;border-color:#f1e1c3}
+html[data-bunker-theme="light"] .hero .btn.secondary{background:transparent;color:#f7ecdc;border-color:#f7ecdc}
+html[data-bunker-theme="light"] .hero-panel{background:rgba(27,22,17,.75);border-color:#6a533d}
+html[data-bunker-theme="light"] .hero-panel p{color:#f1dfc3}
+html[data-bunker-theme="light"] .section-title,
+html[data-bunker-theme="light"] .card h3{color:#292017}
+html[data-bunker-theme="light"] .copy,
+html[data-bunker-theme="light"] .card p{color:#64523f}
+html[data-bunker-theme="light"] .eyebrow{color:#775a3a}
+html[data-bunker-theme="light"] .card{
+ background:linear-gradient(180deg,#fffaf2,#f1e8da);
+ border-color:#dac9b2;box-shadow:0 18px 50px #5b3d1b18;
+}
+html[data-bunker-theme="light"] .big-banner{border-color:#bca687}
+html[data-bunker-theme="light"] .big-banner .content .eyebrow,
+html[data-bunker-theme="light"] .big-banner .content .copy{color:#fff0d5}
+html[data-bunker-theme="light"] .big-banner .content h3{color:#fff7e6}
+html[data-bunker-theme="light"] .pill{color:#f7e7cf;border-color:#8a785d}
+html[data-bunker-theme="light"] .gallery .tile{border-color:#bca58a;box-shadow:0 12px 38px #53351b25}
+html[data-bunker-theme="light"] .cta-band{
+ background:linear-gradient(130deg,#392b20,#1d1713);color:#f7e9d1;
+}
+html[data-bunker-theme="light"] .cta-band p{color:#dec8a9}
+html[data-bunker-theme="light"] .cta-band .eyebrow{color:#e2c29c!important}
+html[data-bunker-theme="light"] .cta-band .btn{
+ background:#f1e1c3;color:#241a12;border-color:#f1e1c3;
+}
+html[data-bunker-theme="light"] .cta-band .btn.secondary{color:#fff0da;border-color:#e0c5a3;background:transparent}
+html[data-bunker-theme="light"] footer{border-color:#d5c5ad;color:#594734}
+html[data-bunker-theme="light"] .bunker-social-row a{border-color:#b99b78;color:#4a3223}
+html[data-bunker-theme="light"] .bunker-social-row a:hover{background:#3e2d1d;color:#fff6e9}
+html[data-bunker-theme="light"] .edit-toggle{background:#36281a;color:#fff0de}
+html[data-bunker-theme="light"] .edit-panel{background:#fbf5e9;color:#302218;border-color:#dac7aa}
+html[data-bunker-theme="light"] .edit-head{border-color:#d9c5a9}
+html[data-bunker-theme="light"] .edit-head p,html[data-bunker-theme="light"] .hint{color:#65523d}
+html[data-bunker-theme="light"] .field-group{border-color:#d9c5a9;background:#f5ebda}
+html[data-bunker-theme="light"] .field input,
+html[data-bunker-theme="light"] .field textarea{background:#fffaf0;color:#35281d;border-color:#ccb799}
+</style>
 </head>
 <body>
   <header>
@@ -394,6 +456,26 @@ try {
     <div class="edit-body" id="editBody"></div>
   </aside>
 
+  <script>
+    // Public theme is stored per branch. Keep the standalone Vercel website
+    // synchronized with Premier Appearance & Themes after visitors refresh.
+    void (async function syncBunkerTheme() {
+      try {
+        const response = await fetch('https://hvqlkapynjfjikqithvd.supabase.co/rest/v1/rpc/branch_website_theme_public', {
+          method:'POST',
+          cache:'no-store',
+          headers:{
+            'apikey':'sb_publishable_9W6651rcdIsyBoegwGe_qw_MvCPRIPK',
+            'Content-Type':'application/json'
+          },
+          body:JSON.stringify({p_slug:'bunker'})
+        });
+        if (!response.ok) return;
+        const mode = await response.json();
+        if (mode === 'dark' || mode === 'light') document.documentElement.setAttribute('data-bunker-theme',mode);
+      } catch { /* Leave the accessible dark fallback intact. */ }
+    })();
+  </script>
   <script>
     const STORAGE_KEY = 'bunker_site_content_v2';
     const ORDER_LINK = "https://premieros-sage.vercel.app/?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62";
