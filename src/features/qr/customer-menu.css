@@ -271,3 +271,16 @@ body:has(.bunker-customer){background:#090909!important}
 .bunker-social-links a{display:inline-flex;align-items:center;justify-content:center;width:41px;height:41px;border-radius:50%;border:1px solid #6e573b;background:#211a13;color:#f1dfc1}
 .bunker-social-links a:hover{background:#f1dfc1;color:#1e1710}
 @media(min-width:540px){.bunker-customer.customer-app{margin:24px auto}}
+
+/* BUNKER ordering photos: no labels, headlines, or dark text overlays on photos. */
+.bunker-customer .bunker-order-photo-grid{
+ display:grid;grid-template-columns:1.35fr 1fr;gap:12px;margin:15px 0 25px;
+}
+.bunker-customer .bunker-order-photo-grid img{
+ display:block;width:100%;height:200px;object-fit:cover;border-radius:20px;
+ border:1px solid #5d4937;filter:none;background:#241b15;
+}
+@media(max-width:480px){
+ .bunker-customer .bunker-order-photo-grid{gap:9px}
+ .bunker-customer .bunker-order-photo-grid img{height:158px;border-radius:15px}
+}
