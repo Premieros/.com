@@ -1,3 +1,4 @@
+import { supabase } from '@/api';
 import { BranchSocialLinks } from './BranchSocialLinks';
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, ChevronLeft, ChevronRight, Heart, Search, SlidersHorizontal, ShoppingBag, Home, Grid2X2, MapPin, Plus, Minus, UtensilsCrossed, ReceiptText, Check } from 'lucide-react';
@@ -35,6 +36,15 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
   const visit = useGuestVisit(token, secure, session);
   const [recoveryCode, setRecoveryCode] = useState(() => { try { return sessionStorage.getItem(`premier_qr_pin_${session}`) || ''; } catch { return ''; } });
   useEffect(() => { if (visit.tracking.visit?.closed) onClosed?.(); }, [visit.tracking.visit?.closed, onClosed]);
+  const [branchPhotos,setBranchPhotos] = useState<{burgerImage?:string;coffeeImage?:string}>({});
+  useEffect(()=>{
+    if(!isBunker)return;
+    let alive=true;
+    void supabase.rpc('branch_website_photos_public',{p_slug:'bunker'}).then(({data,error})=>{
+      if(alive&&!error&&data&&typeof data==='object')setBranchPhotos(data as {burgerImage?:string;coffeeImage?:string});
+    });
+    return()=>{alive=false;};
+  },[isBunker]);
   const [menu, setMenu] = useState<Menu | null>(null);
   const [cart, setCart] = useState<Record<string, QrItem>>({});
   const [table, setTable] = useState('');
@@ -159,8 +169,8 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
         <div className="customer-search"><Search size={21} /><input aria-label={isBunker ? "Search menu" : "ابحث في المنيو"} placeholder={isBunker ? "Search the menu" : "ابحث الآن"} value={query} onChange={e => setQuery(e.target.value)} /><button aria-label={isBunker ? 'Show all categories' : 'عرض كل التصنيفات'} onClick={() => { setCategory(''); document.getElementById('customer-categories')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}><SlidersHorizontal size={20} /></button></div>
         {!query && !onlyFavorites && (isBunker
           ? <div className="bunker-order-photo-grid" aria-label="BUNKER burgers and specialty coffee">
-              <img src="https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1000&q=85" alt="Freshly prepared burger" loading="lazy" />
-              <img src="https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=850&q=85" alt="Specialty coffee" loading="lazy" />
+              <img src={branchPhotos.burgerImage || "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1000&q=85"} alt="Freshly prepared burger" loading="lazy" />
+              <img src={branchPhotos.coffeeImage || "https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=850&q=85"} alt="Specialty coffee" loading="lazy" />
             </div>
           : <div className="customer-promos"><div className="customer-promo-main"><div><span>{isBunker ? 'Fresh & Delicious' : 'طازج ولذيذ'}</span><h2>{appearance.banner_text || (isBunker ? 'BOLD BURGERS. GREAT COFFEE.' : 'كل اللي بتحبه،\nفي طلب واحد')}</h2><small>{isBunker ? "Find your next favorite" : "اختر وجبتك واستمتع بوقتك"}</small></div>{appearance.banner_image_url ? <img src={appearance.banner_image_url} alt={isBunker ? 'BUNKER featured selection' : 'اختيارات الفرع'} /> : <span aria-hidden="true" className="customer-promo-food">{foodSymbol(categories[0]?.name || 'burger')}</span>}</div><div className="customer-promo-side" aria-hidden="true">☕<span>{isBunker ? 'Your coffee moment' : 'لحظتك الحلوة'}</span></div></div>)}
         <div className="customer-category-navigation"><div className="customer-category-heading"><h2>{isBunker ? "Categories" : "الأقسام"}</h2><div><button aria-label={isBunker ? 'Previous categories' : 'الأقسام السابقة'} disabled={!categoryScroll.back} onClick={() => categoriesRef.current?.scrollBy({ left: 250, behavior: 'smooth' })}><ChevronRight size={21} /></button><button aria-label={isBunker ? 'Next categories' : 'الأقسام التالية'} disabled={!categoryScroll.next} onClick={() => categoriesRef.current?.scrollBy({ left: -250, behavior: 'smooth' })}><ChevronLeft size={21} /></button></div></div><div id="customer-categories" ref={categoriesRef} className="customer-categories" aria-label={isBunker ? 'Menu categories' : 'أقسام المنيو'}
