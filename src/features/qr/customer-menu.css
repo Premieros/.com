@@ -390,3 +390,16 @@ body:has(.bunker-customer[data-bunker-theme="light"]){background:#eee6d9!importa
 .bunker-customer[data-bunker-theme="light"] .bunker-order-photo-grid img{
  border-color:#c5b196;background:#e9dac8;
 }
+
+
+/* Demo products remain browsable while QR checkout is disabled. */
+.customer-demo-notice{
+  margin:14px 0 18px;padding:14px 16px;border-radius:16px;
+  background:#302317;border:1px solid #806242;color:#f5dec0;
+  font-size:13px;line-height:1.65;
+}
+.customer-demo-notice strong{font-weight:900;letter-spacing:.08em}
+.bunker-customer[data-bunker-theme="light"] .customer-demo-notice{
+  background:#f4e4cc;border-color:#c1a27c;color:#49301d;
+}
+.bunker-customer[data-bunker-theme="light"] .customer-demo-notice strong{color:#49301d}
