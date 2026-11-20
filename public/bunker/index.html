@@ -203,6 +203,12 @@
   .bunker-social-row:empty{display:none}
   .bunker-social-row a{display:inline-flex;align-items:center;gap:8px;padding:10px 15px;border:1px solid rgba(241,225,195,.3);border-radius:999px;color:#f1e1c3;text-decoration:none;font-size:12px;font-weight:700}
   .bunker-social-row a:hover{background:#f1e1c3;color:#111}
+  .bunker-social-row a::before{display:inline-grid;place-items:center;width:21px;height:21px;border-radius:50%;font-weight:900;font-size:15px}
+  .bunker-social-row a[data-network=facebook]::before{content:"f";background:#f1e1c3;color:#111}
+  .bunker-social-row a[data-network=instagram]::before{content:"◎";font-size:20px}
+  .bunker-social-row a[data-network=tiktok]::before{content:"♪"}
+  .bunker-social-row a[data-network=whatsapp]::before{content:"◉"}
+  .bunker-social-row a[data-network=website]::before{content:"↗"}
   </style>
 </head>
 <body>
@@ -368,7 +374,7 @@ try {
   const value=values && values[name];if(typeof value!=='string')continue;
   let url;try{url=new URL(value)}catch{continue}
   if(url.protocol!=='https:')continue;
-  const a=document.createElement('a');a.href=url.href;a.target='_blank';a.rel='noopener noreferrer';a.textContent=name==='website'?'Website':name[0].toUpperCase()+name.slice(1);
+  const a=document.createElement('a');a.href=url.href;a.target='_blank';a.rel='noopener noreferrer';a.dataset.network=name;a.textContent=name==='website'?'Website':name[0].toUpperCase()+name.slice(1);
   node.appendChild(a);
  }
 }catch{}
