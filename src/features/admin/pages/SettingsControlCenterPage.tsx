@@ -116,7 +116,7 @@ export function SettingsControlCenterPage() {
         tax_enabled: row?.tax_enabled ?? null,
         currency: row?.currency ?? '',
         low_stock_threshold: row?.low_stock_threshold ?? null,
-        allow_negative_stock: row?.allow_negative_stock,
+        allow_negative_stock: row?.allow_negative_stock ?? undefined,
         business_day_mode: row?.business_day_mode ?? 'fixed_time',
         business_day_start: row?.business_day_start ?? '10:00',
         business_day_end: row?.business_day_end ?? '02:00',
@@ -167,7 +167,7 @@ export function SettingsControlCenterPage() {
         branchForm.low_stock_threshold != null && !Number.isNaN(branchForm.low_stock_threshold)
           ? branchForm.low_stock_threshold
           : null,
-      allow_negative_stock: branchForm.allow_negative_stock,
+      allow_negative_stock: branchForm.allow_negative_stock ?? null,
       business_day_mode: branchForm.business_day_mode || 'fixed_time',
       business_day_start: branchForm.business_day_start || '00:00',
       business_day_end: branchForm.business_day_end || '00:00',
