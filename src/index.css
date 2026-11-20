@@ -153,8 +153,8 @@
 
   /* High-contrast typography without harsh pure-white glare. */
   --ui-text: 248 250 252;
-  --ui-muted: 203 213 225;
-  --ui-subtle: 148 163 184;
+  --ui-muted: 235 240 246;
+  --ui-subtle: 211 223 236;
 
   /* Accent is intentionally brighter in dark mode for prices/actions. */
   --ui-accent: var(--brand-400);
@@ -530,6 +530,23 @@
  */
 .premier-backoffice [data-testid='app-sidebar'] {
   --ui-muted: 45 46 54;
+}
+/* Honor dark semantic text tokens: the backoffice sidebar must not inherit
+   its light-mode muted ink when the user chooses a dark appearance. */
+.dark .premier-backoffice [data-testid='app-sidebar'] {
+  --ui-muted: 235 240 246;
+  --ui-subtle: 211 223 236;
+}
+.dark .premier-backoffice [data-testid='app-main'] {
+  color: rgb(var(--ui-text));
+}
+.dark .premier-backoffice [data-testid='app-main'] :is(input, textarea, select) {
+  color: rgb(var(--ui-text));
+  caret-color: rgb(var(--ui-text));
+}
+.dark .premier-backoffice [data-testid='app-main'] :is(input, textarea)::placeholder {
+  color: rgb(var(--ui-subtle));
+  opacity: 1;
 }
 .premier-backoffice [data-testid='app-navigation'] a,
 .premier-backoffice [data-testid='app-navigation'] button {
