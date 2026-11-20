@@ -167,7 +167,7 @@ export function SettingsControlCenterPage() {
         branchForm.low_stock_threshold != null && !Number.isNaN(branchForm.low_stock_threshold)
           ? branchForm.low_stock_threshold
           : null,
-      allow_negative_stock: branchForm.allow_negative_stock ?? null,
+      ...(active === 'inventory' ? { allow_negative_stock: branchForm.allow_negative_stock ?? null } : {}),
       business_day_mode: branchForm.business_day_mode || 'fixed_time',
       business_day_start: branchForm.business_day_start || '00:00',
       business_day_end: branchForm.business_day_end || '00:00',
