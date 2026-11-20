@@ -60,6 +60,10 @@ export function SettingsControlCenterPage() {
 
   const [active, setActive] = useState<SettingsTab>('branch_profile');
   const [saving, setSaving] = useState(false);
+  const [customerTheme, setCustomerTheme] = useState<'light' | 'dark'>('dark');
+  const [themeSaving, setThemeSaving] = useState(false);
+  const [themeMessage, setThemeMessage] = useState('');
+
 
   const myBranchId = user?.branch_id || (branches[0]?.id ?? '');
   const [selectedBranchId, setSelectedBranchId] = useState<string>(myBranchId);
@@ -69,6 +73,37 @@ export function SettingsControlCenterPage() {
   const [loadingStaff, setLoadingStaff] = useState(false);
 
   const targetBranchId = selectedBranchId || myBranchId;
+  useEffect(() => {
+    let alive = true;
+    setThemeMessage('');
+    if (!targetBranchId) return;
+    void supabase.rpc('branch_website_theme_settings', { p_branch: targetBranchId })
+      .then(({ data, error }) => {
+        if (!alive) return;
+        if (error) setThemeMessage(isAr ? 'تعذر تحميل مظهر موقع الفرع' : 'Could not load branch website theme');
+        else if (data === 'dark' || data === 'light') setCustomerTheme(data);
+      });
+    return () => { alive = false; };
+  }, [targetBranchId, isAr]);
+
+  const publishBranchTheme = async (mode: 'light' | 'dark') => {
+    if (!targetBranchId) return;
+    setThemeSaving(true); setThemeMessage('');
+    const { error } = await supabase.rpc('branch_website_theme_save', { p_branch: targetBranchId, p_mode: mode });
+    setThemeSaving(false);
+    if (error) {
+      setThemeMessage(isAr ? 'تغير مظهر النظام على جهازك، لكن تعذر نشر المظهر لموقع الفرع: ' + error.message : 'App mode changed locally, but customer theme could not be published: ' + error.message);
+    } else {
+      setCustomerTheme(mode);
+      setThemeMessage(isAr ? 'تم تحديث مظهر النظام ونشر المظهر على موقع الفرع وصفحة الطلبات.' : 'App theme changed and branch customer theme published.');
+    }
+  };
+
+  const changeThemeMode = (mode: 'light' | 'dark') => {
+    setTheme(mode);
+    void publishBranchTheme(mode);
+  };
+
   useEffect(() => {
     if (targetBranchId) {
       const row = branchSettingsMap[targetBranchId] || null;
@@ -115,7 +150,7 @@ export function SettingsControlCenterPage() {
     const p = findUiTheme(key);
     if (!p) return;
     setUiTheme(key);
-    setTheme(p.mode);
+    void publishBranchTheme(p.mode);
   };
 
   const saveBranchSpecific = async () => {
@@ -768,22 +803,29 @@ export function SettingsControlCenterPage() {
 
               <div>
                 <p className="text-xs font-bold text-ui-text mb-2">{isAr ? 'وضع الإضاءة:' : 'Theme Mode:'}</p>
+                <p className="mb-3 text-xs text-ui-muted">{isAr ? 'اختيارك يغيّر واجهة Premier على هذا الجهاز، وينشر نفس الوضع لموقع الفرع المحدد وصفحة طلبات عملائه.' : 'Changing mode updates Premier on this device and publishes the selected branch website and customer ordering theme.'}</p>
                 <div className="flex gap-2">
                   <Button
                     variant={theme === 'light' ? 'primary' : 'outline'}
                     size="sm"
-                    onClick={() => setTheme('light')}
+                    onClick={() => changeThemeMode('light')}
                   >
                     {isAr ? 'الوضع النهاري (Light)' : 'Light'}
                   </Button>
                   <Button
                     variant={theme === 'dark' ? 'primary' : 'outline'}
                     size="sm"
-                    onClick={() => setTheme('dark')}
+                    onClick={() => changeThemeMode('dark')}
                   >
                     {isAr ? 'الوضع الليلي (Dark)' : 'Dark'}
                   </Button>
                 </div>
+                <p role="status" className="mt-3 text-xs text-ui-muted">
+                  {isAr ? 'مظهر عملاء الفرع المحفوظ: ' : 'Published customer theme: '}
+                  <strong className="text-ui-text">{customerTheme === 'dark' ? 'Dark' : 'Light'}</strong>
+                  {themeSaving ? (isAr ? ' · جارٍ النشر…' : ' · Publishing…') : ''}
+                </p>
+                {themeMessage && <p role="status" className="mt-2 text-xs text-ui-muted">{themeMessage}</p>}
               </div>
 
               <div>
