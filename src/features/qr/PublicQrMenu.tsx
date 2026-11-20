@@ -35,7 +35,7 @@ function demoSymbol(name: string, category?: string) {
 function FoodImage({ product, large = false, demo = false }: { product: QrProduct; large?: boolean; demo?: boolean }) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [product.image_url, product.id]);
-  const frame = product.image_url?.match(/(?:^|\\/)catalog-product-sprite\\.svg#([a-z0-9-]+)$/i)?.[1];
+  const frame = product.image_url?.match(/catalog-product-sprite[.]svg#([a-z0-9-]+)$/i)?.[1];
   const src = frame ? `${import.meta.env.BASE_URL}catalog-product-sprite.svg#${frame}` : product.image_url;
   if (demo) {
     return <div className={`bunker-demo-photo${large ? ' bunker-demo-photo-large' : ''}`}>
