@@ -1,3 +1,4 @@
+import { WebsitePhotosSettings } from '@/features/qr/WebsitePhotosSettings';
 import { WebsiteSocialSettings } from '@/features/qr/WebsiteSocialSettings';
 import { CustomerOrderSettings } from '@/features/qr/CustomerOrderSettings';
 import { useEffect, useState, useCallback } from 'react';
@@ -241,7 +242,7 @@ export function SettingsControlCenterPage() {
         </div>
 
         <div className="md:col-span-3 space-y-6">
-          {active === 'website_social' && <WebsiteSocialSettings key={targetBranchId} branchId={targetBranchId} />}
+          {active === 'website_social' && <><WebsitePhotosSettings key={`photos-${targetBranchId}`} branchId={targetBranchId} /><WebsiteSocialSettings key={targetBranchId} branchId={targetBranchId} /></>}
           {active === 'customer_orders' && <CustomerOrderSettings key={targetBranchId} branchId={targetBranchId} />}
           {active === 'branch_profile' && (
             <Card className="space-y-6 p-4 sm:p-6">
