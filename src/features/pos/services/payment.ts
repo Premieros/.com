@@ -289,13 +289,24 @@ export async function getManualPaymentApprovalStatus(requestId: string): Promise
 }
 
 export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ result: ProcessSaleResult | null; error: string | null }> {
-  // Authoritative Business Logic Check: Negative Stock Policy
-  // If negative stock is disabled, check effective available stock (accounting for unsynced local outbox sales)
+  // Online sales must use the server's branch-specific setting. IndexedDB can
+  // contain an older value even after the manager enabled negative stock.
+  // Offline capture intentionally falls back to the last cached branch setting.
+  const explicitlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
   const branchSettings = await SettingsRepository.getBranchSettings(p.p_branch_id);
   const globalSettings = await SettingsRepository.getGlobalSettings();
-  const allowNegative = branchSettings?.allow_negative_stock ?? globalSettings?.allow_negative_stock ?? false;
-
-  const explicitlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
+  let allowNegative = branchSettings?.allow_negative_stock ?? globalSettings?.allow_negative_stock ?? false;
+  if (!explicitlyOffline) {
+    const { data: serverAllowsNegative, error: policyError } = await supabase.rpc(
+      'effective_allow_negative_stock', { p_branch_id: p.p_branch_id },
+    );
+    if (policyError) {
+      // Don't misreport an unknown policy as "negative stock disabled".
+      // Failing closed also prevents a stale offline cache from loosening policy.
+      return { result: null, error: `STOCK_POLICY_UNAVAILABLE: ${policyError.message}` };
+    }
+    allowNegative = serverAllowsNegative === true;
+  }
   if (explicitlyOffline && (p.p_payment_method === 'instapay' || p.p_payment_method === 'bank_transfer')) {
     return { result: null, error: 'MANUAL_PAYMENT_REQUIRES_ONLINE_APPROVAL' };
   }
