@@ -403,3 +403,70 @@ body:has(.bunker-customer[data-bunker-theme="light"]){background:#eee6d9!importa
   background:#f4e4cc;border-color:#c1a27c;color:#49301d;
 }
 .bunker-customer[data-bunker-theme="light"] .customer-demo-notice strong{color:#49301d}
+
+
+/* BUNKER product photography: soft transparent-looking cutouts rather than
+   rectangular stock-photo backgrounds. The original images stay replaceable
+   in Premier's product editor. */
+.bunker-customer .customer-product-image,
+.bunker-customer .customer-detail-image {
+  isolation:isolate;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+.bunker-customer .customer-product-image .customer-image-content,
+.bunker-customer .customer-detail-image .customer-image-content {
+  background:transparent!important;
+  border:0!important;
+  overflow:visible;
+}
+.bunker-customer .customer-product-image .customer-full-image,
+.bunker-customer .customer-detail-image .customer-full-image {
+  background:transparent!important;
+  border-radius:0!important;
+  object-fit:contain!important;
+  -webkit-mask-image:radial-gradient(ellipse 67% 69% at 50% 50%,#000 48%,rgba(0,0,0,.95) 65%,transparent 98%);
+  mask-image:radial-gradient(ellipse 67% 69% at 50% 50%,#000 48%,rgba(0,0,0,.95) 65%,transparent 98%);
+  filter:drop-shadow(0 12px 16px rgba(0,0,0,.18))!important;
+}
+.bunker-customer .bunker-order-photo-grid {
+  align-items:center;
+  padding:12px 10px 18px;
+  background:linear-gradient(135deg,#221a14,#15110e);
+  border:1px solid #4b3728;border-radius:22px;
+}
+.bunker-customer .bunker-order-photo-grid img {
+  object-fit:contain!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  -webkit-mask-image:radial-gradient(ellipse 67% 69% at center,#000 46%,rgba(0,0,0,.96) 63%,transparent 99%);
+  mask-image:radial-gradient(ellipse 67% 69% at center,#000 46%,rgba(0,0,0,.96) 63%,transparent 99%);
+}
+.bunker-customer[data-bunker-theme="light"] .bunker-order-photo-grid {
+  background:linear-gradient(135deg,#f3e9da,#e6d5bf);
+  border-color:#d6c4ac;
+}
+.bunker-customer[data-bunker-theme="light"] .customer-product-image,
+.bunker-customer[data-bunker-theme="light"] .customer-detail-image {
+  background:transparent!important;border:0!important;
+}
+/* Keep the simulated order clearly separate from a paid order receipt. */
+.bunker-customer .customer-demo-summary {
+  display:grid;gap:12px;margin:20px 0;
+}
+.bunker-customer .customer-demo-summary-line {
+  display:grid;grid-template-columns:minmax(0,1fr) auto;gap:5px 12px;
+  padding:15px;border:1px solid #56412c;border-radius:14px;
+  background:#241b15;color:#f2dfc2;
+}
+.bunker-customer .customer-demo-summary-line small {
+  grid-column:1/-1;color:#d2bb9d;
+}
+.bunker-customer[data-bunker-theme="light"] .customer-demo-summary-line {
+  background:#f3e6d3;border-color:#d4bda2;color:#392819;
+}
+.bunker-customer[data-bunker-theme="light"] .customer-demo-summary-line small {
+  color:#715539;
+}
