@@ -1,78 +1,637 @@
 <!doctype html>
 <html lang="en" dir="ltr">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#090909">
-  <meta name="description" content="BUNKER — Burger & Specialty Coffee. Bold bites, carefully crafted coffee. Discover the experience and order online.">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <meta name="theme-color" content="#0b0b0b" />
   <title>BUNKER | Burger & Specialty Coffee</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 60 60'%3E%3Crect width='60' height='60' rx='9' fill='%23090909'/%3E%3Ctext x='30' y='42' fill='%23F4DEC0' text-anchor='middle' font-family='Arial Black,Arial' font-weight='900' font-size='41'%3EB%3C/text%3E%3C/svg%3E">
+  <meta name="description" content="BUNKER — Burger & Specialty Coffee. Premium BUNKER website with professional demo imagery and a staff-only local preview editor." />
   <style>
-    :root{--black:#090909;--cream:#f4dec0;--cream2:#dfc59e;--muted:#ab9d8c;--line:rgba(244,222,192,.17);--panel:#151311}
-    *{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;background:var(--black);color:var(--cream);font-family:Inter,"Segoe UI",Arial,sans-serif;-webkit-font-smoothing:antialiased}
-    a{text-decoration:none;color:inherit}button,a{ -webkit-tap-highlight-color:transparent}a:focus-visible{outline:3px solid var(--cream);outline-offset:5px}
-    header{position:sticky;top:0;z-index:20;height:77px;display:flex;align-items:center;justify-content:space-between;gap:16px;padding:0 clamp(18px,5.5vw,94px);background:rgba(9,9,9,.95);border-bottom:1px solid var(--line);backdrop-filter:blur(18px)}
-    .brand{font-family:Impact,"Arial Black",sans-serif;font-weight:900;font-size:28px;letter-spacing:.07em;line-height:1}.header-right{display:flex;align-items:center;gap:32px}.nav-link{font-size:12px;font-weight:700;letter-spacing:.13em;color:#d5c2a8}
-    .cta{display:inline-flex;align-items:center;justify-content:center;gap:12px;background:var(--cream);border:1px solid var(--cream);border-radius:3px;color:#13100c;font-weight:800;font-size:12px;letter-spacing:.12em;text-transform:uppercase;padding:17px 22px;transition:.2s}.cta:hover{background:#fff2dd;transform:translateY(-2px)}.cta svg{width:17px;height:17px}
-    .hero{min-height:min(830px,calc(100svh - 77px));position:relative;isolation:isolate;display:grid;place-items:center;text-align:center;overflow:hidden;padding:80px 20px 100px;background:radial-gradient(ellipse 65% 42% at 50% 45%,rgba(91,65,36,.37),transparent 75%),linear-gradient(130deg,#070707,#191510 53%,#090909)}
-    .hero:before{content:"";position:absolute;inset:20px;border:1px solid rgba(244,222,192,.12);pointer-events:none;z-index:-1}.hero:after{content:"";position:absolute;bottom:-230px;left:50%;transform:translateX(-50%);width:580px;height:440px;background:#ddac6d;opacity:.06;filter:blur(100px);border-radius:100%;z-index:-1}
-    .eyebrow{font-size:11px;letter-spacing:.47em;color:var(--cream2);font-weight:800;margin:0 0 32px}.hero-wordmark{margin:0;line-height:.85;font-family:Impact,"Arial Black",sans-serif;font-stretch:condensed;font-weight:1000;font-size:clamp(78px,16.4vw,240px);letter-spacing:-.055em;transform:scaleX(.95);text-shadow:0 15px 38px #0007}.brand-sub{font-size:clamp(10px,1.5vw,18px);font-weight:700;letter-spacing:clamp(.15em,.6vw,.43em);margin:27px 0 0}
-    .hero-rule{height:1px;background:#9e8b71;opacity:.7;max-width:110px;margin:43px auto 30px}.hero-intro{font-size:clamp(15px,2vw,19px);color:#d2c2ad;max-width:560px;line-height:1.8;margin:0 auto 29px}.hero-bottom{position:absolute;bottom:35px;left:50%;transform:translateX(-50%);color:#a99275;font-size:10px;white-space:nowrap;letter-spacing:.33em}
-    .marquee{border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:22px 14px;text-align:center;color:#c5ad8d;font-weight:800;letter-spacing:.38em;font-size:12px}
-    .section{max-width:1280px;margin:auto;padding:110px clamp(18px,6vw,80px)}.section-label{font-size:11px;letter-spacing:.32em;font-weight:900;color:#a99275}.section-heading{font-family:Impact,"Arial Black",sans-serif;font-size:clamp(46px,7vw,86px);letter-spacing:.015em;line-height:1.03;margin:18px 0 40px}
-    .cards{display:grid;grid-template-columns:1fr 1fr;gap:22px}.card{position:relative;min-height:420px;overflow:hidden;background:radial-gradient(circle at 70% 36%,#443323 0%,#16120e 50%,#0e0c0a 100%);border:1px solid var(--line);display:flex;flex-direction:column;justify-content:flex-end;padding:39px}.card.coffee{background:radial-gradient(circle at 65% 32%,#49352b,#19130f 50%,#0c0b0a)}
-    .card:before{content:"";position:absolute;top:39px;right:39px;border:1px solid #b89f7d;width:120px;height:120px;border-radius:50%;opacity:.3}.card-icon{position:absolute;top:85px;left:50%;transform:translateX(-50%);font-size:112px;filter:drop-shadow(0 24px 20px #0008)}.card-name{font:900 clamp(33px,4vw,55px)/1 Impact,"Arial Black",sans-serif;letter-spacing:.04em;margin:0 0 12px;position:relative}.card-copy{position:relative;color:#c7b7a1;line-height:1.7;font-size:15px;max-width:320px;margin:0}.card-number{position:absolute;top:35px;left:37px;font-size:12px;color:#a38a6c;letter-spacing:.18em}
-    .order-band{margin-top:28px;padding:57px 52px;background:#ede0c7;color:#16120f;display:flex;align-items:center;justify-content:space-between;gap:22px}.order-band h2{font:900 clamp(36px,5vw,63px)/1 Impact,"Arial Black",sans-serif;margin:0 0 14px}.order-band p{color:#554939;margin:0;font-size:15px}.dark-cta{background:#111;color:var(--cream);border:1px solid #111}.dark-cta:hover{background:#30251b}
-    footer{padding:40px clamp(18px,6vw,80px);border-top:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:20px;color:#a99780;font-size:12px;letter-spacing:.1em}
-    @media(max-width:700px){header{height:70px}.brand{font-size:22px}.header-right{gap:12px}.nav-link{display:none}.cta{font-size:10px;letter-spacing:.06em;padding:14px 13px}.hero{min-height:650px;padding:75px 14px 100px}.hero:before{inset:12px}.eyebrow{letter-spacing:.23em}.brand-sub{letter-spacing:.15em;margin-top:19px}.hero-rule{margin-top:32px}.section{padding:76px 18px}.cards{grid-template-columns:1fr}.card{min-height:355px;padding:27px}.card-icon{font-size:96px}.order-band{padding:39px 25px;flex-direction:column;align-items:flex-start}.order-band .cta{width:100%}footer{flex-direction:column;align-items:flex-start;line-height:1.7}}
-    @media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.cta{transition:none}}
+    :root {
+      --bg:#0b0b0b;
+      --bg-soft:#121212;
+      --panel:#171717;
+      --panel-2:#1d1a18;
+      --text:#f1e1c3;
+      --muted:#d1bfa2;
+      --subtle:#a89375;
+      --line:rgba(241,225,195,.13);
+      --accent:#f1e1c3;
+      --accent-ink:#16120f;
+      --shadow:0 18px 60px rgba(0,0,0,.35);
+      --radius:22px;
+      --max:1280px;
+    }
+    *{box-sizing:border-box}
+    html{scroll-behavior:smooth}
+    body{
+      margin:0;
+      background:linear-gradient(180deg,#0a0a0a 0%, #0d0b0a 100%);
+      color:var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, "Segoe UI", Arial, sans-serif;
+      -webkit-font-smoothing:antialiased;
+      text-rendering:optimizeLegibility;
+    }
+    a{color:inherit;text-decoration:none}
+    img{display:block;max-width:100%}
+    .shell{width:min(100% - 32px, var(--max));margin:0 auto}
+    .btn{
+      display:inline-flex;align-items:center;justify-content:center;gap:10px;
+      padding:15px 24px;border-radius:999px;border:1px solid var(--accent);
+      background:var(--accent);color:var(--accent-ink);font-weight:800;letter-spacing:.08em;
+      text-transform:uppercase;font-size:12px;transition:transform .2s ease, box-shadow .2s ease, background .2s ease;
+      box-shadow:0 10px 30px rgba(241,225,195,.18);
+      cursor:pointer;
+    }
+    .btn:hover{transform:translateY(-2px);background:#fff0d7}
+    .btn.secondary{background:transparent;color:var(--text);box-shadow:none}
+    .btn.secondary:hover{background:rgba(255,255,255,.04)}
+    .eyebrow{letter-spacing:.38em;font-weight:800;font-size:11px;color:var(--subtle);text-transform:uppercase}
+    .section-title{
+      font-family:Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+      font-weight:900;letter-spacing:.03em;line-height:.95;
+      font-size:clamp(38px,6vw,84px);margin:16px 0 18px;
+    }
+    .copy{color:var(--muted);line-height:1.85;font-size:16px}
+    header{
+      position:sticky;top:0;z-index:50;
+      backdrop-filter:blur(16px);
+      background:rgba(11,11,11,.78);
+      border-bottom:1px solid var(--line);
+    }
+    .nav{
+      width:min(100% - 32px,var(--max));margin:0 auto;
+      display:flex;align-items:center;justify-content:space-between;
+      min-height:78px;gap:16px;
+    }
+    .brand{
+      font-family:Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+      font-size:32px;letter-spacing:.08em;font-weight:900;
+    }
+    .nav-links{display:flex;align-items:center;gap:24px}
+    .nav-links a{font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
+    .hero{
+      position:relative;min-height:92svh;display:grid;align-items:stretch;
+      border-bottom:1px solid var(--line);
+      overflow:hidden;
+    }
+    .hero-media{
+      position:absolute;inset:0;
+    }
+    .hero-media::after{
+      content:"";position:absolute;inset:0;
+      background:
+        linear-gradient(90deg, rgba(11,11,11,.82) 0%, rgba(11,11,11,.55) 38%, rgba(11,11,11,.3) 58%, rgba(11,11,11,.78) 100%),
+        linear-gradient(180deg, rgba(11,11,11,.05) 0%, rgba(11,11,11,.18) 50%, rgba(11,11,11,.78) 100%);
+    }
+    .hero-media img{width:100%;height:100%;object-fit:cover}
+    .hero-content{
+      position:relative;z-index:2;
+      width:min(100% - 32px,var(--max));margin:0 auto;
+      display:grid;grid-template-columns:minmax(0,700px) 1fr;
+      align-items:end;padding:110px 0 70px;gap:28px;
+      min-height:92svh;
+    }
+    .hero-wordmark{
+      font-family:Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;
+      font-size:clamp(76px,18vw,214px);line-height:.8;margin:.14em 0 .07em;
+      letter-spacing:-.04em;text-shadow:0 14px 45px rgba(0,0,0,.33);
+    }
+    .hero-sub{font-size:clamp(11px,1.7vw,18px);letter-spacing:.42em;font-weight:800;color:var(--muted);text-transform:uppercase}
+    .hero-copy{max-width:560px;margin:24px 0 32px;color:#efe3d1;line-height:1.9;font-size:17px}
+    .hero-panel{
+      align-self:end;justify-self:end;max-width:360px;
+      background:rgba(12,12,12,.55);border:1px solid rgba(241,225,195,.14);
+      border-radius:var(--radius);padding:24px;backdrop-filter:blur(10px);box-shadow:var(--shadow)
+    }
+    .hero-panel h3{margin:0 0 12px;font-size:14px;letter-spacing:.18em;text-transform:uppercase;color:var(--subtle)}
+    .hero-panel p{margin:0;color:var(--muted);line-height:1.75;font-size:14px}
+    .hero-actions{display:flex;flex-wrap:wrap;gap:14px}
+    .section{padding:90px 0}
+    .grid-2{display:grid;grid-template-columns:1.1fr .9fr;gap:26px;align-items:stretch}
+    .feature-stack{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+    .card{
+      background:linear-gradient(180deg,var(--panel) 0%, #111 100%);
+      border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow)
+    }
+    .photo-card{display:grid;grid-template-rows:260px auto}
+    .photo-card img{width:100%;height:100%;object-fit:cover}
+    .card-body{padding:24px}
+    .card h3{margin:0 0 10px;font-size:28px;font-family:Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;letter-spacing:.04em}
+    .card p{margin:0;color:var(--muted);line-height:1.75}
+    .split-showcase{display:grid;grid-template-columns:1fr 1fr;gap:22px;margin-top:26px}
+    .big-banner{
+      position:relative;overflow:hidden;border-radius:var(--radius);
+      min-height:460px;border:1px solid var(--line);box-shadow:var(--shadow)
+    }
+    .big-banner img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+    .big-banner::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,11,11,.08),rgba(11,11,11,.76))}
+    .big-banner .content{position:absolute;left:0;right:0;bottom:0;padding:34px;z-index:2}
+    .pill{display:inline-flex;padding:8px 12px;border:1px solid rgba(241,225,195,.2);border-radius:999px;background:rgba(0,0,0,.25);font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+    .gallery{display:grid;grid-template-columns:1.1fr .9fr .9fr;gap:18px}
+    .gallery .tile{
+      position:relative;min-height:260px;overflow:hidden;border-radius:20px;border:1px solid var(--line);
+      box-shadow:var(--shadow)
+    }
+    .gallery .tile.tall{grid-row:span 2;min-height:540px}
+    .gallery .tile img{width:100%;height:100%;object-fit:cover}
+    .gallery .tile::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(11,11,11,.03),rgba(11,11,11,.55))}
+    .gallery .tile .label{position:absolute;left:18px;bottom:18px;z-index:2;font-weight:800;letter-spacing:.16em;text-transform:uppercase;font-size:12px}
+    .cta-band{
+      background:linear-gradient(135deg,#f1e1c3 0%, #e3ccb0 100%);color:#15110d;
+      border-radius:28px;padding:42px;border:1px solid rgba(255,255,255,.12);box-shadow:var(--shadow)
+    }
+    .cta-band .inner{display:flex;gap:22px;justify-content:space-between;align-items:center}
+    .cta-band h2{font-family:Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;font-size:clamp(34px,5vw,68px);line-height:.94;margin:0 0 10px}
+    .cta-band p{margin:0;color:#4b3d2d;line-height:1.7;max-width:650px}
+    footer{padding:34px 0 50px;border-top:1px solid var(--line);color:var(--subtle)}
+    footer .row{display:flex;justify-content:space-between;gap:20px;align-items:center}
+    .mini{font-size:12px;letter-spacing:.12em;text-transform:uppercase}
+    .edit-toggle{
+      position:fixed;right:18px;bottom:18px;z-index:60;display:none;
+      background:#15110d;color:var(--text);border:1px solid rgba(241,225,195,.2);
+      padding:14px 16px;border-radius:999px;box-shadow:var(--shadow);font-weight:800;letter-spacing:.08em;cursor:pointer
+    }
+    .edit-toggle.show{display:inline-flex;align-items:center;gap:10px}
+    .edit-panel-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:69;display:none}
+    .edit-panel-backdrop.show{display:block}
+    .edit-panel{
+      position:fixed;top:0;right:0;bottom:0;z-index:70;width:min(540px,100%);
+      background:#121111;border-left:1px solid var(--line);transform:translateX(100%);
+      transition:transform .22s ease;display:flex;flex-direction:column;
+      box-shadow:-12px 0 40px rgba(0,0,0,.4)
+    }
+    .edit-panel.show{transform:translateX(0)}
+    .edit-head{padding:22px 22px 14px;border-bottom:1px solid var(--line)}
+    .edit-head h3{margin:0 0 8px;font-size:26px;font-family:Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;letter-spacing:.04em}
+    .edit-head p{margin:0;color:var(--muted);line-height:1.6;font-size:14px}
+    .edit-body{padding:18px 22px 24px;overflow:auto;display:grid;gap:14px}
+    .field{display:grid;gap:8px}
+    .field label{font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--subtle);font-weight:800}
+    .field input,.field textarea{
+      width:100%;padding:12px 14px;border-radius:14px;border:1px solid var(--line);background:#0d0d0d;color:var(--text);
+      font:inherit
+    }
+    .field textarea{min-height:98px;resize:vertical}
+    .edit-actions{display:flex;gap:10px;flex-wrap:wrap;padding-top:6px}
+    .hint{font-size:12px;color:var(--subtle);line-height:1.6}
+    .field-group{border:1px solid var(--line);border-radius:18px;padding:16px;background:rgba(255,255,255,.02)}
+    .field-group h4{margin:0 0 12px;font-size:18px;font-family:Impact, Haettenschweiler, "Arial Narrow Bold", sans-serif;letter-spacing:.04em}
+    [data-editable-image], [data-editable-text]{scroll-margin-top:100px}
+    @media (max-width: 980px) {
+      .hero-content,.grid-2,.gallery,.cta-band .inner{grid-template-columns:1fr;display:grid}
+      .feature-stack,.split-showcase{grid-template-columns:1fr}
+      .hero{min-height:auto}
+      .hero-content{min-height:auto;padding:88px 0 56px}
+      .hero-panel{justify-self:start}
+      .gallery .tile.tall{grid-row:span 1;min-height:300px}
+      .nav-links a:not(.btn){display:none}
+    }
+    @media (max-width: 640px) {
+      .nav{min-height:72px}
+      .brand{font-size:26px}
+      .btn{padding:13px 18px;font-size:11px}
+      .hero-wordmark{font-size:min(30vw,138px)}
+      .hero-copy{font-size:15px}
+      .photo-card{grid-template-rows:220px auto}
+      .cta-band{padding:28px 22px}
+      footer .row{display:grid}
+    }
   </style>
 </head>
 <body>
-<header>
-  <a class="brand" href="#top" aria-label="BUNKER home">BUNKER</a>
-  <nav class="header-right" aria-label="Main navigation">
-    <a class="nav-link" href="#discover">EXPLORE</a>
-    <a class="cta" href="../?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62">ORDER NOW <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M5 12h14m-6-6 6 6-6 6"/></svg></a>
-  </nav>
-</header>
-<main id="top">
-  <section class="hero" aria-labelledby="hero-title">
-    <div>
-      <p class="eyebrow">WELCOME TO THE BUNKER</p>
-      <h1 class="hero-wordmark" id="hero-title">BUNKER</h1>
-      <p class="brand-sub">BURGER &amp; SPECIALTY COFFEE</p>
-      <div class="hero-rule"></div>
-      <p class="hero-intro">Bold burgers. Beautifully crafted coffee.<br>One place for the good stuff.</p>
-      <a class="cta" href="../?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62">EXPLORE &amp; ORDER <span aria-hidden="true">↗</span></a>
+  <header>
+    <div class="nav">
+      <a class="brand" href="#home">BUNKER</a>
+      <div class="nav-links">
+        <a href="#experience">Experience</a>
+        <a href="#gallery">Gallery</a>
+        <a href="#order">Order</a>
+        <a class="btn" href="../?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62">Order now</a>
+      </div>
     </div>
-    <div class="hero-bottom">SCROLL TO DISCOVER ↓</div>
-  </section>
-  <div class="marquee" aria-label="Brand statement">BOLD BITES &nbsp; · &nbsp; GREAT COFFEE &nbsp; · &nbsp; GOOD TIMES</div>
-  <section class="section" id="discover" aria-labelledby="discover-title">
-    <span class="section-label">CRAFTED WITH CHARACTER</span>
-    <h2 class="section-heading" id="discover-title">TWO CRAVINGS.<br>ONE DESTINATION.</h2>
-    <div class="cards">
-      <article class="card">
-        <span class="card-number">01 / THE FOOD</span>
-        <span class="card-icon" aria-hidden="true">🍔</span>
-        <h3 class="card-name">THE BURGERS</h3>
-        <p class="card-copy">Big on flavor. Made for those moments when only a really good burger will do.</p>
-      </article>
-      <article class="card coffee">
-        <span class="card-number">02 / THE COFFEE</span>
-        <span class="card-icon" aria-hidden="true">☕</span>
-        <h3 class="card-name">THE COFFEE</h3>
-        <p class="card-copy">Your coffee moment, made with care. Specialty coffee worth slowing down for.</p>
-      </article>
+  </header>
+
+  <main id="home">
+    <section class="hero">
+      <div class="hero-media">
+        <img id="heroImage" data-editable-image="heroImage" alt="BUNKER hero image" />
+      </div>
+      <div class="hero-content">
+        <div>
+          <div class="eyebrow" data-editable-text="eyebrow">Welcome to the Bunker</div>
+          <div class="hero-wordmark">BUNKER</div>
+          <div class="hero-sub" data-editable-text="heroSub">Burger &amp; Specialty Coffee</div>
+          <p class="hero-copy" id="heroCopy" data-editable-text="heroCopy"></p>
+          <div class="hero-actions">
+            <a class="btn" href="../?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62">Order now</a>
+            <a class="btn secondary" href="#experience">Explore the menu</a>
+          </div>
+        </div>
+        <aside class="hero-panel">
+          <h3>Branch Spotlight</h3>
+          <p id="heroPanel" data-editable-text="heroPanel"></p>
+        </aside>
+      </div>
+    </section>
+
+    <section class="section" id="experience">
+      <div class="shell">
+        <div class="eyebrow" data-editable-text="experienceEyebrow">Premium comfort, bold flavor</div>
+        <h2 class="section-title" data-editable-text="experienceTitle">Built for burger cravings and coffee moments.</h2>
+        <p class="copy" id="experienceCopy" data-editable-text="experienceCopy"></p>
+
+        <div class="grid-2" style="margin-top:34px">
+          <div class="big-banner">
+            <img id="featureImage" data-editable-image="featureImage" alt="Feature image" />
+            <div class="content">
+              <span class="pill" data-editable-text="featureBadge">Signature selection</span>
+              <h3 style="margin:0 0 12px;font-size:40px;font-family:Impact,Haettenschweiler,'Arial Narrow Bold',sans-serif;letter-spacing:.04em" data-editable-text="featureTitle">Every bite has a point of view.</h3>
+              <p class="copy" style="max-width:560px" id="featureCopy" data-editable-text="featureCopy"></p>
+            </div>
+          </div>
+          <div class="feature-stack">
+            <article class="card photo-card">
+              <img id="burgerImage" data-editable-image="burgerImage" alt="Burger image" />
+              <div class="card-body">
+                <div class="eyebrow">Burgers</div>
+                <h3 data-editable-text="burgerTitle">Stacked, seared, unforgettable.</h3>
+                <p id="burgerCopy" data-editable-text="burgerCopy"></p>
+              </div>
+            </article>
+            <article class="card photo-card">
+              <img id="coffeeImage" data-editable-image="coffeeImage" alt="Coffee image" />
+              <div class="card-body">
+                <div class="eyebrow">Specialty coffee</div>
+                <h3 data-editable-text="coffeeTitle">Crafted for slow sips and great company.</h3>
+                <p id="coffeeCopy" data-editable-text="coffeeCopy"></p>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <div class="split-showcase">
+          <article class="card photo-card">
+            <img id="interiorImage" data-editable-image="interiorImage" alt="Interior image" />
+            <div class="card-body">
+              <div class="eyebrow">Inside the branch</div>
+              <h3 data-editable-text="interiorTitle">A place that feels designed, not crowded.</h3>
+              <p id="interiorCopy" data-editable-text="interiorCopy"></p>
+            </div>
+          </article>
+          <article class="card photo-card">
+            <img id="dessertImage" data-editable-image="dessertImage" alt="Extra menu image" />
+            <div class="card-body">
+              <div class="eyebrow">More to explore</div>
+              <h3 data-editable-text="dessertTitle">Details that complete the visit.</h3>
+              <p id="dessertCopy" data-editable-text="dessertCopy"></p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="gallery" style="padding-top:0">
+      <div class="shell">
+        <div class="eyebrow">Visual moodboard</div>
+        <h2 class="section-title" data-editable-text="galleryTitle">A demo gallery worthy of a premium launch.</h2>
+        <div class="gallery">
+          <div class="tile tall">
+            <img id="gallery1" data-editable-image="gallery1" alt="Gallery image 1" />
+            <div class="label">Bunker Signature</div>
+          </div>
+          <div class="tile">
+            <img id="gallery2" data-editable-image="gallery2" alt="Gallery image 2" />
+            <div class="label">Coffee Ritual</div>
+          </div>
+          <div class="tile">
+            <img id="gallery3" data-editable-image="gallery3" alt="Gallery image 3" />
+            <div class="label">Counter Mood</div>
+          </div>
+          <div class="tile">
+            <img id="gallery4" data-editable-image="gallery4" alt="Gallery image 4" />
+            <div class="label">Fresh Energy</div>
+          </div>
+          <div class="tile">
+            <img id="gallery5" data-editable-image="gallery5" alt="Gallery image 5" />
+            <div class="label">Late Night Bite</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section" id="order" style="padding-top:0">
+      <div class="shell">
+        <div class="cta-band">
+          <div class="inner">
+            <div>
+              <div class="eyebrow" style="color:#6f5f4c">Order through Premier</div>
+              <h2 data-editable-text="ctaTitle">Ready to order?</h2>
+              <p id="ctaCopy" data-editable-text="ctaCopy"></p>
+            </div>
+            <div style="display:flex;gap:12px;flex-wrap:wrap">
+              <a class="btn" href="../?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62">Open ordering</a>
+              <a class="btn secondary" href="#home" style="border-color:#1a1714;color:#1a1714">Back to top</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="shell row">
+      <div>
+        <div class="brand" style="font-size:24px">BUNKER</div>
+        <div class="mini">Burger &amp; Specialty Coffee</div>
+      </div>
+      <div class="mini">© <span id="year"></span> BUNKER. Demo branch website.</div>
     </div>
-    <aside class="order-band">
-      <div><h2>CRAVING BUNKER?</h2><p>Browse the branch menu and order through our Premier ordering page.</p></div>
-      <a class="cta dark-cta" href="../?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62">ORDER NOW <span aria-hidden="true">↗</span></a>
-    </aside>
-  </section>
-</main>
-<footer><strong>BUNKER · BURGER &amp; SPECIALTY COFFEE</strong><span>© <span id="year"></span> BUNKER. ALL RIGHTS RESERVED.</span></footer>
-<script>document.getElementById('year').textContent=new Date().getFullYear();</script>
+  </footer>
+
+  <button id="editToggle" class="edit-toggle" type="button">✦ Edit website</button>
+  <div id="editBackdrop" class="edit-panel-backdrop"></div>
+  <aside id="editPanel" class="edit-panel" aria-hidden="true">
+    <div class="edit-head">
+      <h3>Website editor</h3>
+      <p>
+        This local preview editor requires an active Premier login, settings-management permission, and BUNKER branch access. Changes are saved only on this device; they do not update the public site for other visitors.
+      </p>
+    </div>
+    <div class="edit-body" id="editBody"></div>
+  </aside>
+
+  <script>
+    const STORAGE_KEY = 'bunker_site_content_v2';
+    const ORDER_LINK = "../?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62";
+    const defaults = {
+      eyebrow: 'Welcome to the Bunker',
+      heroSub: 'Burger & Specialty Coffee',
+      heroCopy: 'A modern branch page with the energy of a premium burger brand and the calm of a specialty coffee spot. This version uses editable demo visuals so the team can replace them later with real BUNKER photography.',
+      heroPanel: 'Fast preview, premium feel. When a staff user visits this page, an edit button appears so images and text can be swapped without touching the code.',
+      experienceEyebrow: 'Premium comfort, bold flavor',
+      experienceTitle: 'Built for burger cravings and coffee moments.',
+      experienceCopy: 'This layout is designed to feel closer to polished brand websites: strong hero imagery, clear product storytelling, high-end spacing, elegant dark styling, and a clear path into the existing Premier ordering experience.',
+      featureBadge: 'Signature selection',
+      featureTitle: 'Every bite has a point of view.',
+      featureCopy: 'Use this space to spotlight your most wanted combo, featured burger, limited menu drop, or a branch message that supports the BUNKER brand tone.',
+      burgerTitle: 'Stacked, seared, unforgettable.',
+      burgerCopy: 'Replace this demo copy with your signature burger story, ingredients, or top-selling items when the final menu is ready.',
+      coffeeTitle: 'Crafted for slow sips and great company.',
+      coffeeCopy: 'Use the coffee panel to introduce your espresso bar, filter brews, iced drinks, or house specials.',
+      interiorTitle: 'A place that feels designed, not crowded.',
+      interiorCopy: 'Perfect for showing off the branch vibe, service counter, seating atmosphere, or late-night experience.',
+      dessertTitle: 'Details that complete the visit.',
+      dessertCopy: 'Keep this block for sides, desserts, seasonal items, or another supporting food shot.',
+      galleryTitle: 'A demo gallery worthy of a premium launch.',
+      ctaTitle: 'Ready to order?',
+      ctaCopy: 'When the customer is ready, send them straight into the current Premier QR ordering flow for the BUNKER branch.',
+      heroImage: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1800&q=80',
+      featureImage: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1400&q=80',
+      burgerImage: 'https://images.unsplash.com/photo-1572802419224-296b0aeee0d9?auto=format&fit=crop&w=1200&q=80',
+      coffeeImage: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80',
+      interiorImage: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1200&q=80',
+      dessertImage: 'https://images.unsplash.com/photo-1517705008128-361805f42e86?auto=format&fit=crop&w=1200&q=80',
+      gallery1: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=80',
+      gallery2: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=80',
+      gallery3: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80',
+      gallery4: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80',
+      gallery5: 'https://images.unsplash.com/photo-1552566626-52f8b828add9?auto=format&fit=crop&w=1200&q=80'
+    };
+
+    function loadContent() {
+      try {
+        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+        return { ...defaults, ...saved };
+      } catch (e) {
+        return { ...defaults };
+      }
+    }
+
+    let content = loadContent();
+
+    function setText(id, value) {
+      document.querySelectorAll(`[data-editable-text="${id}"]`).forEach(el => {
+        if ('value' in el) el.value = value;
+        else el.textContent = value;
+      });
+      const direct = document.getElementById(id);
+      if (direct) direct.textContent = value;
+    }
+
+    function setImage(id, url) {
+      document.querySelectorAll(`[data-editable-image="${id}"]`).forEach(el => el.src = url);
+    }
+
+    function render() {
+      Object.entries(content).forEach(([key, value]) => {
+        if (typeof value !== 'string') return;
+        if (key.toLowerCase().includes('image') || /^gallery\d+$/.test(key)) setImage(key, value);
+        else setText(key, value);
+      });
+      document.getElementById('year').textContent = new Date().getFullYear();
+    }
+
+    function save() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(content));
+      render();
+    }
+
+    function resetToDefault() {
+      content = { ...defaults };
+      save();
+      buildEditor();
+    }
+
+    function exportJson() {
+      const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'bunker-site-content.json';
+      a.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function importJson(file) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        try {
+          const parsed = JSON.parse(reader.result);
+          content = { ...content, ...parsed };
+          save();
+          buildEditor();
+        } catch (e) {
+          alert('Invalid JSON file.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function field(label, key, multiline=false) {
+      const current = content[key] || '';
+      return `
+        <div class="field">
+          <label for="${key}">${label}</label>
+          ${multiline
+            ? `<textarea id="${key}" data-key="${key}">${escapeHtml(current)}</textarea>`
+            : `<input id="${key}" data-key="${key}" value="${escapeAttr(current)}" />`
+          }
+        </div>
+      `;
+    }
+
+    function escapeHtml(str) {
+      return String(str)
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;');
+    }
+    function escapeAttr(str) { return escapeHtml(str).replaceAll("'", '&#39;'); }
+
+    function buildEditor() {
+      const body = document.getElementById('editBody');
+      body.innerHTML = `
+        <div class="field-group">
+          <h4>Hero & intro</h4>
+          ${field('Eyebrow', 'eyebrow')}
+          ${field('Hero subheading', 'heroSub')}
+          ${field('Hero intro copy', 'heroCopy', true)}
+          ${field('Hero side panel text', 'heroPanel', true)}
+          ${field('Hero image URL', 'heroImage')}
+        </div>
+
+        <div class="field-group">
+          <h4>Main storytelling</h4>
+          ${field('Experience eyebrow', 'experienceEyebrow')}
+          ${field('Experience title', 'experienceTitle')}
+          ${field('Experience copy', 'experienceCopy', true)}
+          ${field('Feature badge', 'featureBadge')}
+          ${field('Feature title', 'featureTitle')}
+          ${field('Feature copy', 'featureCopy', true)}
+          ${field('Feature image URL', 'featureImage')}
+        </div>
+
+        <div class="field-group">
+          <h4>Product cards</h4>
+          ${field('Burger title', 'burgerTitle')}
+          ${field('Burger copy', 'burgerCopy', true)}
+          ${field('Burger image URL', 'burgerImage')}
+          ${field('Coffee title', 'coffeeTitle')}
+          ${field('Coffee copy', 'coffeeCopy', true)}
+          ${field('Coffee image URL', 'coffeeImage')}
+          ${field('Interior title', 'interiorTitle')}
+          ${field('Interior copy', 'interiorCopy', true)}
+          ${field('Interior image URL', 'interiorImage')}
+          ${field('Extra card title', 'dessertTitle')}
+          ${field('Extra card copy', 'dessertCopy', true)}
+          ${field('Extra card image URL', 'dessertImage')}
+        </div>
+
+        <div class="field-group">
+          <h4>Gallery & CTA</h4>
+          ${field('Gallery title', 'galleryTitle')}
+          ${field('Gallery 1 image URL', 'gallery1')}
+          ${field('Gallery 2 image URL', 'gallery2')}
+          ${field('Gallery 3 image URL', 'gallery3')}
+          ${field('Gallery 4 image URL', 'gallery4')}
+          ${field('Gallery 5 image URL', 'gallery5')}
+          ${field('CTA title', 'ctaTitle')}
+          ${field('CTA copy', 'ctaCopy', true)}
+        </div>
+
+        <div class="field-group">
+          <h4>Editor actions</h4>
+          <div class="edit-actions">
+            <button class="btn" type="button" id="saveContent">Save changes</button>
+            <button class="btn secondary" type="button" id="resetContent">Reset demo content</button>
+            <button class="btn secondary" type="button" id="exportContent">Export JSON</button>
+            <label class="btn secondary" for="importContent" style="cursor:pointer">Import JSON</label>
+            <input id="importContent" type="file" accept="application/json" style="display:none" />
+          </div>
+          <p class="hint">
+            Tip: replace any demo image URL with your real BUNKER photo later.
+            Sign in to Premier OS with a user who has BUNKER branch access and settings-management permission to open the local preview editor.
+          </p>
+        </div>
+      `;
+
+      body.querySelectorAll('[data-key]').forEach(el => {
+        el.addEventListener('input', (e) => {
+          content[e.target.dataset.key] = e.target.value;
+        });
+      });
+      document.getElementById('saveContent').onclick = save;
+      document.getElementById('resetContent').onclick = resetToDefault;
+      document.getElementById('exportContent').onclick = exportJson;
+      document.getElementById('importContent').onchange = (e) => {
+        const file = e.target.files && e.target.files[0];
+        if (file) importJson(file);
+      };
+    }
+
+    async function canEditBunker() {
+      // A token in storage is not proof of authorization. Validate with Supabase
+      // and require both settings.manage and access to this exact branch.
+      const projectUrl = 'https://hvqlkapynjfjikqithvd.supabase.co';
+      const publishable = 'sb_publishable_9W6651rcdIsyBoegwGe_qw_MvCPRIPK';
+      const branchId = 'd56aae83-f1b3-4153-9224-87594500368d';
+      let token = '';
+      try {
+        for (const key of Object.keys(localStorage)) {
+          if (!/^sb-.*-auth-token$/.test(key)) continue;
+          const session = JSON.parse(localStorage.getItem(key) || '{}');
+          if (session.access_token && session.expires_at && session.expires_at * 1000 > Date.now()) {
+            token = session.access_token;
+            break;
+          }
+        }
+      } catch { return false; }
+      if (!token) return false;
+      const headers = { 'apikey': publishable, 'Authorization': 'Bearer ' + token };
+      try {
+        const me = await fetch(projectUrl + '/auth/v1/user', { headers });
+        if (!me.ok) return false;
+        const user = await me.json();
+        if (!user.id) return false;
+        const permission = await fetch(projectUrl + '/rest/v1/rpc/can_permission', {
+          method: 'POST', headers: { ...headers, 'Content-Type':'application/json' },
+          body: JSON.stringify({ p_permission:'settings.manage' })
+        });
+        if (!permission.ok || await permission.json() !== true) return false;
+        const access = await fetch(projectUrl + '/rest/v1/user_branch_access?select=branch_id&user_id=eq.' +
+          encodeURIComponent(user.id) + '&branch_id=eq.' + branchId + '&limit=1', {headers});
+        if (!access.ok) return false;
+        const rows = await access.json();
+        return Array.isArray(rows) && rows.length > 0;
+      } catch { return false; }
+    }
+
+    function openEditor() {
+      document.getElementById('editPanel').classList.add('show');
+      document.getElementById('editBackdrop').classList.add('show');
+      document.getElementById('editPanel').setAttribute('aria-hidden','false');
+    }
+    function closeEditor() {
+      document.getElementById('editPanel').classList.remove('show');
+      document.getElementById('editBackdrop').classList.remove('show');
+      document.getElementById('editPanel').setAttribute('aria-hidden','true');
+    }
+
+    render();
+    buildEditor();
+
+    const toggle = document.getElementById('editToggle');
+    void canEditBunker().then(allowed => {
+      if (!allowed) return;
+      toggle.classList.add('show');
+      toggle.addEventListener('click', openEditor);
+      document.getElementById('editBackdrop').addEventListener('click', closeEditor);
+      document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') closeEditor();
+      });
+    });
+  </script>
 </body>
 </html>
