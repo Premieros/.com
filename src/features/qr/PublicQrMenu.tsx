@@ -1,3 +1,4 @@
+import { useBunkerPublicTheme } from './useBunkerPublicTheme';
 import { supabase } from '@/api';
 import { BranchSocialLinks } from './BranchSocialLinks';
 import { useEffect, useRef, useState } from 'react';
@@ -30,6 +31,7 @@ function FoodImage({ product, large = false }: { product: QrProduct; large?: boo
 }
 export function PublicQrMenu({ token, identity, session, onClosed }: { token: string; identity?: GuestIdentity; session?: string; onClosed?: () => void }) {
   const isBunker = token === '3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62';
+  const bunkerMode = useBunkerPublicTheme(isBunker);
   const customerError = isBunker ? qrErrorEnglish : qrError;
   const secure = !!identity;
   const delivery = identity?.order_type === 'delivery';
@@ -148,7 +150,7 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
     setDetail(null); setReceipt('');
   }
   function changeQuantity(id: string, value: number) { setCart(c => ({ ...c, [id]: { ...c[id], quantity: Math.max(0, Math.min(99, Math.trunc(value) || 0)) } })); }
-  return <main dir={isBunker ? "ltr" : "rtl"} className={`customer-app${isBunker ? " bunker-customer" : ""}`}>
+  return <main dir={isBunker ? "ltr" : "rtl"} data-bunker-theme={isBunker ? bunkerMode : undefined} className={`customer-app${isBunker ? " bunker-customer" : ""}`}>
     {detail ? <>
       <header className="customer-detail-header"><button aria-label={isBunker ? "Back to menu" : "العودة للمنيو"} onClick={() => setDetail(null)}><ArrowRight size={22} /></button><h1>{isBunker ? "Item details" : "تفاصيل الصنف"}</h1><button aria-label={isBunker ? 'Add to favorites' : 'إضافة للمفضلة'} aria-pressed={favorites.includes(detail.id)} onClick={() => setFavorites(f => f.includes(detail.id) ? f.filter(id => id !== detail.id) : [...f, detail.id])}><Heart size={22} fill={favorites.includes(detail.id) ? '#ff8a35' : 'none'} /></button></header>
       <div className="customer-detail-image"><FoodImage key={detail.id} product={detail} large /></div>
