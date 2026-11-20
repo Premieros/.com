@@ -210,25 +210,6 @@
   .bunker-social-row a[data-network=whatsapp]::before{content:"◉"}
   .bunker-social-row a[data-network=website]::before{content:"↗"}
   </style>
-
-<style>
-/* Let the real food and coffee photographs speak: no text on image surfaces. */
-.hero{display:flex;flex-direction:column;min-height:0;background:#0b0b0b}
-.hero-media{position:relative;inset:auto;width:100%;height:min(65vh,710px);min-height:360px;overflow:hidden}
-.hero-media::after{display:none}
-.hero-media img{object-fit:cover;object-position:center}
-.hero-content{position:relative;display:flex;min-height:0;align-items:center;justify-content:space-between;padding:66px 0 82px;gap:32px}
-.hero-wordmark{font-size:clamp(68px,12vw,154px);line-height:1}
-.hero-panel{background:#18140f}
-.big-banner{display:flex;flex-direction:column;min-height:0}
-.big-banner img{position:relative;inset:auto;height:380px;object-fit:cover}
-.big-banner::after{display:none}
-.big-banner .content{position:relative;left:auto;right:auto;bottom:auto;background:#1b1712;padding:32px}
-.gallery .tile::after,.gallery .tile .label{display:none}
-.gallery .tile img{filter:none}
-@media(max-width:980px){.hero-content{display:flex;flex-direction:column;align-items:flex-start}.hero-panel{align-self:stretch;max-width:100%}}
-@media(max-width:640px){.hero-media{height:380px;min-height:280px}.hero-content{padding:35px 0 48px}.hero-wordmark{font-size:min(23vw,105px)}.big-banner img{height:280px}}
-</style>
 </head>
 <body>
   <header>
@@ -325,7 +306,7 @@
     <section class="section" id="gallery" style="padding-top:0">
       <div class="shell">
         <div class="eyebrow">Visual moodboard</div>
-        <h2 class="section-title" data-editable-text="galleryTitle">A closer look at BUNKER.</h2>
+        <h2 class="section-title" data-editable-text="galleryTitle">A demo gallery worthy of a premium launch.</h2>
         <div class="gallery">
           <div class="tile tall">
             <img id="gallery1" data-editable-image="gallery1" alt="Gallery image 1" />
@@ -419,11 +400,11 @@ try {
     const defaults = {
       eyebrow: 'Welcome to the Bunker',
       heroSub: 'Burger & Specialty Coffee',
-      heroCopy: 'Great burgers, expertly brewed coffee, and good company. Discover the BUNKER experience.',
-      heroPanel: 'Fresh flavors and specialty coffee, crafted for every visit.',
+      heroCopy: 'A modern branch page with the energy of a premium burger brand and the calm of a specialty coffee spot. This version uses editable demo visuals so the team can replace them later with real BUNKER photography.',
+      heroPanel: 'Fast preview, premium feel. When a staff user visits this page, an edit button appears so images and text can be swapped without touching the code.',
       experienceEyebrow: 'Premium comfort, bold flavor',
       experienceTitle: 'Built for burger cravings and coffee moments.',
-      experienceCopy: 'Discover our signature flavors and coffee rituals.',
+      experienceCopy: 'This layout is designed to feel closer to polished brand websites: strong hero imagery, clear product storytelling, high-end spacing, elegant dark styling, and a clear path into the existing Premier ordering experience.',
       featureBadge: 'Signature selection',
       featureTitle: 'Every bite has a point of view.',
       featureCopy: 'Use this space to spotlight your most wanted combo, featured burger, limited menu drop, or a branch message that supports the BUNKER brand tone.',
@@ -443,8 +424,8 @@ try {
       burgerImage: 'https://images.unsplash.com/photo-1572802419224-296b0aeee0d9?auto=format&fit=crop&w=1200&q=80',
       coffeeImage: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80',
       interiorImage: 'https://images.unsplash.com/photo-1554118811-1e0d58224f24?auto=format&fit=crop&w=1200&q=80',
-      dessertImage: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1200&q=80',
-      gallery1: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1200&q=80',
+      dessertImage: 'https://images.unsplash.com/photo-1517705008128-361805f42e86?auto=format&fit=crop&w=1200&q=80',
+      gallery1: 'https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=1200&q=80',
       gallery2: 'https://images.unsplash.com/photo-1509042239860-f550ce710b93?auto=format&fit=crop&w=1200&q=80',
       gallery3: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?auto=format&fit=crop&w=1200&q=80',
       gallery4: 'https://images.unsplash.com/photo-1517248135467-4c7edcad34c4?auto=format&fit=crop&w=1200&q=80',
