@@ -200,3 +200,74 @@
 .customer-rating-stars button.is-selected { color: #cc7500; background: #fff3d7; }
 .customer-rating-stars button:focus-visible { outline: 3px solid #f59e0b; outline-offset: 2px; }
 .customer-rating-stars button:disabled { opacity: .5; cursor: not-allowed; }
+
+
+/* BUNKER ordering identity is isolated to its branch QR token. */
+body:has(.bunker-customer){background:#090909!important}
+.bunker-customer.customer-app{
+ --orange:#f1dfc1;--ink:#f1dfc1;--muted:#beac91;
+ color:#f1dfc1!important;background:#0d0c0b!important;
+ color-scheme:dark;max-width:590px;
+ border:1px solid #3c3328;box-shadow:0 18px 70px #0006;
+ font-family:Inter,system-ui,Arial,sans-serif;
+}
+.bunker-customer h1,.bunker-customer h2,.bunker-customer h3,
+.bunker-customer strong,.bunker-customer label,.bunker-customer p,
+.bunker-customer button,.bunker-customer span{color:inherit}
+.bunker-customer .customer-header{border-bottom:1px solid #3c3328;padding-bottom:17px}
+.bunker-customer .customer-header h1{color:#f1dfc1;font-family:Impact,"Arial Black",sans-serif;font-size:31px;letter-spacing:.06em}
+.bunker-customer .customer-header p{color:#bca788}
+.bunker-customer .customer-brand-icon{background:#292116;color:#f1dfc1}
+.bunker-customer .customer-table,.bunker-customer .customer-search,
+.bunker-customer .customer-request-state,.bunker-customer .customer-bill,
+.bunker-customer .customer-service,.bunker-customer .customer-cart-item,
+.bunker-customer .customer-detail-image,.bunker-customer .customer-stepper{
+ background:#211d18!important;border:1px solid #4d4133!important;color:#f1dfc1!important;
+}
+.bunker-customer input,.bunker-customer textarea,.bunker-customer select{
+ background:#211d18!important;color:#f1dfc1!important;border-color:#5c4b38!important;
+}
+.bunker-customer input::placeholder{color:#b0a18d!important}
+.bunker-customer .customer-search input{border:0!important}
+.bunker-customer .customer-table label,.bunker-customer .customer-table select,
+.bunker-customer .customer-section-title h2,.bunker-customer .customer-product h3,
+.bunker-customer .customer-detail-copy h2{color:#f1dfc1!important}
+.bunker-customer .customer-table-hint,.bunker-customer .customer-product p,
+.bunker-customer .customer-detail-copy>p,.bunker-customer .customer-eyebrow,
+.bunker-customer .customer-note,.bunker-customer .customer-entry p{color:#c4b39a!important}
+.bunker-customer .customer-promos{direction:ltr}
+.bunker-customer .customer-promo-main{
+ background:linear-gradient(115deg,#3e3021,#181310)!important;border:1px solid #554129;
+}
+.bunker-customer .customer-promo-side{background:#241d15!important}
+.bunker-customer .customer-promo-side span{color:#d9c9ae!important}
+.bunker-customer .customer-category-heading button,.bunker-customer .customer-categories button>span,
+.bunker-customer .customer-section-title button,.bunker-customer .customer-detail-header button{
+ background:#2d261d!important;border:1px solid #554839!important;color:#f1dfc1!important;
+}
+.bunker-customer .customer-categories button{color:#dbc9b0!important}
+.bunker-customer .customer-categories .is-selected>span{background:#594630!important;border-color:#e7d1ad!important}
+.bunker-customer .customer-product{
+ background:#1d1915!important;border:1px solid #4c3f32!important;
+}
+.bunker-customer .customer-product-image{background:#28221a!important}
+.bunker-customer .customer-product strong,.bunker-customer .customer-price{color:#f1dfc1!important}
+.bunker-customer .customer-add,.bunker-customer .customer-primary,
+.bunker-customer .customer-service button{
+ background:#f1dfc1!important;color:#17120e!important;border:1px solid #f1dfc1!important;
+ box-shadow:none!important;
+}
+.bunker-customer .customer-bottom,.bunker-customer .customer-detail-action{
+ background:#17130ff5!important;border-color:#3e3428!important;
+}
+.bunker-customer .customer-bottom>button{color:#dac9ad!important}
+.bunker-customer .customer-bottom>button.is-active{background:#443628!important;color:#fff0d7!important}
+.bunker-customer .customer-bottom .customer-cart-bubble{background:#f1dfc1!important;color:#17120e!important}
+.bunker-customer .customer-entry input,.bunker-customer.customer-entry textarea,
+.bunker-customer.customer-entry select{color:#f1dfc1!important}
+.bunker-customer .customer-alert{background:#3a241d!important;color:#ffe0cc!important}
+.bunker-customer .customer-receipt,.bunker-customer .customer-recovery{background:#252116!important;color:#e7d2ac!important;border-color:#574631!important}
+.bunker-social-links{display:flex;flex-wrap:wrap;gap:9px;padding:3px 0 16px;margin-bottom:12px}
+.bunker-social-links a{display:inline-flex;align-items:center;justify-content:center;width:41px;height:41px;border-radius:50%;border:1px solid #6e573b;background:#211a13;color:#f1dfc1}
+.bunker-social-links a:hover{background:#f1dfc1;color:#1e1710}
+@media(min-width:540px){.bunker-customer.customer-app{margin:24px auto}}
