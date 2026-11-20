@@ -1,3 +1,4 @@
+import { useBunkerPublicTheme } from './useBunkerPublicTheme';
 import { useEffect, useRef, useState } from 'react';
 import { qrPublic } from '@/api/domains/qrPublic';
 import { PublicQrMenu } from './PublicQrMenu';
@@ -40,6 +41,7 @@ export function TableCamera({ onCapture }: { onCapture: (image: string) => void 
 interface Entry { enabled: boolean; branch_name?: string; tables?: QrTable[]; visit?: GuestIdentity; closed?: boolean }
 export function GuestEntryGate({ token }: { token: string }) {
   const isBunker = token === '3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62';
+  const bunkerMode = useBunkerPublicTheme(isBunker);
   const customerError = isBunker ? qrErrorEnglish : qrError;
   const [session, setSession] = useState(() => readVisit(token));
   const [entry, setEntry] = useState<Entry | null>(null);
@@ -80,7 +82,7 @@ export function GuestEntryGate({ token }: { token: string }) {
   function restart() { setIdentity(null); setClosed(false); setStep('phone'); setPhone(''); setName(''); setPhoto(''); setTable(''); setAddress(''); setPin(''); setSession(resetVisit(token)); }
   if (entry?.enabled === false) return <PublicQrMenu token={token} />;
   if (identity && !closed) return <PublicQrMenu key={session} token={token} identity={identity} session={session} onClosed={() => { setIdentity(null); setClosed(true); }} />;
-  return <main dir={isBunker ? "ltr" : "rtl"} className={`customer-app customer-entry${isBunker ? " bunker-customer" : ""}`}><header><span className="customer-eyebrow">{entry?.branch_name || (isBunker ? 'BUNKER' : 'Premier')}</span><h1>{closed ? (isBunker ? 'Visit complete' : 'انتهت زيارتك') : (isBunker ? 'Welcome to BUNKER' : 'أهلًا بك')}</h1><p>{closed ? (isBunker ? 'Your visit is complete. Start a new order any time.' : 'أُغلق الدخول لهذه الزيارة. يمكنك بدء طلب جديد.') : (isBunker ? 'Your orders, all in one place.' : 'طلبك وحسابك في مكان واحد')}</p></header>
+  return <main dir={isBunker ? "ltr" : "rtl"} data-bunker-theme={isBunker ? bunkerMode : undefined} className={`customer-app customer-entry${isBunker ? " bunker-customer" : ""}`}><header><span className="customer-eyebrow">{entry?.branch_name || (isBunker ? 'BUNKER' : 'Premier')}</span><h1>{closed ? (isBunker ? 'Visit complete' : 'انتهت زيارتك') : (isBunker ? 'Welcome to BUNKER' : 'أهلًا بك')}</h1><p>{closed ? (isBunker ? 'Your visit is complete. Start a new order any time.' : 'أُغلق الدخول لهذه الزيارة. يمكنك بدء طلب جديد.') : (isBunker ? 'Your orders, all in one place.' : 'طلبك وحسابك في مكان واحد')}</p></header>
     {error && <p role="alert" className="customer-alert">{error}</p>}
     {!entry ? <><p role="status">{isBunker ? 'Checking branch link…' : 'جارٍ التحقق من رابط الفرع…'}</p>{error && <button className="customer-primary" onClick={() => window.location.reload()}>{isBunker ? 'Try again' : 'إعادة المحاولة'}</button>}</> : closed ? <button className="customer-primary" onClick={restart}>{isBunker ? 'Start a new order' : 'بدء طلب جديد'}</button> : <form onSubmit={e => { e.preventDefault(); void run(step === 'phone' ? lookup : step === 'pin' ? resume : step === 'table' ? () => begin('dine_in') : step === 'delivery' ? () => begin('delivery') : async () => setStep('type')); }}>
       {step === 'phone' && <><label>{isBunker ? 'Phone number' : 'رقم الهاتف'}<input type="tel" autoComplete="tel" inputMode="tel" required maxLength={24} value={phone} disabled={busy} onChange={e => setPhone(e.target.value)} /></label><p>{isBunker ? 'If you have an active order, you can reopen it with your recovery code.' : 'إذا كان لديك طلب نشط سنفتح طلبك بعد التحقق من رمز الاسترجاع.'}</p></>}
