@@ -32,9 +32,13 @@ export type MyActiveTableOrderResolution = {
   order_id?: string;
 };
 
-export async function fetchActiveOrders(branchId: string): Promise<PosRealtimeData> {
+export async function fetchActiveOrders(branchId: string, onTables?: (tables: DiningTable[]) => void): Promise<PosRealtimeData> {
   const [tRes, oRes, operatorRes] = await Promise.all([
-    supabase.from('dining_tables').select('*').eq('branch_id', branchId).eq('is_active', true).order('name'),
+    Promise.resolve(supabase.from('dining_tables').select('*').eq('branch_id', branchId).eq('is_active', true).order('name'))
+      .then(result => {
+        if (!result.error) onTables?.((result.data as DiningTable[]) || []);
+        return result;
+      }),
     supabase.from('orders')
       .select('*')
       .eq('branch_id', branchId)

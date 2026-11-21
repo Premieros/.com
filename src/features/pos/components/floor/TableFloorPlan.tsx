@@ -173,13 +173,13 @@ export function TableFloorPlan({
         );
       })}
       {(() => {
-        const loose = tables.filter((tb) => !tb.area_id);
+        const loose = tables.filter((tb) => !tb.area_id || !areas.some(area => area.id === tb.area_id));
         if (loose.length === 0) return null;
         return (
           <Card key="loose" className="p-4">
             <h3 className="text-sm font-bold text-ui-text mb-3 flex items-center gap-2">
               <MapPin className="w-4 h-4 text-ui-subtle" />
-              {isAr ? 'طاولات بدون منطقة' : 'Tables without area'}
+              {isAr ? 'طاولات أخرى' : 'Other tables'}
             </h3>
             {renderCanvas(loose)}
           </Card>
