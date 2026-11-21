@@ -96,9 +96,9 @@ $fragment$;
   v_definition := replace(v_definition,v_old,v_new);
 
   v_old := '    IF COALESCE((v_mod->>''success'')::boolean,false) IS NOT TRUE THEN RETURN v_mod; END IF;';
-  v_new := v_old || E'\\n\\n' ||
+  v_new := v_old || chr(10)||chr(10) ||
     '    -- An automatically generated raw is never a finished product.' ||
-    E'\\n' || '    IF v_auto_raw_id IS NOT NULL THEN v_base_ready:=false; END IF;';
+    chr(10) || '    IF v_auto_raw_id IS NOT NULL THEN v_base_ready:=false; END IF;';
   IF strpos(v_definition,v_old)=0 THEN RAISE EXCEPTION 'SALE_FALLBACK_MODIFIER_DRIFT'; END IF;
   v_definition := replace(v_definition,v_old,v_new);
 
