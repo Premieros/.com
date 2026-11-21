@@ -46,3 +46,15 @@ Date: 2026-11-21. Scope: **all current and future branches**; BUNKER is the firs
 `supabase/migrations/20261121090500_bunker_live_stock_or_recipe_gate.sql` defines `qr_private.bunker_live_menu_ready()` with `cost_price > 0` and a pre-existing inventory/recipe/component/link requirement. This contradicts agreed business policy. Do not simply drop the checks without first guaranteeing safe stock auto-linking and correct financial event semantics.
 
 Status: requirements documented; functional implementation and E2E acceptance **not yet verified**.
+
+## Execution checkpoint — 2026-11-21
+
+- [x] One canonical POS fallback raw is now reused by direct sale and the already-established kitchen-send path. Unconfigured products map to a branch-scoped, product-ID keyed 1:1 recipe.
+- [x] The sale fallback stock source is treated as raw (not negative finished goods), with a per-raw exception to strict zero-stock policy; normal products/recipes retain their own policy.
+- [x] Invalid warehouse/selected modifiers are checked before auto-creating a fallback.
+- [x] Automated tests added for branch separation, zero-cost product sale, negative raw stock, material reuse and restricted RPC.
+- [x] A branch QR is already permanent and serialized at the server. Its printed URL now uses the same platform-origin landing address, not the admin browser's changing host; old previously printed URLs are not invalidated.
+- [ ] **Release gate**: migration replay, integration/security and browser smoke CI must complete green on final commit before merge.
+- [ ] **E2E release gate**: refund, partial void/split, kitchen-send snapshots, double-submit, printer and offline reconciliation need witnessed end-to-end checks.
+- [ ] Shared domain-to-branch resolver, one verified custom domain per branch, and inline Edit/draft/publish/restore remain future implementation. BUNKER's existing website alone is not the shared renderer.
+- [ ] Do not enable real QR ordering until branch-specific authorization and end-to-end acceptance are proven.
