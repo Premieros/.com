@@ -1,4 +1,4 @@
-import {lazy,Suspense,useEffect,useState} from 'react';
+import {lazy,Suspense,useEffect,useRef,useState} from 'react';
 import {useSearchParams} from 'react-router-dom';
 import {useAuth} from '@/context/AuthContext';
 import {EDITOR_CHANNEL,executeWebsiteEdit,isWebsiteEditorMessage,WEBSITE_ORIGINS} from './websiteInlineEditor';
@@ -12,8 +12,15 @@ export function WebsiteEditorBridgePage() {
  const nonce=params.get('nonce')||'';
  const [status,setStatus]=useState('ارجع إلى الموقع لبدء التعديل بعد التحقق من الصلاحيات.');
  const valid=WEBSITE_ORIGINS.includes(origin)&&/^[a-f0-9]{32}$/.test(nonce)&&!!window.opener;
+ const actor=useRef<string|undefined>(user?.id);
+ const userId=user?.id;
  useEffect(()=>{
-  if(!valid||loading||!user)return;
+  actor.current=userId;
+  if(!valid||loading)return;
+  window.opener?.postMessage({channel:EDITOR_CHANNEL,nonce,type:userId?'ready':'disconnected'},origin);
+ },[userId,loading,valid,origin,nonce]);
+ useEffect(()=>{
+  if(!valid)return;
   const opener=window.opener;
   let cancelled=false;
   let queue=Promise.resolve();
@@ -21,12 +28,14 @@ export function WebsiteEditorBridgePage() {
   const receive=(event:MessageEvent)=>{
    if(!isWebsiteEditorMessage(event,opener,origin,nonce))return;
    const request=event.data;
+   if(!actor.current)return;
    if(request.op==='hello'){send({type:'ready'});return;}
+   const requestedActor=actor.current;
    queue=queue.then(async()=>{
-    if(cancelled)return;
+    if(cancelled||actor.current!==requestedActor)return;
     try{
      const result=await executeWebsiteEdit(request);
-     if(cancelled)return;
+     if(cancelled||actor.current!==requestedActor)return;
      setStatus('التعديل المباشر متاح. ارجع إلى الموقع واترك هذه النافذة مفتوحة أثناء التعديل.');
      send({id:request.id,ok:true,result});
     }catch(error){
@@ -35,9 +44,12 @@ export function WebsiteEditorBridgePage() {
    });
   };
   window.addEventListener('message',receive);
-  send({type:'ready'});
-  return()=>{cancelled=true;window.removeEventListener('message',receive);send({type:'disconnected'});};
- },[valid,loading,user,origin,nonce]);
+  const disconnect=()=>send({type:'disconnected'});
+  window.addEventListener('pagehide',disconnect);
+  // React StrictMode and cached-to-fresh profile hydration may replay effects.
+  // Only real navigation/sign-out closes the channel, never an effect cleanup.
+  return()=>{cancelled=true;window.removeEventListener('message',receive);window.removeEventListener('pagehide',disconnect);};
+ },[valid,origin,nonce]);
  if(!valid)return <p dir="rtl" role="alert" className="p-8">افتح وضع التعديل من موقع BUNKER نفسه.</p>;
  if(loading)return <p dir="rtl" role="status" className="p-8">جار التحقق من الحساب…</p>;
  if(!user)return <Suspense fallback={<p>جار التحميل…</p>}><LoginPage/></Suspense>;
