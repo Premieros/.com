@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   getGlobalSettings: vi.fn(),
   enqueueOfflineSaleIdempotent: vi.fn(),
   getSession: vi.fn(),
+  branchPolicyRpc: vi.fn(),
 }));
 
 vi.mock('@/api', () => ({
@@ -16,7 +17,7 @@ vi.mock('@/api', () => ({
     processSaleIdempotent: mocks.processSaleIdempotent,
     processSaleManualPayment: mocks.processSaleManualPayment,
   },
-  supabase: { auth: { getSession: mocks.getSession } },
+  supabase: { auth: { getSession: mocks.getSession }, rpc: mocks.branchPolicyRpc },
 }));
 vi.mock('@/core/repositories', () => ({
   SettingsRepository: {
@@ -72,6 +73,15 @@ describe('POS confirmed and queued sales survive local projection errors', () =>
     mocks.recordLocalMovement.mockRejectedValue(new Error('IndexedDB unavailable'));
     mocks.enqueueOfflineSaleIdempotent.mockImplementation(async (sale: { id: string }) => ({ id: sale.id, inserted: true }));
     mocks.getSession.mockResolvedValue({ data: { session: { user: { id: 'cashier-1' } } }, error: null });
+    mocks.branchPolicyRpc.mockResolvedValue({ data: true, error: null });
+  });
+
+  it('fails closed if the branch stock policy cannot be verified online', async () => {
+    mocks.branchPolicyRpc.mockResolvedValueOnce({ data: null, error: { message: 'permission denied' } });
+    const { result, error } = await processSaleForOrder(payload);
+    expect(result).toBeNull();
+    expect(error).toContain('STOCK_POLICY_UNAVAILABLE');
+    expect(mocks.processSaleIdempotent).not.toHaveBeenCalled();
   });
 
   it('returns a real online RPC confirmation for a normal cash sale', async () => {
