@@ -10,7 +10,7 @@ const local=!!url && /(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url);
   beforeAll(async()=>{await db.connect();});
   afterAll(async()=>{await db.end();});
 
-  it('sells a zero-cost unmapped product on strict-stock branch then refunds its negative raw once',async()=>{
+  it.each(['cash','card'])('keeps automatic raw inventory exact through %s sale retries and partial refunds',async(paymentMethod)=>{
     const tag=randomUUID().replace(/-/g,'').slice(0,12);
     const org=randomUUID(),branch=randomUUID(),wh=randomUUID(),user=randomUUID(),product=randomUUID();
     const email=`ci-auto-sale-${tag}@ci.invalid`;
@@ -41,15 +41,17 @@ const local=!!url && /(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url);
       expect(policy.allow).toBe(false);
       const invoice=`CI-AUTO-INVOICE-${tag}`;
       const items=JSON.stringify([{product_id:product,quantity:2,unit_price:20}]);
-      const {rows:[checkout]}=await db.query<{data:{success:boolean;error?:string;sale_id?:string}}>(
-        `select public.process_sale(
+      const operationKey=`ci-auto-sale-${tag}`;
+      const saleSql=`select public.process_sale_idempotent(
+          $21::text,
           $1::text,$2::uuid,$3::uuid,$4::uuid,$5::uuid,
           $6::numeric,$7::numeric,$8::text,$9::numeric,$10::numeric,
           $11::numeric,$12::numeric,$13::text,$14::text,$15::jsonb,
           $16::uuid,$17::text,$18::uuid,$19::uuid,$20::integer
-        ) data`,
-        [invoice,branch,wh,null,user,40,0,'amount',0,0,40,40,'cash','completed',
-          items,null,'takeaway',null,null,null]);
+        ) data`;
+      const saleArgs=[invoice,branch,wh,null,user,40,0,'amount',0,0,40,40,paymentMethod,'completed',
+        items,null,'takeaway',null,null,null,operationKey];
+      const {rows:[checkout]}=await db.query<{data:{success:boolean;error?:string;sale_id?:string}}>(saleSql,saleArgs);
       expect(checkout.data).toMatchObject({success:true});
       expect(checkout.data.sale_id).toBeTruthy();
       const saleId=checkout.data.sale_id;
@@ -63,6 +65,21 @@ const local=!!url && /(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url);
       expect(raw).toBeDefined();
       expect(raw.name).toBe('No-Recipe CI Item');
       expect(Number(raw.quantity)).toBe(-2);
+      // A lost checkout response can allocate another display invoice. The
+      // durable operation key must return the original sale without movement.
+      const {rows:[replayed]}=await db.query(saleSql,[`CI-RETRY-${tag}`,...saleArgs.slice(1)]);
+      expect(replayed.data).toMatchObject({success:true,sale_id:saleId,idempotent_replay:true});
+      const changedArgs=[...saleArgs];
+      changedArgs[14]=JSON.stringify([{product_id:product,quantity:3,unit_price:20}]);
+      const {rows:[conflict]}=await db.query(saleSql,changedArgs);
+      expect(conflict.data).toMatchObject({success:false,error:'IDEMPOTENCY_KEY_REUSED_WITH_DIFFERENT_PAYLOAD'});
+      const rawBalance=async()=>{
+        const {rows:[row]}=await db.query<{balance:string}>(`
+          select coalesce(sum(quantity),0)::text balance from public.raw_material_batches
+          where raw_material_id=$1 and branch_id=$2`,[raw.id,branch]);
+        return Number(row.balance);
+      };
+      expect(await rawBalance()).toBe(-2);
       const {rows:itemsSold}=await db.query<{id:string;quantity:string}>(
         'select id,quantity::text quantity from public.sale_items where sale_id=$1 and product_id=$2',
         [saleId,product]);
@@ -70,12 +87,24 @@ const local=!!url && /(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url);
       expect(Number(itemsSold[0].quantity)).toBe(2);
       const {rows:[returned]}=await db.query<{data:{success:boolean;error?:string}}>(
         'select public.process_refund($1::uuid,$2::jsonb,$3::text) data',
-        [saleId,JSON.stringify([{sale_item_id:itemsSold[0].id,quantity:2}]),'CI automated refund']);
+        [saleId,JSON.stringify([{sale_item_id:itemsSold[0].id,quantity:0.5}]),'CI partial refund']);
       expect(returned.data).toMatchObject({success:true});
-      const {rows:[after]}=await db.query<{balance:string}>(`
-        select coalesce(sum(quantity),0)::text balance from public.raw_material_batches
-        where raw_material_id=$1 and branch_id=$2`,[raw.id,branch]);
-      expect(Number(after.balance)).toBe(0);
+      expect(await rawBalance()).toBe(-1.5);
+      const {rows:[remainder]}=await db.query(
+        'select public.process_refund($1::uuid,$2::jsonb,$3::text) data',
+        [saleId,JSON.stringify([{sale_item_id:itemsSold[0].id,quantity:1.5}]),'CI remaining refund']);
+      expect(remainder.data).toMatchObject({success:true});
+      expect(await rawBalance()).toBe(0);
+      const {rows:[excess]}=await db.query(
+        'select public.process_refund($1::uuid,$2::jsonb,$3::text) data',
+        [saleId,JSON.stringify([{sale_item_id:itemsSold[0].id,quantity:0.5}]),'CI over-refund rejected']);
+      expect(excess.data).toMatchObject({success:false});
+      expect(await rawBalance()).toBe(0);
+      const {rows:[counters]}=await db.query(
+        'select refunded_quantity::numeric quantity,refunded_amount::numeric amount from public.sale_items where id=$1',
+        [itemsSold[0].id]);
+      expect(Number(counters.quantity)).toBe(2);
+      expect(Number(counters.amount)).toBe(40);
       const {rows:[saleCount]}=await db.query<{n:string}>(
         'select count(*)::text n from public.sales where invoice_number=$1',[invoice]);
       expect(Number(saleCount.n)).toBe(1);
@@ -84,3 +113,4 @@ const local=!!url && /(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url);
     }
   });
 });
+
