@@ -3,36 +3,26 @@
 -- No demo products, recipe products, linked units, or tracked finished-goods are changed.
 CREATE OR REPLACE FUNCTION public._ensure_sale_auto_raw_recipe(p_branch_id uuid, p_product_id uuid)
 RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $$
-DECLARE v_product record; v_raw_id uuid; v_recipe_id uuid; v_code text;
+DECLARE v_product record; v_raw_id uuid;
 BEGIN
-  -- This internal function is not granted directly to end users. The parent
-  -- sale transaction owns authorization, validation and warehouse selection.
-  SELECT id, name, branch_id, is_demo INTO v_product
-    FROM public.products WHERE id=p_product_id AND branch_id=p_branch_id AND is_active
-    FOR UPDATE;
+  -- Canonical existing POS fallback already owns unique, branch-safe raw IDs
+  -- and 1:1 recipe links; reuse it instead of inventing a competing code.
+  SELECT id,name,branch_id,is_demo INTO v_product
+  FROM public.products
+  WHERE id=p_product_id AND branch_id=p_branch_id AND is_active
+  FOR UPDATE;
   IF NOT FOUND THEN RETURN jsonb_build_object('success',false,'error','PRODUCT_NOT_IN_BRANCH'); END IF;
   IF COALESCE(v_product.is_demo,false)
      OR EXISTS (SELECT 1 FROM public.recipes WHERE product_id=p_product_id AND branch_id=p_branch_id)
      OR EXISTS (SELECT 1 FROM public.product_unit_links WHERE product_id=p_product_id)
+     OR EXISTS (SELECT 1 FROM public.product_components WHERE product_id=p_product_id)
      OR EXISTS (SELECT 1 FROM public.inventory_batches WHERE product_id=p_product_id AND branch_id=p_branch_id)
   THEN RETURN jsonb_build_object('success',true,'action','existing_stock_configuration'); END IF;
+  v_raw_id := public._ensure_pos_fallback_product_raw(p_product_id,p_branch_id);
+  IF v_raw_id IS NULL THEN RETURN jsonb_build_object('success',false,'error','AUTO_RAW_CREATE_FAILED'); END IF;
+  RETURN jsonb_build_object('success',true,'action','auto_linked',
+    'raw_material_id',v_raw_id);
 
-  -- Identity is the product UUID, not a shared display name. This prevents
-  -- similarly named products (or different branches) from merging inventory.
-  v_code := 'AUTO-PRODUCT-' || replace(p_product_id::text,'-','');
-  SELECT id INTO v_raw_id FROM public.raw_materials
-    WHERE code=v_code AND branch_id=p_branch_id FOR UPDATE;
-  IF v_raw_id IS NULL THEN
-    INSERT INTO public.raw_materials(code,name,branch_id,default_cost,description)
-    VALUES (v_code,v_product.name,p_branch_id,0,'Automatically generated for an unlinked sale product')
-    RETURNING id INTO v_raw_id;
-  END IF;
-  INSERT INTO public.recipes(product_id,branch_id,name,yield_quantity,is_active,notes)
-    VALUES(p_product_id,p_branch_id,v_product.name,1,true,'System-generated 1:1 raw-material sale mapping')
-    RETURNING id INTO v_recipe_id;
-  INSERT INTO public.recipe_items(recipe_id,raw_material_id,quantity)
-    VALUES(v_recipe_id,v_raw_id,1);
-  RETURN jsonb_build_object('success',true,'action','auto_linked','raw_material_id',v_raw_id,'recipe_id',v_recipe_id);
 END $$;
 REVOKE ALL ON FUNCTION public._ensure_sale_auto_raw_recipe(uuid,uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION public._ensure_sale_auto_raw_recipe(uuid,uuid) TO service_role,postgres;
@@ -63,4 +53,4 @@ $fragment$;
 END $patch$;
 
 COMMENT ON FUNCTION public._ensure_sale_auto_raw_recipe(uuid,uuid) IS
-'Internal sale-path mapping: if product has no recipe, unit link or finished stock records, create one same-name raw material with a product-unique code and a 1:1 recipe. Raw sale stock can run negative via existing FIFO mechanism.';
+'Internal sale-path mapping: if product has no recipe, unit link or finished stock records, create the canonical POS fallback raw and 1:1 recipe, avoiding duplicate mappings between direct-sale and kitchen paths. Raw sale stock can run negative via existing FIFO mechanism.';
