@@ -201,15 +201,24 @@ begin
 end $function$
 ;
 
-insert into storage.buckets (id,name,public,file_size_limit,allowed_mime_types)
-values ('branch-website-photos','branch-website-photos',true,5242880,array['image/jpeg','image/png','image/webp'])
-on conflict(id) do nothing;
-drop policy if exists branch_website_photos_public_read on storage.objects;
-create policy branch_website_photos_public_read on storage.objects
- for select to anon,authenticated using(bucket_id='branch-website-photos');
-drop policy if exists branch_website_photos_staff_upload on storage.objects;
-create policy branch_website_photos_staff_upload on storage.objects
- for insert to authenticated with check(bucket_id='branch-website-photos' and public.branch_website_photo_upload_allowed(name));
+-- CI uses bare PostgreSQL with no Supabase Storage extension.
+-- On hosted Supabase, create the public photo bucket and its scoped policies.
+-- Skip this block in disposable CI PostgreSQL, not in production.
+do $storage_setup$
+begin
+ if to_regclass('storage.buckets') is not null and to_regclass('storage.objects') is not null then
+   execute $stmt$insert into storage.buckets(id,name,public,file_size_limit,allowed_mime_types)
+     values('branch-website-photos','branch-website-photos',true,5242880,array['image/jpeg','image/png','image/webp'])
+     on conflict(id) do nothing$stmt$;
+   execute 'drop policy if exists branch_website_photos_public_read on storage.objects';
+   execute $stmt$create policy branch_website_photos_public_read on storage.objects
+     for select to anon,authenticated using(bucket_id='branch-website-photos')$stmt$;
+   execute 'drop policy if exists branch_website_photos_staff_upload on storage.objects';
+   execute $stmt$create policy branch_website_photos_staff_upload on storage.objects
+     for insert to authenticated with check(bucket_id='branch-website-photos' and public.branch_website_photo_upload_allowed(name))$stmt$;
+ end if;
+end
+$storage_setup$;
 
 revoke all on function public.branch_website_links_public(text) from public;
 grant execute on function public.branch_website_links_public(text) to anon,authenticated,service_role;
