@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#0b0b0b" />
+  <link rel="stylesheet" href="/bunker/inline-editor.css" />
   <title>BUNKER | Burger & Specialty Coffee</title>
   <meta name="description" content="BUNKER — Burger & Specialty Coffee. Explore our menu, burgers and coffee." />
   <style>
@@ -276,12 +277,12 @@ html[data-bunker-theme="light"] .field textarea{background:#fffaf0;color:#35281d
 <body>
   <header>
     <div class="nav">
-      <a class="brand" href="#home">BUNKER</a>
+      <a class="brand" href="#home" data-editable-text="brand">BUNKER</a>
       <div class="nav-links">
-        <a href="#experience">Experience</a>
-        <a href="#gallery">Gallery</a>
-        <a href="#order">Order</a>
-        <a class="btn" href="https://premieros-sage.vercel.app/?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62">Order now</a>
+        <a href="#experience" data-editable-text="navExperience">Experience</a>
+        <a href="#gallery" data-editable-text="navGallery">Gallery</a>
+        <a href="#order" data-editable-text="navOrder">Order</a>
+        <a class="btn" href="https://premieros-sage.vercel.app/?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62" data-editable-text="orderButton">Order now</a>
       </div>
     </div>
   </header>
@@ -294,16 +295,16 @@ html[data-bunker-theme="light"] .field textarea{background:#fffaf0;color:#35281d
       <div class="hero-content">
         <div>
           <div class="eyebrow" data-editable-text="eyebrow">Welcome to the Bunker</div>
-          <div class="hero-wordmark">BUNKER</div>
+          <div class="hero-wordmark" data-editable-text="brand">BUNKER</div>
           <div class="hero-sub" data-editable-text="heroSub">Burger &amp; Specialty Coffee</div>
           <p class="hero-copy" id="heroCopy" data-editable-text="heroCopy"></p>
           <div class="hero-actions">
-            <a class="btn" href="https://premieros-sage.vercel.app/?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62">Order now</a>
-            <a class="btn secondary" href="#experience">Explore the menu</a>
+            <a class="btn" href="https://premieros-sage.vercel.app/?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62" data-editable-text="orderButton">Order now</a>
+            <a class="btn secondary" href="#experience" data-editable-text="exploreButton">Explore the menu</a>
           </div>
         </div>
         <aside class="hero-panel">
-          <h3>Branch Spotlight</h3>
+          <h3 data-editable-text="spotlightTitle">Branch Spotlight</h3>
           <p id="heroPanel" data-editable-text="heroPanel"></p>
         </aside>
       </div>
@@ -328,7 +329,7 @@ html[data-bunker-theme="light"] .field textarea{background:#fffaf0;color:#35281d
             <article class="card photo-card">
               <img id="burgerImage" data-editable-image="burgerImage" alt="Burger image" />
               <div class="card-body">
-                <div class="eyebrow">Burgers</div>
+                <div class="eyebrow" data-editable-text="burgerEyebrow">Burgers</div>
                 <h3 data-editable-text="burgerTitle">Stacked, seared, unforgettable.</h3>
                 <p id="burgerCopy" data-editable-text="burgerCopy"></p>
               </div>
@@ -336,7 +337,7 @@ html[data-bunker-theme="light"] .field textarea{background:#fffaf0;color:#35281d
             <article class="card photo-card">
               <img id="coffeeImage" data-editable-image="coffeeImage" alt="Coffee image" />
               <div class="card-body">
-                <div class="eyebrow">Specialty coffee</div>
+                <div class="eyebrow" data-editable-text="coffeeEyebrow">Specialty coffee</div>
                 <h3 data-editable-text="coffeeTitle">Crafted for slow sips and great company.</h3>
                 <p id="coffeeCopy" data-editable-text="coffeeCopy"></p>
               </div>
@@ -348,7 +349,7 @@ html[data-bunker-theme="light"] .field textarea{background:#fffaf0;color:#35281d
           <article class="card photo-card">
             <img id="interiorImage" data-editable-image="interiorImage" alt="Interior image" />
             <div class="card-body">
-              <div class="eyebrow">Inside the branch</div>
+              <div class="eyebrow" data-editable-text="interiorEyebrow">Inside the branch</div>
               <h3 data-editable-text="interiorTitle">A place that feels designed, not crowded.</h3>
               <p id="interiorCopy" data-editable-text="interiorCopy"></p>
             </div>
@@ -356,7 +357,7 @@ html[data-bunker-theme="light"] .field textarea{background:#fffaf0;color:#35281d
           <article class="card photo-card">
             <img id="dessertImage" data-editable-image="dessertImage" alt="Extra menu image" />
             <div class="card-body">
-              <div class="eyebrow">More to explore</div>
+              <div class="eyebrow" data-editable-text="dessertEyebrow">More to explore</div>
               <h3 data-editable-text="dessertTitle">Details that complete the visit.</h3>
               <p id="dessertCopy" data-editable-text="dessertCopy"></p>
             </div>
@@ -367,28 +368,28 @@ html[data-bunker-theme="light"] .field textarea{background:#fffaf0;color:#35281d
 
     <section class="section" id="gallery" style="padding-top:0">
       <div class="shell">
-        <div class="eyebrow">Visual moodboard</div>
+        <div class="eyebrow" data-editable-text="galleryEyebrow">Visual moodboard</div>
         <h2 class="section-title" data-editable-text="galleryTitle">A glimpse of the BUNKER experience.</h2>
         <div class="gallery">
           <div class="tile tall">
             <img id="gallery1" data-editable-image="gallery1" alt="Gallery image 1" />
-            <div class="label">Bunker Signature</div>
+            <div class="label" data-editable-text="galleryLabel1">Bunker Signature</div>
           </div>
           <div class="tile">
             <img id="gallery2" data-editable-image="gallery2" alt="Gallery image 2" />
-            <div class="label">Coffee Ritual</div>
+            <div class="label" data-editable-text="galleryLabel2">Coffee Ritual</div>
           </div>
           <div class="tile">
             <img id="gallery3" data-editable-image="gallery3" alt="Gallery image 3" />
-            <div class="label">Counter Mood</div>
+            <div class="label" data-editable-text="galleryLabel3">Counter Mood</div>
           </div>
           <div class="tile">
             <img id="gallery4" data-editable-image="gallery4" alt="Gallery image 4" />
-            <div class="label">Fresh Energy</div>
+            <div class="label" data-editable-text="galleryLabel4">Fresh Energy</div>
           </div>
           <div class="tile">
             <img id="gallery5" data-editable-image="gallery5" alt="Gallery image 5" />
-            <div class="label">Late Night Bite</div>
+            <div class="label" data-editable-text="galleryLabel5">Late Night Bite</div>
           </div>
         </div>
       </div>
@@ -399,13 +400,13 @@ html[data-bunker-theme="light"] .field textarea{background:#fffaf0;color:#35281d
         <div class="cta-band">
           <div class="inner">
             <div>
-              <div class="eyebrow" style="color:#6f5f4c">Order through Premier</div>
+              <div class="eyebrow" style="color:#6f5f4c" data-editable-text="orderEyebrow">Order through Premier</div>
               <h2 data-editable-text="ctaTitle">Ready to order?</h2>
               <p id="ctaCopy" data-editable-text="ctaCopy"></p>
             </div>
             <div style="display:flex;gap:12px;flex-wrap:wrap">
-              <a class="btn" href="https://premieros-sage.vercel.app/?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62">Open ordering</a>
-              <a class="btn secondary" href="#home" style="border-color:#1a1714;color:#1a1714">Back to top</a>
+              <a class="btn" href="https://premieros-sage.vercel.app/?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62" data-editable-text="openOrdering">Open ordering</a>
+              <a class="btn secondary" href="#home" style="border-color:#1a1714;color:#1a1714" data-editable-text="backTop">Back to top</a>
             </div>
           </div>
         </div>
@@ -416,10 +417,10 @@ html[data-bunker-theme="light"] .field textarea{background:#fffaf0;color:#35281d
   <footer>
     <div class="shell row">
       <div>
-        <div class="brand" style="font-size:24px">BUNKER</div>
-        <div class="mini">Burger &amp; Specialty Coffee</div>
+        <div class="brand" style="font-size:24px" data-editable-text="brand">BUNKER</div>
+        <div class="mini" data-editable-text="footerSub">Burger &amp; Specialty Coffee</div>
       </div>
-      <div class="mini">© <span id="year"></span> BUNKER. Burger & Specialty Coffee.</div>
+      <div class="mini">© <span id="year"></span> <span data-editable-text="footerCopy">BUNKER. Burger & Specialty Coffee.</span></div>
     </div>
   <div id="bunkerSocial" class="bunker-social-row" aria-label="Find BUNKER on social media"></div>
 <script>
@@ -490,6 +491,11 @@ try {
       galleryTitle: 'A glimpse of the BUNKER experience.',
       ctaTitle: 'Ready to order?',
       ctaCopy: 'Open our menu to explore available items and ordering options.',
+      brand:'BUNKER',navExperience:'Experience',navGallery:'Gallery',navOrder:'Order',orderButton:'Order now',
+      exploreButton:'Explore the menu',spotlightTitle:'Branch Spotlight',burgerEyebrow:'Burgers',coffeeEyebrow:'Specialty coffee',
+      interiorEyebrow:'Inside the branch',dessertEyebrow:'More to explore',galleryEyebrow:'Visual moodboard',
+      galleryLabel1:'Bunker Signature',galleryLabel2:'Coffee Ritual',galleryLabel3:'Counter Mood',galleryLabel4:'Fresh Energy',galleryLabel5:'Late Night Bite',
+      orderEyebrow:'Order through Premier',openOrdering:'Open ordering',backTop:'Back to top',footerSub:'Burger & Specialty Coffee',footerCopy:'BUNKER. Burger & Specialty Coffee.',
       heroImage: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1800&q=80',
       featureImage: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1400&q=80',
       burgerImage: 'https://images.unsplash.com/photo-1572802419224-296b0aeee0d9?auto=format&fit=crop&w=1200&q=80',
@@ -512,11 +518,12 @@ try {
 
     function setText(id, value) {
       document.querySelectorAll(`[data-editable-text="${id}"]`).forEach(el => {
+        if(el.isContentEditable)return;
         if ('value' in el) el.value = value;
         else el.textContent = value;
       });
       const direct = document.getElementById(id);
-      if (direct) direct.textContent = value;
+      if (direct && !direct.isContentEditable) direct.textContent = value;
     }
 
     function setImage(id, url) {
@@ -547,6 +554,7 @@ try {
         });
         if (!response.ok) return;
         const photos = await response.json();
+        if(document.body.classList.contains('website-editing'))return;
         for(const [key,url] of Object.entries(photos || {})) {
           if(typeof url !== 'string' || !/^https:\/\//.test(url)) continue;
           if(Object.prototype.hasOwnProperty.call(defaults,key) &&
@@ -557,12 +565,6 @@ try {
         render();
       } catch { /* Keep demo photographs if photo settings are unavailable. */ }
     })();
-    const toggle = document.getElementById('editToggle');
-    toggle.textContent = 'إدارة نصوص وصور الموقع';
-    toggle.classList.add('show');
-    toggle.addEventListener('click', () => {
-      window.location.assign('https://premieros-sage.vercel.app/#/settings?section=website_social&website_branch=d56aae83-f1b3-4153-9224-87594500368d');
-    });
     void (async () => {
       try {
         const response = await fetch('https://hvqlkapynjfjikqithvd.supabase.co/rest/v1/rpc/branch_website_content_public', {
@@ -571,6 +573,7 @@ try {
         });
         if (!response.ok) return;
         const published = await response.json();
+        if(document.body.classList.contains('website-editing'))return;
         for (const [key,value] of Object.entries(published || {})) {
           if (Object.hasOwn(defaults,key) && typeof value==='string' &&
               !key.toLowerCase().includes('image') && !/^gallery\d+$/.test(key)) content[key]=value;
@@ -579,5 +582,6 @@ try {
       } catch { /* Leave the public default content intact on network failure. */ }
     })();
   </script>
+  <script src="/bunker/inline-editor.js"></script>
 </body>
 </html>
