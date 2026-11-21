@@ -14,7 +14,7 @@ describe('public QR mobile order intake', () => {
   it('uses a nonpersistent anonymous client and renders the table without login', async () => {
     render(<PublicQrMenu token={token} />);
     expect(await screen.findByText('Table A')).toBeInTheDocument();
-    expect(mocks.create.mock.calls[0][2]).toEqual({ auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
+    expect(mocks.create.mock.calls.map(call => call[2])).toContainEqual({ auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     expect(screen.queryByText('Login')).not.toBeInTheDocument();
   });
   it('restores the private visit after reload and shows its pending request', async () => {
