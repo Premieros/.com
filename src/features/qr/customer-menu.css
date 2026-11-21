@@ -506,3 +506,75 @@ body:has(.bunker-customer[data-bunker-theme="light"]){background:#eee6d9!importa
  .bunker-customer .bunker-demo-photo{min-height:118px}
  .bunker-customer .bunker-demo-photo-fallback{font-size:64px}
 }
+
+
+/* Restaurant menu cards: readable descriptions, stronger product hierarchy and
+   a consistent tap target for adding or opening the product on mobile. */
+.customer-product .customer-product-category{
+  align-self:flex-start;font-size:10px;font-weight:800;line-height:1.5;
+  letter-spacing:.06em;text-transform:uppercase;color:var(--muted);
+  margin:2px 2px 3px;
+}
+.customer-product .customer-product-description{
+  display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:2;
+  overflow:hidden;text-overflow:ellipsis;
+  text-align:start;line-height:1.55;min-height:2.95em;
+  margin:3px 2px 10px;font-size:11px;
+}
+.customer-product .customer-product-price{
+  align-self:flex-start;margin-top:auto;padding:4px 2px 2px;
+  font-size:18px;font-weight:900;line-height:1.3;
+}
+.customer-product .customer-product-price small{font-size:11px;font-weight:600}
+.bunker-customer .customer-products{gap:14px}
+.bunker-customer .customer-product{
+  padding:13px 12px 12px;
+  border-radius:22px;
+  transition:transform .18s ease,box-shadow .18s ease,border-color .18s ease;
+}
+.bunker-customer .customer-product:focus-within{
+  outline:2px solid #b79366;outline-offset:3px;
+}
+@media(hover:hover){
+  .bunker-customer .customer-product:hover{
+    transform:translateY(-3px);
+    border-color:#b79366;
+    box-shadow:0 16px 32px #0003;
+  }
+}
+.bunker-customer .customer-product-open{align-items:stretch;text-align:start}
+.bunker-customer .customer-product-image{
+  min-height:156px;aspect-ratio:1.22;margin-bottom:13px;
+}
+.bunker-customer .customer-product .customer-product-category{
+  color:#c2a788!important;
+}
+.bunker-customer .customer-product h3{
+  font-size:15px;line-height:1.35;margin:2px 2px 3px;
+  font-weight:850;min-height:2.7em;
+}
+.bunker-customer .customer-product .customer-product-description{
+  color:#c6b49c!important;font-size:11px;line-height:1.55;
+  min-height:3.1em;
+}
+.bunker-customer .customer-product .customer-product-price{
+  color:#f3dfbd!important;font-size:18px;
+}
+.bunker-customer .customer-add{
+  min-height:44px;margin-top:13px;border-radius:13px;font-size:12px;
+}
+.bunker-customer[data-bunker-theme="light"] .customer-product .customer-product-category{
+  color:#80684f!important;
+}
+.bunker-customer[data-bunker-theme="light"] .customer-product .customer-product-description{
+  color:#594c40!important;
+}
+.bunker-customer[data-bunker-theme="light"] .customer-product .customer-product-price{
+  color:#5a3520!important;
+}
+@media(max-width:390px){
+  .bunker-customer .customer-products{gap:9px}
+  .bunker-customer .customer-product{padding:10px 9px}
+  .bunker-customer .customer-product-image{min-height:126px}
+  .bunker-customer .customer-product h3{font-size:13px}
+}
