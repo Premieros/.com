@@ -3,7 +3,11 @@ import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const url=process.env.SUPABASE_DB_URL;
-const local=!!url && /(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url);
+const local=(()=>{
+  if(!url) return false;
+  try { return ['localhost','127.0.0.1','[::1]'].includes(new URL(url).hostname); }
+  catch { return false; }
+})();
 
 (local ? describe : describe.skip)('Direct POS sale and refund on automatic raw debt (disposable DB only)',()=>{
   const db=new Client({connectionString:url});
@@ -51,6 +55,13 @@ const local=!!url && /(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url);
         ) data`;
       const saleArgs=[invoice,branch,wh,null,user,40,0,'amount',0,0,40,40,paymentMethod,'completed',
         items,null,'takeaway',null,null,null,operationKey];
+      const invalidWarehouse=[...saleArgs];
+      invalidWarehouse[2]=randomUUID();
+      const {rows:[invalid]}=await db.query(saleSql,invalidWarehouse);
+      expect(invalid.data.success).toBe(false);
+      const {rows:[unmapped]}=await db.query(
+        'select count(*)::text n from public.recipes where product_id=$1',[product]);
+      expect(Number(unmapped.n)).toBe(0);
       const {rows:[checkout]}=await db.query<{data:{success:boolean;error?:string;sale_id?:string}}>(saleSql,saleArgs);
       expect(checkout.data).toMatchObject({success:true});
       expect(checkout.data.sale_id).toBeTruthy();
@@ -105,6 +116,19 @@ const local=!!url && /(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url);
         [itemsSold[0].id]);
       expect(Number(counters.quantity)).toBe(2);
       expect(Number(counters.amount)).toBe(40);
+      // Do not accept a vacuously balanced empty journal: sale and refunds
+      // must actually post, and every posted journal must balance separately.
+      const {rows:journals}=await db.query<{id:string;lines:string;delta:string}>(`
+        select j.id,count(l.id)::text lines,coalesce(sum(l.debit-l.credit),0)::text delta
+        from public.journal_entries j
+        left join public.journal_entry_lines l on l.journal_entry_id=j.id
+        where j.branch_id=$1 and j.status='posted'
+        group by j.id`,[branch]);
+      expect(journals.length).toBeGreaterThanOrEqual(3);
+      for(const journal of journals){
+        expect(Number(journal.lines)).toBeGreaterThanOrEqual(2);
+        expect(Number(journal.delta)).toBeCloseTo(0,5);
+      }
       const {rows:[saleCount]}=await db.query<{n:string}>(
         'select count(*)::text n from public.sales where invoice_number=$1',[invoice]);
       expect(Number(saleCount.n)).toBe(1);
