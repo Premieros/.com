@@ -10,6 +10,7 @@ it('publishes branch text with permissions, validation and revision protection',
  try{
   await db.exec(`create role anon; create role authenticated; create role service_role;
    create schema qr_private;
+   grant usage on schema qr_private to anon,authenticated,service_role;
    create function public.can_permission(text) returns boolean language sql as $$ select true $$;
    create table public.organizations(id uuid primary key,is_active boolean);
    create table public.branches(id uuid primary key,organization_id uuid,is_active boolean);
@@ -18,6 +19,10 @@ it('publishes branch text with permissions, validation and revision protection',
    insert into public.organizations values('${branch}',true);
    insert into public.branches values('${branch}','${branch}',true),('${other}','${branch}',true);`);
   await db.exec(readFileSync(new URL('../../supabase/migrations/20261121130032_branch_website_central_content.sql',import.meta.url),'utf8'));
+  await db.exec(readFileSync(new URL('../../supabase/migrations/20261121131705_branch_website_content_private_execution.sql',import.meta.url),'utf8'));
+  const interfaces=await db.query<{prosecdef:boolean}>("select prosecdef from pg_proc where pronamespace='public'::regnamespace and proname like 'branch_website_content_%'");
+  expect(interfaces.rows).toHaveLength(3);
+  expect(interfaces.rows.every(row=>!row.prosecdef)).toBe(true);
   await db.query("select set_config('test.branch',$1,false)",[branch]);
   const save=(id:string,content:unknown,version:number)=>db.query<{revision:number}>(
    'select public.branch_website_content_save($1,$2::jsonb,$3) revision',[id,JSON.stringify(content),version]);
