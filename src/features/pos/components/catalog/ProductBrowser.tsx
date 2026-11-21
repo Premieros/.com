@@ -209,6 +209,9 @@ export function ProductBrowser({ branchId = null, userId = null, enableStationNa
       </div>
 
       <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-y-contain p-2.5 pb-24 sm:p-3 lg:pb-3">
+        {hasBranch && !shiftChecked && <p role="status" className="mb-2 rounded-xl bg-ui-page-alt p-3 text-sm text-ui-muted">
+          {isAr ? 'جار التحقق من الوردية قبل إضافة الأصناف…' : 'Checking the shift before adding items…'}
+        </p>}
         {!hasBranch ? <div className="flex h-full flex-col items-center justify-center text-center text-ui-subtle"><ShoppingCart className="mb-3 h-10 w-10 opacity-20" /><p className="font-black">{isAr ? 'اختر الفرع أولاً' : 'Select a branch first'}</p></div> : filteredProducts.length === 0 ? <div className="flex h-full flex-col items-center justify-center text-center text-ui-subtle"><Package className="mb-3 h-10 w-10 opacity-20" /><p className="font-black">{t('noData')}</p></div> : (
           <div className="grid grid-cols-2 content-start items-start gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(175px,1fr))] xl:grid-cols-[repeat(auto-fill,minmax(190px,1fr))]" data-testid="pos-product-grid">
             {filteredProducts.map((product) => {

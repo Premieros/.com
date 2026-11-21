@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <meta name="theme-color" content="#0b0b0b" />
   <title>BUNKER | Burger & Specialty Coffee</title>
-  <meta name="description" content="BUNKER — Burger & Specialty Coffee. Premium BUNKER website with professional demo imagery and a staff-only local preview editor." />
+  <meta name="description" content="BUNKER — Burger & Specialty Coffee. Explore our menu, burgers and coffee." />
   <style>
     :root {
       --bg:#0b0b0b;
@@ -368,7 +368,7 @@ html[data-bunker-theme="light"] .field textarea{background:#fffaf0;color:#35281d
     <section class="section" id="gallery" style="padding-top:0">
       <div class="shell">
         <div class="eyebrow">Visual moodboard</div>
-        <h2 class="section-title" data-editable-text="galleryTitle">A demo gallery worthy of a premium launch.</h2>
+        <h2 class="section-title" data-editable-text="galleryTitle">A glimpse of the BUNKER experience.</h2>
         <div class="gallery">
           <div class="tile tall">
             <img id="gallery1" data-editable-image="gallery1" alt="Gallery image 1" />
@@ -419,7 +419,7 @@ html[data-bunker-theme="light"] .field textarea{background:#fffaf0;color:#35281d
         <div class="brand" style="font-size:24px">BUNKER</div>
         <div class="mini">Burger &amp; Specialty Coffee</div>
       </div>
-      <div class="mini">© <span id="year"></span> BUNKER. Demo branch website.</div>
+      <div class="mini">© <span id="year"></span> BUNKER. Burger & Specialty Coffee.</div>
     </div>
   <div id="bunkerSocial" class="bunker-social-row" aria-label="Find BUNKER on social media"></div>
 <script>
@@ -445,16 +445,6 @@ try {
 </footer>
 
   <button id="editToggle" class="edit-toggle" type="button">✦ Edit website</button>
-  <div id="editBackdrop" class="edit-panel-backdrop"></div>
-  <aside id="editPanel" class="edit-panel" aria-hidden="true">
-    <div class="edit-head">
-      <h3>Website editor</h3>
-      <p>
-        This local preview editor requires an active Premier login, settings-management permission, and BUNKER branch access. Changes are saved only on this device; they do not update the public site for other visitors.
-      </p>
-    </div>
-    <div class="edit-body" id="editBody"></div>
-  </aside>
 
   <script>
     // Public theme is stored per branch. Keep the standalone Vercel website
@@ -477,7 +467,6 @@ try {
     })();
   </script>
   <script>
-    const STORAGE_KEY = 'bunker_site_content_v2';
     const ORDER_LINK = "https://premieros-sage.vercel.app/?bunker_order=1#/qr/3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62";
     const defaults = {
       eyebrow: 'Welcome to the Bunker',
@@ -486,21 +475,21 @@ try {
       heroPanel: 'Burgers, coffee, and a place to enjoy them. Discover BUNKER.',
       experienceEyebrow: 'Premium comfort, bold flavor',
       experienceTitle: 'Built for burger cravings and coffee moments.',
-      experienceCopy: 'This layout is designed to feel closer to polished brand websites: strong hero imagery, clear product storytelling, high-end spacing, elegant dark styling, and a clear path into the existing Premier ordering experience.',
+      experienceCopy: 'Explore the BUNKER menu for burgers, coffee, and more.',
       featureBadge: 'Signature selection',
       featureTitle: 'Every bite has a point of view.',
       featureCopy: 'Explore our burger selection and find your next favorite on the menu.',
       burgerTitle: 'Stacked, seared, unforgettable.',
       burgerCopy: 'Discover the burger selection on our menu.',
       coffeeTitle: 'Crafted for slow sips and great company.',
-      coffeeCopy: 'Use the coffee panel to introduce your espresso bar, filter brews, iced drinks, or house specials.',
+      coffeeCopy: 'Explore espresso favorites and iced coffee on our menu.',
       interiorTitle: 'A place that feels designed, not crowded.',
-      interiorCopy: 'Perfect for showing off the branch vibe, service counter, seating atmosphere, or late-night experience.',
+      interiorCopy: 'Discover the atmosphere of BUNKER.',
       dessertTitle: 'Details that complete the visit.',
-      dessertCopy: 'Keep this block for sides, desserts, seasonal items, or another supporting food shot.',
+      dessertCopy: 'Complete your order with sides and desserts from the menu.',
       galleryTitle: 'A glimpse of the BUNKER experience.',
       ctaTitle: 'Ready to order?',
-      ctaCopy: 'When the customer is ready, send them straight into the current Premier QR ordering flow for the BUNKER branch.',
+      ctaCopy: 'Open our menu to explore available items and ordering options.',
       heroImage: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1800&q=80',
       featureImage: 'https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=1400&q=80',
       burgerImage: 'https://images.unsplash.com/photo-1572802419224-296b0aeee0d9?auto=format&fit=crop&w=1200&q=80',
