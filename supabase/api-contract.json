@@ -1886,6 +1886,7 @@
     "sale_payments",
     "sales",
     "settings",
+    "stock_count_items",
     "subscriptions",
     "suppliers",
     "system_settings",
