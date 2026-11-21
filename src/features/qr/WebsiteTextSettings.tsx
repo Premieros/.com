@@ -22,7 +22,7 @@ export function WebsiteTextSettings({branchId}:{branchId:string}) {
  useEffect(()=>{
   let cancelled=false;
   alive.current=true;
-  void supabase.rpc('branch_website_content_settings',{p_branch:branchId}).then(({data,error})=>{
+  void Promise.resolve(supabase.rpc('branch_website_content_settings',{p_branch:branchId})).then(({data,error})=>{
    if(cancelled)return;
    if(error){setFailed(true);setMessage('تعذر تحميل نصوص الموقع. '+error.message);}
    else {setContent(data?.content||{});setRevision(data?.revision||0);}
