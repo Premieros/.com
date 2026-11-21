@@ -122,7 +122,7 @@ const local=(()=>{
         select j.id,count(l.id)::text lines,coalesce(sum(l.debit-l.credit),0)::text delta
         from public.journal_entries j
         left join public.journal_entry_lines l on l.journal_entry_id=j.id
-        where j.branch_id=$1 and j.status='posted'
+        where j.branch_id=$1 and j.posting_status='POSTED'
         group by j.id`,[branch]);
       expect(journals.length).toBeGreaterThanOrEqual(3);
       for(const journal of journals){
