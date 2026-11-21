@@ -1,0 +1,15 @@
+--- canonical/20261109073426_premier_sales_items_view_permission_gate_20261109.sql
++++ history/20261109073426.sql
+@@ -1,6 +1,3 @@
+--- MIRRORED VERBATIM from already-applied Premier production migration history.
+--- Version: 20261109073426; name: premier_sales_items_view_permission_gate_20261109
+--- DO NOT manually rerun on production. A fresh database replays sequentially.
+ BEGIN;
+ SET LOCAL lock_timeout='3s';
+ SET LOCAL statement_timeout='15s';
+@@ -14,4 +11,4 @@
+  USING (public.is_platform_admin() OR (public.can_permission('sales.view') AND private.sale_read_visible(id,branch_id,created_at)));
+ CREATE POLICY premier_sale_items_financial_select_gate ON public.sale_items AS RESTRICTIVE FOR SELECT TO authenticated
+  USING (public.is_platform_admin() OR (public.can_permission('sales.view') AND private.sale_read_visible_by_id(sale_id)));
+-COMMIT;
++COMMIT;

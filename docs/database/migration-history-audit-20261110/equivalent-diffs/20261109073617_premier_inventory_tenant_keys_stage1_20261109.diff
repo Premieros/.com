@@ -1,0 +1,15 @@
+--- canonical/20261109073617_premier_inventory_tenant_keys_stage1_20261109.sql
++++ history/20261109073617.sql
+@@ -1,6 +1,3 @@
+--- MIRRORED VERBATIM from already-applied Premier production migration history.
+--- Version: 20261109073617; name: premier_inventory_tenant_keys_stage1_20261109
+--- DO NOT manually rerun on production. A fresh database replays sequentially.
+ BEGIN;
+ SET LOCAL lock_timeout='2s';
+ SET LOCAL statement_timeout='20s';
+@@ -14,4 +11,4 @@
+ ALTER TABLE public.products ADD CONSTRAINT premier_products_id_branch_uq UNIQUE (id,branch_id);
+ ALTER TABLE public.inventory ADD CONSTRAINT premier_inventory_warehouse_branch_fk FOREIGN KEY (warehouse_id,branch_id) REFERENCES public.warehouses(id,branch_id) NOT VALID;
+ ALTER TABLE public.inventory ADD CONSTRAINT premier_inventory_product_branch_fk FOREIGN KEY (product_id,branch_id) REFERENCES public.products(id,branch_id) NOT VALID;
+-COMMIT;
++COMMIT;

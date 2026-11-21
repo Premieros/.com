@@ -1,0 +1,7 @@
+--- canonical/20261009092021_phase4a_costing_v2_baseline.sql
++++ history/20261009092021.sql
+@@ -1,3 +1,4 @@
++
+ create table if not exists public.item_standard_costs (
+   id uuid primary key default gen_random_uuid(),
+   item_id uuid not null references public.items(id) on delete cascade,

@@ -1,0 +1,79 @@
+{
+  "captured_on": "2026-11-10",
+  "project_ref": "hvqlkapynjfjikqithvd",
+  "main_commit": "97d4b09e481b10b1620781f138efd4d1e9bbff20",
+  "scope": "Read-only metadata capture; no business rows or credentials",
+  "migrations": [
+    {
+      "version": "20261110104453",
+      "name": "premier_stock_valuation_rpc_branch_auth_20261110",
+      "statement_count": 1,
+      "archive": "docs/database/production-p0-20261110/migrations/20261110104453_premier_stock_valuation_rpc_branch_auth_20261110.sql",
+      "canonical_path": "supabase/migrations/20261109180000_premier_stock_valuation_rpc_branch_auth.sql",
+      "sha256": "4855885a35e2ee544d7911fae9a21da729a20c6f7a5455624c2de9fbec3e4625",
+      "canonical_byte_equal": true
+    },
+    {
+      "version": "20261110104523",
+      "name": "premier_refund_core_atomic_failure_20261110",
+      "statement_count": 1,
+      "archive": "docs/database/production-p0-20261110/migrations/20261110104523_premier_refund_core_atomic_failure_20261110.sql",
+      "canonical_path": "supabase/migrations/20261109183000_premier_refund_core_atomic_failure.sql",
+      "sha256": "2c9a027612c030fa4e3b59eb134ea40e43ae4ccf190c19e04db916b29e035699",
+      "canonical_byte_equal": true
+    },
+    {
+      "version": "20261110104600",
+      "name": "premier_stock_count_atomic_failures_20261110",
+      "statement_count": 1,
+      "archive": "docs/database/production-p0-20261110/migrations/20261110104600_premier_stock_count_atomic_failures_20261110.sql",
+      "canonical_path": "supabase/migrations/20261109140000_premier_stock_count_atomic_failures.sql",
+      "sha256": "a891b7c62043fc3e9632a5b304950020da984d09a6fae6cf1035e74c33e26fed",
+      "canonical_byte_equal": true
+    }
+  ],
+  "functions": [
+    {
+      "signature": "_process_refund_single_core(uuid,jsonb,text)",
+      "archive": "docs/database/production-p0-20261110/functions/_process_refund_single_core.sql",
+      "sha256": "57bd2920ff372a280ed7d755407a1592f57ae0e3e7ec9ef45a33c65017c3e10b",
+      "definition_md5": "c550a6de1a79d13527433bed80af4f69",
+      "security_definer": true,
+      "volatility": "v",
+      "config": [
+        "search_path=public, pg_temp"
+      ],
+      "acl": "{postgres=X/postgres,service_role=X/postgres}",
+      "anon_execute": false,
+      "authenticated_execute": false
+    },
+    {
+      "signature": "apply_stock_count(uuid)",
+      "archive": "docs/database/production-p0-20261110/functions/apply_stock_count.sql",
+      "sha256": "ab1dcab7df1d1a033dc699b3d93cd79d8403e6521d24ee5b8ea87de62679d98f",
+      "definition_md5": "4a52e8e375507a470d8f8d395ea945d1",
+      "security_definer": true,
+      "volatility": "v",
+      "config": [
+        "search_path=public, pg_temp"
+      ],
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "anon_execute": false,
+      "authenticated_execute": true
+    },
+    {
+      "signature": "get_stock_valuation(uuid,uuid)",
+      "archive": "docs/database/production-p0-20261110/functions/get_stock_valuation.sql",
+      "sha256": "b74eab3a0c2d0514ccfb5537f1381b109b14f7f7e87b8b22d132d448019fd07a",
+      "definition_md5": "6f3568a6e2d3c198b80923892709fdf3",
+      "security_definer": true,
+      "volatility": "s",
+      "config": [
+        "search_path=public, pg_temp"
+      ],
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "anon_execute": false,
+      "authenticated_execute": true
+    }
+  ]
+}

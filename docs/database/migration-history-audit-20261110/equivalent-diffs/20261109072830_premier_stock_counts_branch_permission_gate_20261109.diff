@@ -1,0 +1,15 @@
+--- canonical/20261109072830_premier_stock_counts_branch_permission_gate_20261109.sql
++++ history/20261109072830.sql
+@@ -1,6 +1,3 @@
+--- MIRRORED VERBATIM from already-applied Premier production migration history.
+--- Version: 20261109072830; name: premier_stock_counts_branch_permission_gate_20261109
+--- DO NOT manually rerun on production. A fresh database replays sequentially.
+ BEGIN;
+ SET LOCAL lock_timeout = '3s';
+ SET LOCAL statement_timeout = '15s';
+@@ -31,4 +28,4 @@
+  RAISE EXCEPTION 'STOCK_COUNTS_GATE_POSTCONDITION_FAILED';
+  END IF;
+ END $verify$;
+-COMMIT;
++COMMIT;

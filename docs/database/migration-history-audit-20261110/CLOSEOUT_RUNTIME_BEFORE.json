@@ -1,0 +1,42 @@
+{
+  "captured_on": "2026-11-11",
+  "project_ref": "hvqlkapynjfjikqithvd",
+  "functions": [
+    {
+      "schema": "app_private",
+      "proname": "record_login_failure",
+      "arguments": "p_username text",
+      "definition": "CREATE OR REPLACE FUNCTION app_private.record_login_failure(p_username text)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nDECLARE\n  v_user public.users%ROWTYPE;\n  v_new_attempts integer;\nBEGIN\n  SELECT *\n  INTO v_user\n  FROM public.users\n  WHERE username = lower(btrim(p_username));\n\n  IF v_user.id IS NULL THEN\n    RETURN jsonb_build_object('success', true);\n  END IF;\n\n  IF v_user.is_locked AND v_user.lock_until IS NOT NULL AND v_user.lock_until > now() THEN\n    RETURN jsonb_build_object('success', true);\n  END IF;\n\n  v_new_attempts := COALESCE(v_user.failed_attempts, 0) + 1;\n  IF v_new_attempts >= 5 THEN\n    UPDATE public.users\n    SET failed_attempts = v_new_attempts,\n        is_locked = true,\n        lock_until = now() + interval '5 minutes'\n    WHERE id = v_user.id;\n  ELSE\n    UPDATE public.users\n    SET failed_attempts = v_new_attempts\n    WHERE id = v_user.id;\n  END IF;\n\n  RETURN jsonb_build_object('success', true);\nEND;\n$function$\n",
+      "acl": "{postgres=X/postgres,anon=X/postgres,authenticated=X/postgres,service_role=X/postgres}",
+      "security_definer": true,
+      "config": [
+        "search_path=public, pg_temp"
+      ],
+      "sha256": "ef44ae545f7a34991dd1cadb2a85091340501454c847f47ff70fc4dafa9d8140"
+    },
+    {
+      "schema": "public",
+      "proname": "complete_stale_kitchen_orders",
+      "arguments": "p_branch_id uuid",
+      "definition": "CREATE OR REPLACE FUNCTION public.complete_stale_kitchen_orders(p_branch_id uuid)\n RETURNS jsonb\n LANGUAGE plpgsql\n SECURITY DEFINER\n SET search_path TO 'public', 'pg_temp'\nAS $function$\nDECLARE\n  v_is_service_role boolean := COALESCE(current_setting('role', true), '') = 'service_role';\n  v_completed integer := 0;\nBEGIN\n  IF p_branch_id IS NULL THEN\n    RETURN jsonb_build_object('success', false, 'error', 'BRANCH_REQUIRED');\n  END IF;\n\n  IF NOT v_is_service_role THEN\n    IF auth.uid() IS NULL THEN\n      RETURN jsonb_build_object('success', false, 'error', 'AUTH_REQUIRED');\n    END IF;\n    IF NOT public.user_may_access_branch(p_branch_id) THEN\n      RETURN jsonb_build_object('success', false, 'error', 'BRANCH_ACCESS_DENIED');\n    END IF;\n    IF NOT public.can_permission('pos.kds_view') THEN\n      RETURN jsonb_build_object('success', false, 'error', 'POS_KDS_VIEW_REQUIRED');\n    END IF;\n  END IF;\n\n  WITH stale AS (\n    SELECT o.id, o.kitchen_status\n    FROM public.orders o\n    WHERE o.branch_id = p_branch_id\n      AND o.status IN ('open', 'held', 'completed')\n      AND o.kitchen_status IN ('sent', 'cooking', 'ready')\n      AND COALESCE(o.kitchen_sent_at, o.created_at) <= now() - interval '40 minutes'\n    FOR UPDATE SKIP LOCKED\n  ),\n  updated AS (\n    UPDATE public.orders o\n    SET kitchen_status = 'served',\n        updated_at = now()\n    FROM stale s\n    WHERE o.id = s.id\n    RETURNING o.id, s.kitchen_status AS previous_status\n  ),\n  audit_rows AS (\n    INSERT INTO public.audit_log(\n      user_id,\n      action,\n      entity,\n      entity_id,\n      details,\n      branch_id\n    )\n    SELECT\n      auth.uid(),\n      'kitchen_auto_completed_40m',\n      'order',\n      u.id,\n      jsonb_build_object(\n        'previous_status', u.previous_status,\n        'completed_as', 'served',\n        'threshold_minutes', 40\n      ),\n      p_branch_id\n    FROM updated u\n    RETURNING 1\n  )\n  SELECT count(*) INTO v_completed FROM audit_rows;\n\n  RETURN jsonb_build_object(\n    'success', true,\n    'completed_count', v_completed,\n    'threshold_minutes', 40\n  );\nEND;\n$function$\n",
+      "acl": "{postgres=X/postgres,service_role=X/postgres,authenticated=X/postgres}",
+      "security_definer": true,
+      "config": [
+        "search_path=public, pg_temp"
+      ],
+      "sha256": "a4c9a46a7d06e707461b4e9d30d78a8a56c9c9d705c93a93bc5d803619ac7197"
+    },
+    {
+      "schema": "public",
+      "proname": "record_login_failure",
+      "arguments": "p_username text",
+      "definition": "CREATE OR REPLACE FUNCTION public.record_login_failure(p_username text)\n RETURNS jsonb\n LANGUAGE sql\n SET search_path TO 'app_private', 'public', 'pg_temp'\nAS $function$\n  SELECT app_private.record_login_failure(p_username);\n$function$\n",
+      "acl": "{postgres=X/postgres,authenticated=X/postgres,service_role=X/postgres,anon=X/postgres}",
+      "security_definer": false,
+      "config": [
+        "search_path=app_private, public, pg_temp"
+      ],
+      "sha256": "0b217643c62cdcbe8815134f5a3f4bc44263d7e4c05c75e3e902a841f19ac107"
+    }
+  ]
+}

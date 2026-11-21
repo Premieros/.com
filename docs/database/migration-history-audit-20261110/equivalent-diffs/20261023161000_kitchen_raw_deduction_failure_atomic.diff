@@ -1,0 +1,7 @@
+--- canonical/20261023161000_kitchen_raw_deduction_failure_atomic.sql
++++ history/20261023123728.sql
+@@ -1,4 +1,3 @@
+--- Ensure multi-component kitchen deductions roll back entirely on a later component failure.
+ CREATE OR REPLACE FUNCTION public._deduct_kitchen_raw_components(p_product_id uuid, p_branch_id uuid, p_warehouse_id uuid, p_quantity numeric, p_modifier_option_ids jsonb, p_event_id uuid, p_reference_number text, p_created_by uuid)
+  RETURNS jsonb
+  LANGUAGE plpgsql

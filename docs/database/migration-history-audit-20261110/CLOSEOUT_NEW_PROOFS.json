@@ -1,0 +1,3217 @@
+{
+  "source_rows": [
+    {
+      "version": "20260927144333",
+      "name": "organization_module_updated_by_index",
+      "statement_hashes": [
+        "1d50486016b2765594599f4b92a531e1ff657894acd9a4a95d5aee475993cbd1"
+      ]
+    },
+    {
+      "version": "20260929132312",
+      "name": "business_profile_runtime_storage",
+      "statement_hashes": [
+        "e701f4937c397c418ae955fd413d09b25f45eade8b71283c66686b15a8e0fe25"
+      ]
+    },
+    {
+      "version": "20261008235622",
+      "name": "phase1a_rpc_surface_hardening",
+      "statement_hashes": [
+        "00c9f647849280778c47ca23e21233d1a7a0835fb8c5ec0e969f6a725b1f49ac"
+      ]
+    },
+    {
+      "version": "20261008235837",
+      "name": "phase1b_remove_redundant_kitchen_delete_policy",
+      "statement_hashes": [
+        "8af32a83e33cd25608927baf02cf5f68d572e286bc70c4b3ee39851c231370c3"
+      ]
+    },
+    {
+      "version": "20261008235940",
+      "name": "phase1b_consolidate_kitchen_write_policies",
+      "statement_hashes": [
+        "2b179b4553185c6ae4cb8e40131e0b078d25208afdd510027d8cf715e31af9ca"
+      ]
+    },
+    {
+      "version": "20261009000022",
+      "name": "phase1b_consolidate_remaining_permissive_policies",
+      "statement_hashes": [
+        "85be2e1ad2825f22367cdffdd61323eca85652d0f34049d3cf79b92bebf5f9e6"
+      ]
+    },
+    {
+      "version": "20261009080923",
+      "name": "phase2a_canonical_item_compatibility",
+      "statement_hashes": [
+        "f6ffd1fe728a006365d6f11d5252de03c63662f9a011f5012e20b3620e8d1846"
+      ]
+    },
+    {
+      "version": "20261009081334",
+      "name": "phase2b_canonical_item_sync",
+      "statement_hashes": [
+        "2b0b809e418f6011a3108ea8d616b7b5779ddcae8d2175c543f23b05031d5178"
+      ]
+    },
+    {
+      "version": "20261009081634",
+      "name": "phase2c_canonical_item_read_model",
+      "statement_hashes": [
+        "4f05e2f5a5ff39c6ced5849d2f4ca02fa5396897a9331a7c7e03ad453d0aec2c"
+      ]
+    },
+    {
+      "version": "20261009085820",
+      "name": "phase2d_canonical_dual_read_reconciliation",
+      "statement_hashes": [
+        "db01053defaa3f2ea90ea4cf3a4311470960b695c14ec497000a45aae20059b9"
+      ]
+    },
+    {
+      "version": "20261009090317",
+      "name": "phase3a_canonical_inventory_movement_read_model",
+      "statement_hashes": [
+        "618a85bce6a6bfa59c4b805ab5393bd59497d05a9f0f7abcf250d8ac9ac31699"
+      ]
+    },
+    {
+      "version": "20261009090833",
+      "name": "phase3b_canonical_inventory_balance_projection",
+      "statement_hashes": [
+        "13dac078863588ab21ea904c0ece985de7b621068b30912511b5d67f3985c877"
+      ]
+    },
+    {
+      "version": "20261009091158",
+      "name": "phase3c_inventory_batch_diagnostics",
+      "statement_hashes": [
+        "2dd43feaef691096ca9c70aa66e0f70f8cd8813a7304049851e093db5bf63ec6"
+      ]
+    },
+    {
+      "version": "20261009091524",
+      "name": "phase3d_inventory_review_evidence",
+      "statement_hashes": [
+        "1520aaf60f404ae936b0e959c6e91dee76346562431eae7a5858839212a9831d"
+      ]
+    },
+    {
+      "version": "20261009092021",
+      "name": "phase4a_costing_v2_baseline",
+      "statement_hashes": [
+        "7cb53b503f5c2de64e5a9845766c2c4a70660d202b8ded26be33ede82347fcb6"
+      ]
+    },
+    {
+      "version": "20261009092803",
+      "name": "phase4b_standard_cost_command",
+      "statement_hashes": [
+        "2ad8afe06e683d83527bb33a2a5014ec9c9c218175d48a006add71304245c0d6"
+      ]
+    },
+    {
+      "version": "20261009131940",
+      "name": "phase4c_cost_variance_read_models",
+      "statement_hashes": [
+        "bb341874494a08c208342c3c7e9f9b344ece51a848ea3114bc3f54e8d4893b55"
+      ]
+    },
+    {
+      "version": "20261009135011",
+      "name": "phase4e_cost_variance_summary",
+      "statement_hashes": [
+        "ae39a261b82a822a95b2f746c6f5b3c8e9300ae5709313932d7332cbacf87ac0"
+      ]
+    },
+    {
+      "version": "20261011063245",
+      "name": "phase5b_period_lock_and_journal_reversal",
+      "statement_hashes": [
+        "80f1a2734f389077fc785283a4569f56332e3287a8be2538a8da22928de731dd"
+      ]
+    },
+    {
+      "version": "20261011063603",
+      "name": "phase5c_journal_mutation_registry",
+      "statement_hashes": [
+        "963ab4bfe1fb972247f7c13c710bfc6f79e97ac61a9306261c592f647b4c53c2"
+      ]
+    },
+    {
+      "version": "20261011133446",
+      "name": "phase8c_scheduled_verified_event_worker",
+      "statement_hashes": [
+        "cc9c40d4e37b74a1947d95def1712ee129ae504d4eb328b164aaaad018c67e1c"
+      ]
+    },
+    {
+      "version": "20261023042826",
+      "name": "stage_non_fifo_warehouse_balances_v2",
+      "statement_hashes": [
+        "2b8eb1a0de66e5e053e5b8f9daf2d35fa16e8da0d5686239522cef6cdd9e169b"
+      ]
+    },
+    {
+      "version": "20261023043004",
+      "name": "stage_non_fifo_idempotent_movement_contract",
+      "statement_hashes": [
+        "d92ff84f9f127e9c12406e2ceb8e6da63710fe7d88854119449c32bd4cd9609d"
+      ]
+    },
+    {
+      "version": "20261023043629",
+      "name": "link_gated_non_fifo_movements_to_inventory_ledger",
+      "statement_hashes": [
+        "5724a80ca406f61c56d18f8f14eaa637e78b0b8bafff7e7049e873df6e9a5378"
+      ]
+    },
+    {
+      "version": "20261023120442",
+      "name": "non_fifo_v3_document_aware_movement_stage",
+      "statement_hashes": [
+        "6405f35bb0f317c7c71b529b696033a1ae87c0be01e9534116401834cabf39b0"
+      ]
+    },
+    {
+      "version": "20261023123728",
+      "name": "make_kitchen_raw_component_deduction_fail_atomic",
+      "statement_hashes": [
+        "84ba1968989ec4f91fd23caee8fa749215bfc520c3cd0833fe3b70c9aaeebb4f"
+      ]
+    },
+    {
+      "version": "20261023124737",
+      "name": "kitchen_document_context_and_warehouse_guard",
+      "statement_hashes": [
+        "83ff734bf22f36c3dec3aea1369ff16082bbbf2bd81ee910a6048b8741108882"
+      ]
+    },
+    {
+      "version": "20261023125710",
+      "name": "kitchen_raw_operational_cost_published_price_only",
+      "statement_hashes": [
+        "351590d44f1849c510aacdc8f467184ff810880e9527b3c344021a66e98678ee"
+      ]
+    },
+    {
+      "version": "20261023130126",
+      "name": "align_new_kitchen_ledger_cost_with_published_price",
+      "statement_hashes": [
+        "22c4cdeb560d837bd9e0ee2f914edad2ab3f351247dda0beaedad455ce0823e4"
+      ]
+    },
+    {
+      "version": "20261023130618",
+      "name": "reject_repeated_kitchen_inventory_event_before_fifo_deduction",
+      "statement_hashes": [
+        "5db8f466795b45dc430de661423a977816acffaf150d38d6aa30a52ac41b256c"
+      ]
+    },
+    {
+      "version": "20261023132050",
+      "name": "retire_unreferenced_fifo_historical_debt_rebase_helpers",
+      "statement_hashes": [
+        "0f322163254696fcc32e9060f0ebe30f9309d2b27349f1e56b68b8304f6747c2"
+      ]
+    },
+    {
+      "version": "20261023152041",
+      "name": "deploy_corrected_unified_raw_movement_core_v1",
+      "statement_hashes": [
+        "ca3d2afe9e891d4b44b8fbc69bd83f4f8b839d794843b670c4a42f6927f5fee8"
+      ]
+    },
+    {
+      "version": "20261024174313",
+      "name": "cutover_product_adjustment_without_fifo",
+      "statement_hashes": [
+        "acea39508b500f148f3f2200cae8ed7aef0edf32b97145c319d9a58f06910de6"
+      ]
+    },
+    {
+      "version": "20261026202407",
+      "name": "canonical_current_display_stock_costs",
+      "statement_hashes": [
+        "cde47c6b2313508fc5d4142bea606d3b239399bc2274560a0ae15d3d9691bc3d"
+      ]
+    },
+    {
+      "version": "20261027053310",
+      "name": "canonical_current_sale_price_read_contract",
+      "statement_hashes": [
+        "99e003d14e5942086d6e91085d07fe6f2a20531b45f0a420f4242a1a33521952"
+      ]
+    },
+    {
+      "version": "20261027085510",
+      "name": "kitchen_manufactured_group_deduction_and_snapshot_reversal",
+      "statement_hashes": [
+        "42ca8db70e0d6d71b14a8d0443c442ebea10b04404d97e22c52909f29667ada0"
+      ]
+    },
+    {
+      "version": "20261027085656",
+      "name": "avoid_double_raw_consumption_for_manufactured_kitchen_sends",
+      "statement_hashes": [
+        "4cc24bb440b24403c5f90fda7232e36256f5e3ccfc2de52feacf12ccbd11a8ce"
+      ]
+    },
+    {
+      "version": "20261027092007",
+      "name": "honor_branch_negative_stock_policy_for_manufactured_kitchen_send",
+      "statement_hashes": [
+        "f367a08138c46bef2ec72f8b1a65ed7ca9729b246696c1d591fb7c8110df92eb"
+      ]
+    },
+    {
+      "version": "20261027092106",
+      "name": "fix_manufactured_kitchen_oversell_debt_sale_fk",
+      "statement_hashes": [
+        "cb1f8ae7aeb8bfc622042a1bae18dedca4bdfb72fb35197a77096b7efcd1b089"
+      ]
+    },
+    {
+      "version": "20261027175944",
+      "name": "secure_internal_raw_cost_triggers_and_invoker_view",
+      "statement_hashes": [
+        "b8846d4bd1579bbcf0ba7467584d5793090456760f74663b1bb53ad66f9ab59a"
+      ]
+    },
+    {
+      "version": "20261027180005",
+      "name": "allow_branch_scoped_raw_cost_cache_read",
+      "statement_hashes": [
+        "1f9d437de5b955a95f356008faa5ed05ee0f3e058c0b75b1652573d6262486a2"
+      ]
+    },
+    {
+      "version": "20261027180243",
+      "name": "align_cached_raw_cost_access_with_material_visibility",
+      "statement_hashes": [
+        "fa4be14d6e5692f0d3d01259033a1fee545338f3d5ad5956d611736168091bb4"
+      ]
+    },
+    {
+      "version": "20261109072830",
+      "name": "premier_stock_counts_branch_permission_gate_20261109",
+      "statement_hashes": [
+        "ef8be6b4d352ca1356a7ed98841be9be597905c7481129f4be1d9767d5f089e1"
+      ]
+    },
+    {
+      "version": "20261109073118",
+      "name": "premier_expenses_financial_permission_gate_20261109",
+      "statement_hashes": [
+        "c577f3747f3a63070819e3595c97d7f47babe7a5929688daeb2188a4e8cba682"
+      ]
+    },
+    {
+      "version": "20261109073305",
+      "name": "premier_purchase_history_permission_gate_20261109",
+      "statement_hashes": [
+        "7a8f168b7e42fb8db913f19ed0fdc023a3b15d72b1795397590f6bbb469a89f3"
+      ]
+    },
+    {
+      "version": "20261109073426",
+      "name": "premier_sales_items_view_permission_gate_20261109",
+      "statement_hashes": [
+        "6539ab5c4428b9425548c8791cbedf6434e9e87efa0cbe15c0c8c27e39452afb"
+      ]
+    },
+    {
+      "version": "20261109073617",
+      "name": "premier_inventory_tenant_keys_stage1_20261109",
+      "statement_hashes": [
+        "a339ec8d2278862b2c7d1817c3b5b21ec1ac819f936f3cad66c6d7dd3f5ec62c"
+      ]
+    },
+    {
+      "version": "20261109073705",
+      "name": "premier_inventory_composite_fk_delete_parity_20261109",
+      "statement_hashes": [
+        "5377261d4211dc82e89a0a3cd086ee703f6a38563f97c3bb0dd8a7f26e6bdcb0"
+      ]
+    },
+    {
+      "version": "20261109073733",
+      "name": "premier_orders_recipes_branch_foreign_keys_stage2_20261109",
+      "statement_hashes": [
+        "5daa54f4d63112b4dc83ae7fdb9c7af642228c2a86e0b91c08f41bc08b88515d"
+      ]
+    },
+    {
+      "version": "20261109073754",
+      "name": "premier_sales_purchases_counts_warehouse_keys_stage3_20261109",
+      "statement_hashes": [
+        "fe956cb7431b50650df2889b44fad11cc5c0b28af0f034756a48f28200969e94"
+      ]
+    },
+    {
+      "version": "20261109073818",
+      "name": "premier_sales_orders_parent_composite_keys_stage4_20261109",
+      "statement_hashes": [
+        "db6761dc718f5a25f17cc4b33cc16552778ae4e99a1afc2866430e7bf0650703"
+      ]
+    },
+    {
+      "version": "20261109073839",
+      "name": "premier_payments_kitchen_composite_foreign_keys_stage5_20261109",
+      "statement_hashes": [
+        "c97f39a78c12b9498b22ed15f7379517a59bac02b882474ef2ffd03a61c94c12"
+      ]
+    },
+    {
+      "version": "20261109073920",
+      "name": "premier_validate_inventory_branch_fks_20261109",
+      "statement_hashes": [
+        "52bfb85aa7f6714ec0213d707b06d7029db81fed4ae61e9e610883ac2decadfd"
+      ]
+    },
+    {
+      "version": "20261109073923",
+      "name": "premier_validate_warehouse_document_branch_fks_20261109",
+      "statement_hashes": [
+        "2d1ab6bbe319f9a4b009f342d4092f300af58904133ef9fd55d18d5fb90ff084"
+      ]
+    },
+    {
+      "version": "20261109073928",
+      "name": "premier_validate_sale_payment_kitchen_branch_fks_20261109",
+      "statement_hashes": [
+        "bcc46f4fa405ef383b74e64055d2dadd2267c2821806aa6c481273ef672f6eb1"
+      ]
+    },
+    {
+      "version": "20261109074100",
+      "name": "premier_product_unit_links_multibranch_permission_gate_20261109",
+      "statement_hashes": [
+        "1a6df936f298a12e9fa3fa91d8a27789a32797b09b92f6f51ba6a251882a5b70"
+      ]
+    },
+    {
+      "version": "20261109081844",
+      "name": "premier_stock_counts_write_permission_gate_20261109",
+      "statement_hashes": [
+        "5626e446f6ae06ad38163706a2954d33b8a05b01ab7bcf50aab6e1433d4a6d80"
+      ]
+    },
+    {
+      "version": "20261109084444",
+      "name": "premier_stock_count_lines_rls_direct_dml_lockdown_20261109",
+      "statement_hashes": [
+        "2971c36baab61c75e074d476b1bf3f800f4a52e679aa00758f779461a4bf15d5"
+      ]
+    },
+    {
+      "version": "20261109094032",
+      "name": "premier_ready_product_actual_batch_cogs_20261109",
+      "statement_hashes": [
+        "023f3b3073fc74659d4dafac0eb7092f438ad2ce85a63c0cebe8953e5d6d3470"
+      ]
+    },
+    {
+      "version": "20260927064130",
+      "name": "bootstrap_043_user_role_management",
+      "statement_hashes": [
+        "e77c5888b251009957aee15c6c1f66d4899adc7d6145a03a0cf0975620fe21b2"
+      ]
+    },
+    {
+      "version": "20260927064137",
+      "name": "bootstrap_044_rbac_hardening",
+      "statement_hashes": [
+        "9172f327b534174dc0b610e901e61f19b72916cc237363e54204488427949973"
+      ]
+    },
+    {
+      "version": "20260927064301",
+      "name": "bootstrap_055_subscriptions",
+      "statement_hashes": [
+        "953bbe112e5b5d72d3f15027e07aa2adf84b0412e1d9f1973e4ddfa0e8c6cd2f"
+      ]
+    },
+    {
+      "version": "20260927065142",
+      "name": "bootstrap_batch_127_142",
+      "statement_hashes": [
+        "4f551b4a2abdbcae10ab247b404d02b81ad569dd556440ed3d57ce6718163ffd"
+      ]
+    },
+    {
+      "version": "20260927065328",
+      "name": "bootstrap_batch_191_206",
+      "statement_hashes": [
+        "9220ffd421a45a7e1323484291bd8234106162ff3f4a0c7ca4021ff428f8e2be"
+      ]
+    },
+    {
+      "version": "20260927065354",
+      "name": "bootstrap_batch_207_222",
+      "statement_hashes": [
+        "c98fb7ac1e50c2564d365be3808d840d74ee3ad5785fcd4898b3c0b287403987"
+      ]
+    },
+    {
+      "version": "20260927065422",
+      "name": "bootstrap_batch_223_238",
+      "statement_hashes": [
+        "3ae76ff7f0b9a0256e10b06b1fb785e316d52b41f95de638f1c98aa8ba3ab8d9"
+      ]
+    },
+    {
+      "version": "20260927065752",
+      "name": "bootstrap_batch_335_350",
+      "statement_hashes": [
+        "d6419d9a569ed5e9569409469e23b2ba6e7759be8917f793b9bd475b33dc5576"
+      ]
+    },
+    {
+      "version": "20260927065826",
+      "name": "bootstrap_batch_351_366",
+      "statement_hashes": [
+        "e050226df1781c3258e97988db9871591b6989115e1bc6e8050f934ebb16bc69"
+      ]
+    },
+    {
+      "version": "20260927070509",
+      "name": "bootstrap_batch_415_430",
+      "statement_hashes": [
+        "714f80bf7d7f088faf825415ed92a7c23bb17a53f7a8e64d42af80b36d03b0f6"
+      ]
+    },
+    {
+      "version": "20260927141752",
+      "name": "organization_module_controls",
+      "statement_hashes": [
+        "346841369a59ea27cbf9d0c4a4bef5afec40471edd9e7fdd7732fe93dfc57bb2"
+      ]
+    },
+    {
+      "version": "20260929132251",
+      "name": "organization_business_profiles",
+      "statement_hashes": [
+        "5a1a0d3866d7aa529f4934e54171abbd181feaf40e45b4630f09474b289166fa"
+      ]
+    },
+    {
+      "version": "20261003120340",
+      "name": "fix_production_order_raw_warehouse",
+      "statement_hashes": [
+        "d29ed428c9f1e76b0d88a0ad239721b11967efacb9604234ab51791adc2437a5"
+      ]
+    },
+    {
+      "version": "20261009134308",
+      "name": "phase4d_immutable_sale_cost_snapshots",
+      "statement_hashes": [
+        "5a8eb1c63917b73722109bf0b5e65240b32c88b62f747f03efb126a015875ebc"
+      ]
+    },
+    {
+      "version": "20261009140019",
+      "name": "phase5a_fiscal_period_posting_metadata",
+      "statement_hashes": [
+        "cd983d8f83345dd46ec16ef2221c6beded4d607b352fe9ef88ad6cbf6b287b74"
+      ]
+    },
+    {
+      "version": "20261011064606",
+      "name": "phase5e_append_only_fifo_sale_cogs",
+      "statement_hashes": [
+        "4a28fd39c98166983a2faec37bad143eb651db80b80c039eb6692b5d9ec01d60"
+      ]
+    },
+    {
+      "version": "20261011064956",
+      "name": "phase5f_append_only_fifo_orphan_and_stock",
+      "statement_hashes": [
+        "ea8e4723cad264fe09e7ccf036528d71074dd513da7fdd7933e009219387dc58"
+      ]
+    },
+    {
+      "version": "20261023043100",
+      "name": "published_cost_asof_event_v2",
+      "statement_hashes": [
+        "517d97baf1dcb2398e3cfd531c96e0483b60272eb9a4c8c086ebe89884873fac"
+      ]
+    },
+    {
+      "version": "20261023122353",
+      "name": "sale_snapshot_modifier_cost_asof_published_price",
+      "statement_hashes": [
+        "8ba9817513d91cd90b227b8e7b0efac4d7fdfdf68aa7b4b42164ddd67c67477e"
+      ]
+    },
+    {
+      "version": "20261023132918",
+      "name": "guard_direct_non_fifo_kitchen_material_event_replay",
+      "statement_hashes": [
+        "ba283bacdb8938a0583948beb58f1e0964ad61c61234f63e58534cc7006abc89"
+      ]
+    },
+    {
+      "version": "20261023133130",
+      "name": "refactor_kitchen_ledger_to_direct_movement_link",
+      "statement_hashes": [
+        "743fbfd94058162aaf937223dd3872bb97b4acb19314d8d4ed3ee43a7a112ed9"
+      ]
+    },
+    {
+      "version": "20261023134151",
+      "name": "sync_non_fifo_kitchen_staged_warehouse_balance_after_write",
+      "statement_hashes": [
+        "4b15157c54e2213a58a5201898e38a90f8e8fe2f073fed3868a0d7cf628b7144"
+      ]
+    },
+    {
+      "version": "20261023140605",
+      "name": "reconcile_nine_verified_raw_branch_balance_cache_rows",
+      "statement_hashes": [
+        "8fa459e4adc8d3403968fcc6147c59445d0316c9c725dd587eb5bceaabe75272"
+      ]
+    },
+    {
+      "version": "20261023152102",
+      "name": "cutover_manufactured_unit_raw_inputs_to_unified_movements",
+      "statement_hashes": [
+        "25ffeeb1f57daa7c696cb097158efe4f95aa8f1ea4b37d3f72a9082aa07c1348"
+      ]
+    },
+    {
+      "version": "20261023152514",
+      "name": "cutover_stock_count_raw_negative_delta_to_unified_engine",
+      "statement_hashes": [
+        "fb7b138049ff434ce55d7bd762df72ff8731cb0e24e71ada565e103d98d60572"
+      ]
+    },
+    {
+      "version": "20261023152705",
+      "name": "cutover_single_warehouse_branch_raw_adjustment_preserve_journal",
+      "statement_hashes": [
+        "e740ffe8d1137febec235f2877313907215ed68da6a0ba4ccf7b22478bad0056"
+      ]
+    },
+    {
+      "version": "20261023152853",
+      "name": "cutover_purchase_return_raw_to_document_warehouse_unified",
+      "statement_hashes": [
+        "64be8741ddbb1f9c79620c429f52eda6933ce881e31ba16d2098cb616b5926b6"
+      ]
+    },
+    {
+      "version": "20261023152948",
+      "name": "cutover_raw_warehouse_transfer_both_legs_unified",
+      "statement_hashes": [
+        "4211cb7c206dc4d29cac1f53debb40912b0b2137ef72d22484a47e24019ab0a7"
+      ]
+    },
+    {
+      "version": "20261023153040",
+      "name": "cutover_modifiers_sale_raw_warehouse_unified_atomic",
+      "statement_hashes": [
+        "c1aa5c9523d5f372d6000e7202032756948d2222dc5692de6837fbfed78261dd"
+      ]
+    },
+    {
+      "version": "20261023153111",
+      "name": "cutover_legacy_sale_unit_raw_consumption_unified",
+      "statement_hashes": [
+        "36e07d71e83e8d4d558133eef89de3f0a48db9113e7e676d45f05150def36db7"
+      ]
+    },
+    {
+      "version": "20261024170040",
+      "name": "add_product_fifo_cutover_readiness_gate",
+      "statement_hashes": [
+        "c6eb220752ab9b20a64ce18fd61adfd1a5928c304c963489e1c0567881e31e0e"
+      ]
+    },
+    {
+      "version": "20261024174300",
+      "name": "product_non_fifo_stock_removal_compatibility_engine",
+      "statement_hashes": [
+        "497ae6f4e7a07e962673e2ea35bad1b3d2a33eae112130619c0fe316ef670aee"
+      ]
+    },
+    {
+      "version": "20261024180153",
+      "name": "cutover_stock_count_product_removal_non_fifo",
+      "statement_hashes": [
+        "95347281c074f62a80d58f32cc889868b30b3e95a8705f7dc3a1ec067048ed5f"
+      ]
+    },
+    {
+      "version": "20261024180216",
+      "name": "cutover_purchase_return_product_removal_non_fifo",
+      "statement_hashes": [
+        "f4f3028414d2f4bca58018d78510190e62d31684d1d982e64f67322460f9e327"
+      ]
+    },
+    {
+      "version": "20261024191859",
+      "name": "cutover_sale_products_without_fifo_final",
+      "statement_hashes": [
+        "872aff7b8ac0af3e32fbf0d44c19d62b00f7d6c7832c0f3529b803df90edd833"
+      ]
+    },
+    {
+      "version": "20261024191902",
+      "name": "cutover_transfer_products_without_fifo_final",
+      "statement_hashes": [
+        "cd9d391eeacbbed5b00c3d24f3b7071be8da818e4992ba51576e6946a01544e0"
+      ]
+    },
+    {
+      "version": "20261026200727",
+      "name": "unified_stock_balance_read_contract_products_raw_and_units",
+      "statement_hashes": [
+        "37f3261a10dffdb6a7e28a7bf2b06e196393a00563deb9040ccf6d5623062041"
+      ]
+    },
+    {
+      "version": "20261026201549",
+      "name": "unify_ready_product_sale_stock_cost_and_lock",
+      "statement_hashes": [
+        "12f17ac3e8b5bdb9526dca2c24dc5a91923d31133b8c01dec71c22fe2ee63a27"
+      ]
+    },
+    {
+      "version": "20261026202246",
+      "name": "unify_manufactured_unit_sale_cost_catalog_source",
+      "statement_hashes": [
+        "c45e8453c2853bb31c35fba39a2efa40233ce442a5969b8e591dac6362a120be"
+      ]
+    },
+    {
+      "version": "20261026202836",
+      "name": "unify_product_valuation_with_signed_stock_and_current_cost",
+      "statement_hashes": [
+        "685294acd739c403e8ac9051c6fe4c7659a52810b921369df34b2979c23ee45d"
+      ]
+    },
+    {
+      "version": "20260927063830",
+      "name": "bootstrap_013_manufacturing_rpc",
+      "statement_hashes": [
+        "7f06d853dc070d14fdcc5217ccdfb5ad393439ed10e20c4ba3254371ed618e7f"
+      ]
+    },
+    {
+      "version": "20260927063853",
+      "name": "bootstrap_020_d2_rpc",
+      "statement_hashes": [
+        "310d4353cd4bd6ebf5b1c2284fd6ce8911934e28996022f1e8222664c74aa10d"
+      ]
+    },
+    {
+      "version": "20260927065003",
+      "name": "bootstrap_20260819220000_multitenant_foundation",
+      "statement_hashes": [
+        "58b17417e1817abaa01c9d599665aa1f0641200edfec50bacff72d16b1135cdc"
+      ]
+    },
+    {
+      "version": "20260927065012",
+      "name": "bootstrap_20260821000000_branch_management_phase2",
+      "statement_hashes": [
+        "98618387f84bb5ce5c077eb153a0244a3508d724b581a84467747b1d159416f4"
+      ]
+    },
+    {
+      "version": "20260927065050",
+      "name": "bootstrap_batch_111_118",
+      "statement_hashes": [
+        "37924b58e82bb1e7a9160b9d19596525e9e3f666b36be19d9cd0d01550a5ca87"
+      ]
+    },
+    {
+      "version": "20260927065518",
+      "name": "bootstrap_batch_255_270",
+      "statement_hashes": [
+        "e33383a7d7210ad8e3613b99dea55bde5c786bc7273a28b5903f0a2db5ddb7d5"
+      ]
+    },
+    {
+      "version": "20260927070403",
+      "name": "bootstrap_batch_383_398",
+      "statement_hashes": [
+        "cb22d902d86067e2588a24d739207f1a68a8582d4351ee4fc23c78f1208827a6"
+      ]
+    },
+    {
+      "version": "20260927070434",
+      "name": "bootstrap_batch_399_414",
+      "statement_hashes": [
+        "2e45f3e69c80c01b942fa94b9b69e7bcac9395f20740e20eee3abcbb83b54474"
+      ]
+    },
+    {
+      "version": "20260927070538",
+      "name": "bootstrap_batch_431_443",
+      "statement_hashes": [
+        "4ebc3bcf3a0b50a0d6ed03c845fc31cea7750cf42f8bea4d49e7f323beb42b19"
+      ]
+    },
+    {
+      "version": "20261003092253",
+      "name": "allow_negative_stock_server_policy",
+      "statement_hashes": [
+        "aafb76b4da5caae30e0ff4ecd57485d8f406be7dcd4d77cd732fda8c8dc02b72"
+      ]
+    },
+    {
+      "version": "20261003103213",
+      "name": "allow_negative_stock_server_policy",
+      "statement_hashes": [
+        "97b32715f7c394a4472c7ed5760df9ed37868b86da81b3f62e43122762f2e0a4"
+      ]
+    },
+    {
+      "version": "20261007082531",
+      "name": "public_trial_registration_pos_only",
+      "statement_hashes": [
+        "827fe4db963807868c592c0474b85f5d807be42a7563dbfdf51dd2f6dc51d36e"
+      ]
+    },
+    {
+      "version": "20261007095731",
+      "name": "unify_organization_subscription_runtime",
+      "statement_hashes": [
+        "4a09444d14819dc97b8d30574176c5a25017004383a85fc2322167460e073ea8"
+      ]
+    },
+    {
+      "version": "20261007115531",
+      "name": "customer_support_chat",
+      "statement_hashes": [
+        "507fe79653d9b2865d74855c244eafd33e66dd4783eef72180e403ba59d0d16a"
+      ]
+    },
+    {
+      "version": "20261011080408",
+      "name": "phase4d_component_cost_evidence",
+      "statement_hashes": [
+        "749c966d217be1ebee5f593401447656a9f32069d523bf2bb33a02042ecd2905"
+      ]
+    },
+    {
+      "version": "20261011081037",
+      "name": "phase4d_fail_closed_missing_component_cost",
+      "statement_hashes": [
+        "38b5d35175a47a808bd96e813b7955a64a083de8738ab3b55ff9ad355cfdb310"
+      ]
+    },
+    {
+      "version": "20261022090902",
+      "name": "owner_tenant_branch_isolation",
+      "statement_hashes": [
+        "c8edd55b0f99d001c694f95ff0b5cb1bf61707fecf0ad4d596daf20e4178e1cb"
+      ]
+    },
+    {
+      "version": "20261023043413",
+      "name": "implement_gated_atomic_non_fifo_movement_v2",
+      "statement_hashes": [
+        "dbb91cc9774a233c28647fefad66240ced8ad4b61e17ebcc4dc0ccfb5d953e38"
+      ]
+    },
+    {
+      "version": "20261023122502",
+      "name": "allow_zero_cost_valid_existing_recipe_sale_snapshot",
+      "statement_hashes": [
+        "8cc2a42f989421dbd5a879bbbf56852ce300fcfb219adff208dd8cab08d49259"
+      ]
+    },
+    {
+      "version": "20261023132326",
+      "name": "staged_kitchen_stock_non_fifo_compat_engine",
+      "statement_hashes": [
+        "fbffdaee188d3ccba80596a9a1da8c37d09536d13c5db953e7b4cc07c8ed1b1a"
+      ]
+    },
+    {
+      "version": "20261023132442",
+      "name": "cutover_kitchen_component_stock_consumption_without_fifo",
+      "statement_hashes": [
+        "9b2dde95b986f8c49571e880f0f67b1484f793e90f5a0f8e881ef02d5b53965b"
+      ]
+    },
+    {
+      "version": "20261023133657",
+      "name": "enforce_kitchen_stock_quantity_precision_before_non_fifo_write",
+      "statement_hashes": [
+        "e10dfb26b689b72a52a97666ae4d1607c1f41b68fc091c8f12c1c2854ae42bd0"
+      ]
+    },
+    {
+      "version": "20261023152309",
+      "name": "cutover_production_orders_raw_consumption_and_waste_atomic",
+      "statement_hashes": [
+        "805574fc6c4ee52e6ec5baa5c4c8efe6fe64f014419b7ddbcac19bc3907a0933"
+      ]
+    },
+    {
+      "version": "20261024170057",
+      "name": "exclude_gate_from_product_fifo_dependency_count",
+      "statement_hashes": [
+        "69511755e91c121e5ac7499df81d57de587f7fc11b8cc87e7d2dcc3a8f281b9c"
+      ]
+    },
+    {
+      "version": "20261027053343",
+      "name": "unified_current_stock_position_with_cost_and_price",
+      "statement_hashes": [
+        "a39f89a8eb068deaaed54f3878b7986b9378812779cbcdecf6bd40318dcaa7a1"
+      ]
+    },
+    {
+      "version": "20261110104453",
+      "name": "premier_stock_valuation_rpc_branch_auth_20261110",
+      "statement_hashes": [
+        "4855885a35e2ee544d7911fae9a21da729a20c6f7a5455624c2de9fbec3e4625"
+      ]
+    }
+  ],
+  "files": [
+    {
+      "canonical_path": "supabase/migrations/20260927095000_auto_business_day_close.sql",
+      "canonical_sha256": "b0b7ee70cb2bca2a640bf99d18b69e67277ccce6f47e8f3ac58185761e4b4143",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [],
+      "statement_count": 7,
+      "covered_statements": 0,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": []
+        },
+        {
+          "canonical_index": 1,
+          "hits": []
+        },
+        {
+          "canonical_index": 2,
+          "hits": []
+        },
+        {
+          "canonical_index": 3,
+          "hits": []
+        },
+        {
+          "canonical_index": 4,
+          "hits": []
+        },
+        {
+          "canonical_index": 5,
+          "hits": []
+        },
+        {
+          "canonical_index": 6,
+          "hits": []
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20260927154500_organization_module_controls.sql",
+      "canonical_sha256": "d0c07a90fb1968745c27fd973c030b9129506c77115f2b695a57a887c86d640b",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [
+        {
+          "version": "20260927141752",
+          "kind": "body_tokens",
+          "windows": [
+            0
+          ],
+          "whole": true,
+          "remote_statement_hashes": [
+            "346841369a59ea27cbf9d0c4a4bef5afec40471edd9e7fdd7732fe93dfc57bb2"
+          ]
+        }
+      ],
+      "statement_count": 31,
+      "covered_statements": 31,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 0
+            }
+          ]
+        },
+        {
+          "canonical_index": 1,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 1
+            }
+          ]
+        },
+        {
+          "canonical_index": 2,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 2
+            }
+          ]
+        },
+        {
+          "canonical_index": 3,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 3
+            }
+          ]
+        },
+        {
+          "canonical_index": 4,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 4
+            }
+          ]
+        },
+        {
+          "canonical_index": 5,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 5
+            }
+          ]
+        },
+        {
+          "canonical_index": 6,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 6
+            }
+          ]
+        },
+        {
+          "canonical_index": 7,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 7
+            }
+          ]
+        },
+        {
+          "canonical_index": 8,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 8
+            }
+          ]
+        },
+        {
+          "canonical_index": 9,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 9
+            }
+          ]
+        },
+        {
+          "canonical_index": 10,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 10
+            }
+          ]
+        },
+        {
+          "canonical_index": 11,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 11
+            }
+          ]
+        },
+        {
+          "canonical_index": 12,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 12
+            },
+            {
+              "version": "20260927065518",
+              "index": 33
+            }
+          ]
+        },
+        {
+          "canonical_index": 13,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 13
+            },
+            {
+              "version": "20260927065518",
+              "index": 34
+            }
+          ]
+        },
+        {
+          "canonical_index": 14,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 14
+            },
+            {
+              "version": "20260927065003",
+              "index": 33
+            },
+            {
+              "version": "20260927065518",
+              "index": 35
+            }
+          ]
+        },
+        {
+          "canonical_index": 15,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 15
+            }
+          ]
+        },
+        {
+          "canonical_index": 16,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 16
+            }
+          ]
+        },
+        {
+          "canonical_index": 17,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 17
+            }
+          ]
+        },
+        {
+          "canonical_index": 18,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 18
+            }
+          ]
+        },
+        {
+          "canonical_index": 19,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 19
+            }
+          ]
+        },
+        {
+          "canonical_index": 20,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 20
+            }
+          ]
+        },
+        {
+          "canonical_index": 21,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 21
+            }
+          ]
+        },
+        {
+          "canonical_index": 22,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 22
+            },
+            {
+              "version": "20261007082531",
+              "index": 6
+            },
+            {
+              "version": "20261007095731",
+              "index": 5
+            }
+          ]
+        },
+        {
+          "canonical_index": 23,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 23
+            }
+          ]
+        },
+        {
+          "canonical_index": 24,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 24
+            },
+            {
+              "version": "20261007082531",
+              "index": 7
+            },
+            {
+              "version": "20261007095731",
+              "index": 6
+            }
+          ]
+        },
+        {
+          "canonical_index": 25,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 25
+            },
+            {
+              "version": "20261007082531",
+              "index": 8
+            },
+            {
+              "version": "20261007095731",
+              "index": 7
+            }
+          ]
+        },
+        {
+          "canonical_index": 26,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 26
+            }
+          ]
+        },
+        {
+          "canonical_index": 27,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 27
+            }
+          ]
+        },
+        {
+          "canonical_index": 28,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 28
+            }
+          ]
+        },
+        {
+          "canonical_index": 29,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 29
+            }
+          ]
+        },
+        {
+          "canonical_index": 30,
+          "hits": [
+            {
+              "version": "20260927141752",
+              "index": 30
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20260928153000_internal_trigger_execute_boundary.sql",
+      "canonical_sha256": "65295a61f3b77ee6a8d9fb2207d631c4fddbfaf6b59cecc2ed4e00de3a850012",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [],
+      "statement_count": 10,
+      "covered_statements": 1,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": []
+        },
+        {
+          "canonical_index": 1,
+          "hits": []
+        },
+        {
+          "canonical_index": 2,
+          "hits": []
+        },
+        {
+          "canonical_index": 3,
+          "hits": []
+        },
+        {
+          "canonical_index": 4,
+          "hits": []
+        },
+        {
+          "canonical_index": 5,
+          "hits": []
+        },
+        {
+          "canonical_index": 6,
+          "hits": []
+        },
+        {
+          "canonical_index": 7,
+          "hits": []
+        },
+        {
+          "canonical_index": 8,
+          "hits": []
+        },
+        {
+          "canonical_index": 9,
+          "hits": [
+            {
+              "version": "20260927064130",
+              "index": 51
+            },
+            {
+              "version": "20260927064137",
+              "index": 77
+            },
+            {
+              "version": "20260927064301",
+              "index": 33
+            },
+            {
+              "version": "20260927065142",
+              "index": 37
+            },
+            {
+              "version": "20260927065142",
+              "index": 41
+            },
+            {
+              "version": "20260927065142",
+              "index": 58
+            },
+            {
+              "version": "20260927065142",
+              "index": 61
+            },
+            {
+              "version": "20260927065142",
+              "index": 64
+            },
+            {
+              "version": "20260927065142",
+              "index": 85
+            },
+            {
+              "version": "20260927065142",
+              "index": 95
+            },
+            {
+              "version": "20260927065142",
+              "index": 106
+            },
+            {
+              "version": "20260927065142",
+              "index": 116
+            },
+            {
+              "version": "20260927065142",
+              "index": 148
+            },
+            {
+              "version": "20260927065752",
+              "index": 84
+            },
+            {
+              "version": "20260927065826",
+              "index": 27
+            },
+            {
+              "version": "20260927065826",
+              "index": 63
+            },
+            {
+              "version": "20260927065826",
+              "index": 71
+            },
+            {
+              "version": "20260927065826",
+              "index": 85
+            },
+            {
+              "version": "20260927065826",
+              "index": 92
+            },
+            {
+              "version": "20260927065826",
+              "index": 103
+            },
+            {
+              "version": "20260927065826",
+              "index": 129
+            },
+            {
+              "version": "20260927070509",
+              "index": 170
+            },
+            {
+              "version": "20260927070509",
+              "index": 177
+            },
+            {
+              "version": "20260927070509",
+              "index": 210
+            },
+            {
+              "version": "20260929132251",
+              "index": 5
+            },
+            {
+              "version": "20260927063853",
+              "index": 7
+            },
+            {
+              "version": "20260927065518",
+              "index": 198
+            },
+            {
+              "version": "20260927070403",
+              "index": 42
+            },
+            {
+              "version": "20260927070403",
+              "index": 53
+            },
+            {
+              "version": "20260927070403",
+              "index": 59
+            },
+            {
+              "version": "20260927070403",
+              "index": 115
+            },
+            {
+              "version": "20260927070403",
+              "index": 119
+            },
+            {
+              "version": "20260927070434",
+              "index": 54
+            },
+            {
+              "version": "20260927070434",
+              "index": 62
+            },
+            {
+              "version": "20260927070434",
+              "index": 67
+            },
+            {
+              "version": "20260927070434",
+              "index": 72
+            },
+            {
+              "version": "20260927070538",
+              "index": 124
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20260929144000_organization_business_profiles.sql",
+      "canonical_sha256": "4664e1a41a9715393dead687c19e8a8d51947153f6651f98f86641e4facc0c33",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [],
+      "statement_count": 6,
+      "covered_statements": 5,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": [
+            {
+              "version": "20260929132251",
+              "index": 0
+            }
+          ]
+        },
+        {
+          "canonical_index": 1,
+          "hits": [
+            {
+              "version": "20260929132251",
+              "index": 1
+            }
+          ]
+        },
+        {
+          "canonical_index": 2,
+          "hits": []
+        },
+        {
+          "canonical_index": 3,
+          "hits": [
+            {
+              "version": "20260929132251",
+              "index": 3
+            }
+          ]
+        },
+        {
+          "canonical_index": 4,
+          "hits": [
+            {
+              "version": "20260929132251",
+              "index": 4
+            }
+          ]
+        },
+        {
+          "canonical_index": 5,
+          "hits": [
+            {
+              "version": "20260927064130",
+              "index": 51
+            },
+            {
+              "version": "20260927064137",
+              "index": 77
+            },
+            {
+              "version": "20260927064301",
+              "index": 33
+            },
+            {
+              "version": "20260927065142",
+              "index": 37
+            },
+            {
+              "version": "20260927065142",
+              "index": 41
+            },
+            {
+              "version": "20260927065142",
+              "index": 58
+            },
+            {
+              "version": "20260927065142",
+              "index": 61
+            },
+            {
+              "version": "20260927065142",
+              "index": 64
+            },
+            {
+              "version": "20260927065142",
+              "index": 85
+            },
+            {
+              "version": "20260927065142",
+              "index": 95
+            },
+            {
+              "version": "20260927065142",
+              "index": 106
+            },
+            {
+              "version": "20260927065142",
+              "index": 116
+            },
+            {
+              "version": "20260927065142",
+              "index": 148
+            },
+            {
+              "version": "20260927065752",
+              "index": 84
+            },
+            {
+              "version": "20260927065826",
+              "index": 27
+            },
+            {
+              "version": "20260927065826",
+              "index": 63
+            },
+            {
+              "version": "20260927065826",
+              "index": 71
+            },
+            {
+              "version": "20260927065826",
+              "index": 85
+            },
+            {
+              "version": "20260927065826",
+              "index": 92
+            },
+            {
+              "version": "20260927065826",
+              "index": 103
+            },
+            {
+              "version": "20260927065826",
+              "index": 129
+            },
+            {
+              "version": "20260927070509",
+              "index": 170
+            },
+            {
+              "version": "20260927070509",
+              "index": 177
+            },
+            {
+              "version": "20260927070509",
+              "index": 210
+            },
+            {
+              "version": "20260929132251",
+              "index": 5
+            },
+            {
+              "version": "20260927063853",
+              "index": 7
+            },
+            {
+              "version": "20260927065518",
+              "index": 198
+            },
+            {
+              "version": "20260927070403",
+              "index": 42
+            },
+            {
+              "version": "20260927070403",
+              "index": 53
+            },
+            {
+              "version": "20260927070403",
+              "index": 59
+            },
+            {
+              "version": "20260927070403",
+              "index": 115
+            },
+            {
+              "version": "20260927070403",
+              "index": 119
+            },
+            {
+              "version": "20260927070434",
+              "index": 54
+            },
+            {
+              "version": "20260927070434",
+              "index": 62
+            },
+            {
+              "version": "20260927070434",
+              "index": 67
+            },
+            {
+              "version": "20260927070434",
+              "index": 72
+            },
+            {
+              "version": "20260927070538",
+              "index": 124
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009134308_phase4d_immutable_sale_cost_snapshots.sql",
+      "canonical_sha256": "d46857b7084d3908f8a3e172a90bafc15101a70d09211ebbd852677873c26517",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [
+        {
+          "version": "20261009134308",
+          "kind": "body_tokens",
+          "windows": [
+            0
+          ],
+          "whole": true,
+          "remote_statement_hashes": [
+            "5a8eb1c63917b73722109bf0b5e65240b32c88b62f747f03efb126a015875ebc"
+          ]
+        }
+      ],
+      "statement_count": 40,
+      "covered_statements": 40,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": [
+            {
+              "version": "20261009080923",
+              "index": 0
+            },
+            {
+              "version": "20261009134308",
+              "index": 0
+            }
+          ]
+        },
+        {
+          "canonical_index": 1,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 1
+            }
+          ]
+        },
+        {
+          "canonical_index": 2,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 2
+            }
+          ]
+        },
+        {
+          "canonical_index": 3,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 3
+            }
+          ]
+        },
+        {
+          "canonical_index": 4,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 4
+            }
+          ]
+        },
+        {
+          "canonical_index": 5,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 5
+            }
+          ]
+        },
+        {
+          "canonical_index": 6,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 6
+            }
+          ]
+        },
+        {
+          "canonical_index": 7,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 7
+            }
+          ]
+        },
+        {
+          "canonical_index": 8,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 8
+            }
+          ]
+        },
+        {
+          "canonical_index": 9,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 9
+            }
+          ]
+        },
+        {
+          "canonical_index": 10,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 10
+            }
+          ]
+        },
+        {
+          "canonical_index": 11,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 11
+            }
+          ]
+        },
+        {
+          "canonical_index": 12,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 12
+            }
+          ]
+        },
+        {
+          "canonical_index": 13,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 13
+            }
+          ]
+        },
+        {
+          "canonical_index": 14,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 14
+            }
+          ]
+        },
+        {
+          "canonical_index": 15,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 15
+            }
+          ]
+        },
+        {
+          "canonical_index": 16,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 16
+            }
+          ]
+        },
+        {
+          "canonical_index": 17,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 17
+            }
+          ]
+        },
+        {
+          "canonical_index": 18,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 18
+            }
+          ]
+        },
+        {
+          "canonical_index": 19,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 19
+            }
+          ]
+        },
+        {
+          "canonical_index": 20,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 20
+            }
+          ]
+        },
+        {
+          "canonical_index": 21,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 21
+            }
+          ]
+        },
+        {
+          "canonical_index": 22,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 22
+            }
+          ]
+        },
+        {
+          "canonical_index": 23,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 23
+            }
+          ]
+        },
+        {
+          "canonical_index": 24,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 24
+            }
+          ]
+        },
+        {
+          "canonical_index": 25,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 25
+            }
+          ]
+        },
+        {
+          "canonical_index": 26,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 26
+            }
+          ]
+        },
+        {
+          "canonical_index": 27,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 27
+            }
+          ]
+        },
+        {
+          "canonical_index": 28,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 28
+            }
+          ]
+        },
+        {
+          "canonical_index": 29,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 29
+            }
+          ]
+        },
+        {
+          "canonical_index": 30,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 30
+            }
+          ]
+        },
+        {
+          "canonical_index": 31,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 31
+            }
+          ]
+        },
+        {
+          "canonical_index": 32,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 32
+            }
+          ]
+        },
+        {
+          "canonical_index": 33,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 33
+            }
+          ]
+        },
+        {
+          "canonical_index": 34,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 34
+            }
+          ]
+        },
+        {
+          "canonical_index": 35,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 35
+            }
+          ]
+        },
+        {
+          "canonical_index": 36,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 36
+            }
+          ]
+        },
+        {
+          "canonical_index": 37,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 37
+            }
+          ]
+        },
+        {
+          "canonical_index": 38,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 38
+            }
+          ]
+        },
+        {
+          "canonical_index": 39,
+          "hits": [
+            {
+              "version": "20261009134308",
+              "index": 39
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20261009140019_phase5a_fiscal_period_posting_metadata.sql",
+      "canonical_sha256": "a7d33a4924f5f3e4959455718fb74e14f5bc7f75eba2f69cb3b5726528f9763d",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [],
+      "statement_count": 22,
+      "covered_statements": 16,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": []
+        },
+        {
+          "canonical_index": 1,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 1
+            }
+          ]
+        },
+        {
+          "canonical_index": 2,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 2
+            }
+          ]
+        },
+        {
+          "canonical_index": 3,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 3
+            }
+          ]
+        },
+        {
+          "canonical_index": 4,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 4
+            }
+          ]
+        },
+        {
+          "canonical_index": 5,
+          "hits": []
+        },
+        {
+          "canonical_index": 6,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 6
+            }
+          ]
+        },
+        {
+          "canonical_index": 7,
+          "hits": []
+        },
+        {
+          "canonical_index": 8,
+          "hits": []
+        },
+        {
+          "canonical_index": 9,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 10
+            }
+          ]
+        },
+        {
+          "canonical_index": 10,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 12
+            }
+          ]
+        },
+        {
+          "canonical_index": 11,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 11
+            }
+          ]
+        },
+        {
+          "canonical_index": 12,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 13
+            }
+          ]
+        },
+        {
+          "canonical_index": 13,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 15
+            }
+          ]
+        },
+        {
+          "canonical_index": 14,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 17
+            }
+          ]
+        },
+        {
+          "canonical_index": 15,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 14
+            }
+          ]
+        },
+        {
+          "canonical_index": 16,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 16
+            }
+          ]
+        },
+        {
+          "canonical_index": 17,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 18
+            }
+          ]
+        },
+        {
+          "canonical_index": 18,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 21
+            }
+          ]
+        },
+        {
+          "canonical_index": 19,
+          "hits": [
+            {
+              "version": "20261009140019",
+              "index": 22
+            }
+          ]
+        },
+        {
+          "canonical_index": 20,
+          "hits": []
+        },
+        {
+          "canonical_index": 21,
+          "hits": []
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20261011064606_phase5e_append_only_fifo_sale_cogs.sql",
+      "canonical_sha256": "22c4dd4011897cb492a4a784366c60fbfa21113957a0c53e468939d24ff2e563",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [
+        {
+          "version": "20261011064606",
+          "kind": "body_tokens",
+          "windows": [
+            0
+          ],
+          "whole": true,
+          "remote_statement_hashes": [
+            "4a28fd39c98166983a2faec37bad143eb651db80b80c039eb6692b5d9ec01d60"
+          ]
+        }
+      ],
+      "statement_count": 14,
+      "covered_statements": 14,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 0
+            }
+          ]
+        },
+        {
+          "canonical_index": 1,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 1
+            }
+          ]
+        },
+        {
+          "canonical_index": 2,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 2
+            }
+          ]
+        },
+        {
+          "canonical_index": 3,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 3
+            }
+          ]
+        },
+        {
+          "canonical_index": 4,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 4
+            }
+          ]
+        },
+        {
+          "canonical_index": 5,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 5
+            }
+          ]
+        },
+        {
+          "canonical_index": 6,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 6
+            },
+            {
+              "version": "20261011064956",
+              "index": 0
+            }
+          ]
+        },
+        {
+          "canonical_index": 7,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 7
+            }
+          ]
+        },
+        {
+          "canonical_index": 8,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 8
+            }
+          ]
+        },
+        {
+          "canonical_index": 9,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 9
+            }
+          ]
+        },
+        {
+          "canonical_index": 10,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 10
+            }
+          ]
+        },
+        {
+          "canonical_index": 11,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 11
+            }
+          ]
+        },
+        {
+          "canonical_index": 12,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 12
+            }
+          ]
+        },
+        {
+          "canonical_index": 13,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 13
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20261011064956_phase5f_append_only_fifo_orphan_and_stock.sql",
+      "canonical_sha256": "221ad5b028db2abb11ee65d68a1a818f5b0cb92a94cb831227ed57ae0fb49569",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [
+        {
+          "version": "20261011064956",
+          "kind": "body_tokens",
+          "windows": [
+            0
+          ],
+          "whole": true,
+          "remote_statement_hashes": [
+            "ea8e4723cad264fe09e7ccf036528d71074dd513da7fdd7933e009219387dc58"
+          ]
+        }
+      ],
+      "statement_count": 11,
+      "covered_statements": 11,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": [
+            {
+              "version": "20261011064606",
+              "index": 6
+            },
+            {
+              "version": "20261011064956",
+              "index": 0
+            }
+          ]
+        },
+        {
+          "canonical_index": 1,
+          "hits": [
+            {
+              "version": "20261011064956",
+              "index": 1
+            }
+          ]
+        },
+        {
+          "canonical_index": 2,
+          "hits": [
+            {
+              "version": "20261011064956",
+              "index": 2
+            }
+          ]
+        },
+        {
+          "canonical_index": 3,
+          "hits": [
+            {
+              "version": "20261011064956",
+              "index": 3
+            }
+          ]
+        },
+        {
+          "canonical_index": 4,
+          "hits": [
+            {
+              "version": "20261011064956",
+              "index": 4
+            }
+          ]
+        },
+        {
+          "canonical_index": 5,
+          "hits": [
+            {
+              "version": "20261011064956",
+              "index": 5
+            }
+          ]
+        },
+        {
+          "canonical_index": 6,
+          "hits": [
+            {
+              "version": "20261011064956",
+              "index": 6
+            }
+          ]
+        },
+        {
+          "canonical_index": 7,
+          "hits": [
+            {
+              "version": "20261011064956",
+              "index": 7
+            }
+          ]
+        },
+        {
+          "canonical_index": 8,
+          "hits": [
+            {
+              "version": "20261011064956",
+              "index": 8
+            }
+          ]
+        },
+        {
+          "canonical_index": 9,
+          "hits": [
+            {
+              "version": "20261011064956",
+              "index": 9
+            }
+          ]
+        },
+        {
+          "canonical_index": 10,
+          "hits": [
+            {
+              "version": "20261011064956",
+              "index": 10
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023150600_raw_published_price_asof_helper.sql",
+      "canonical_sha256": "f5a8e02dba0142e117ed039f2401a209696c4cc45eab08d351470b663c8ef6bc",
+      "terminator_repaired_for_comparison_only": true,
+      "matches": [],
+      "statement_count": 3,
+      "covered_statements": 2,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": []
+        },
+        {
+          "canonical_index": 1,
+          "hits": [
+            {
+              "version": "20261023043100",
+              "index": 1
+            }
+          ]
+        },
+        {
+          "canonical_index": 2,
+          "hits": [
+            {
+              "version": "20261023043100",
+              "index": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023150700_sale_snapshot_modifier_cost_asof_published_price.sql",
+      "canonical_sha256": "2b94aaceb5b2c3d5e9b84901851c080996dcc563f1713a18a5045cba1aa12667",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [
+        {
+          "version": "20261023122502",
+          "kind": "strict_ast",
+          "windows": [
+            0
+          ],
+          "whole": true,
+          "remote_statement_hashes": [
+            "8cc2a42f989421dbd5a879bbbf56852ce300fcfb219adff208dd8cab08d49259"
+          ]
+        }
+      ],
+      "statement_count": 1,
+      "covered_statements": 1,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": [
+            {
+              "version": "20261023122502",
+              "index": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023172500_reconcile_nine_verified_raw_branch_balance_cache_rows.sql",
+      "canonical_sha256": "4e68f2e06f2a4dd01d044ca91d66035d9526ecfd7a8489a7f373c04d2dc4e3ef",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [
+        {
+          "version": "20261023140605",
+          "kind": "body_tokens",
+          "windows": [
+            0
+          ],
+          "whole": true,
+          "remote_statement_hashes": [
+            "8fa459e4adc8d3403968fcc6147c59445d0316c9c725dd587eb5bceaabe75272"
+          ]
+        }
+      ],
+      "statement_count": 1,
+      "covered_statements": 1,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": [
+            {
+              "version": "20261023140605",
+              "index": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023211500_guard_direct_kitchen_material_replay.sql",
+      "canonical_sha256": "e75ae39a8c243026bda706ee410f589f24a3ed320a5cefedbae7480d44fa056e",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [],
+      "statement_count": 3,
+      "covered_statements": 3,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": [
+            {
+              "version": "20261023132918",
+              "index": 0
+            }
+          ]
+        },
+        {
+          "canonical_index": 1,
+          "hits": [
+            {
+              "version": "20261023132326",
+              "index": 1
+            }
+          ]
+        },
+        {
+          "canonical_index": 2,
+          "hits": [
+            {
+              "version": "20261023132326",
+              "index": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023214500_kitchen_stock_precision_guard.sql",
+      "canonical_sha256": "5fcfce2dedabe38b899b07f04f01c945365a4d5ec254755ebc552dae30b23519",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [
+        {
+          "version": "20261023133657",
+          "kind": "strict_ast",
+          "windows": [
+            0
+          ],
+          "whole": true,
+          "remote_statement_hashes": [
+            "e10dfb26b689b72a52a97666ae4d1607c1f41b68fc091c8f12c1c2854ae42bd0"
+          ]
+        }
+      ],
+      "statement_count": 1,
+      "covered_statements": 1,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": [
+            {
+              "version": "20261023133657",
+              "index": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20261023234000_production_order_non_fifo_raw_and_waste.sql",
+      "canonical_sha256": "cb2c52e5fe36a7d23817713a89ccfa356536544c3fd9abf13df2ed159e9a3673",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [
+        {
+          "version": "20261023152309",
+          "kind": "strict_ast",
+          "windows": [
+            0
+          ],
+          "whole": true,
+          "remote_statement_hashes": [
+            "805574fc6c4ee52e6ec5baa5c4c8efe6fe64f014419b7ddbcac19bc3907a0933"
+          ]
+        }
+      ],
+      "statement_count": 1,
+      "covered_statements": 1,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": [
+            {
+              "version": "20261023152309",
+              "index": 0
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20261024192500_product_fifo_cutover_readiness_gate.sql",
+      "canonical_sha256": "03fbff7e295251f043f06e69f2203eab3134f51349730d3dc51369879c6cd657",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [],
+      "statement_count": 3,
+      "covered_statements": 2,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": []
+        },
+        {
+          "canonical_index": 1,
+          "hits": [
+            {
+              "version": "20261024170040",
+              "index": 1
+            }
+          ]
+        },
+        {
+          "canonical_index": 2,
+          "hits": [
+            {
+              "version": "20261024170040",
+              "index": 2
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20261026190000_unified_stock_balances_read_contract.sql",
+      "canonical_sha256": "dbae34b53038719e4f131621d4c2882d83bc1cd38b399f0debd148018e952d83",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [],
+      "statement_count": 3,
+      "covered_statements": 2,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": [
+            {
+              "version": "20261026200727",
+              "index": 0
+            }
+          ]
+        },
+        {
+          "canonical_index": 1,
+          "hits": [
+            {
+              "version": "20261026200727",
+              "index": 1
+            }
+          ]
+        },
+        {
+          "canonical_index": 2,
+          "hits": []
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20261105010000_harden_login_failure_and_user_security.sql",
+      "canonical_sha256": "86f7ea28b687723b3d42337a92e9b85799271da1d594c26396f6abb508c6f788",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [],
+      "statement_count": 7,
+      "covered_statements": 6,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": []
+        },
+        {
+          "canonical_index": 1,
+          "hits": [
+            {
+              "version": "20260927065422",
+              "index": 110
+            }
+          ]
+        },
+        {
+          "canonical_index": 2,
+          "hits": [
+            {
+              "version": "20260927065422",
+              "index": 112
+            }
+          ]
+        },
+        {
+          "canonical_index": 3,
+          "hits": [
+            {
+              "version": "20260927065422",
+              "index": 114
+            }
+          ]
+        },
+        {
+          "canonical_index": 4,
+          "hits": [
+            {
+              "version": "20260927065422",
+              "index": 116
+            }
+          ]
+        },
+        {
+          "canonical_index": 5,
+          "hits": [
+            {
+              "version": "20260927065422",
+              "index": 118
+            }
+          ]
+        },
+        {
+          "canonical_index": 6,
+          "hits": [
+            {
+              "version": "20260927064130",
+              "index": 51
+            },
+            {
+              "version": "20260927064137",
+              "index": 77
+            },
+            {
+              "version": "20260927064301",
+              "index": 33
+            },
+            {
+              "version": "20260927065142",
+              "index": 37
+            },
+            {
+              "version": "20260927065142",
+              "index": 41
+            },
+            {
+              "version": "20260927065142",
+              "index": 58
+            },
+            {
+              "version": "20260927065142",
+              "index": 61
+            },
+            {
+              "version": "20260927065142",
+              "index": 64
+            },
+            {
+              "version": "20260927065142",
+              "index": 85
+            },
+            {
+              "version": "20260927065142",
+              "index": 95
+            },
+            {
+              "version": "20260927065142",
+              "index": 106
+            },
+            {
+              "version": "20260927065142",
+              "index": 116
+            },
+            {
+              "version": "20260927065142",
+              "index": 148
+            },
+            {
+              "version": "20260927065752",
+              "index": 84
+            },
+            {
+              "version": "20260927065826",
+              "index": 27
+            },
+            {
+              "version": "20260927065826",
+              "index": 63
+            },
+            {
+              "version": "20260927065826",
+              "index": 71
+            },
+            {
+              "version": "20260927065826",
+              "index": 85
+            },
+            {
+              "version": "20260927065826",
+              "index": 92
+            },
+            {
+              "version": "20260927065826",
+              "index": 103
+            },
+            {
+              "version": "20260927065826",
+              "index": 129
+            },
+            {
+              "version": "20260927070509",
+              "index": 170
+            },
+            {
+              "version": "20260927070509",
+              "index": 177
+            },
+            {
+              "version": "20260927070509",
+              "index": 210
+            },
+            {
+              "version": "20260929132251",
+              "index": 5
+            },
+            {
+              "version": "20260927063853",
+              "index": 7
+            },
+            {
+              "version": "20260927065518",
+              "index": 198
+            },
+            {
+              "version": "20260927070403",
+              "index": 42
+            },
+            {
+              "version": "20260927070403",
+              "index": 53
+            },
+            {
+              "version": "20260927070403",
+              "index": 59
+            },
+            {
+              "version": "20260927070403",
+              "index": 115
+            },
+            {
+              "version": "20260927070403",
+              "index": 119
+            },
+            {
+              "version": "20260927070434",
+              "index": 54
+            },
+            {
+              "version": "20260927070434",
+              "index": 62
+            },
+            {
+              "version": "20260927070434",
+              "index": 67
+            },
+            {
+              "version": "20260927070434",
+              "index": 72
+            },
+            {
+              "version": "20260927070538",
+              "index": 124
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "canonical_path": "supabase/migrations/20261109143000_premier_kds_read_only_permissions.sql",
+      "canonical_sha256": "35d9793cd540525f1c5a6e5aaa4854caa0749b0cd634a6625bab80fbdec4e048",
+      "terminator_repaired_for_comparison_only": false,
+      "matches": [],
+      "statement_count": 8,
+      "covered_statements": 3,
+      "coverage": [
+        {
+          "canonical_index": 0,
+          "hits": [
+            {
+              "version": "20261109072830",
+              "index": 0
+            },
+            {
+              "version": "20261109073118",
+              "index": 0
+            },
+            {
+              "version": "20261109073305",
+              "index": 0
+            },
+            {
+              "version": "20261109073426",
+              "index": 0
+            },
+            {
+              "version": "20261109073617",
+              "index": 0
+            },
+            {
+              "version": "20261109073705",
+              "index": 0
+            },
+            {
+              "version": "20261109073733",
+              "index": 0
+            },
+            {
+              "version": "20261109073754",
+              "index": 0
+            },
+            {
+              "version": "20261109073818",
+              "index": 0
+            },
+            {
+              "version": "20261109073839",
+              "index": 0
+            },
+            {
+              "version": "20261109073920",
+              "index": 0
+            },
+            {
+              "version": "20261109073923",
+              "index": 0
+            },
+            {
+              "version": "20261109073928",
+              "index": 0
+            },
+            {
+              "version": "20261109074100",
+              "index": 0
+            },
+            {
+              "version": "20261109081844",
+              "index": 0
+            },
+            {
+              "version": "20261109084444",
+              "index": 0
+            },
+            {
+              "version": "20261109094032",
+              "index": 0
+            },
+            {
+              "version": "20261110104453",
+              "index": 0
+            }
+          ]
+        },
+        {
+          "canonical_index": 1,
+          "hits": [
+            {
+              "version": "20261109073617",
+              "index": 1
+            },
+            {
+              "version": "20261109073705",
+              "index": 1
+            },
+            {
+              "version": "20261109073733",
+              "index": 1
+            },
+            {
+              "version": "20261109073754",
+              "index": 1
+            },
+            {
+              "version": "20261109073818",
+              "index": 1
+            },
+            {
+              "version": "20261109073839",
+              "index": 1
+            },
+            {
+              "version": "20261109073920",
+              "index": 1
+            },
+            {
+              "version": "20261109073923",
+              "index": 1
+            },
+            {
+              "version": "20261109073928",
+              "index": 1
+            },
+            {
+              "version": "20261109074100",
+              "index": 1
+            },
+            {
+              "version": "20261109081844",
+              "index": 1
+            },
+            {
+              "version": "20261109084444",
+              "index": 1
+            },
+            {
+              "version": "20261109094032",
+              "index": 2
+            },
+            {
+              "version": "20261110104453",
+              "index": 1
+            }
+          ]
+        },
+        {
+          "canonical_index": 2,
+          "hits": []
+        },
+        {
+          "canonical_index": 3,
+          "hits": []
+        },
+        {
+          "canonical_index": 4,
+          "hits": []
+        },
+        {
+          "canonical_index": 5,
+          "hits": []
+        },
+        {
+          "canonical_index": 6,
+          "hits": []
+        },
+        {
+          "canonical_index": 7,
+          "hits": [
+            {
+              "version": "20261109072830",
+              "index": 6
+            },
+            {
+              "version": "20261109073118",
+              "index": 5
+            },
+            {
+              "version": "20261109073305",
+              "index": 6
+            },
+            {
+              "version": "20261109073426",
+              "index": 6
+            },
+            {
+              "version": "20261109073617",
+              "index": 8
+            },
+            {
+              "version": "20261109073705",
+              "index": 8
+            },
+            {
+              "version": "20261109073733",
+              "index": 6
+            },
+            {
+              "version": "20261109073754",
+              "index": 7
+            },
+            {
+              "version": "20261109073818",
+              "index": 7
+            },
+            {
+              "version": "20261109073839",
+              "index": 7
+            },
+            {
+              "version": "20261109073920",
+              "index": 5
+            },
+            {
+              "version": "20261109073923",
+              "index": 8
+            },
+            {
+              "version": "20261109073928",
+              "index": 6
+            },
+            {
+              "version": "20261109074100",
+              "index": 6
+            },
+            {
+              "version": "20261109081844",
+              "index": 6
+            },
+            {
+              "version": "20261109084444",
+              "index": 7
+            },
+            {
+              "version": "20261109094032",
+              "index": 6
+            },
+            {
+              "version": "20261110104453",
+              "index": 8
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

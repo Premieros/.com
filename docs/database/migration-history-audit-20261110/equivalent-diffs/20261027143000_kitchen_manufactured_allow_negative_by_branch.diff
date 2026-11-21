@@ -1,0 +1,8 @@
+--- canonical/20261027143000_kitchen_manufactured_allow_negative_by_branch.sql
++++ history/20261027092007.sql
+@@ -214,4 +214,4 @@
+     'detail', SQLERRM
+   );
+ END;
+-$function$;
++$function$;

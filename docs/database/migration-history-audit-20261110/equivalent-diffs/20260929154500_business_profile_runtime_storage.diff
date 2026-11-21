@@ -1,0 +1,8 @@
+--- canonical/20260929154500_business_profile_runtime_storage.sql
++++ history/20260929132312.sql
+@@ -114,4 +114,4 @@
+     public.user_can_access_organization(organization_id)
+     AND (branch_id IS NULL OR public.user_may_access_branch(branch_id))
+   )
+-);
++);
