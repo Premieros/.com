@@ -14,7 +14,7 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
     bunker: boolean; ready?: boolean; real_products?: number; demo_products?: number;
     active_tables?: number; active_stations?: number; active_warehouses?: number;
     authorized_staff?: number; products_missing_cost?: number;
-    products_missing_kitchen_route?: number; enabled?: boolean;
+    products_missing_kitchen_route?: number; products_missing_stock_or_recipe?: number; enabled?: boolean;
     requires_business_approval?: boolean;
   } | null>(null);
   const [readinessLoading, setReadinessLoading] = useState(false);
@@ -54,7 +54,7 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
       if (error) throw error;
       setMessage('تم حفظ إعدادات طلبات العملاء لهذا الفرع فقط.');
       void loadReadiness();
-    } catch (failure) { const message = failure instanceof Error ? failure.message : String(failure); setMessage((message.includes('BUNKER_LIVE_NOT_READY') || message.includes('QR_DEMO_PRODUCTS_NOT_APPROVED')) ? 'لا يمكن تفعيل طلبات BUNKER قبل إكمال تكاليف الأصناف وصلاحيات الموظفين والمخزن والطاولات وربط المطبخ. راجع بطاقة الجاهزية أعلاه.' : qrError(failure)); } finally { setBusy(false); }
+    } catch (failure) { const message = failure instanceof Error ? failure.message : String(failure); setMessage((message.includes('BUNKER_LIVE_NOT_READY') || message.includes('QR_DEMO_PRODUCTS_NOT_APPROVED')) ? 'لا يمكن تفعيل طلبات BUNKER قبل إكمال التكاليف والمخزون أو الوصفات وصلاحيات الموظفين والمخزن والطاولات وربط المطبخ. راجع بطاقة الجاهزية أعلاه.' : qrError(failure)); } finally { setBusy(false); }
   }
   const roles = rolesList.filter(r => r.is_active && r.role !== 'super_admin' && (!r.branch_id || r.branch_id === branchId) && r.permissions.includes('pos.order.edit'));
   return <section dir="rtl" className="space-y-5 rounded-2xl border border-ui-border bg-ui-surface p-5">
@@ -69,6 +69,7 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
             ['المنتجات المنشورة',readiness.real_products ?? 0,(readiness.real_products ?? 0)>0 && (readiness.demo_products ?? 0)===0],
             ['منتجات بدون تكلفة مسجلة',readiness.products_missing_cost ?? 0,(readiness.products_missing_cost ?? 0)===0],
             ['ربط مطبخ غير مكتمل',readiness.products_missing_kitchen_route ?? 0,(readiness.products_missing_kitchen_route ?? 0)===0],
+            ['أصناف بلا رصيد مخزني أو وصفة',readiness.products_missing_stock_or_recipe ?? 0,(readiness.products_missing_stock_or_recipe ?? 0)===0],
             ['مخازن نشطة',readiness.active_warehouses ?? 0,(readiness.active_warehouses ?? 0)>0],
             ['موظفون موثّقون ومصرح لهم',readiness.authorized_staff ?? 0,(readiness.authorized_staff ?? 0)>0],
             ['الطاولات النشطة',readiness.active_tables ?? 0,(readiness.active_tables ?? 0)>0],
