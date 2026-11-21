@@ -71,6 +71,8 @@ export function ProductsPage() {
   });
   const [categories, setCategories] = useState<Category[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
+  const [quickModalOpen, setQuickModalOpen] = useState(false);
+  const [ingredientsModalOpen, setIngredientsModalOpen] = useState(false);
   const [editSection, setEditSection] = useState<'basic' | 'components' | 'units'>('basic');
   const [catalogToolsOpen, setCatalogToolsOpen] = useState(false);
   const [editing, setEditing] = useState<Product | null>(null);
@@ -164,7 +166,25 @@ export function ProductsPage() {
   const availableManufacturedToAdd = manufacturedInventoryUnits.filter((unit) => !linkedInventoryUnits.some((row) => row.unit_id === unit.id));
   const availableRawMaterialsToAdd = rawMaterialOptions.filter((material) => !recipeIngredients.some((row) => row.raw_material_id === material.id));
 
-  const openAdd = () => { window.location.hash = '/products/setup'; };
+  const openAdd = () => {
+    if (!can('products.create')) return;
+    setEditing(null);
+    setEditSection('basic');
+    setBusinessAttributes({});
+    setProductComponents([]);
+    setRecipeIngredients([]);
+    setRecipeYield(1);
+    setLinkedInventoryUnits([]);
+    setUnits([]);
+    setForm({
+      name:'',name_en:'',barcode:'',sku:'',category_id:'',description:'',
+      cost_price:0,sale_price:0,wholesale_price:0,image_url:'',
+      image_position_x:0,image_position_y:0,image_zoom:1,is_active:true,
+      low_stock_threshold:5,min_stock:0,max_stock:0,reorder_point:0,
+      product_type:'ready',branch_id:branchFilter || branches[0]?.id || '',
+    });
+    setQuickModalOpen(true);
+  };
 
   const openEdit = async (p: Product) => {
     const stockComponentsPromise = supportsComposition ? loadStockComponents() : Promise.resolve();
@@ -267,7 +287,7 @@ export function ProductsPage() {
     setLinkedUnitQty(1);
     setComponentSel('');
     setComponentQty(1);
-    setModalOpen(true);
+    setQuickModalOpen(true);
   };
 
   const save = async () => {
@@ -355,6 +375,8 @@ export function ProductsPage() {
     }
     show(t('saveSuccess'), 'success');
     setModalOpen(false);
+    setQuickModalOpen(false);
+    setIngredientsModalOpen(false);
     await invalidatePosCatalogCache();
     await loadLiveProductCosts();
     reloadProducts();
@@ -465,6 +487,92 @@ export function ProductsPage() {
       <DesignPageHeader title={itemLabel} actions={<>{can('products.import') && <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} data-testid="products-import" />}{can('products.import') && <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} data-testid="products-import-button"><Upload className="w-4 h-4" /> {t('importExcel')}</Button>}{can('products.export') && <Button variant="outline" size="sm" onClick={handleExport} data-testid="products-export"><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}<Button variant="outline" size="sm" onClick={() => setCatalogToolsOpen(true)} data-testid="products-tools"><SlidersHorizontal className="w-4 h-4" /> {lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'}</Button>{can('products.create') && <Button size="sm" onClick={openAdd} data-testid="products-add"><Plus className="w-4 h-4" /> {t('add')}</Button>}</>} />
       <DesignPanel testId="products-search-panel"><DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="products-search" /></DesignPanel>
       <DesignPanel testId="products-table-panel"><DataTable columns={columns} data={filtered} loading={loading} emptyMessage={t('noData')} onRowClick={can('products.edit') ? openEdit : undefined} /><DesignPagination loaded={products.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} /></DesignPanel>
+      <Modal open={quickModalOpen} onClose={() => setQuickModalOpen(false)}
+        title={editing ? (lang === 'ar' ? 'تعديل المنتج' : 'Edit product') : (lang === 'ar' ? 'منتج جديد' : 'New product')} size="md">
+        <div className="space-y-4" data-testid="product-quick-editor">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Input label={lang === 'ar' ? 'اسم المنتج' : 'Product name'} required
+                value={form.name} onChange={e => setForm(f => ({...f,name:e.target.value}))}/>
+            </div>
+            <Select label={lang === 'ar' ? 'التصنيف' : 'Category'} value={form.category_id}
+              onChange={e => setForm(f=>({...f,category_id:e.target.value}))}>
+              <option value="">{lang === 'ar' ? 'بدون تصنيف' : 'Uncategorized'}</option>
+              {categories.filter(cat=>!form.branch_id || cat.branch_id===form.branch_id).map(cat=><option key={cat.id} value={cat.id}>{cat.name}</option>)}
+            </Select>
+            <Input label={lang === 'ar' ? 'سعر البيع' : 'Price'} type="number" step="0.01" min="0"
+              value={form.sale_price} onChange={e=>setForm(f=>({...f,sale_price:Number(e.target.value)||0}))}/>
+            <div className="sm:col-span-2">
+              <Textarea label={lang === 'ar' ? 'وصف يظهر للعملاء' : 'Customer-facing description'}
+                value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} rows={2}/>
+            </div>
+            <div className="sm:col-span-2">
+              <Input label={lang === 'ar' ? 'رابط صورة المنتج' : 'Product image URL'}
+                value={form.image_url} onChange={e=>setForm(f=>({...f,image_url:e.target.value}))}/>
+              {form.image_url && <div className="mt-2 h-28 overflow-hidden rounded-xl bg-ui-page-alt">
+                <ProductImage src={form.image_url} name={form.name} className="h-full w-full"
+                  imgClassName="h-full w-full object-contain"/>
+              </div>}
+            </div>
+            {!branchFilter && <Select label={t('branch')} value={form.branch_id}
+              onChange={e=>setForm(f=>({...f,branch_id:e.target.value,category_id:''}))}>
+              <option value="">{lang === 'ar' ? 'اختر الفرع' : 'Select branch'}</option>
+              {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
+            </Select>}
+          </div>
+          <div className="flex flex-wrap gap-2 rounded-xl border border-ui-border bg-ui-page-alt p-3">
+            {editing && supportsComposition && <Button size="sm" variant="outline" onClick={() => {
+              setQuickModalOpen(false);setIngredientsModalOpen(true);
+            }}>{lang === 'ar' ? `المكونات (${recipeIngredients.length+linkedInventoryUnits.length+productComponents.length})` : `Ingredients (${recipeIngredients.length+linkedInventoryUnits.length+productComponents.length})`}</Button>}
+            <Button size="sm" variant="outline" onClick={()=>{
+              setQuickModalOpen(false);setEditSection('basic');setModalOpen(true);
+            }}>{lang === 'ar' ? 'تفاصيل إضافية' : 'Advanced details'}</Button>
+            {!editing && <span className="text-xs text-ui-muted self-center">
+              {lang === 'ar' ? 'بعد حفظ المنتج يمكنك إضافة مكوناته.' : 'Save the product first to add ingredients.'}
+            </span>}
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={()=>setQuickModalOpen(false)}>{t('cancel')}</Button>
+            <Button onClick={()=>void save()} disabled={!form.name.trim() || !form.branch_id || form.sale_price<0}>{t('save')}</Button>
+          </div>
+        </div>
+      </Modal>
+      <Modal open={ingredientsModalOpen} onClose={() => {setIngredientsModalOpen(false);setQuickModalOpen(true);}}
+        title={lang==='ar' ? 'مكونات المنتج' : 'Product ingredients'} size="md">
+        <div className="space-y-4" data-testid="product-ingredients-quick-editor">
+          <p className="text-sm text-ui-muted">{lang==='ar' ? 'اختر الخامة والكمية المستخدمة لكل وحدة بيع. يتم تطبيق المكونات على المخزون عند إرسال الطلب للمطبخ.' : 'Choose each ingredient and quantity per item. Inventory is consumed when sent to the kitchen.'}</p>
+          {!can('recipes.manage') && <p className="rounded-lg bg-ui-warning-soft p-3 text-sm text-ui-warning">{lang==='ar'?'تحتاج صلاحية إدارة الوصفات لتعديل الخامات.':'Recipe permissions are required to edit raw ingredients.'}</p>}
+          <div className="space-y-2">
+            {recipeIngredients.map((row,i)=><div key={row.raw_material_id} className="flex items-end gap-2 rounded-xl border border-ui-border p-2">
+              <div className="min-w-0 flex-1 text-sm font-semibold text-ui-text">{row.raw_material?.name || rawMaterialOptions.find(x=>x.id===row.raw_material_id)?.name}</div>
+              <Input label={lang==='ar'?'الكمية':'Qty'} type="number" min={0.0001} step={0.0001}
+                value={row.quantity / Math.max(1,recipeYield)} className="w-28"
+                disabled={!can('recipes.manage')}
+                onChange={e=>updateDirectRawIngredient(i,{quantity:(Number(e.target.value)||0)*Math.max(1,recipeYield)})}/>
+              {can('recipes.manage') && <button type="button" className="p-2 text-ui-danger" onClick={()=>removeDirectRawIngredient(i)} aria-label={lang==='ar'?'حذف المكون':'Remove ingredient'}><Trash2 className="h-4 w-4"/></button>}
+            </div>)}
+          </div>
+          {can('recipes.manage') && <div className="grid gap-2 sm:grid-cols-[1fr_100px_auto] sm:items-end">
+            <Select label={lang==='ar'?'إضافة خامة':'Add ingredient'} value={rawMaterialSel} onChange={e=>setRawMaterialSel(e.target.value)}>
+              <option value="">{lang==='ar'?'اختر خامة':'Choose ingredient'}</option>
+              {availableRawMaterialsToAdd.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
+            </Select>
+            <Input label={lang==='ar'?'الكمية':'Qty'} type="number" min="0.0001" step="0.0001"
+              value={rawMaterialQty} onChange={e=>setRawMaterialQty(Number(e.target.value)||0)}/>
+            <Button variant="outline" onClick={()=>{
+              if (!rawMaterialSel || rawMaterialQty<=0) return;
+              addDirectRawIngredient();
+              setForm(f=>({...f,product_type:'manufactured'}));
+            }} disabled={!rawMaterialSel || rawMaterialQty<=0}><Plus className="h-4 w-4"/>{t('add')}</Button>
+          </div>}
+          {!rawMaterialOptions.length && <p className="text-xs text-ui-muted">{lang==='ar'?'لا توجد خامات مسجلة في هذا الفرع. أضف الخامات من المخزون أولاً.':'No branch raw materials available. Register ingredients in inventory first.'}</p>}
+          {(linkedInventoryUnits.length>0 || productComponents.length>0) && <p className="text-xs text-ui-muted">{lang==='ar'?'يوجد مكونات أو مجموعات متقدمة محفوظة، يمكن تعديلها من التفاصيل الإضافية.':'Existing advanced component groups can be edited under Advanced details.'}</p>}
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" onClick={()=>{setIngredientsModalOpen(false);setQuickModalOpen(true);}}>{lang==='ar'?'رجوع':'Back'}</Button>
+            <Button onClick={()=>void save()}>{t('save')}</Button>
+          </div>
+        </div>
+      </Modal>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? (lang === 'ar' ? `تعديل: ${editing.name}` : `Edit: ${editing.name}`) : t('add')} size="xl">
         <div className="space-y-4">
           {editing && <div data-testid="product-edit-sections" className={`grid ${supportsComposition ? 'grid-cols-3' : 'grid-cols-2'} gap-2 rounded-xl bg-ui-page-alt p-1`}><button type="button" onClick={() => setEditSection('basic')} className={`rounded-lg px-3 py-2 text-sm font-bold transition ${editSection === 'basic' ? 'bg-ui-surface text-ui-primary shadow-sm' : 'text-ui-muted'}`}>{lang === 'ar' ? 'البيانات' : 'Details'}</button>{supportsComposition && <button type="button" onClick={() => setEditSection('components')} className={`rounded-lg px-3 py-2 text-sm font-bold transition ${editSection === 'components' ? 'bg-ui-surface text-ui-primary shadow-sm' : 'text-ui-muted'}`}>{lang === 'ar' ? 'المكونات' : 'Components'}</button>}<button type="button" onClick={() => setEditSection('units')} className={`rounded-lg px-3 py-2 text-sm font-bold transition ${editSection === 'units' ? 'bg-ui-surface text-ui-primary shadow-sm' : 'text-ui-muted'}`}>{lang === 'ar' ? 'وحدات البيع' : 'Sales units'}</button></div>}
