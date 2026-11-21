@@ -70,8 +70,25 @@ describe('Phase 1 — public sensitive RPC privilege boundaries', () => {
         and has_function_privilege('anon',p.oid,'EXECUTE')
       order by p.proname, args
     `);
-    expect(rows.map(row => row.proname)).toEqual(['register_trial_tenant']);
-    expect(rows[0].is_definer).toBe(true);
-    expect(rows[0].authenticated_execute).toBe(false);
+    // Registration is still the only anonymous *write* entry point.
+    // These four public branch storefront RPCs are explicitly read-only.
+    const publicReadOnly = [
+      'branch_website_links_public',
+      'branch_website_photos_public',
+      'branch_website_theme_public',
+      'bunker_demo_menu_preview',
+    ];
+    expect(rows.map(row => row.proname)).toEqual([...publicReadOnly, 'register_trial_tenant']);
+    for (const entry of rows) {
+      expect(entry.is_definer).toBe(true);
+      expect(entry.anon_execute).toBe(true);
+      if (entry.proname === 'register_trial_tenant') {
+        expect(entry.authenticated_execute).toBe(false);
+      } else {
+        expect(publicReadOnly).toContain(entry.proname);
+        expect(entry.authenticated_execute).toBe(true);
+        expect(entry.args).toBe(entry.proname === 'bunker_demo_menu_preview' ? '' : 'p_slug text');
+      }
+    }
   });
 });
