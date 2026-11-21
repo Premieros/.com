@@ -4,7 +4,7 @@ import { Client } from 'pg';
 // Isolated CI Postgres only: all fixture writes are enclosed in a transaction
 // and rolled back, never used against the production database.
 const connectionString = process.env.SUPABASE_DB_URL;
-const local = !!connectionString && /(?:localhost|127\\.0\\.0\\.1|\\[::1\\])(?::\\d+)?\\//.test(connectionString);
+const local = !!connectionString && /(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(connectionString);
 
 (local ? describe : describe.skip)('Shared sale fallback material and negative inventory', () => {
   const db = new Client({ connectionString });
