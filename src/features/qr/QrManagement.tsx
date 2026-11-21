@@ -3,6 +3,7 @@ import { supabase } from '@/api';
 import { qr } from '@/api/domains/qr';
 import { qrError } from './service';
 import { printCustomerOrderQr } from './printCustomerOrderQr';
+import { getPermanentBranchQrUrl } from './permanentBranchQrUrl';
 
 interface MenuChoice { id: string; name: string; sale_price: number; is_demo?: boolean }
 export function QrManagement({ branchId, brandName, onMenuUpdated }: { branchId: string; brandName?: string; onMenuUpdated?: () => void }) {
@@ -43,12 +44,12 @@ export function QrManagement({ branchId, brandName, onMenuUpdated }: { branchId:
       const { data, error } = await qr.branchCode({ p_branch: branchId });
       if (error) throw error;
       if (!data) throw new Error('QR_LINK_INVALID');
-      const url = new URL(window.location.href);
-      url.hash = `/qr/${data}`;
-      url.search = '';
+      // A QR printed from a custom-domain admin session, localhost or a
+      // preview deployment must still contain the same durable public URL.
+      const permanentUrl = getPermanentBranchQrUrl(data);
       const qrCode = await import('qrcode');
-      setImage(await qrCode.toDataURL(url.href, { width: 400, margin: 3 }));
-      setLink(url.href);
+      setImage(await qrCode.toDataURL(permanentUrl, { width: 400, margin: 3 }));
+      setLink(permanentUrl);
       setMessage('هذا رمز الفرع الثابت. لن يتغير عند إعادة عرضه أو طباعته. يختار العميل الطاولة من هاتفه.');
     } catch (failure) { setMessage(qrError(failure)); } finally { setBusy(false); }
   }
@@ -59,7 +60,7 @@ export function QrManagement({ branchId, brandName, onMenuUpdated }: { branchId:
     }
   }
   return <details dir="rtl" className="rounded border bg-ui-surface p-4">
-    <summary className="cursor-pointer font-bold">إعداد المنيو وإنشاء رموز QR للطباعة</summary>
+    <summary className="cursor-pointer font-bold">إدارة المنيو ورمز QR الدائم للفرع</summary>
     <p className="my-2">نشر الأصناف يستبدل قائمة منيو الفرع بالكامل. اختر القائمة كاملة قبل الحفظ.</p>
     <p className="my-2 text-sm text-amber-600 dark:text-amber-400">بالنسبة لـBUNKER: لا يمكن تشغيل استقبال الطلبات الحقيقية إذا كان منيو الفرع يحتوي على أصناف موسومة Demo. اعتمد المنتجات والأسعار في كتالوج الفرع، ثم انشر المنيو الجديد.</p>
     <div className="my-3 grid max-h-60 gap-2 overflow-auto sm:grid-cols-2">{products.map(p => <label key={p.id}>
@@ -70,7 +71,7 @@ export function QrManagement({ branchId, brandName, onMenuUpdated }: { branchId:
       <h3 className="font-bold">رمز QR الثابت للفرع</h3>
       <p className="text-sm text-ui-subtle">رمز واحد لكل الفرع، ولا يرتبط بطاولة محددة. بعد المسح يختار العميل طاولته بنفسه. ينشأ الرمز مرة واحدة فقط ويظل نفسه عند إعادة عرضه أو طباعته.</p>
       <button type="button" disabled={busy || loading} className="rounded-xl bg-ui-primary px-5 py-3 text-white" onClick={() => void showBranchCode()}>
-        {busy ? 'جارٍ تجهيز الرمز…' : 'إنشاء / عرض رمز الفرع الثابت'}
+        {busy ? 'جارٍ تجهيز الرمز…' : 'عرض رمز QR الدائم للفرع'}
       </button>
       {message && <p role="status" className="my-3">{message}</p>}
       {image && <div className="space-y-3">
