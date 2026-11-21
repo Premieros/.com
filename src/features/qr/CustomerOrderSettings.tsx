@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { qr } from '@/api/domains/qr';
+import { supabase } from '@/api';
 import { useRoles } from '@/context/RolesContext';
 import type { QrSettings } from './service';
 import { qrError } from './errors';
@@ -9,6 +10,8 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
   const { rolesList } = useRoles();
   const [settings, setSettings] = useState<QrSettings | null>(null);
   const [busy, setBusy] = useState(false);
+  const [readiness, setReadiness] = useState<{ bunker: boolean; ready?: boolean; real_products?: number; demo_products?: number; active_tables?: number; enabled?: boolean } | null>(null);
+  const [readinessLoading, setReadinessLoading] = useState(false);
   const [message, setMessage] = useState('');
   useEffect(() => {
     let alive = true;
@@ -21,6 +24,22 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
     }).catch(failure => { if (alive) setMessage(qrError(failure)); });
     return () => { alive = false; };
   }, [branchId]);
+  async function loadReadiness() {
+    if (!branchId) return;
+    setReadinessLoading(true);
+    const { data, error } = await supabase.rpc('bunker_live_order_readiness', { p_branch: branchId });
+    setReadinessLoading(false);
+    if (!error && data && typeof data === 'object') setReadiness(data as typeof readiness);
+  }
+  useEffect(() => {
+    let alive = true;
+    setReadiness(null);
+    if (!branchId) return;
+    void supabase.rpc('bunker_live_order_readiness', { p_branch: branchId }).then(({data,error}) => {
+      if (alive && !error && data && typeof data === 'object') setReadiness(data as typeof readiness);
+    });
+    return () => { alive = false; };
+  }, [branchId]);
   async function save() {
     if (!settings) return;
     setBusy(true); setMessage('');
@@ -28,14 +47,22 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
       const { error } = await qr.saveSettings({ p_branch: branchId, p_enabled: settings.enabled, p_appearance: settings.appearance, p_roles: settings.reviewer_roles, p_checkin: !!settings.checkin_enabled });
       if (error) throw error;
       setMessage('تم حفظ إعدادات طلبات العملاء لهذا الفرع فقط.');
-    } catch (failure) { setMessage(qrError(failure)); } finally { setBusy(false); }
+      void loadReadiness();
+    } catch (failure) { const message = failure instanceof Error ? failure.message : String(failure); setMessage(message.includes('QR_DEMO_PRODUCTS_NOT_APPROVED') ? 'لا يمكن تفعيل استقبال الطلبات الحقيقية قبل إزالة الأصناف التجريبية من المنيو واعتماد أصناف وأسعار حقيقية للفرع.' : qrError(failure)); } finally { setBusy(false); }
   }
   const roles = rolesList.filter(r => r.is_active && r.role !== 'super_admin' && (!r.branch_id || r.branch_id === branchId) && r.permissions.includes('pos.order.edit'));
   return <section dir="rtl" className="space-y-5 rounded-2xl border border-ui-border bg-ui-surface p-5">
     <div><h2 className="text-xl font-bold">طلبات العملاء</h2><p className="mt-2 text-sm text-ui-subtle">هذه الإعدادات خاصة بالفرع المحدد بالأعلى. العميل يختار الطاولة، والموظف يعتمدها أو يختار بديلًا متاحًا.</p></div>
     {message && <p role="status" className="rounded border p-3">{message}</p>}
     {!settings ? <p>جارٍ تحميل إعدادات الفرع…</p> : <>
-      <label className="flex gap-2"><input type="checkbox" disabled={busy} checked={settings.enabled} onChange={e => setSettings(s => s && ({ ...s, enabled: e.target.checked }))} />تفعيل استقبال طلبات العملاء</label>
+      {readiness?.bunker && <div className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-ui-text">
+        <h3 className="font-bold">جاهزية ربط طلبات BUNKER بالكاشير والمطبخ</h3>
+        <p>الأصناف المعتمدة في المنيو: <strong>{readiness.real_products ?? 0}</strong> · الأصناف التجريبية: <strong>{readiness.demo_products ?? 0}</strong> · الطاولات النشطة: <strong>{readiness.active_tables ?? 0}</strong></p>
+        <p>{readiness.ready ? 'المنيو جاهز للنشر. بعد تفعيل استقبال الطلبات، يظهر طلب العميل في صندوق طلبات العملاء ويحتاج اعتماد الموظف قبل توجيهه للمطبخ.' : 'المنيو غير جاهز للطلبات الفعلية. اختر أصناف حقيقية بأسعار معتمدة وأزل أصناف Demo من المنيو المنشور. وضع التجربة يظل متاحًا بدون تسجيل مبيعات.'}</p>
+        <p className="text-xs text-ui-muted">المسار: العميل يرسل الطلب ← إشعار الموظف في Premier POS ← قبول أو رفض ← فتح الطلب في الكاشير ← إرسال للمطبخ بواسطة الموظف.</p>
+        <button type="button" className="rounded-lg border border-ui-border px-3 py-2 font-semibold" disabled={readinessLoading || busy} onClick={() => void loadReadiness()}>{readinessLoading ? 'جارٍ التحقق…' : 'تحديث حالة الجاهزية'}</button>
+      </div>}
+      <label className="flex gap-2"><input type="checkbox" disabled={busy || (!!readiness?.bunker && !readiness.ready && !settings.enabled)} checked={settings.enabled} onChange={e => setSettings(s => s && ({ ...s, enabled: e.target.checked }))} />تفعيل استقبال طلبات العملاء</label>
       <label className="flex gap-2"><input type="checkbox" disabled={busy} checked={!!settings.checkin_enabled} onChange={e => setSettings(s => s && ({ ...s, checkin_enabled: e.target.checked }))} />الدخول بالهاتف ورمز استرجاع الطلب وصورة الطاولة</label><p className="text-sm text-ui-subtle">صورة الطاولة يراجعها الموظف؛ إغلاق الحساب ينهي دخول الزيارة. التوصيل متاح من خارج المكان.</p><div className="grid gap-4 sm:grid-cols-2">{([
         ['brand_name','اسم المنيو'], ['subtitle','وصف قصير أسفل الاسم'], ['logo_url','رابط الشعار (https)'], ['banner_text','نص البنر'], ['banner_image_url','رابط صورة البنر (https)'],
       ] as const).map(([key,label]) => <label key={key} className="space-y-2 text-sm"><span>{label}</span><input className="block w-full rounded-xl border border-ui-border bg-ui-bg p-3" maxLength={key.includes('url') ? 1500 : 160} type={key.includes('url') ? 'url' : 'text'} value={settings.appearance[key] || ''} disabled={busy} onChange={e => setSettings(s => s && ({ ...s, appearance: { ...s.appearance, [key]: e.target.value } }))} /></label>)}</div>
@@ -45,7 +72,7 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
         {settings.reviewer_roles.length > 0 && <button className="text-sm underline" disabled={busy} onClick={() => setSettings(s => s && ({ ...s, reviewer_roles: [] }))}>السماح لكل من لديه صلاحية تعديل الطلبات</button>}
       </fieldset>
       <button className="rounded-xl bg-ui-primary px-5 py-3 text-white" disabled={busy} onClick={() => void save()}>{busy ? 'جارٍ الحفظ…' : 'حفظ إعدادات طلبات العملاء'}</button>
-      <QrManagement key={branchId} branchId={branchId} brandName={settings.appearance.brand_name} />
+      <QrManagement key={branchId} branchId={branchId} brandName={settings.appearance.brand_name} onMenuUpdated={() => void loadReadiness()} />
     </>}
   </section>;
 }
