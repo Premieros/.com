@@ -16,8 +16,8 @@ it('reuses successful modifier reads on reopen while keeping actors and branches
  const confirm=vi.fn();
  const props={product,currency:'EGP',isOpen:true,onClose:vi.fn(),onConfirm:confirm};
  const view=render(<ProductConfigModal {...props}/>);
- await waitFor(()=>expect(screen.getByRole('button',{name:'إضافة',exact:true})).toBeEnabled());
- fireEvent.click(screen.getByRole('button',{name:'إضافة',exact:true}));
+ await waitFor(()=>expect(screen.getByRole('button',{name:'إضافة'})).toBeEnabled());
+ fireEvent.click(screen.getByRole('button',{name:'إضافة'}));
  expect(confirm).toHaveBeenCalledOnce();
  view.rerender(<ProductConfigModal {...props} isOpen={false}/>);
  view.rerender(<ProductConfigModal {...props}/>);
@@ -38,9 +38,9 @@ it('does not cache a failed read or permit adding without verified modifier rule
  const props={product,currency:'EGP',isOpen:true,onClose:vi.fn(),onConfirm:vi.fn()};
  const view=render(<ProductConfigModal {...props}/>);
  await screen.findByText('Unavailable');
- expect(screen.getByRole('button',{name:'إضافة',exact:true})).toBeDisabled();
+ expect(screen.getByRole('button',{name:'إضافة'})).toBeDisabled();
  view.rerender(<ProductConfigModal {...props} isOpen={false}/>);
  view.rerender(<ProductConfigModal {...props}/>);
- await waitFor(()=>expect(screen.getByRole('button',{name:'إضافة',exact:true})).toBeEnabled());
+ await waitFor(()=>expect(screen.getByRole('button',{name:'إضافة'})).toBeEnabled());
  expect(mocks.read).toHaveBeenCalledTimes(2);
 });
