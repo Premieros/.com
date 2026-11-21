@@ -10,7 +10,13 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
   const { rolesList } = useRoles();
   const [settings, setSettings] = useState<QrSettings | null>(null);
   const [busy, setBusy] = useState(false);
-  const [readiness, setReadiness] = useState<{ bunker: boolean; ready?: boolean; real_products?: number; demo_products?: number; active_tables?: number; enabled?: boolean } | null>(null);
+  const [readiness, setReadiness] = useState<{
+    bunker: boolean; ready?: boolean; real_products?: number; demo_products?: number;
+    active_tables?: number; active_stations?: number; active_warehouses?: number;
+    authorized_staff?: number; products_missing_cost?: number;
+    products_missing_kitchen_route?: number; enabled?: boolean;
+    requires_business_approval?: boolean;
+  } | null>(null);
   const [readinessLoading, setReadinessLoading] = useState(false);
   const [message, setMessage] = useState('');
   useEffect(() => {
@@ -48,18 +54,28 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
       if (error) throw error;
       setMessage('تم حفظ إعدادات طلبات العملاء لهذا الفرع فقط.');
       void loadReadiness();
-    } catch (failure) { const message = failure instanceof Error ? failure.message : String(failure); setMessage(message.includes('QR_DEMO_PRODUCTS_NOT_APPROVED') ? 'لا يمكن تفعيل استقبال الطلبات الحقيقية قبل إزالة الأصناف التجريبية من المنيو واعتماد أصناف وأسعار حقيقية للفرع.' : qrError(failure)); } finally { setBusy(false); }
+    } catch (failure) { const message = failure instanceof Error ? failure.message : String(failure); setMessage((message.includes('BUNKER_LIVE_NOT_READY') || message.includes('QR_DEMO_PRODUCTS_NOT_APPROVED')) ? 'لا يمكن تفعيل طلبات BUNKER قبل إكمال تكاليف الأصناف وصلاحيات الموظفين والمخزن والطاولات وربط المطبخ. راجع بطاقة الجاهزية أعلاه.' : qrError(failure)); } finally { setBusy(false); }
   }
   const roles = rolesList.filter(r => r.is_active && r.role !== 'super_admin' && (!r.branch_id || r.branch_id === branchId) && r.permissions.includes('pos.order.edit'));
   return <section dir="rtl" className="space-y-5 rounded-2xl border border-ui-border bg-ui-surface p-5">
     <div><h2 className="text-xl font-bold">طلبات العملاء</h2><p className="mt-2 text-sm text-ui-subtle">هذه الإعدادات خاصة بالفرع المحدد بالأعلى. العميل يختار الطاولة، والموظف يعتمدها أو يختار بديلًا متاحًا.</p></div>
     {message && <p role="status" className="rounded border p-3">{message}</p>}
     {!settings ? <p>جارٍ تحميل إعدادات الفرع…</p> : <>
-      {readiness?.bunker && <div className="space-y-2 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-ui-text">
-        <h3 className="font-bold">جاهزية ربط طلبات BUNKER بالكاشير والمطبخ</h3>
-        <p>الأصناف المعتمدة في المنيو: <strong>{readiness.real_products ?? 0}</strong> · الأصناف التجريبية: <strong>{readiness.demo_products ?? 0}</strong> · الطاولات النشطة: <strong>{readiness.active_tables ?? 0}</strong></p>
-        <p>{readiness.ready ? 'المنيو جاهز للنشر. بعد تفعيل استقبال الطلبات، يظهر طلب العميل في صندوق طلبات العملاء ويحتاج اعتماد الموظف قبل توجيهه للمطبخ.' : 'المنيو غير جاهز للطلبات الفعلية. اختر أصناف حقيقية بأسعار معتمدة وأزل أصناف Demo من المنيو المنشور. وضع التجربة يظل متاحًا بدون تسجيل مبيعات.'}</p>
-        <p className="text-xs text-ui-muted">المسار: العميل يرسل الطلب ← إشعار الموظف في Premier POS ← قبول أو رفض ← فتح الطلب في الكاشير ← إرسال للمطبخ بواسطة الموظف.</p>
+      {readiness?.bunker && <div data-testid="bunker-handoff-readiness" className="space-y-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-ui-text">
+        <h3 className="font-bold">جاهزية التشغيل الفعلي لفرع BUNKER</h3>
+        <p>{readiness.ready ? 'المتطلبات الفنية مكتملة، لكن يلزم اعتماد الإدارة وتجربة الطلب والمطبخ والدفع قبل التفعيل.' : 'الطلبات الحقيقية مغلقة لحين استكمال المتطلبات أدناه. معاينة المنيو والسلة التجريبية تعمل بدون تسجيل مبيعات.'}</p>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {([
+            ['المنتجات المنشورة',readiness.real_products ?? 0,(readiness.real_products ?? 0)>0 && (readiness.demo_products ?? 0)===0],
+            ['منتجات بدون تكلفة مسجلة',readiness.products_missing_cost ?? 0,(readiness.products_missing_cost ?? 0)===0],
+            ['ربط مطبخ غير مكتمل',readiness.products_missing_kitchen_route ?? 0,(readiness.products_missing_kitchen_route ?? 0)===0],
+            ['مخازن نشطة',readiness.active_warehouses ?? 0,(readiness.active_warehouses ?? 0)>0],
+            ['موظفون موثّقون ومصرح لهم',readiness.authorized_staff ?? 0,(readiness.authorized_staff ?? 0)>0],
+            ['الطاولات النشطة',readiness.active_tables ?? 0,(readiness.active_tables ?? 0)>0],
+          ] as [string,number,boolean][]).map(([label,count,ok])=><div key={label} className="flex items-center justify-between gap-2 rounded-lg border border-ui-border bg-ui-surface p-3"><span>{ok ? '✓' : '⚠'} {label}</span><strong>{count}</strong></div>)}
+        </div>
+        <p className="text-xs text-ui-muted">اعتماد القائمة والأسعار والوصفات، واختبار الكاشير والمطبخ والطابعة واسترجاع النسخة الاحتياطية يحتاج تأكيد مسؤول الفرع. لا تُنشأ مستخدمون أو أرصدة أو مبيعات تلقائيًا.</p>
+        <p className="text-xs text-ui-muted">المسار: العميل يرسل الطلب ← صندوق طلبات العملاء ← قبول الموظف ← الكاشير ← المطبخ.</p>
         <button type="button" className="rounded-lg border border-ui-border px-3 py-2 font-semibold" disabled={readinessLoading || busy} onClick={() => void loadReadiness()}>{readinessLoading ? 'جارٍ التحقق…' : 'تحديث حالة الجاهزية'}</button>
       </div>}
       <label className="flex gap-2"><input type="checkbox" disabled={busy || (!!readiness?.bunker && !readiness.ready && !settings.enabled)} checked={settings.enabled} onChange={e => setSettings(s => s && ({ ...s, enabled: e.target.checked }))} />تفعيل استقبال طلبات العملاء</label>
