@@ -4,8 +4,8 @@ import { qr } from '@/api/domains/qr';
 import { qrError } from './service';
 import { printCustomerOrderQr } from './printCustomerOrderQr';
 
-interface MenuChoice { id: string; name: string; sale_price: number }
-export function QrManagement({ branchId, brandName }: { branchId: string; brandName?: string }) {
+interface MenuChoice { id: string; name: string; sale_price: number; is_demo?: boolean }
+export function QrManagement({ branchId, brandName, onMenuUpdated }: { branchId: string; brandName?: string; onMenuUpdated?: () => void }) {
   const [products, setProducts] = useState<MenuChoice[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
   const [image, setImage] = useState('');
@@ -18,7 +18,7 @@ export function QrManagement({ branchId, brandName }: { branchId: string; brandN
     setLoading(true);
     setSelected([]); setImage(''); setLink(''); setProducts([]); setMessage('');
     void Promise.all([
-      supabase.from('products').select('id,name,sale_price').eq('branch_id', branchId).eq('is_active', true).order('name'),
+      supabase.from('products').select('id,name,sale_price,is_demo').eq('branch_id', branchId).eq('is_active', true).order('name'),
       qr.configuration({ p_branch: branchId }),
     ]).then(([catalog, config]) => {
       if (!alive) return;
@@ -33,6 +33,7 @@ export function QrManagement({ branchId, brandName }: { branchId: string; brandN
       const { error } = await qr.configure({ p_branch: branchId, p_products: selected });
       if (error) throw error;
       setMessage('تم نشر الأصناف المحددة. الأصناف التي تتطلب إضافات إلزامية لا تظهر في هذه المرحلة.');
+      onMenuUpdated?.();
     } catch (failure) { setMessage(qrError(failure)); } finally { setBusy(false); }
   }
   async function showBranchCode() {
@@ -60,8 +61,9 @@ export function QrManagement({ branchId, brandName }: { branchId: string; brandN
   return <details dir="rtl" className="rounded border bg-ui-surface p-4">
     <summary className="cursor-pointer font-bold">إعداد المنيو وإنشاء رموز QR للطباعة</summary>
     <p className="my-2">نشر الأصناف يستبدل قائمة منيو الفرع بالكامل. اختر القائمة كاملة قبل الحفظ.</p>
+    <p className="my-2 text-sm text-amber-600 dark:text-amber-400">بالنسبة لـBUNKER: لا يمكن تشغيل استقبال الطلبات الحقيقية إذا كان منيو الفرع يحتوي على أصناف موسومة Demo. اعتمد المنتجات والأسعار في كتالوج الفرع، ثم انشر المنيو الجديد.</p>
     <div className="my-3 grid max-h-60 gap-2 overflow-auto sm:grid-cols-2">{products.map(p => <label key={p.id}>
-      <input type="checkbox" checked={selected.includes(p.id)} disabled={busy} onChange={e => setSelected(ids => e.target.checked ? [...ids, p.id] : ids.filter(id => id !== p.id))} /> {p.name} · {Number(p.sale_price).toFixed(2)}
+      <input type="checkbox" checked={selected.includes(p.id)} disabled={busy} onChange={e => setSelected(ids => e.target.checked ? [...ids, p.id] : ids.filter(id => id !== p.id))} /> {p.name} · {Number(p.sale_price).toFixed(2)} {p.is_demo && <strong className="ms-1 rounded bg-amber-500/15 px-2 py-0.5 text-xs text-amber-600 dark:text-amber-400">Demo — غير معتمد للبيع الفعلي</strong>}
     </label>)}</div>
     <button disabled={busy || loading} className="rounded border p-2" onClick={() => void saveMenu()}>نشر الأصناف المحددة</button>
     <div className="my-4 space-y-3 rounded-xl border border-ui-border p-4">
