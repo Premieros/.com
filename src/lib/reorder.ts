@@ -121,5 +121,7 @@ export function reorderLinesToProcurementItems(
       unit_name: l.unit_name,
       estimated_cost: l.estimated_cost > 0 ? l.estimated_cost : undefined,
     }))
-    .filter((i) => i.quantity > 0);
+    // Reject Infinity/NaN from number inputs before passing quantities to the RPC.
+    // Zero and negative values remain intentionally excluded.
+    .filter((i) => Number.isFinite(i.quantity) && i.quantity > 0);
 }
