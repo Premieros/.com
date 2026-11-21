@@ -1,4 +1,5 @@
 import { WebsitePhotosSettings } from '@/features/qr/WebsitePhotosSettings';
+import { WebsiteTextSettings } from '@/features/qr/WebsiteTextSettings';
 import { WebsiteSocialSettings } from '@/features/qr/WebsiteSocialSettings';
 import { CustomerOrderSettings } from '@/features/qr/CustomerOrderSettings';
 import { useEffect, useState, useCallback } from 'react';
@@ -21,7 +22,7 @@ import {
   Landmark,
   Smartphone,
 } from 'lucide-react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -49,6 +50,7 @@ interface UserRow {
 
 export function SettingsControlCenterPage() {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const { t, lang, setLang, languageLocked, lockLanguagePreference, unlockLanguagePreference } = useLanguage();
   const { theme, setTheme, setUiTheme } = useTheme();
   const { settings, branchSettingsMap, saveBranchSettings } = useSettings();
@@ -73,6 +75,13 @@ export function SettingsControlCenterPage() {
   const [loadingStaff, setLoadingStaff] = useState(false);
 
   const targetBranchId = selectedBranchId || myBranchId;
+  useEffect(() => {
+    if (searchParams.get('section') !== 'website_social') return;
+    const requestedBranch = searchParams.get('website_branch');
+    if (requestedBranch && branches.some(branch => branch.id === requestedBranch) &&
+        (isSuperAdmin || requestedBranch === myBranchId)) setSelectedBranchId(requestedBranch);
+    setActive('website_social');
+  }, [searchParams, branches, isSuperAdmin, myBranchId]);
   useEffect(() => {
     let alive = true;
     setThemeMessage('');
@@ -277,7 +286,7 @@ export function SettingsControlCenterPage() {
         </div>
 
         <div className="md:col-span-3 space-y-6">
-          {active === 'website_social' && <><WebsitePhotosSettings key={`photos-${targetBranchId}`} branchId={targetBranchId} /><WebsiteSocialSettings key={targetBranchId} branchId={targetBranchId} /></>}
+          {active === 'website_social' && <><WebsiteTextSettings key={`text-${targetBranchId}`} branchId={targetBranchId} /><WebsitePhotosSettings key={`photos-${targetBranchId}`} branchId={targetBranchId} /><WebsiteSocialSettings key={targetBranchId} branchId={targetBranchId} /></>}
           {active === 'customer_orders' && <CustomerOrderSettings key={targetBranchId} branchId={targetBranchId} />}
           {active === 'branch_profile' && (
             <Card className="space-y-6 p-4 sm:p-6">

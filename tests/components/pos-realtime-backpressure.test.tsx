@@ -34,7 +34,26 @@ it('bounds full snapshots during sustained notifications and retains the final r
   expect(mock.fetch.mock.calls.length).toBeGreaterThan(1);
   expect(hook.result.current.loading).toBe(false);
   await act(async () => { mock.wake.get('a')?.(); await vi.advanceTimersByTimeAsync(2_000); });
-  expect(mock.fetch).toHaveBeenLastCalledWith('a');
+  expect(mock.fetch).toHaveBeenLastCalledWith('a', expect.any(Function));
+});
+
+it('shows tables while the full order snapshot is still pending and ignores an old branch callback', async () => {
+  const callbacks = new Map<string, (tables: PosRealtimeData['tables']) => void>();
+  let finish!: (value: PosRealtimeData) => void;
+  mock.fetch.mockImplementation((branch, onTables) => {
+    callbacks.set(branch, onTables);
+    return new Promise<PosRealtimeData>(resolve => { finish = resolve; });
+  });
+  const hook = renderHook(({ branch }) => usePosRealtime(branch), { initialProps: { branch: 'a' } });
+  const tables = [{ id: 'table-a', branch_id: 'a' }] as PosRealtimeData['tables'];
+  act(() => callbacks.get('a')?.(tables));
+  expect(hook.result.current.data.tables).toEqual(tables);
+  expect(hook.result.current.loading).toBe(true);
+  hook.rerender({ branch: 'b' });
+  act(() => callbacks.get('a')?.(tables));
+  expect(hook.result.current.data.tables).toEqual([]);
+  await act(async () => { finish(empty); });
+  hook.unmount();
 });
 
 it('finishes initial loading despite an event during a slow read, then refreshes once', async () => {

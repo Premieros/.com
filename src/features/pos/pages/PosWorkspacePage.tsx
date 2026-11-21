@@ -401,26 +401,36 @@ export function PosWorkspacePage() {
       setLoadWarning('');
       try {
         const fixedBranch = effectiveBranch;
+        let serverCatalogReceived = false;
+        setProducts([]);
+        setCategories([]);
+        setCustomers([]);
+        setDiningAreas([]);
         
         // Hydrate branch-scoped cache immediately, even while online, so resumed orders
         // can render the product catalog without waiting for the network round-trip.
-        const cachedData = await loadCachedPosData(fixedBranch || undefined);
         const cachedCatalog = offlinePosManager.getCatalogCache(fixedBranch || 'default');
-        const cachedProducts = cachedData.products.length > 0 ? cachedData.products : cachedCatalog?.products || [];
-        const cachedCategories = cachedData.categories.length > 0 ? cachedData.categories : cachedCatalog?.categories || [];
-
-        if (cachedProducts.length > 0 && !cancelled) {
-          setProducts(cachedProducts);
-          setCategories(cachedCategories);
-          if (cachedData.customers.length > 0) setCustomers(cachedData.customers);
-          if (cachedData.settings) setOfflineSettings(cachedData.settings);
-          if (cachedData.branches.length > 0) setOfflineBranches(cachedData.branches);
+        if (cachedCatalog?.products.length && !cancelled) {
+          setProducts(cachedCatalog.products);
+          setCategories(cachedCatalog.categories);
           setLoading(false);
         }
+        const cacheRead = loadCachedPosData(fixedBranch || undefined).then(cachedData => {
+          if (!cancelled && !serverCatalogReceived && cachedData.products.length > 0) {
+            setProducts(cachedData.products);
+            setCategories(cachedData.categories);
+            setCustomers(cachedData.customers);
+            if (cachedData.settings) setOfflineSettings(cachedData.settings);
+            if (cachedData.branches.length > 0) setOfflineBranches(cachedData.branches);
+            setLoading(false);
+          }
+          return cachedData;
+        }).catch(() => null);
 
         // If navigator is offline, the hydrated cache is the terminal source.
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
-          if (cachedProducts.length > 0) return;
+          const cachedData = await cacheRead;
+          if (cachedCatalog?.products.length || cachedData?.products.length) return;
         }
 
         let cusq = supabase.from('customers').select('*');
@@ -435,7 +445,15 @@ export function PosWorkspacePage() {
           areaq = areaq.eq('branch_id', fixedBranch);
         }
         const [pRes, cRes, catRes, aRes] = await Promise.allSettled([
-          productQuery,
+          Promise.resolve(productQuery).then(result => {
+            // Customers and dining-area refreshes must not delay the catalog.
+            if (!cancelled && !result.error) {
+              serverCatalogReceived = true;
+              setProducts((result.data as Product[]) || []);
+              setLoading(false);
+            }
+            return result;
+          }),
           cusq.order('name'),
           catq.order('name'),
           areaq.order('name'),
@@ -498,12 +516,13 @@ export function PosWorkspacePage() {
 
         // Only a product-catalog failure can block POS after offline fallback.
         // Secondary customer/settings/branch/category failures degrade gracefully.
-        if (productLoadError || loadedProds.length === 0) {
+        if (productLoadError) {
           const offlineData = await loadCachedPosData(fixedBranch || undefined);
           const catalogFallback = offlinePosManager.getCatalogCache(fixedBranch || 'default');
           const fallbackProds = offlineData.products.length > 0 ? offlineData.products : catalogFallback?.products || [];
           const fallbackCats = offlineData.categories.length > 0 ? offlineData.categories : catalogFallback?.categories || [];
 
+          if (cancelled) return;
           if (fallbackProds.length > 0) {
             setProducts(fallbackProds);
             setCategories(fallbackCats);
@@ -857,7 +876,13 @@ export function PosWorkspacePage() {
       onSendKitchen={() => void pos.sendToKitchen()}
       onPrint={() => { if (!blockUnsentOpenOrder()) void pos.printReceipt(); }}
       onPay={handlePay}
-      onAddItem={() => barcodeRef.current?.focus()}
+      onAddItem={() => {
+        // Focusing a field behind the full-width tables landing does not open it.
+        window.dispatchEvent(new Event('pos:order-flow-started'));
+        setPanel(null);
+        setMobileOrderOpen(false);
+        requestAnimationFrame(() => barcodeRef.current?.focus());
+      }}
       onConfigureItem={(item) => setConfigItem(item)}
       onOpenCustomerModal={() => setCustomerModalOpen(true)}
       onOpenTableModal={() => setTableModalOpen(true)}

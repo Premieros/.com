@@ -32,12 +32,11 @@ export type { ActiveShiftInfo, UsePosOrderInput } from './usePosOrderBase';
  */
 export function usePosOrder(input: UsePosOrderInput) {
   const allowNegative = input.effSettings?.allow_negative_stock === true;
-  const sellThroughInput = useMemo<UsePosOrderInput>(() => ({
-    ...input,
-    rawShortageOnly: Object.fromEntries(input.products.map((product) => [product.id, allowNegative])),
-  }), [input, allowNegative]);
-
-  const base = usePosOrderBase(sellThroughInput);
+  const rawShortageOnly = useMemo(
+    () => Object.fromEntries(input.products.map(product => [product.id, allowNegative])),
+    [input.products, allowNegative],
+  );
+  const base = usePosOrderBase({ ...input, rawShortageOnly });
   const { t, lang } = useLanguage();
   const isAr = lang === 'ar';
   const { show } = useToast();

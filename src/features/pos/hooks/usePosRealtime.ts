@@ -48,7 +48,11 @@ export function usePosRealtime(branchId: string): UsePosRealtimeResult {
           lastReadStartedAtRef.current = Date.now();
           try {
             const revision = mutationRevisionRef.current;
-            const snapshot = await fetchActiveOrders(targetBranch);
+            const snapshot = await fetchActiveOrders(targetBranch, tables => {
+              if (mountedRef.current && activeBranchRef.current === targetBranch && revision === mutationRevisionRef.current) {
+                setData(current => ({ ...current, tables }));
+              }
+            });
             if (activeBranchRef.current === targetBranch && revision === mutationRevisionRef.current) {
               watchedOrderIdsRef.current = new Set(snapshot.watchedOrderIds);
               visibleItemIdsRef.current = new Set(snapshot.orderItems.map((item) => item.id));

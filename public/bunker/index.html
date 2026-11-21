@@ -482,23 +482,23 @@ try {
     const defaults = {
       eyebrow: 'Welcome to the Bunker',
       heroSub: 'Burger & Specialty Coffee',
-      heroCopy: 'A modern branch page with the energy of a premium burger brand and the calm of a specialty coffee spot. This version uses editable demo visuals so the team can replace them later with real BUNKER photography.',
-      heroPanel: 'Fast preview, premium feel. When a staff user visits this page, an edit button appears so images and text can be swapped without touching the code.',
+      heroCopy: 'Explore BUNKER burgers and specialty coffee, then open our menu to choose your next order.',
+      heroPanel: 'Burgers, coffee, and a place to enjoy them. Discover BUNKER.',
       experienceEyebrow: 'Premium comfort, bold flavor',
       experienceTitle: 'Built for burger cravings and coffee moments.',
       experienceCopy: 'This layout is designed to feel closer to polished brand websites: strong hero imagery, clear product storytelling, high-end spacing, elegant dark styling, and a clear path into the existing Premier ordering experience.',
       featureBadge: 'Signature selection',
       featureTitle: 'Every bite has a point of view.',
-      featureCopy: 'Use this space to spotlight your most wanted combo, featured burger, limited menu drop, or a branch message that supports the BUNKER brand tone.',
+      featureCopy: 'Explore our burger selection and find your next favorite on the menu.',
       burgerTitle: 'Stacked, seared, unforgettable.',
-      burgerCopy: 'Replace this demo copy with your signature burger story, ingredients, or top-selling items when the final menu is ready.',
+      burgerCopy: 'Discover the burger selection on our menu.',
       coffeeTitle: 'Crafted for slow sips and great company.',
       coffeeCopy: 'Use the coffee panel to introduce your espresso bar, filter brews, iced drinks, or house specials.',
       interiorTitle: 'A place that feels designed, not crowded.',
       interiorCopy: 'Perfect for showing off the branch vibe, service counter, seating atmosphere, or late-night experience.',
       dessertTitle: 'Details that complete the visit.',
       dessertCopy: 'Keep this block for sides, desserts, seasonal items, or another supporting food shot.',
-      galleryTitle: 'A demo gallery worthy of a premium launch.',
+      galleryTitle: 'A glimpse of the BUNKER experience.',
       ctaTitle: 'Ready to order?',
       ctaCopy: 'When the customer is ready, send them straight into the current Premier QR ordering flow for the BUNKER branch.',
       heroImage: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1800&q=80',
@@ -515,12 +515,8 @@ try {
     };
 
     function loadContent() {
-      try {
-        const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
-        return { ...defaults, ...saved };
-      } catch (e) {
-        return { ...defaults };
-      }
+      // Visitors always see the published content, never another browser draft.
+      return { ...defaults };
     }
 
     let content = loadContent();
@@ -545,193 +541,6 @@ try {
         else setText(key, value);
       });
       document.getElementById('year').textContent = new Date().getFullYear();
-    }
-
-    function save() {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(content));
-      render();
-    }
-
-    function resetToDefault() {
-      content = { ...defaults };
-      save();
-      buildEditor();
-    }
-
-    function exportJson() {
-      const blob = new Blob([JSON.stringify(content, null, 2)], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = 'bunker-site-content.json';
-      a.click();
-      URL.revokeObjectURL(url);
-    }
-
-    function importJson(file) {
-      const reader = new FileReader();
-      reader.onload = () => {
-        try {
-          const parsed = JSON.parse(reader.result);
-          content = { ...content, ...parsed };
-          save();
-          buildEditor();
-        } catch (e) {
-          alert('Invalid JSON file.');
-        }
-      };
-      reader.readAsText(file);
-    }
-
-    function field(label, key, multiline=false) {
-      const current = content[key] || '';
-      return `
-        <div class="field">
-          <label for="${key}">${label}</label>
-          ${multiline
-            ? `<textarea id="${key}" data-key="${key}">${escapeHtml(current)}</textarea>`
-            : `<input id="${key}" data-key="${key}" value="${escapeAttr(current)}" />`
-          }
-        </div>
-      `;
-    }
-
-    function escapeHtml(str) {
-      return String(str)
-        .replaceAll('&', '&amp;')
-        .replaceAll('<', '&lt;')
-        .replaceAll('>', '&gt;')
-        .replaceAll('"', '&quot;');
-    }
-    function escapeAttr(str) { return escapeHtml(str).replaceAll("'", '&#39;'); }
-
-    function buildEditor() {
-      const body = document.getElementById('editBody');
-      body.innerHTML = `
-        <div class="field-group">
-          <h4>Hero & intro</h4>
-          ${field('Eyebrow', 'eyebrow')}
-          ${field('Hero subheading', 'heroSub')}
-          ${field('Hero intro copy', 'heroCopy', true)}
-          ${field('Hero side panel text', 'heroPanel', true)}
-          ${field('Hero image URL', 'heroImage')}
-        </div>
-
-        <div class="field-group">
-          <h4>Main storytelling</h4>
-          ${field('Experience eyebrow', 'experienceEyebrow')}
-          ${field('Experience title', 'experienceTitle')}
-          ${field('Experience copy', 'experienceCopy', true)}
-          ${field('Feature badge', 'featureBadge')}
-          ${field('Feature title', 'featureTitle')}
-          ${field('Feature copy', 'featureCopy', true)}
-          ${field('Feature image URL', 'featureImage')}
-        </div>
-
-        <div class="field-group">
-          <h4>Product cards</h4>
-          ${field('Burger title', 'burgerTitle')}
-          ${field('Burger copy', 'burgerCopy', true)}
-          ${field('Burger image URL', 'burgerImage')}
-          ${field('Coffee title', 'coffeeTitle')}
-          ${field('Coffee copy', 'coffeeCopy', true)}
-          ${field('Coffee image URL', 'coffeeImage')}
-          ${field('Interior title', 'interiorTitle')}
-          ${field('Interior copy', 'interiorCopy', true)}
-          ${field('Interior image URL', 'interiorImage')}
-          ${field('Extra card title', 'dessertTitle')}
-          ${field('Extra card copy', 'dessertCopy', true)}
-          ${field('Extra card image URL', 'dessertImage')}
-        </div>
-
-        <div class="field-group">
-          <h4>Gallery & CTA</h4>
-          ${field('Gallery title', 'galleryTitle')}
-          ${field('Gallery 1 image URL', 'gallery1')}
-          ${field('Gallery 2 image URL', 'gallery2')}
-          ${field('Gallery 3 image URL', 'gallery3')}
-          ${field('Gallery 4 image URL', 'gallery4')}
-          ${field('Gallery 5 image URL', 'gallery5')}
-          ${field('CTA title', 'ctaTitle')}
-          ${field('CTA copy', 'ctaCopy', true)}
-        </div>
-
-        <div class="field-group">
-          <h4>Editor actions</h4>
-          <div class="edit-actions">
-            <button class="btn" type="button" id="saveContent">Save changes</button>
-            <button class="btn secondary" type="button" id="resetContent">Reset demo content</button>
-            <button class="btn secondary" type="button" id="exportContent">Export JSON</button>
-            <label class="btn secondary" for="importContent" style="cursor:pointer">Import JSON</label>
-            <input id="importContent" type="file" accept="application/json" style="display:none" />
-          </div>
-          <p class="hint">
-            Tip: replace any demo image URL with your real BUNKER photo later.
-            Sign in to Premier OS with a user who has BUNKER branch access and settings-management permission to open the local preview editor.
-          </p>
-        </div>
-      `;
-
-      body.querySelectorAll('[data-key]').forEach(el => {
-        el.addEventListener('input', (e) => {
-          content[e.target.dataset.key] = e.target.value;
-        });
-      });
-      document.getElementById('saveContent').onclick = save;
-      document.getElementById('resetContent').onclick = resetToDefault;
-      document.getElementById('exportContent').onclick = exportJson;
-      document.getElementById('importContent').onchange = (e) => {
-        const file = e.target.files && e.target.files[0];
-        if (file) importJson(file);
-      };
-    }
-
-    async function canEditBunker() {
-      // A token in storage is not proof of authorization. Validate with Supabase
-      // and require both settings.manage and access to this exact branch.
-      const projectUrl = 'https://hvqlkapynjfjikqithvd.supabase.co';
-      const publishable = 'sb_publishable_9W6651rcdIsyBoegwGe_qw_MvCPRIPK';
-      const branchId = 'd56aae83-f1b3-4153-9224-87594500368d';
-      let token = '';
-      try {
-        for (const key of Object.keys(localStorage)) {
-          if (!/^sb-.*-auth-token$/.test(key)) continue;
-          const session = JSON.parse(localStorage.getItem(key) || '{}');
-          if (session.access_token && session.expires_at && session.expires_at * 1000 > Date.now()) {
-            token = session.access_token;
-            break;
-          }
-        }
-      } catch { return false; }
-      if (!token) return false;
-      const headers = { 'apikey': publishable, 'Authorization': 'Bearer ' + token };
-      try {
-        const me = await fetch(projectUrl + '/auth/v1/user', { headers });
-        if (!me.ok) return false;
-        const user = await me.json();
-        if (!user.id) return false;
-        const permission = await fetch(projectUrl + '/rest/v1/rpc/can_permission', {
-          method: 'POST', headers: { ...headers, 'Content-Type':'application/json' },
-          body: JSON.stringify({ p_permission:'settings.manage' })
-        });
-        if (!permission.ok || await permission.json() !== true) return false;
-        const access = await fetch(projectUrl + '/rest/v1/user_branch_access?select=branch_id&user_id=eq.' +
-          encodeURIComponent(user.id) + '&branch_id=eq.' + branchId + '&limit=1', {headers});
-        if (!access.ok) return false;
-        const rows = await access.json();
-        return Array.isArray(rows) && rows.length > 0;
-      } catch { return false; }
-    }
-
-    function openEditor() {
-      document.getElementById('editPanel').classList.add('show');
-      document.getElementById('editBackdrop').classList.add('show');
-      document.getElementById('editPanel').setAttribute('aria-hidden','false');
-    }
-    function closeEditor() {
-      document.getElementById('editPanel').classList.remove('show');
-      document.getElementById('editBackdrop').classList.remove('show');
-      document.getElementById('editPanel').setAttribute('aria-hidden','true');
     }
 
     render();
@@ -759,18 +568,27 @@ try {
         render();
       } catch { /* Keep demo photographs if photo settings are unavailable. */ }
     })();
-    buildEditor();
-
     const toggle = document.getElementById('editToggle');
-    void canEditBunker().then(allowed => {
-      if (!allowed) return;
-      toggle.classList.add('show');
-      toggle.addEventListener('click', openEditor);
-      document.getElementById('editBackdrop').addEventListener('click', closeEditor);
-      document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape') closeEditor();
-      });
+    toggle.textContent = 'إدارة نصوص وصور الموقع';
+    toggle.classList.add('show');
+    toggle.addEventListener('click', () => {
+      window.location.assign('https://premieros-sage.vercel.app/#/settings?section=website_social&website_branch=d56aae83-f1b3-4153-9224-87594500368d');
     });
+    void (async () => {
+      try {
+        const response = await fetch('https://hvqlkapynjfjikqithvd.supabase.co/rest/v1/rpc/branch_website_content_public', {
+          method:'POST', headers:{'Content-Type':'application/json','apikey':'sb_publishable_9W6651rcdIsyBoegwGe_qw_MvCPRIPK'},
+          body:JSON.stringify({p_branch:'d56aae83-f1b3-4153-9224-87594500368d'})
+        });
+        if (!response.ok) return;
+        const published = await response.json();
+        for (const [key,value] of Object.entries(published || {})) {
+          if (Object.hasOwn(defaults,key) && typeof value==='string' &&
+              !key.toLowerCase().includes('image') && !/^gallery\d+$/.test(key)) content[key]=value;
+        }
+        render();
+      } catch { /* Leave the public default content intact on network failure. */ }
+    })();
   </script>
 </body>
 </html>
