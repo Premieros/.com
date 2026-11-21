@@ -1,0 +1,3 @@
+# PostgreSQL function drift guards compare exact multiline SQL text.
+# Preserve the canonical bytes on Windows checkouts as well as Linux CI.
+*.sql text eol=lf
