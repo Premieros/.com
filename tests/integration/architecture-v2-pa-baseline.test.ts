@@ -47,7 +47,15 @@ describe('Architecture V2 P-A safety baseline', () => {
   });
 
   it('does not allow unexpected PUBLIC/anon execution of SECURITY DEFINER functions', async () => {
-    const temporaryBaselineAllowlist = ['register_trial_tenant'];
+    // Explicitly approved anonymous public storefront reads are audited below.
+    // Any other SECURITY DEFINER function exposed to anon/PUBLIC remains a failure.
+    const temporaryBaselineAllowlist = [
+      'register_trial_tenant',
+      'branch_website_links_public',
+      'branch_website_photos_public',
+      'branch_website_theme_public',
+      'bunker_demo_menu_preview',
+    ];
 
     const { rows } = await client.query<{ function_name: string }>(
       `select distinct p.proname as function_name
@@ -65,6 +73,31 @@ describe('Architecture V2 P-A safety baseline', () => {
     );
 
     expect(rows).toEqual([]);
+  });
+
+  it('allows only narrow read-only public storefront functions, without data mutation', async () => {
+    const storefront = [
+      'branch_website_links_public',
+      'branch_website_photos_public',
+      'branch_website_theme_public',
+      'bunker_demo_menu_preview',
+    ];
+    const { rows } = await client.query<{
+      proname: string; def: string; anon: boolean; authenticated: boolean;
+    }>(`
+      select p.proname, pg_get_functiondef(p.oid) as def,
+             has_function_privilege('anon',p.oid,'EXECUTE') as anon,
+             has_function_privilege('authenticated',p.oid,'EXECUTE') as authenticated
+      from pg_proc p where p.pronamespace='public'::regnamespace
+        and p.prosecdef and p.proname=any($1::text[]) order by p.proname
+    `, [storefront]);
+    expect(rows.map(r => r.proname)).toEqual([...storefront].sort());
+    for (const row of rows) {
+      expect(row.anon && row.authenticated).toBe(true);
+      expect(row.def).toMatch(/set search_path to ''/i);
+      // Their publicly visible data must remain read-only and branch-scoped.
+      expect(row.def).not.toMatch(/\\b(insert|update|delete|merge|alter|drop|truncate|grant|revoke|execute)\\b/i);
+    }
   });
 
   it('keeps internal low-level helpers unreachable by anon/authenticated clients', async () => {
