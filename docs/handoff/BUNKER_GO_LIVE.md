@@ -25,13 +25,14 @@ Status: **TECHNICALLY PREPARED — NOT AUTHORIZED FOR LIVE ORDERS** (customer pr
   - `supabase/migrations/20261121090200_pos_negative_stock_policy_handoff.sql`
   - `supabase/migrations/20261121090300_bunker_adopt_menu_and_keep_preview.sql`
   - `supabase/migrations/20261121090400_bunker_handoff_warehouse_and_order_activation_gate.sql`
+  - `supabase/migrations/20261121090500_bunker_live_stock_or_recipe_gate.sql`
   Verify the latest migration CI replay is successful before treating the schema as reproducible.
 
 ## Completed handoff preparation (2026-11-21)
 - [x] 15 BUNKER catalog products adopted with provisional existing retail prices and English product descriptions; no demo flags remain.
 - [x] One empty active warehouse created: **BUNKER Main Stock**, with **zero fabricated stock balances**.
 - [x] Five active menu categories all route to the existing active kitchen station `main`. Kitchen supervisor must confirm and adjust this route if needed.
-- [x] Server-side BUNKER-specific activation gate now requires nonzero product costs, real authorized branch staff identities/membership, active warehouse, valid kitchen routing and active tables; it has no impact on other branches.
+- [x] Server-side BUNKER-specific activation gate now requires nonzero product costs, real authorized branch staff identities/membership, active warehouse, operational stock-or-recipe links for every menu item, valid kitchen routing and active tables; it has no impact on other branches.
 - [x] Branch settings show itemized readiness blockers for authorized managers.
 - [x] Acceptance worksheet: [`BUNKER_MENU_STAFF_UAT_ACCEPTANCE.md`](./BUNKER_MENU_STAFF_UAT_ACCEPTANCE.md) — price approvals, recipe/cost sign-off, staff roster and real device/UAT signatures.
 
@@ -40,7 +41,7 @@ Status: **TECHNICALLY PREPARED — NOT AUTHORIZED FOR LIVE ORDERS** (customer pr
 - [ ] **Authorized identity roster:** branch owner provides the staff roster and role permissions; verify existing Supabase auth identities, active organization membership, branch access, and POS order review permissions. Fix the 29 unmatched users only after owner verifies each person. Do not merge accounts by email alone.
 - [ ] **Separate domain project:** Vercel operator removes both `bunker-egy.app` and `www.bunker-egy.app` from `premier.os` and attaches them to `bunker` (keep the same DNS; verify apex-to-www redirect and HTTPS). Independently check `/admin`, `/#/settings`, and unknown routes on the custom domain do not reveal Premier admin; ensure `ORDER NOW` resolves only to the BUNKER QR page.
 - [ ] **Photo/social/theme approval:** upload actual rights-cleared images and real social links through Premier settings; select and save light/dark; check the public site and QR page on mobile and desktop. Default demo images, empty links and dark mode are not brand approval.
-- [ ] **Kitchen and stock setup:** confirm that `main` is the intended kitchen routing for all five BUNKER categories; perform real opening stock count and register all recipes, UOMs, costs and purchases; 15/15 product costs are currently zero and none has recorded recipes or components. Five negative raw balances are in another branch and require a separate controller review.
+- [ ] **Kitchen and stock setup:** confirm that `main` is the intended kitchen routing for all five BUNKER categories; perform real opening stock count and register all recipes, UOMs, costs and purchases; 15/15 product costs are currently zero, no raw materials/recipes are registered, and no BUNKER product stock rows exist; every item needs inventory or an operational recipe before live ordering. Five negative raw balances are in another branch and require a separate controller review.
 - [ ] **Device UAT (isolated test shift, approved):** log in as a branch-authorized cashier/reviewer; QR check-in/table selection; submit order; verify notification; accept/reject; send to KDS; mark ready/served; settle via cash/card; receipt/print; shift close; cancellation/refund; duplicate submit; offline/reconnect; role and branch isolation. Use a staging branch or a test transaction with an approved reversal procedure; do not inject fake financial records into production.
 - [ ] **Restore rehearsal:** verify encrypted backup, perform timed restore in isolated environment, document actual RPO/RTO, and test monitoring and rollback.
 - [ ] **Sign-off:** business owner, cashier lead, kitchen lead, and technical QA sign date/time with screenshots/log links. Only then enable BUNKER real customer ordering in branch settings.
