@@ -70,6 +70,19 @@ BEGIN
     -- Prepare only unmapped items; do not alter real recipes, linked units or
     -- tracked finished goods. Reuse the kitchen's canonical auto raw ID.
     v_auto_raw_id := NULL;
+    IF NOT EXISTS(
+      SELECT 1 FROM public.warehouses w WHERE w.id=p_warehouse_id
+        AND w.branch_id=p_branch_id AND w.is_active
+    ) THEN
+      RETURN jsonb_build_object('success',false,'error','WAREHOUSE_NOT_IN_BRANCH');
+    END IF;
+    -- Do not create catalog/inventory setup for invalid modifier submissions.
+    v_mod := public.resolve_product_modifiers(
+      v_product_id,p_branch_id,COALESCE(v_item->'modifier_option_ids','[]'::jsonb)
+    );
+    IF COALESCE((v_mod->>'success')::boolean,false) IS NOT TRUE THEN
+      RETURN v_mod;
+    END IF;
     v_res := public._ensure_sale_auto_raw_recipe(p_branch_id,v_product_id);
     IF COALESCE((v_res->>'success')::boolean,false) IS NOT TRUE THEN
       RETURN v_res;
