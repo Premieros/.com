@@ -415,6 +415,23 @@ export function ActiveOrdersPage() {
     { key: 'takeaway', title: t('takeawayOrders'), value: String(counts.takeaway), icon: <ShoppingBag className="w-6 h-6" />, color: 'purple' },
   ];
 
+  const tableStatePending = loading || Boolean(error);
+  const floorPlan = <fieldset disabled={tableStatePending} aria-busy={loading} className="min-w-0">
+    <TableFloorPlan
+      areas={areas}
+      tables={tables}
+      ordersByTable={ordersByTable}
+      canManage={canManage && !tableStatePending}
+      currency="EGP"
+      onSelectTable={table => { if (!tableStatePending) setTableTarget(table); }}
+      onAddArea={openCreateArea}
+      onAddTable={openAddTable}
+      onRenameArea={openRenameArea}
+      onDeleteArea={deleteArea}
+      onEditDefaultAreaCount={openMainAreaCountEditor}
+    />
+  </fieldset>;
+
   return (
     <DesignSurface testId="active-orders-page" className="space-y-6">
       {canManage && effectiveBranch && <QrManagement key={effectiveBranch} branchId={effectiveBranch} />}
@@ -453,8 +470,9 @@ export function ActiveOrdersPage() {
           <p className="text-lg font-medium">{isAr ? 'اختر الفرع لعرض مركز الطلبات' : 'Select a branch to view the active orders'}</p>
         </DesignPanel>
       ) : loading ? (
-        <div className="flex justify-center py-16">
-          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-ui-primary" />
+        <div className="space-y-4">
+          <p role="status" className="text-sm text-ui-muted">{isAr ? 'جار تأكيد حالة الطلبات قبل فتح الطاولات…' : 'Confirming order status before opening tables…'}</p>
+          {tables.length > 0 ? floorPlan : <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-ui-primary" /></div>}
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -469,19 +487,7 @@ export function ActiveOrdersPage() {
                 {areasError}
               </DesignPanel>
             )}
-            <TableFloorPlan
-              areas={areas}
-              tables={tables}
-              ordersByTable={ordersByTable}
-              canManage={canManage}
-              currency="EGP"
-              onSelectTable={setTableTarget}
-              onAddArea={openCreateArea}
-              onAddTable={openAddTable}
-              onRenameArea={openRenameArea}
-              onDeleteArea={deleteArea}
-              onEditDefaultAreaCount={openMainAreaCountEditor}
-            />
+            {floorPlan}
           </div>
 
           <div className="space-y-3">
