@@ -35,7 +35,9 @@ BEGIN
   SELECT pg_get_functiondef(
     'public._deduct_sale_inventory_with_modifiers_core(uuid,uuid,jsonb,uuid,text)'::regprocedure
   ) INTO v_definition;
-  v_needle := '    v_mod := public.resolve_product_modifiers(';
+  -- Resolve and validate modifiers first, before creating any stock setup.
+  -- Otherwise an invalid checkout might leave an auto-created raw behind.
+  v_needle := '    -- Use the same authoritative base-stock decision as POS availability, but';
   v_insert := $fragment$
     -- Convert unconfigured products to a 1:1 raw recipe before availability.
     -- Existing recipes / units / tracked finished stock remain unchanged.
