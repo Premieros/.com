@@ -54,6 +54,7 @@ export type Permission =
   | 'users.view' | 'users.manage'
   | 'audit.view'
   | 'settings.manage'
+  | 'website.edit'
   | 'branches.manage';
 
 export const ALL_PERMISSIONS: Permission[] = [
@@ -88,7 +89,7 @@ export const ALL_PERMISSIONS: Permission[] = [
   'approvals.review', 'approvals.override', 'approvals.policy.manage',
   'work.authorization.approve', 'work.authorization.manage', 'work.authorization.bypass',
   'users.view', 'users.manage', 'users.create', 'users.branches.manage', 'roles.permissions.manage',
-  'audit.view', 'settings.manage', 'branches.manage',
+  'audit.view', 'settings.manage', 'website.edit', 'branches.manage',
 ];
 
 export const PERMISSION_LABELS: Record<Permission, { ar: string; en: string }> = {
@@ -210,6 +211,7 @@ export const PERMISSION_LABELS: Record<Permission, { ar: string; en: string }> =
   'roles.permissions.manage': { ar: 'إدارة الأدوار والصلاحيات', en: 'Manage Role Permissions' },
   'audit.view': { ar: 'عرض سجل العمليات', en: 'View Audit Log' },
   'settings.manage': { ar: 'إدارة الإعدادات', en: 'Manage Settings' },
+  'website.edit': { ar: 'تعديل الموقع', en: 'Edit Website' },
   'branches.manage': { ar: 'إدارة الفروع', en: 'Manage Branches' },
 };
 
@@ -241,7 +243,7 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
   { key: 'shifts', ar: 'الشيفتات', en: 'Shifts', permissions: ['shifts.view', 'shifts.open', 'shifts.close', 'shifts.close_with_open_orders', 'shifts.manage', 'shifts.report.user', 'shifts.report.shift', 'shifts.day_close'] },
   { key: 'approvals', ar: 'الموافقات', en: 'Approvals', permissions: ['approvals.review', 'approvals.override', 'approvals.policy.manage', 'work.authorization.approve', 'work.authorization.manage', 'work.authorization.bypass'] },
   { key: 'reports', ar: 'التقارير', en: 'Reports', permissions: ['reports.view', 'reports.financial', 'reports.costing', 'reports.print', 'reports.export'] },
-  { key: 'admin', ar: 'الإدارة', en: 'Administration', permissions: ['users.view', 'users.manage', 'users.create', 'users.branches.manage', 'roles.permissions.manage', 'audit.view', 'settings.manage', 'branches.manage'] },
+  { key: 'admin', ar: 'الإدارة', en: 'Administration', permissions: ['users.view', 'users.manage', 'users.create', 'users.branches.manage', 'roles.permissions.manage', 'audit.view', 'settings.manage', 'website.edit', 'branches.manage'] },
 ];
 
 export const OPERATIONAL_PERMISSION_SECTIONS: PermissionGroup[] = [
@@ -373,6 +375,7 @@ export const OPERATIONAL_PERMISSION_SECTIONS: PermissionGroup[] = [
       .permissions.filter(
         (permission) =>
           permission === 'settings.manage'
+          || permission === 'website.edit'
           || permission === 'branches.manage'
           || permission === 'audit.view',
       ),
@@ -382,7 +385,7 @@ export const OPERATIONAL_PERMISSION_SECTIONS: PermissionGroup[] = [
 export const DEFAULT_ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   super_admin: [...ALL_PERMISSIONS],
   owner: ALL_PERMISSIONS.filter((permission) => permission !== 'history.unlimited'),
-  branch_manager: ['dashboard.view', 'pos.view', 'pos.order.create', 'pos.order.edit', 'pos.payment.take', 'pos.order.split', 'pos.order.transfer', 'pos.receipt.print', 'pos.discount', 'pos.change_price', 'pos.reprint', 'pos.hold', 'pos.send_kitchen', 'pos.kds_view', 'pos.kds_update', 'pos.print_kitchen', 'pos.void', 'pos.cancel_order', 'floor_plan.view', 'floor_plan.manage', 'products.view', 'products.create', 'products.edit', 'products.delete', 'products.modifiers.manage', 'products.print', 'products.export', 'products.import', 'categories.view', 'categories.manage', 'components.view', 'components.manage', 'purchases.view', 'purchases.manage', 'purchases.print', 'purchases.delete', 'purchases.requests', 'purchases.rfq', 'purchases.receiving', 'purchases.evaluation', 'procurement.request.create', 'procurement.order.create', 'procurement.receive', 'procurement.payment.create', 'inventory.view', 'inventory.adjust', 'inventory.count.create', 'inventory.count.approve', 'inventory.count.reject', 'inventory.count.apply', 'inventory.transfer.create', 'inventory.transfer.approve', 'inventory.ledger.view', 'warehouses.view', 'warehouses.manage', 'customers.view', 'customers.manage', 'customers.print', 'customers.export', 'suppliers.view', 'suppliers.manage', 'suppliers.print', 'expenses.view', 'expenses.manage', 'expenses.print', 'sales.view', 'sales.refund.create', 'sales.payment.receive', 'refunds.approve', 'sales.print', 'sales.export', 'reports.view', 'reports.financial', 'reports.costing', 'reports.print', 'reports.export', 'accounts.view', 'accounts.manage', 'accounting.journal.post', 'accounting.treasury.transfer', 'accounting.reconciliation.manage', 'shifts.view', 'shifts.open', 'shifts.close', 'shifts.manage', 'approvals.review', 'approvals.override', 'approvals.policy.manage', 'users.view', 'users.manage', 'users.create', 'users.branches.manage', 'roles.permissions.manage', 'settings.manage'],
+  branch_manager: ['dashboard.view', 'pos.view', 'pos.order.create', 'pos.order.edit', 'pos.payment.take', 'pos.order.split', 'pos.order.transfer', 'pos.receipt.print', 'pos.discount', 'pos.change_price', 'pos.reprint', 'pos.hold', 'pos.send_kitchen', 'pos.kds_view', 'pos.kds_update', 'pos.print_kitchen', 'pos.void', 'pos.cancel_order', 'floor_plan.view', 'floor_plan.manage', 'products.view', 'products.create', 'products.edit', 'products.delete', 'products.modifiers.manage', 'products.print', 'products.export', 'products.import', 'categories.view', 'categories.manage', 'components.view', 'components.manage', 'purchases.view', 'purchases.manage', 'purchases.print', 'purchases.delete', 'purchases.requests', 'purchases.rfq', 'purchases.receiving', 'purchases.evaluation', 'procurement.request.create', 'procurement.order.create', 'procurement.receive', 'procurement.payment.create', 'inventory.view', 'inventory.adjust', 'inventory.count.create', 'inventory.count.approve', 'inventory.count.reject', 'inventory.count.apply', 'inventory.transfer.create', 'inventory.transfer.approve', 'inventory.ledger.view', 'warehouses.view', 'warehouses.manage', 'customers.view', 'customers.manage', 'customers.print', 'customers.export', 'suppliers.view', 'suppliers.manage', 'suppliers.print', 'expenses.view', 'expenses.manage', 'expenses.print', 'sales.view', 'sales.refund.create', 'sales.payment.receive', 'refunds.approve', 'sales.print', 'sales.export', 'reports.view', 'reports.financial', 'reports.costing', 'reports.print', 'reports.export', 'accounts.view', 'accounts.manage', 'accounting.journal.post', 'accounting.treasury.transfer', 'accounting.reconciliation.manage', 'shifts.view', 'shifts.open', 'shifts.close', 'shifts.manage', 'approvals.review', 'approvals.override', 'approvals.policy.manage', 'users.view', 'users.manage', 'users.create', 'users.branches.manage', 'roles.permissions.manage', 'settings.manage', 'website.edit'],
   cashier: ['dashboard.view', 'pos.view', 'pos.order.create', 'pos.order.edit', 'pos.payment.take', 'pos.order.split', 'pos.order.transfer', 'pos.receipt.print', 'pos.hold', 'pos.send_kitchen', 'pos.print_kitchen', 'pos.void', 'floor_plan.view', 'products.view', 'customers.view', 'customers.manage', 'inventory.view', 'sales.view', 'sales.print', 'shifts.view', 'shifts.open', 'shifts.close'],
   warehouse_manager: ['dashboard.view', 'products.view', 'products.create', 'products.edit', 'products.delete', 'products.print', 'products.export', 'products.import', 'categories.view', 'categories.manage', 'components.view', 'components.manage', 'inventory.view', 'inventory.adjust', 'inventory.count.create', 'inventory.count.approve', 'inventory.count.reject', 'inventory.count.apply', 'inventory.transfer.create', 'inventory.transfer.approve', 'inventory.ledger.view', 'warehouses.view', 'warehouses.manage', 'purchases.view', 'purchases.manage', 'purchases.print', 'purchases.requests', 'purchases.rfq', 'purchases.receiving', 'purchases.evaluation', 'suppliers.view', 'suppliers.manage', 'suppliers.print', 'shifts.view'],
   accountant: ['dashboard.view', 'sales.view', 'sales.print', 'sales.export', 'purchases.view', 'purchases.print', 'expenses.view', 'expenses.manage', 'expenses.print', 'inventory.view', 'customers.view', 'customers.print', 'customers.export', 'suppliers.view', 'suppliers.print', 'reports.view', 'reports.financial', 'reports.costing', 'reports.print', 'reports.export', 'accounts.view', 'accounts.manage', 'accounting.journal.post', 'accounting.treasury.transfer', 'accounting.reconciliation.manage', 'shifts.view'],
