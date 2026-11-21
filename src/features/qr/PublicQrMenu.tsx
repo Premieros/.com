@@ -131,7 +131,7 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
               setMenu(sample); setDemoPreview(true); setRetry(null); setCart({}); setPage('home'); setError('');
               try { sessionStorage.removeItem(storageKey); } catch { /* No storage. */ }
             } else setError(customerError(failure));
-          }).catch(() => { if (alive) setError(customerError(failure)); });
+          }).then(undefined, () => { if (alive) setError(customerError(failure)); });
         } else setError(customerError(failure));
       } else setMenu(data);
     }).catch(failure => { if (alive) setError(customerError(failure)); });
