@@ -198,6 +198,9 @@ describe('partial table transfer against the full schema and actual guards', () 
   expect(sent.rows[0].result).toMatchObject({success:false,error:'ITEM_ALREADY_SENT'});
   await client.query('DELETE FROM public.order_kitchen_inventory_events WHERE order_id=$1',[source]);
   await client.query('DELETE FROM public.order_kitchen_sends WHERE order_id=$1',[source]);
+  await client.query('UPDATE public.orders SET tax_amount=round(subtotal*0.14,2), total=subtotal-discount_amount+round(subtotal*0.14,2) WHERE id=$1',[source]);
+  const taxBefore=(await client.query('SELECT tax_amount::float8 AS tax FROM public.orders WHERE id=$1',[source])).rows[0].tax;
+  expect(taxBefore).toBeGreaterThan(0);
   const before=(await client.query('SELECT sum(total)::float8 v FROM public.orders WHERE id=ANY($1::uuid[])',[[source,target]])).rows[0].v;
   const stockBefore=(await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n;
   const result=await split();
@@ -210,6 +213,11 @@ describe('partial table transfer against the full schema and actual guards', () 
   expect((await client.query('SELECT sum(quantity)::float8 q FROM public.order_items WHERE order_id=$1',[newOrder])).rows[0].q).toBe(1);
   const after=(await client.query('SELECT sum(total)::float8 v FROM public.orders WHERE id=ANY($1::uuid[])',[[source,target,newOrder]])).rows[0].v;
   expect(after).toBe(before);
+  const taxRows=(await client.query('SELECT id,tax_amount::float8 AS tax FROM public.orders WHERE id=ANY($1::uuid[])',[[source,newOrder]])).rows;
+  const movedTax=Math.round(taxBefore/3*100)/100;
+  expect(taxRows.find((row)=>row.id===newOrder)?.tax).toBe(movedTax);
+  expect(taxRows.find((row)=>row.id===source)?.tax).toBeCloseTo(taxBefore-movedTax,2);
+
   expect((await client.query('SELECT count(*)::int n FROM public.order_kitchen_sends WHERE order_id=$1',[newOrder])).rows[0].n).toBe(0);
   expect((await client.query('SELECT count(*)::int n FROM public.inventory_ledger')).rows[0].n).toBe(stockBefore);
  });

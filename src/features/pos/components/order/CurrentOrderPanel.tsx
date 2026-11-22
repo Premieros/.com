@@ -12,7 +12,7 @@ import {
   X,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import { formatCurrency } from '@/lib/format';
+import { formatFinancialCurrency } from '@/lib/format';
 import type { CartItem, Customer, DiningTable, OrderItem, OrderType } from '@/lib/types';
 import type { KitchenSendItem } from '../../types';
 import { computeSentState } from '../../utils/sentState';
@@ -344,10 +344,13 @@ export function CurrentOrderPanel({
                 type="button"
                 data-testid={`pos-selected-split-${selectedItem.product.id}`}
                 disabled={!selectedCanSplit}
+                title={selectedCanSplit ? undefined : !activeOrderId
+                  ? (isAr ? 'علّق الطلب أولًا لحفظه.' : 'Hold the order to save it first.')
+                  : (isAr ? 'يمكن فصل الصنف المحفوظ قبل إرساله للمطبخ.' : 'Only a saved item that has not been sent to the kitchen can be split here.')}
                 onClick={() => setSplitItem(selectedItem)}
                 className="flex h-9 items-center gap-1 rounded-lg border border-ui-primary/30 bg-ui-surface px-2.5 text-[10px] font-black text-ui-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <ArrowRightLeft className="h-3.5 w-3.5" /> Split
+                <ArrowRightLeft className="h-3.5 w-3.5" /> {isAr ? 'فصل الصنف' : 'Split item'}
               </button>
             )}
             {selectedCanRemoveOrVoid && selectedItems.length === 1 && selectedItem && (
@@ -447,7 +450,7 @@ export function CurrentOrderPanel({
                         {sent.sentQty > 0 ? (isAr ? 'مرسل' : 'Sent') : (isAr ? 'تعديل' : 'Edit')}
                       </button>
                     )}
-                    <span className="shrink-0 text-xs font-black text-ui-accent">{formatCurrency(item.quantity * item.unit_price - (item.discount_amount || 0), currency, lang)}</span>
+                    <span className="shrink-0 text-xs font-black text-ui-accent">{formatFinancialCurrency(item.quantity * item.unit_price - (item.discount_amount || 0), currency, lang)}</span>
                   </div>
 
                   <div className="mt-2 flex items-center gap-1.5 border-t border-ui-border/70 pt-2">
@@ -476,10 +479,10 @@ export function CurrentOrderPanel({
       {!empty && (
         <div className="shrink-0 border-t border-ui-border p-3">
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="rounded-xl border border-ui-border bg-ui-page-alt p-2"><p className="text-[10px] font-bold text-ui-muted">{t('subtotal')}</p><p className="mt-0.5 truncate text-xs font-black text-ui-text">{formatCurrency(subtotal, currency, lang)}</p></div>
-            <div className="rounded-xl bg-ui-page-alt p-2"><p className="text-[9px] font-bold text-ui-subtle">{t('discount')}</p><p data-testid="pos-discount-value" className="mt-0.5 truncate text-xs font-black text-ui-text">{formatCurrency(discountValue, currency, lang)}</p></div>
-            <div className="rounded-xl border border-ui-border bg-ui-page-alt p-2"><p className="text-[10px] font-bold text-ui-muted">{lang === 'ar' ? 'الضريبة' : 'Tax'} ({Number(taxRate).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US', {maximumFractionDigits:2})}%)</p><p data-testid="pos-tax-value" className="mt-0.5 truncate text-xs font-black text-ui-text">{formatCurrency(taxAmount, currency, lang)}</p></div>
-            <div className="rounded-xl border border-ui-primary/30 bg-ui-primary-soft p-2"><p className="text-[10px] font-bold text-ui-muted">{t('total')}</p><p data-testid="pos-total-value" className="mt-0.5 truncate text-sm font-black text-ui-accent">{formatCurrency(total, currency, lang)}</p></div>
+            <div className="rounded-xl border border-ui-border bg-ui-page-alt p-2"><p className="text-[10px] font-bold text-ui-muted">{t('subtotal')}</p><p className="mt-0.5 truncate text-xs font-black text-ui-text">{formatFinancialCurrency(subtotal, currency, lang)}</p></div>
+            <div className="rounded-xl bg-ui-page-alt p-2"><p className="text-[9px] font-bold text-ui-subtle">{t('discount')}</p><p data-testid="pos-discount-value" className="mt-0.5 truncate text-xs font-black text-ui-text">{formatFinancialCurrency(discountValue, currency, lang)}</p></div>
+            <div className="rounded-xl border border-ui-border bg-ui-page-alt p-2"><p className="text-[10px] font-bold text-ui-muted">{lang === 'ar' ? 'الضريبة' : 'Tax'} ({Number(taxRate).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US', {maximumFractionDigits:2})}%)</p><p data-testid="pos-tax-value" className="mt-0.5 truncate text-xs font-black text-ui-text">{formatFinancialCurrency(taxAmount, currency, lang)}</p></div>
+            <div className="rounded-xl border border-ui-primary/30 bg-ui-primary-soft p-2"><p className="text-[10px] font-bold text-ui-muted">{t('total')}</p><p data-testid="pos-total-value" className="mt-0.5 truncate text-sm font-black text-ui-accent">{formatFinancialCurrency(total, currency, lang)}</p></div>
           </div>
         </div>
       )}

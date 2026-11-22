@@ -664,10 +664,10 @@ export function usePosOrder(input: UsePosOrderInput) {
         if (!ok) return false;
         if (newId) {
           const heldRes = await api.floorPlan.setOrderStatus({ p_order_id: newId, p_status: 'held' });
+          setActiveOrderId(newId);
+          setActiveOrderNumber(newNum);
           if (heldRes.error || !(heldRes.data as RpcResult | null)?.success) {
             show(t('orderHeld') + ': ' + (heldRes.error?.message || (heldRes.data as RpcResult | null)?.detail || (heldRes.data as RpcResult | null)?.error || ''), 'error');
-            setActiveOrderId(newId);
-            setActiveOrderNumber(newNum);
             return false;
           }
         }

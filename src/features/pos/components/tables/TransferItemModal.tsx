@@ -215,7 +215,7 @@ export function TransferItemModal({ open, onClose, item, orderId, orderItemId, s
   if (!open || !item || !orderId || !orderItemId) return null;
 
   return (
-    <Modal open={open} onClose={onClose} title={isAr ? 'Split — فصل صنف من الطلب' : 'Split — Move item to another order'} size="lg">
+    <Modal open={open} onClose={onClose} title={isAr ? 'فصل صنف من الطلب' : 'Split — Move item to another order'} size="lg">
       <div className="space-y-4">
         <div className="rounded-2xl border border-ui-border bg-ui-page-alt p-3">
           <div className="flex items-center gap-3">
@@ -346,7 +346,7 @@ export function TransferItemModal({ open, onClose, item, orderId, orderItemId, s
             disabled={loading || !!pendingRequestId || (targetKind === 'table' && !selectedTableId) || reason.trim().length < 3}
           >
             <ArrowRightLeft className="h-4 w-4" />
-            {pendingRequestId ? (isAr ? 'بانتظار المدير' : 'Waiting') : (isAr ? 'طلب Split' : 'Request Split')}
+            {pendingRequestId ? (isAr ? 'بانتظار المدير' : 'Waiting') : (isAr ? 'تنفيذ الفصل' : 'Request Split')}
           </Button>
         </div>
       </div>
