@@ -98,6 +98,29 @@ describe('full ERP/POS operating cycle', () => {
         [rawId, `CIR-${token}`, unitId, branchId],
       );
 
+      const atomicSku = `CI-ATOMIC-${token}`;
+      const atomicProduct = { p_name: 'CI Product With Ingredients', p_branch_id: branchId, p_sku: atomicSku, p_sale_price: 15 };
+      await client.query('SAVEPOINT invalid_product_recipe');
+      await expect(client.query('select public.create_product_with_raw_components($1,$2)', [
+        atomicProduct, JSON.stringify([{ raw_material_id: rawId, quantity: 0 }]),
+      ])).rejects.toThrow('INVALID_DIRECT_RAW_COMPONENT');
+      await client.query('ROLLBACK TO SAVEPOINT invalid_product_recipe');
+      expect((await client.query('select id from public.products where sku=$1', [atomicSku])).rowCount).toBe(0);
+
+      await client.query('SET LOCAL ROLE authenticated');
+      const atomic = await json('select public.create_product_with_raw_components($1,$2) result', [
+        atomicProduct, JSON.stringify([{ raw_material_id: rawId, quantity: 2 }]),
+      ]);
+      await client.query('RESET ROLE');
+      expect(atomic?.success).toBe(true);
+      const atomicRecipe = await client.query(`
+        select p.product_type, i.quantity::float8 as quantity
+        from public.products p join public.recipes r on r.product_id=p.id
+        join public.recipe_items i on i.recipe_id=r.id
+        where p.sku=$1 and i.raw_material_id=$2
+      `, [atomicSku, rawId]);
+      expect(atomicRecipe.rows).toEqual([{ product_type: 'manufactured', quantity: 2 }]);
+
       await client.query(
         `insert into public.products(id,name,sku,cost_price,sale_price,wholesale_price,is_active,product_type,branch_id)
          values

@@ -1,3 +1,4 @@
+import type { CreateProductInput } from '@/api/domains/catalog';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Plus, Edit2, Trash2, Download, Upload, Barcode as BarcodeIcon, QrCode, Move, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '@/api';
@@ -161,6 +162,24 @@ export function ProductsPage() {
   useEffect(() => { loadMeta(); }, [loadMeta]);
   useEffect(() => { loadLiveProductCosts(); }, [loadLiveProductCosts]);
 
+  const [saving, setSaving] = useState(false);
+  const saveLock = useRef(false);
+  const canManageRecipes = can('recipes.manage');
+
+  useEffect(() => {
+    if (!quickModalOpen || editing || !supportsRawComposition || !canManageRecipes || !form.branch_id) return;
+    let active = true;
+    setRawMaterialOptions([]);
+    supabase.from('raw_materials').select('id,name,branch_id')
+      .eq('branch_id', form.branch_id).eq('is_active', true).not('unit_id', 'is', null).order('name')
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) show(error.message, 'error');
+        else setRawMaterialOptions(data ?? []);
+      });
+    return () => { active = false; };
+  }, [quickModalOpen, editing, supportsRawComposition, canManageRecipes, form.branch_id, show]);
+
   const filtered = products;
   const availableToAdd = stockComponents.filter((s) => s.product_id !== editing?.id && !productComponents.some((c) => c.component_product_id === s.product_id));
   const availableManufacturedToAdd = manufacturedInventoryUnits.filter((unit) => !linkedInventoryUnits.some((row) => row.unit_id === unit.id));
@@ -174,6 +193,8 @@ export function ProductsPage() {
     setProductComponents([]);
     setRecipeIngredients([]);
     setRecipeYield(1);
+    setRawMaterialSel('');
+    setRawMaterialQty(1);
     setLinkedInventoryUnits([]);
     setUnits([]);
     setForm({
@@ -290,7 +311,7 @@ export function ProductsPage() {
     setQuickModalOpen(true);
   };
 
-  const save = async () => {
+  const saveProduct = async () => {
     if (editing ? !can('products.edit') : !can('products.create')) return;
     if (!form.name) { show(t('required') + ': ' + t('name'), 'error'); return; }
     const effectiveBranch = form.branch_id || branchFilter || '';
@@ -310,7 +331,7 @@ export function ProductsPage() {
       if (unitError) { show(unitError.message, 'error'); return; }
       await logAudit('update', 'products', editing.id, { name: form.name });
     } else {
-      const { data, error } = await api.catalog.createProduct({
+      const createInput: CreateProductInput = {
         p_name: payload.name,
         p_name_en: payload.name_en || null,
         p_barcode: payload.barcode || null,
@@ -329,7 +350,14 @@ export function ProductsPage() {
         p_product_type: payload.product_type,
         p_is_active: payload.is_active,
         p_units: unitPayload.length > 0 ? unitPayload : null,
-      });
+      };
+      const { data, error } = recipeIngredients.length > 0
+        ? await api.catalog.createProductWithRawComponents({
+          p_product: createInput,
+          p_items: recipeIngredients.map(({ raw_material_id, quantity, wastage_percent }) =>
+            ({ raw_material_id, quantity, wastage_percent })),
+        })
+        : await api.catalog.createProduct(createInput);
       if (error || !data || data.success === false) { show(error?.message || data?.error || 'error', 'error'); return; }
       pid = data.product_id!;
     }
@@ -382,6 +410,18 @@ export function ProductsPage() {
     reloadProducts();
   };
 
+  const save = async () => {
+    if (saveLock.current) return;
+    saveLock.current = true;
+    setSaving(true);
+    try {
+      await saveProduct();
+    } finally {
+      saveLock.current = false;
+      setSaving(false);
+    }
+  };
+
   const addComponentRow = () => { if (!componentSel) { show(t('required'), 'error'); return; } setProductComponents([...productComponents, { component_product_id: componentSel, quantity: componentQty > 0 ? componentQty : 1 }]); setComponentSel(''); setComponentQty(1); };
   const updateComponentQty = (i: number, qty: number) => setProductComponents(productComponents.map((c, idx) => idx === i ? { ...c, quantity: qty > 0 ? qty : 1 } : c));
   const removeComponentRow = (i: number) => setProductComponents(productComponents.filter((_, idx) => idx !== i));
@@ -406,6 +446,7 @@ export function ProductsPage() {
   const removeDirectRawIngredient = (index: number) => {
     if (!can('recipes.manage')) return;
     setRecipeIngredients(recipeIngredients.filter((_, i) => i !== index));
+    if (!editing && recipeIngredients.length === 1) setForm(f=>({...f,product_type:'ready'}));
   };
 
   const addLinkedInventoryUnit = () => {
@@ -482,6 +523,33 @@ export function ProductsPage() {
     { key: 'actions', header: t('actions'), render: (p) => <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}><button onClick={() => showBarcode(p)} className="p-1.5 rounded-md hover:bg-ui-page-alt text-ui-subtle" title={t('barcode')}><BarcodeIcon className="w-4 h-4" /></button><button onClick={() => showQR(p)} className="p-1.5 rounded-md hover:bg-ui-page-alt text-ui-subtle" title={t('generateQR')}><QrCode className="w-4 h-4" /></button>{can('products.edit') && <button onClick={() => openEdit(p)} className="ui-icon-action ui-icon-action-info" title={t('edit')}><Edit2 className="w-4 h-4" /></button>}{can('products.delete') && <button onClick={() => setDeleteId(p.id)} className="ui-icon-action ui-icon-action-danger" title={t('delete')}><Trash2 className="w-4 h-4" /></button>}</div> },
   ];
 
+  const directIngredientFields = <>
+          <div className="space-y-2">
+            {recipeIngredients.map((row,i)=><div key={row.raw_material_id} className="flex items-end gap-2 rounded-xl border border-ui-border p-2">
+              <div className="min-w-0 flex-1 text-sm font-semibold text-ui-text">{row.raw_material?.name || rawMaterialOptions.find(x=>x.id===row.raw_material_id)?.name}</div>
+              <Input label={lang==='ar'?'الكمية':'Qty'} type="number" min={0.0001} step={0.0001}
+                value={row.quantity / Math.max(1,recipeYield)} className="w-28"
+                disabled={!can('recipes.manage')}
+                onChange={e=>updateDirectRawIngredient(i,{quantity:(Number(e.target.value)||0)*Math.max(1,recipeYield)})}/>
+              {can('recipes.manage') && <button type="button" className="p-2 text-ui-danger" onClick={()=>removeDirectRawIngredient(i)} aria-label={lang==='ar'?'حذف المكون':'Remove ingredient'}><Trash2 className="h-4 w-4"/></button>}
+            </div>)}
+          </div>
+          {can('recipes.manage') && <div className="grid gap-2 sm:grid-cols-[1fr_100px_auto] sm:items-end">
+            <Select label={lang==='ar'?'إضافة خامة':'Add ingredient'} value={rawMaterialSel} onChange={e=>setRawMaterialSel(e.target.value)}>
+              <option value="">{lang==='ar'?'اختر خامة':'Choose ingredient'}</option>
+              {availableRawMaterialsToAdd.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
+            </Select>
+            <Input label={lang==='ar'?'الكمية':'Qty'} type="number" min="0.0001" step="0.0001"
+              value={rawMaterialQty} onChange={e=>setRawMaterialQty(Number(e.target.value)||0)}/>
+            <Button variant="outline" onClick={()=>{
+              if (!rawMaterialSel || rawMaterialQty<=0) return;
+              addDirectRawIngredient();
+              setForm(f=>({...f,product_type:'manufactured'}));
+            }} disabled={!rawMaterialSel || rawMaterialQty<=0}><Plus className="h-4 w-4"/>{t('add')}</Button>
+          </div>}
+          {!rawMaterialOptions.length && <p className="text-xs text-ui-muted">{lang==='ar'?'لا توجد خامات مسجلة في هذا الفرع. أضف الخامات من المخزون أولاً.':'No branch raw materials available. Register ingredients in inventory first.'}</p>}
+  </>;
+
   return (
     <DesignSurface testId="products-page">
       <DesignPageHeader title={itemLabel} actions={<>{can('products.import') && <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} data-testid="products-import" />}{can('products.import') && <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} data-testid="products-import-button"><Upload className="w-4 h-4" /> {t('importExcel')}</Button>}{can('products.export') && <Button variant="outline" size="sm" onClick={handleExport} data-testid="products-export"><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}<Button variant="outline" size="sm" onClick={() => setCatalogToolsOpen(true)} data-testid="products-tools"><SlidersHorizontal className="w-4 h-4" /> {lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'}</Button>{can('products.create') && <Button size="sm" onClick={openAdd} data-testid="products-add"><Plus className="w-4 h-4" /> {t('add')}</Button>}</>} />
@@ -515,11 +583,22 @@ export function ProductsPage() {
               </div>}
             </div>
             {!branchFilter && <Select label={t('branch')} value={form.branch_id}
-              onChange={e=>setForm(f=>({...f,branch_id:e.target.value,category_id:''}))}>
+              onChange={e=>{
+                setForm(f=>({...f,branch_id:e.target.value,category_id:'',product_type:'ready'}));
+                setRecipeIngredients([]);
+                setRawMaterialSel('');
+              }}>
               <option value="">{lang === 'ar' ? 'اختر الفرع' : 'Select branch'}</option>
               {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
             </Select>}
           </div>
+          {!editing && supportsRawComposition && can('recipes.manage') && (
+            <details className="rounded-xl border border-ui-border p-3" open={recipeIngredients.length > 0 || undefined}>
+              <summary className="cursor-pointer font-semibold">{lang === 'ar' ? 'بمكونات · أضف الخامات' : 'With ingredients · add raw materials'}</summary>
+              <p className="my-2 text-sm text-ui-muted">{lang === 'ar' ? 'حدد كمية الخامة لكل وحدة بيع.' : 'Set the ingredient quantity per sale unit.'}</p>
+              {directIngredientFields}
+            </details>
+          )}
           <div className="flex flex-wrap gap-2 rounded-xl border border-ui-border bg-ui-page-alt p-3">
             {editing && supportsComposition && <Button size="sm" variant="outline" onClick={() => {
               setQuickModalOpen(false);setIngredientsModalOpen(true);
@@ -527,13 +606,10 @@ export function ProductsPage() {
             <Button size="sm" variant="outline" onClick={()=>{
               setQuickModalOpen(false);setEditSection('basic');setModalOpen(true);
             }}>{lang === 'ar' ? 'تفاصيل إضافية' : 'Advanced details'}</Button>
-            {!editing && <span className="text-xs text-ui-muted self-center">
-              {lang === 'ar' ? 'بعد حفظ المنتج يمكنك إضافة مكوناته.' : 'Save the product first to add ingredients.'}
-            </span>}
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={()=>setQuickModalOpen(false)}>{t('cancel')}</Button>
-            <Button onClick={()=>void save()} disabled={!form.name.trim() || !form.branch_id || form.sale_price<0}>{t('save')}</Button>
+            <Button onClick={()=>void save()} disabled={saving || !form.name.trim() || !form.branch_id || form.sale_price<0 || (!editing && !!rawMaterialSel)}>{t('save')}</Button>
           </div>
         </div>
       </Modal>
@@ -542,34 +618,11 @@ export function ProductsPage() {
         <div className="space-y-4" data-testid="product-ingredients-quick-editor">
           <p className="text-sm text-ui-muted">{lang==='ar' ? 'اختر الخامة والكمية المستخدمة لكل وحدة بيع. يتم تطبيق المكونات على المخزون عند إرسال الطلب للمطبخ.' : 'Choose each ingredient and quantity per item. Inventory is consumed when sent to the kitchen.'}</p>
           {!can('recipes.manage') && <p className="rounded-lg bg-ui-warning-soft p-3 text-sm text-ui-warning">{lang==='ar'?'تحتاج صلاحية إدارة الوصفات لتعديل الخامات.':'Recipe permissions are required to edit raw ingredients.'}</p>}
-          <div className="space-y-2">
-            {recipeIngredients.map((row,i)=><div key={row.raw_material_id} className="flex items-end gap-2 rounded-xl border border-ui-border p-2">
-              <div className="min-w-0 flex-1 text-sm font-semibold text-ui-text">{row.raw_material?.name || rawMaterialOptions.find(x=>x.id===row.raw_material_id)?.name}</div>
-              <Input label={lang==='ar'?'الكمية':'Qty'} type="number" min={0.0001} step={0.0001}
-                value={row.quantity / Math.max(1,recipeYield)} className="w-28"
-                disabled={!can('recipes.manage')}
-                onChange={e=>updateDirectRawIngredient(i,{quantity:(Number(e.target.value)||0)*Math.max(1,recipeYield)})}/>
-              {can('recipes.manage') && <button type="button" className="p-2 text-ui-danger" onClick={()=>removeDirectRawIngredient(i)} aria-label={lang==='ar'?'حذف المكون':'Remove ingredient'}><Trash2 className="h-4 w-4"/></button>}
-            </div>)}
-          </div>
-          {can('recipes.manage') && <div className="grid gap-2 sm:grid-cols-[1fr_100px_auto] sm:items-end">
-            <Select label={lang==='ar'?'إضافة خامة':'Add ingredient'} value={rawMaterialSel} onChange={e=>setRawMaterialSel(e.target.value)}>
-              <option value="">{lang==='ar'?'اختر خامة':'Choose ingredient'}</option>
-              {availableRawMaterialsToAdd.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
-            </Select>
-            <Input label={lang==='ar'?'الكمية':'Qty'} type="number" min="0.0001" step="0.0001"
-              value={rawMaterialQty} onChange={e=>setRawMaterialQty(Number(e.target.value)||0)}/>
-            <Button variant="outline" onClick={()=>{
-              if (!rawMaterialSel || rawMaterialQty<=0) return;
-              addDirectRawIngredient();
-              setForm(f=>({...f,product_type:'manufactured'}));
-            }} disabled={!rawMaterialSel || rawMaterialQty<=0}><Plus className="h-4 w-4"/>{t('add')}</Button>
-          </div>}
-          {!rawMaterialOptions.length && <p className="text-xs text-ui-muted">{lang==='ar'?'لا توجد خامات مسجلة في هذا الفرع. أضف الخامات من المخزون أولاً.':'No branch raw materials available. Register ingredients in inventory first.'}</p>}
+          {directIngredientFields}
           {(linkedInventoryUnits.length>0 || productComponents.length>0) && <p className="text-xs text-ui-muted">{lang==='ar'?'يوجد مكونات أو مجموعات متقدمة محفوظة، يمكن تعديلها من التفاصيل الإضافية.':'Existing advanced component groups can be edited under Advanced details.'}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={()=>{setIngredientsModalOpen(false);setQuickModalOpen(true);}}>{lang==='ar'?'رجوع':'Back'}</Button>
-            <Button onClick={()=>void save()}>{t('save')}</Button>
+            <Button onClick={()=>void save()} disabled={saving}>{t('save')}</Button>
           </div>
         </div>
       </Modal>
