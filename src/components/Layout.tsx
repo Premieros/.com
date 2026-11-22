@@ -158,7 +158,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
   // POS has a permanent top-bar shortcut. Reuse the exact same permission,
   // organization-module and route filters as every other navigation entry.
   const canOpenPos = visibleItems.some((item) => item.id === 'pos');
-  const canOpenSales = visibleItems.some((item) => item.id === 'sales-invoices');
+  const canOpenKitchen = visibleItems.some((item) => item.id === 'kitchen-display');
   const grouped = useMemo(() => visibleItems.reduce<Partial<Record<SidebarSection, typeof visibleItems>>>((acc, item) => {
     if (item.id === 'pos') return acc;
     const section = sidebarSectionForItem(item);
@@ -282,18 +282,18 @@ function AccountLayout({ children }: { children: ReactNode }) {
               <span className="hidden xl:inline">{ar ? 'نقطة البيع' : 'Point of Sale'}</span>
             </NavLink>
           )}
-          {canOpenSales && (
+          {canOpenKitchen && (
             <NavLink
-              data-testid="header-sales-shortcut"
-              to={APP_ROUTES.sales}
-              onPointerEnter={() => prefetchAppRoute(APP_ROUTES.sales)}
-              onFocus={() => prefetchAppRoute(APP_ROUTES.sales)}
-              aria-label={ar ? 'شاشة البيع' : 'Sales'}
-              title={ar ? 'شاشة البيع' : 'Sales'}
+              data-testid="header-kitchen-shortcut"
+              to={APP_ROUTES.kitchenDisplay}
+              onPointerEnter={() => prefetchAppRoute(APP_ROUTES.kitchenDisplay)}
+              onFocus={() => prefetchAppRoute(APP_ROUTES.kitchenDisplay)}
+              aria-label={ar ? 'شاشة المطبخ' : 'Kitchen Display'}
+              title={ar ? 'شاشة المطبخ' : 'Kitchen Display'}
               className={({ isActive }) => `flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl border border-ui-border bg-ui-surface px-2.5 text-xs font-bold text-ui-text shadow-ui-xs transition hover:bg-ui-page-alt active:scale-95 sm:px-3 ${isActive ? 'border-ui-primary text-ui-primary' : ''}`}
             >
-              <FileText className="h-4 w-4 shrink-0" />
-              <span className="hidden xl:inline">{ar ? 'شاشة البيع' : 'Sales'}</span>
+              <ChefHat className="h-4 w-4 shrink-0" />
+              <span className="hidden xl:inline">{ar ? 'شاشة المطبخ' : 'Kitchen Display'}</span>
             </NavLink>
           )}
         </div>
