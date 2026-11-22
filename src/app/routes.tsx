@@ -9,6 +9,7 @@ import { useOrganizationModules } from '@/core/modules/OrganizationModulesContex
 import { moduleForPath, moduleForRoute, type OrganizationModuleKey } from '@/core/modules/module.config';
 import { PageLoadFallback } from '@/components/PageProgressLoader';
 
+const DeliveryWorkspacePage = lazy(() => import('../features/operations/delivery/DeliveryWorkspacePage'));
 const LoginPage = lazy(() => import('../features/auth/pages/LoginPage').then(m => ({ default: m.LoginPage })));
 const RegisterPage = lazy(() => import('../features/auth/pages/RegisterPage').then(m => ({ default: m.RegisterPage })));
 const PublicSupportPage = lazy(() => import('../features/support/PublicSupportPage').then(m => ({ default: m.PublicSupportPage })));
@@ -204,7 +205,7 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.manufacturingCenter} element={<Navigate to={APP_ROUTES.inventoryUnits} replace />} />
         <Route path={APP_ROUTES.pos} element={<ProtectedRoute permission="pos.view" fullscreen><PosWorkspacePage /></ProtectedRoute>} />
         <Route path={`${APP_ROUTES.pos}/:orderId`} element={<ProtectedRoute permission="pos.view" fullscreen><PosWorkspacePage /></ProtectedRoute>} />
-        <Route path={APP_ROUTES.delivery} element={<ProtectedRoute permission="pos.view" fullscreen><Navigate to={APP_ROUTES.pos} replace state={{ startStep: 'delivery' }} /></ProtectedRoute>} />
+        <Route path={APP_ROUTES.delivery} element={<ProtectedRoute permission="pos.view"><DeliveryWorkspacePage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.driveThru} element={<ProtectedRoute permission="pos.view" fullscreen><Navigate to={APP_ROUTES.pos} replace state={{ startStep: 'car' }} /></ProtectedRoute>} />
         <Route path={APP_ROUTES.floorPlan} element={<ProtectedRoute permission="floor_plan.view"><ActiveOrdersPage /></ProtectedRoute>} />
         <Route path="/kitchen" element={<ProtectedRoute permission="pos.kds_view"><Navigate to={APP_ROUTES.kitchenDisplay} replace /></ProtectedRoute>} />

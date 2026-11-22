@@ -125,6 +125,28 @@ describe('full ERP/POS operating cycle', () => {
       expect((await client.query("select has_function_privilege('anon','public.customer_support_staff_list(uuid,uuid)','execute') allowed"))
         .rows[0].allowed).toBe(false);
 
+      const deliveryOrder = randomUUID();
+      await client.query("insert into public.orders(id,order_number,branch_id,order_type,cashier_id) values($1,$2,$3,'delivery',$4)",
+        [deliveryOrder, `CI-DEL-${token}`, branchId, userId]);
+      await client.query('SET LOCAL ROLE authenticated');
+      const deliveryDriver = (await client.query("select public.delivery_save_directory($1,'driver','CI driver') id", [branchId])).rows[0].id;
+      const deliveryService = (await client.query("select public.delivery_save_directory($1,'service','CI service') id", [branchId])).rows[0].id;
+      const dispatch = 'select public.delivery_update_dispatch($1,$2,$3,$4,$5,$6) result';
+      expect((await client.query(dispatch, [branchId, deliveryOrder, 0, 'assigned', deliveryService, deliveryDriver])).rows[0].result).toBe(1);
+      expect((await client.query(dispatch, [branchId, deliveryOrder, 1, 'on_the_way', deliveryService, deliveryDriver])).rows[0].result).toBe(2);
+      const desk = await client.query('select public.delivery_workspace($1) result', [branchId]);
+      expect(desk.rows[0].result.orders).toContainEqual(expect.objectContaining({
+        id: deliveryOrder, driver_id: deliveryDriver, service_id: deliveryService, dispatch_status: 'on_the_way',
+        order_status: 'open',
+      }));
+      await client.query('SAVEPOINT stale_dispatch');
+      await expect(client.query(dispatch, [branchId, deliveryOrder, 1, 'delivered', deliveryService, deliveryDriver]))
+        .rejects.toThrow('DELIVERY_REFRESH_REQUIRED');
+      await client.query('ROLLBACK TO SAVEPOINT stale_dispatch');
+      expect((await client.query(dispatch, [branchId, deliveryOrder, 2, 'delivered', deliveryService, deliveryDriver])).rows[0].result).toBe(3);
+      await client.query('RESET ROLE');
+      expect((await client.query('select status from public.orders where id=$1', [deliveryOrder])).rows[0].status).toBe('open');
+
       const atomicSku = `CI-ATOMIC-${token}`;
       const atomicProduct = { p_name: 'CI Product With Ingredients', p_branch_id: branchId, p_sku: atomicSku, p_sale_price: 15 };
       await client.query('SAVEPOINT invalid_product_recipe');

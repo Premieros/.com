@@ -47,6 +47,7 @@ interface DataTableProps<T> {
   }>;
   /** Set false for embedded detail tables. */
   internalScroll?: boolean;
+  fitColumns?: boolean;
 }
 
 type ColumnFilterState = {
@@ -111,6 +112,7 @@ export function DataTable<T extends { id?: string }>({
   importAccept = '.xlsx,.xls,.csv',
   columnTotals,
   internalScroll = true,
+  fitColumns = false,
 }: DataTableProps<T>) {
   const branchScope = useBranchScope();
   const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
@@ -766,11 +768,11 @@ export function DataTable<T extends { id?: string }>({
       </div>
 
       <div data-testid="data-table-scroll" data-table-viewport={internalScroll ? '' : undefined} role="region" aria-label={isRtl ? 'صفوف الجدول القابلة للتمرير' : 'Scrollable table rows'} tabIndex={0} className={`ui-accent-top ui-accent-neutral hidden max-w-full overflow-auto overscroll-contain rounded-xl border border-ui-border bg-ui-surface shadow-ui-sm [scrollbar-gutter:stable] sm:block `}>
-        <table className="w-full min-w-max text-sm">
+        <table className={`w-full text-sm ${fitColumns ? 'table-fixed' : 'min-w-max'}`}>
           <thead className="sticky top-0 z-20 bg-ui-page-alt">
             <tr className="border-b border-ui-border bg-ui-page-alt">
               {showCheckbox && (
-                <th className="sticky top-0 z-20 w-10 bg-ui-page-alt px-4 py-3">
+                <th className={`sticky top-0 z-20 bg-ui-page-alt ${fitColumns ? 'w-9 px-2 py-2' : 'w-10 px-4 py-3'}`}>
                   <input type="checkbox" checked={!!allSelected} onChange={toggleAll}
                     className="h-4 w-4 rounded border-ui-border-strong text-ui-primary focus:ring-ui-ring" />
                 </th>
@@ -778,7 +780,7 @@ export function DataTable<T extends { id?: string }>({
               {visibleColumns.map((col, index) => (
                 <th
                   key={col.key}
-                  className={`sticky top-0 z-20 whitespace-nowrap bg-ui-page-alt px-4 py-3 text-start text-xs font-extrabold uppercase tracking-wide text-ui-text ${index === 0 && !showCheckbox ? 'start-0 z-30' : ''} ${col.className || ''}`}
+                  className={`sticky top-0 z-20 bg-ui-page-alt text-start text-xs font-extrabold uppercase tracking-wide text-ui-text ${fitColumns ? 'whitespace-normal px-2 py-2' : 'whitespace-nowrap px-4 py-3'} ${index === 0 && !showCheckbox ? 'start-0 z-30' : ''} ${col.className || ''}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span>{col.header}</span>
@@ -807,14 +809,14 @@ export function DataTable<T extends { id?: string }>({
                 className={`hover:bg-ui-page-alt/60 transition-colors duration-150 ${onRowClick ? 'cursor-pointer' : ''} ${selectedIds?.has(row.id || '') ? 'bg-ui-primary-soft/50' : ''}`}
               >
                 {showCheckbox && (
-                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                  <td className={fitColumns ? 'px-2 py-2' : 'px-4 py-3'} onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={!!(row.id && selectedIds?.has(row.id))}
                       onChange={() => row.id && toggleRow(row.id)}
                       className="h-4 w-4 rounded border-ui-border-strong text-ui-primary focus:ring-ui-ring" />
                   </td>
                 )}
                 {visibleColumns.map((col, index) => (
-                  <td key={col.key} className={`px-4 py-3 font-medium text-ui-text ${index === 0 && !showCheckbox ? 'sticky start-0 z-[1] bg-ui-surface' : ''} ${col.className || ''}`}>
+                  <td key={col.key} className={`font-medium text-ui-text ${fitColumns ? 'break-words px-2 py-2' : 'px-4 py-3'} ${index === 0 && !showCheckbox ? 'sticky start-0 z-[1] bg-ui-surface' : ''} ${col.className || ''}`}>
                     {renderCell(row, col)}
                   </td>
                 ))}
@@ -828,7 +830,7 @@ export function DataTable<T extends { id?: string }>({
                 {visibleColumns.map((column, index) => {
                   const total = visibleTotals.find((entry) => entry.key === column.key);
                   return (
-                    <td key={column.key} className={`whitespace-nowrap px-4 py-2 font-bold tabular-nums text-ui-text ${index === 0 && !showCheckbox ? 'sticky start-0 bg-ui-page-alt' : ''} ${column.className || ''}`}>
+                    <td key={column.key} className={`font-bold tabular-nums text-ui-text ${fitColumns ? 'break-words px-2 py-2' : 'whitespace-nowrap px-4 py-2'} ${index === 0 && !showCheckbox ? 'sticky start-0 bg-ui-page-alt' : ''} ${column.className || ''}`}>
                       {index === 0 && !total && (isRtl ? 'إجمالي الصفوف المعروضة' : 'Visible rows total')}
                       {total && <span data-testid={`data-table-total-${total.key}`} aria-label={total.label}>{total.format(total.sum)}</span>}
                     </td>
