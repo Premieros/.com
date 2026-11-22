@@ -36,6 +36,7 @@ interface SaleRow {
   subtotal: number;
   discount_amount: number;
   tax_amount: number;
+  delivery_fee_amount?: number;
   total: number;
   paid_amount: number;
   refunded_amount: number;
@@ -65,7 +66,7 @@ export function SalesPage() {
   const canViewSales = can('sales.view');
   const { rows: items, loading, error, total, hasMore, loadMore, loadingMore, refresh: reloadSales } = usePaginatedRows<SaleRow>({
     table: 'sales',
-    select: 'id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))',
+    select: 'id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, delivery_fee_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
     filters: [{ column: 'is_archived', value: false }],
@@ -216,6 +217,7 @@ export function SalesPage() {
       subtotal: Number(sale.subtotal || 0),
       discount: Number(sale.discount_amount || 0),
       tax: Number(sale.tax_amount || 0),
+      deliveryFee: Number(sale.delivery_fee_amount || 0),
       total: Number(sale.total || 0),
       paid: Number(sale.paid_amount || 0),
       change: Math.max(0, Number(sale.paid_amount || 0) - Number(sale.total || 0)),
@@ -317,7 +319,7 @@ export function SalesPage() {
     setSourceLookup('loading');
     (async () => {
       const { data, error: lookupError } = await supabase.from('sales')
-        .select('id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))')
+        .select('id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, delivery_fee_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))')
         .eq('id', requestedSaleId)
         .in('branch_id', branchScope.selectedBranchIds)
         .eq('is_archived', false)

@@ -813,6 +813,7 @@ export function PosWorkspacePage() {
       subtotal={pos.subtotal}
       discountValue={pos.discountValue}
       taxAmount={pos.taxAmount}
+      deliveryFee={pos.deliveryFee}
       total={pos.total}
       change={pos.change}
       completing={pos.completing}
