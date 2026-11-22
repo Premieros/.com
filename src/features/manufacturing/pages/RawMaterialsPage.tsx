@@ -123,7 +123,10 @@ export function RawMaterialsPage() {
   };
 
   const save = async () => {
-    if (!form.code.trim() || !form.name.trim()) { show(t('required'), 'error'); return; }
+    if (!form.name.trim() || !form.code.trim()) {
+      show(isAr ? 'أدخل اسم الخامة وكودها قبل الحفظ.' : 'Enter the raw material name and code before saving.', 'error');
+      return;
+    }
     if (!form.id && !form.unit_id) {
       show(isAr ? 'وحدة قياس الخامة مطلوبة عند الإنشاء' : 'Raw-material measurement unit is required on creation', 'error');
       return;
@@ -302,8 +305,8 @@ export function RawMaterialsPage() {
 
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={form.id ? t('editRawMaterial') : t('addRawMaterial')} size="lg">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <Input label={t('materialName')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-          <Input label={t('code')} value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="RM-001" />
+          <Input label={t('materialName')} required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+          <Input label={t('code')} required value={form.code} onChange={(e) => setForm({ ...form, code: e.target.value })} placeholder="RM-001" />
           {form.id ? (
             <div data-testid="raw-material-measurement-unit-locked"><label className="block text-sm font-medium text-ui-muted mb-1">{isAr ? 'وحدة القياس' : 'Measurement unit'}</label><div className="min-h-11 flex items-center rounded-lg border border-ui-border bg-ui-page-alt px-3 text-sm font-semibold text-ui-text">{unitLabel(form.unit_id)}<span className="ms-2 text-xs font-normal text-ui-subtle">{isAr ? 'ثابتة' : 'locked'}</span></div></div>
           ) : (
