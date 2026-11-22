@@ -22,12 +22,15 @@ describe('customer phone entry and recovery', () => {
     fireEvent.click(screen.getByRole('button', { name: 'متابعة' }));
     fireEvent.change(screen.getByLabelText('عنوان التوصيل'), { target: { value: 'عنوان توصيل واضح' } });
     fireEvent.click(await screen.findByRole('button', { name: 'دخول المنيو' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'التصنيفات' }));
+    expect(screen.getByRole('button', { name: 'التصنيفات' })).toHaveAttribute('aria-current', 'page');
     fireEvent.click(await screen.findByRole('button', { name: 'إضافة Tea' }));
     fireEvent.click(screen.getByRole('button', { name: /أضف إلى السلة/ }));
     fireEvent.click(screen.getByRole('button', { name: /فتح السلة/ }));
     expect(screen.queryByLabelText('رمز استرجاع الطلب')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'إرسال الطلب للموظف' }));
     expect(await screen.findByText('07')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'طلبي وحسابي' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByText(/احتفظ به لفتح طلبك/)).toBeInTheDocument();
     expect(mocks.rpc.mock.calls.find(([name]) => name === 'qr_guest_place')?.[1]).toMatchObject({ p_table: null });
     expect(mocks.rpc.mock.calls.some(([name]) => name === 'qr_guest_resume')).toBe(false);
