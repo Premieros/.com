@@ -613,23 +613,23 @@ export function SalesPage() {
   const PAYMENT_LABELS: Record<string, string> = { cash: t('cash'), card: t('card'), transfer: t('transfer'), credit: t('credit') };
 
   const columns: Column<SaleRow>[] = [
-    { key: 'invoice_number', header: t('invoiceNumber'), className: 'min-w-44', mobilePriority: true, render: (r) => (
-      <div className="flex items-center gap-3 min-w-0">
+    { key: 'invoice_number', header: isAr ? 'رقم الفاتورة' : 'Invoice', className: 'w-[14%]', mobilePriority: true, render: (r) => (
+      <div className="flex items-center gap-1.5 min-w-0">
         <FileText className="h-4 w-4 shrink-0 text-brand-500" />
         <div className="min-w-0">
-          <div className="font-bold text-ui-text whitespace-nowrap" dir="auto">{r.invoice_number}</div>
+          <div className="font-bold text-ui-text break-words" dir="auto">{r.invoice_number}</div>
           {r.source_order?.order_number && (
-            <div className="text-xs font-medium text-ui-subtle whitespace-nowrap">
+            <div className="text-xs font-medium text-ui-subtle break-words">
               {isAr ? 'طلب' : 'Order'}: {r.source_order.order_number}
             </div>
           )}
         </div>
       </div>
     )},
-    { key: 'branch', header: t('branch'), className: 'min-w-36', render: (r) => <BranchBadge name={branches.find((b) => b.id === r.branch_id)?.name || '-'} /> },
-    { key: 'customer', header: t('customer'), className: 'min-w-40', render: (r) => <span className="block max-w-60 truncate font-medium" title={r.customer?.name || ''}>{r.customer?.name || '-'}</span> },
-    { key: 'status', header: t('status'), className: 'min-w-28', render: (r) => (
-      <div className="flex items-center gap-1.5 whitespace-nowrap">
+    { key: 'branch', header: t('branch'), className: 'w-[10%]', render: (r) => <BranchBadge name={branches.find((b) => b.id === r.branch_id)?.name || '-'} /> },
+    { key: 'customer', header: t('customer'), className: 'w-[13%]', render: (r) => <span className="block max-w-60 truncate font-medium" title={r.customer?.name || ''}>{r.customer?.name || '-'}</span> },
+    { key: 'status', header: t('status'), className: 'w-[10%]', render: (r) => (
+      <div className="flex items-center gap-1.5 break-words">
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
           r.status === 'completed' ? 'bg-ui-success-soft text-ui-success' :
           r.status === 'returned' ? 'bg-ui-danger-soft text-ui-danger' :
@@ -644,17 +644,17 @@ export function SalesPage() {
         )}
       </div>
     )},
-    { key: 'order_type', header: isAr ? 'المصدر' : 'Source', className: 'min-w-28', render: (r) => <span className="text-ui-muted">{orderTypeLabelForSale(r.order_type) || '-'}</span> },
-    { key: 'total', header: t('total'), className: 'min-w-32 whitespace-nowrap text-end tabular-nums', mobilePriority: true, render: (r) => <span className="font-bold text-ui-text">{formatCurrency(r.total, currency, lang)}</span> },
-    { key: 'paid_amount', header: isAr ? 'المدفوع' : 'Paid', className: 'min-w-28 whitespace-nowrap text-end tabular-nums', render: (r) => formatCurrency(r.paid_amount, currency, lang) },
-    { key: 'payment_method', header: isAr ? 'طريقة الدفع' : 'Payment', className: 'min-w-28', render: (r) => (
-      <span className="whitespace-nowrap rounded-full bg-ui-page-alt px-2.5 py-1 text-xs font-medium text-ui-muted">
+    { key: 'order_type', header: isAr ? 'المصدر' : 'Source', className: 'w-[10%]', render: (r) => <span className="text-ui-muted">{orderTypeLabelForSale(r.order_type) || '-'}</span> },
+    { key: 'total', header: t('total'), className: 'w-[10%] break-words text-end tabular-nums', mobilePriority: true, render: (r) => <span className="font-bold text-ui-text">{formatFinancialCurrency(r.total, currency, lang)}</span> },
+    { key: 'paid_amount', header: isAr ? 'المدفوع' : 'Paid', className: 'w-[10%] break-words text-end tabular-nums', render: (r) => formatFinancialCurrency(r.paid_amount, currency, lang) },
+    { key: 'payment_method', header: isAr ? 'طريقة الدفع' : 'Payment', className: 'w-[10%]', render: (r) => (
+      <span className="break-words rounded-full bg-ui-page-alt px-2.5 py-1 text-xs font-medium text-ui-muted">
         {PAYMENT_LABELS[r.payment_method] || r.payment_method}
       </span>
     )},
-    { key: 'created_at', header: isAr ? 'تاريخ ووقت الإنشاء' : 'Created at', className: 'min-w-44 whitespace-nowrap', render: (r) => <span className="text-sm text-ui-subtle tabular-nums">{formatDateTime(r.created_at, lang)}</span> },
+    { key: 'created_at', header: isAr ? 'التاريخ والوقت' : 'Created at', className: 'w-[14%] break-words', render: (r) => <span className="text-sm text-ui-subtle tabular-nums">{formatDateTime(r.created_at, lang)}</span> },
     { key: 'actions', header: t('actions'), render: (r) => (
-      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
+      <div className="flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
         {canPreviewReceipt && (
           <button
             onClick={() => void previewSaleReceipt(r)}
@@ -787,10 +787,10 @@ export function SalesPage() {
             {isAr ? `المعروض: ${filtered.length} من ${items.length} محمّلة` : `Showing ${filtered.length} of ${items.length} loaded`}
           </span>
         </div>
-        <div className="min-w-0 px-3 py-3 sm:px-4 sales-invoices-layout [&_table]:w-full [&_thead_tr]:bg-ui-page-alt/60 [&_th]:px-4 [&_th]:py-4 [&_tbody_tr]:h-[68px] [&_tbody_tr]:hover:bg-ui-page-alt/60 [&_td]:px-4 [&_td]:py-4">
+        <div className="min-w-0 px-3 py-3 sm:px-4 sales-invoices-layout">
           <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')}
             onRowClick={openViewSale} showCheckbox selectedIds={selectedIds} onSelectionChange={setSelectedIds}
-            tableId="sales-invoices-layout"
+            tableId="sales-invoices-layout" fitColumns
             columnTotals={branchScope.selectedBranchIds.length === 1 ? [
               { key: 'total', label: isAr ? 'إجمالي الفواتير المعروضة' : 'Visible invoices total', value: (row) => Number(row.total), format: (sum) => formatFinancialCurrency(sum, currency, lang) },
               { key: 'paid_amount', label: isAr ? 'إجمالي المدفوع المعروض' : 'Visible paid total', value: (row) => Number(row.paid_amount), format: (sum) => formatFinancialCurrency(sum, currency, lang) },
