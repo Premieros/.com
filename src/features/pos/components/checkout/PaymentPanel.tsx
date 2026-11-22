@@ -45,6 +45,7 @@ interface PaymentPanelProps {
   subtotal: number;
   discountValue: number;
   taxAmount: number;
+  deliveryFee?: number;
   total: number;
   change: number;
   completing: boolean;
@@ -360,6 +361,7 @@ export function PaymentPanel(p: PaymentPanelProps) {
               <div className="flex items-center justify-between"><span className="text-ui-muted">{t('subtotal')}</span><span className="font-bold">{formatFinancialCurrency(p.subtotal, p.currency, lang)}</span></div>
               {p.discountValue > 0 && <div className="flex items-center justify-between"><span className="text-ui-muted">{t('discount')}</span><span className="font-bold text-ui-danger">−{formatFinancialCurrency(p.discountValue, p.currency, lang)}</span></div>}
               {p.taxAmount > 0 && <div className="flex items-center justify-between"><span className="text-ui-muted">{t('tax')}</span><span className="font-bold">{formatFinancialCurrency(p.taxAmount, p.currency, lang)}</span></div>}
+              {!!p.deliveryFee && <div className="flex items-center justify-between"><span>{isAr ? 'رسوم التوصيل' : 'Delivery fee'}</span><span className="font-bold">{formatFinancialCurrency(p.deliveryFee, p.currency, lang)}</span></div>}
               <div className="flex items-center justify-between border-t border-ui-border pt-2 text-base"><span className="font-black">{t('total')}</span><span className="font-black text-ui-accent">{formatFinancialCurrency(p.total, p.currency, lang)}</span></div>
             </div>
           </div>

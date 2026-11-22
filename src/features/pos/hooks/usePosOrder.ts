@@ -1,6 +1,7 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/api';
 import * as api from '@/api';
+import { userFacingErrorMessage } from '@/lib/userFacingError';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
 import { cartToItems, type ItemPayload } from '../utils/cart';
@@ -108,6 +109,7 @@ export function usePosOrder(input: UsePosOrderInput) {
     subtotal: preview.subtotal,
     discount: preview.discount_amount,
     tax: preview.tax_amount,
+    deliveryFee: preview.delivery_fee_amount,
     total: preview.total,
     paid,
     change: Math.max(paid - preview.total, 0),
@@ -186,11 +188,11 @@ export function usePosOrder(input: UsePosOrderInput) {
     if (error || !preview?.has_payable_items) {
       show(error === 'SETTLEMENT_PREVIEW_SCOPE_MISMATCH'
         ? (isAr ? 'تغير الطلب أو الفرع أثناء تجهيز الحساب. أعد فتح التحصيل للطلب الحالي.' : 'Order or branch changed while preparing payment. Reopen checkout for the current order.')
-        : (error || (isAr ? 'لا توجد أصناف مرسلة للمطبخ جاهزة للتحصيل' : 'No sent kitchen items are ready for settlement')), 'error');
+        : error === 'DELIVERY_FEE_REQUIRED' ? userFacingErrorMessage(error, lang) : (error || (isAr ? 'لا توجد أصناف مرسلة للمطبخ جاهزة للتحصيل' : 'No sent kitchen items are ready for settlement')), 'error');
       return null;
     }
     return preview;
-  }, [base.activeOrderId, isAr, loadScopedSettlementPreview, saveOpenOrderSnapshot, show]);
+  }, [base.activeOrderId, isAr, lang, loadScopedSettlementPreview, saveOpenOrderSnapshot, show]);
 
   const transferOrderToTable = useCallback(async (
     targetOrderId: string,
@@ -502,6 +504,7 @@ export function usePosOrder(input: UsePosOrderInput) {
   return {
     ...base,
     ...settlementTotals,
+    deliveryFee: settlementPreview?.delivery_fee_amount ?? 0,
     completing: base.completing || offlineCompleting,
     checkoutOpen: base.checkoutOpen,
     setCheckoutOpen,

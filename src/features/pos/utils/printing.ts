@@ -21,6 +21,7 @@ export interface ReceiptData {
   subtotal: number;
   discount: number;
   tax: number;
+  deliveryFee?: number;
   total: number;
   paid: number;
   change: number;
@@ -287,6 +288,7 @@ export function buildReceiptFixedTemplate(
   ];
   if (receipt.discount > 0) totals.push({ label: isAr ? 'الخصم' : 'Discount', value: `-${thermalMoney(receipt.discount, currency)}` });
   if (s.receipt_show_tax !== false && receipt.tax > 0) totals.push({ label: isAr ? 'الضريبة' : 'Tax', value: thermalMoney(receipt.tax, currency) });
+  if (receipt.deliveryFee) totals.push({ label: isAr ? 'رسوم التوصيل' : 'Delivery fee', value: thermalMoney(receipt.deliveryFee, currency) });
   totals.push({ label: isAr ? 'الإجمالي' : 'TOTAL', value: thermalMoney(receipt.total, currency), emphasis: true });
 
   if (!receipt.isOpenOrder && !receipt.hidePaymentSummary) {
@@ -381,6 +383,7 @@ export function buildReceiptThermalText(receipt: ReceiptData, s: Settings, _lang
   moneyRow(isAr ? 'المجموع الفرعي' : 'SUBTOTAL', thermalMoney(receipt.subtotal, currency));
   if (receipt.discount > 0) moneyRow(isAr ? 'الخصم' : 'DISCOUNT', `-${thermalMoney(receipt.discount, currency)}`);
   if (s.receipt_show_tax !== false && receipt.tax > 0) moneyRow(isAr ? 'الضريبة' : 'TAX', thermalMoney(receipt.tax, currency));
+  if (receipt.deliveryFee) moneyRow(isAr ? 'رسوم التوصيل' : 'DELIVERY FEE', thermalMoney(receipt.deliveryFee, currency));
   moneyRow(isAr ? 'الإجمالي' : 'TOTAL', thermalMoney(receipt.total, currency));
 
   if (!receipt.isOpenOrder && !receipt.hidePaymentSummary) {

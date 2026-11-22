@@ -1,3 +1,4 @@
+import { DeliveryFeeEditor } from './DeliveryFeeEditor';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRightLeft,
@@ -478,6 +479,7 @@ export function CurrentOrderPanel({
 
       {!empty && (
         <div className="shrink-0 border-t border-ui-border p-3">
+          {orderType === 'delivery' && activeOrderId && <DeliveryFeeEditor key={activeOrderId} orderId={activeOrderId} currency={currency} canEdit={perms.canEditOrder} itemsTotal={total} />}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <div className="rounded-xl border border-ui-border bg-ui-page-alt p-2"><p className="text-[10px] font-bold text-ui-muted">{t('subtotal')}</p><p className="mt-0.5 truncate text-xs font-black text-ui-text">{formatFinancialCurrency(subtotal, currency, lang)}</p></div>
             <div className="rounded-xl bg-ui-page-alt p-2"><p className="text-[9px] font-bold text-ui-subtle">{t('discount')}</p><p data-testid="pos-discount-value" className="mt-0.5 truncate text-xs font-black text-ui-text">{formatFinancialCurrency(discountValue, currency, lang)}</p></div>
