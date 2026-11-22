@@ -1,3 +1,4 @@
+import { optimizePhoto } from '@/lib/optimizePhoto';
 import {supabase} from '@/api';
 
 export const BUNKER_BRANCH = 'd56aae83-f1b3-4153-9224-87594500368d';
@@ -54,13 +55,14 @@ export async function executeWebsiteEdit(request:EditorRequest) {
    if(!(file instanceof File) || !['image/jpeg','image/png','image/webp'].includes(file.type) || file.size>5*1024*1024 || !file.size) throw new Error('اختر صورة JPG أو PNG أو WebP بحجم لا يتجاوز 5 ميجابايت.');
    // Read the file received from the site window before starting the Storage request.
    // Send the image bytes directly instead of letting fetch read a cross-window File.
-   const bytes=await file.arrayBuffer().catch(()=>{
+   const photo=await optimizePhoto(file,1600);
+   const bytes=await photo.arrayBuffer().catch(()=>{
     throw new Error('تعذرت قراءة الصورة. أعد اختيارها من جهازك.');
    });
-   const ext=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
+   const ext=photo.type==='image/png'?'png':photo.type==='image/webp'?'webp':'jpg';
    const path=`${BUNKER_BRANCH}/${request.key}/${crypto.randomUUID()}.${ext}`;
    const bucket=supabase.storage.from('branch-website-photos');
-   checked(await bucket.upload(path,bytes,{contentType:file.type,upsert:false,cacheControl:'3600'}));
+   checked(await bucket.upload(path,bytes,{contentType:photo.type,upsert:false,cacheControl:'3600'}));
    url=bucket.getPublicUrl(path).data.publicUrl;
   } else {
    if(typeof request.value!=='string' || request.value.length>1500)throw new Error('رابط الصورة غير صالح.');

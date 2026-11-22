@@ -10,6 +10,7 @@ interface ProductImageProps {
   positionX?: number | null;
   positionY?: number | null;
   zoom?: number | null;
+  priority?: boolean;
 }
 
 const VISUALS: Array<{ terms: string[]; emoji: string; label: string }> = [
@@ -90,7 +91,7 @@ function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value));
 }
 
-export function ProductImage({ src, name, category, className = '', imgClassName = '', alt, positionX = 0, positionY = 0, zoom = 1 }: ProductImageProps) {
+export function ProductImage({ src, name, category, className = '', imgClassName = '', alt, positionX = 0, positionY = 0, zoom = 1, priority = false }: ProductImageProps) {
   const [failed, setFailed] = useState(false);
   useEffect(() => setFailed(false), [src]);
 
@@ -135,7 +136,9 @@ export function ProductImage({ src, name, category, className = '', imgClassName
           src={src}
           alt={alt || name || ''}
           className={imgClassName || 'h-full w-full object-contain'}
-          loading="lazy"
+          loading={priority ? 'eager' : 'lazy'}
+          fetchPriority={priority ? 'high' : undefined}
+          decoding="async"
           onError={() => setFailed(true)}
           style={{ transform, transformOrigin: 'center' }}
         />
