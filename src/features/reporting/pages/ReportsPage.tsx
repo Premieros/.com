@@ -4,6 +4,7 @@ import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, T
 import { Download, TrendingUp, ShoppingCart, Receipt, Package, BarChart3, CreditCard, Users, List, Layers, AlertTriangle, FileDown, Printer, UserCheck, RotateCcw, Trash2 } from 'lucide-react';
 import { costing, reporting, supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
+import { useTableViewport } from '@/components/useTableViewport';
 import { PageHeader, Card } from '@/components/PageHeader';
 import { Button } from '@/components/Button';
 import { formatFinancialCurrency, formatDate, formatPercent, todayISO } from '@/lib/format';
@@ -162,7 +163,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     [branchColumn]: branchNameById(branchId),
   });
   const { effectiveSettings } = useSettings();
-  const currency = effectiveSettings(branchFilter)?.currency || 'EGP';
+  const currency = effectiveSettings(effectiveBranchFilter || branchFilter)?.currency || 'EGP';
   const { visibleColumns, toggleColumn, showAllColumns, restoreVisibleColumns, columnOrder, moveColumn, resetColumnOrder } = useColumnPreferences(reportType);
   const { savedReports, saveReport, deleteReport } = useCustomReports();
   const reportBranchLabel = reportBranchIds.length === 1
@@ -1313,6 +1314,21 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     }
   };
 
+  // Aggregate only columns whose values are additive across report rows.
+  const reportRowsRef = useTableViewport(!loading && presentedRows.length > 0);
+  const nonAdditiveMoneyColumns = new Set([
+    'متوسط الفاتورة', 'Avg Invoice', 'Avg Order', 'سعر البيع', 'Sale Price', 'الهامش', 'Margin',
+    'تكلفة الوحدة', 'Unit Cost', 'تكلفة الوحدة الحالية FIFO', 'Current FIFO Unit Cost',
+    'آخر تكلفة معتمدة', 'Latest Authoritative Cost', 'تكلفة الوحدة للمقارنة', 'Comparison Unit Cost',
+  ]);
+  const totalsByColumn = new Map(columns.flatMap((key) => {
+    if (reportBranchIds.length !== 1 || !moneyKeys.includes(key) || nonAdditiveMoneyColumns.has(key)) return [];
+    const values = presentedRows.map((row) => row[key]);
+    if (!values.length || !values.every((value): value is number => typeof value === 'number' && Number.isFinite(value))) return [];
+    return [[key, values.reduce((sum, value) => sum + value, 0)] as const];
+  }));
+  const reportTotalLabel = lang === 'ar' ? 'إجمالي النتائج المعروضة' : 'Filtered results total';
+
   const renderReportCell = (row: Record<string, unknown>, key: string) => {
     const value = row[key];
     const display = typeof value === 'number' && moneyKeys.includes(key)
@@ -1490,8 +1506,9 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
           financial truth from a partial table/page or unrelated SQL. */}
       {['sales_by_payment', 'sales_by_product', 'sales_by_employee', 'cashier_performance'].includes(reportType)
         && !loading && !reportError && chartData.length > 0 && (
-        <section className="mb-3 rounded-xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm" aria-label={lang === 'ar' ? 'رسم بياني للتقرير' : 'Report chart'} data-testid="premier-report-chart">
-          <div className="mb-3">
+        <details className="mb-3 rounded-xl border border-ui-border bg-ui-surface p-3 shadow-ui-sm" aria-label={lang === 'ar' ? 'رسم بياني للتقرير' : 'Report chart'} data-testid="premier-report-chart">
+          <summary className="cursor-pointer text-sm font-semibold">{lang === 'ar' ? 'عرض الرسم البياني' : 'Show report chart'}</summary>
+          <div className="mb-3 mt-3">
             <h3 className="text-sm font-bold text-ui-text">{lang === 'ar' ? 'تحليل بصري من نفس بيانات التقرير' : 'Chart from the same report source'}</h3>
             <p className="mt-1 text-xs text-ui-muted">{lang === 'ar'
               ? 'يعرض السجلات/التجميعات التي يعيدها مصدر التقرير الحالي فقط، وليس إجماليًا مستقلًا.'
@@ -1508,7 +1525,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
               </RechartsBarChart>
             </ResponsiveContainer>
           </div>
-        </section>
+        </details>
       )}
 
       <Card className="p-4 border-ui-border bg-ui-surface shadow-ui">
@@ -1548,8 +1565,8 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
               ? (lang === 'ar' ? 'فشل تحميل التقرير — راجع رسالة الخطأ بالأعلى.' : 'Report failed — see the error above.')
               : (lang === 'ar' ? `لا توجد سجلات فعلية لهذا التقرير في الفترة ${from} إلى ${to} ونطاق الفروع الحالي. جرّب توسيع الفترة أو تغيير الفرع.` : `No records exist for this report from ${from} to ${to} within the current branch scope. Try another period or branch.`)}</div>
         ) : (
-          <div>
-            <div data-testid="reports-mobile-results" className="space-y-2 sm:hidden">
+          <div ref={reportRowsRef}>
+            <div data-testid="reports-mobile-results" data-table-viewport="" className="space-y-2 overflow-y-auto overscroll-contain sm:hidden">
               {pagedRows.rows.map((row, index) => (
                 <article key={index} className="rounded-xl border border-ui-border bg-ui-surface p-3 shadow-ui-sm">
                   <dl className="divide-y divide-ui-border">
@@ -1589,13 +1606,13 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
               ))}
             </div>
 
-            <div className="hidden overflow-x-auto sm:block">
+            <div data-table-viewport="" className="hidden overflow-auto overscroll-contain sm:block">
               <table className="w-full min-w-max text-sm" data-testid="report-results-table">
                 <thead className="sticky top-0 z-10 bg-ui-page-alt">
                   <tr className="border-b border-ui-border">
                     {columns.map((key, columnIndex) => (
                       <th key={key} scope="col" aria-sort={tableSort === key ? (tableSortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-                        className={`px-3 py-2 text-start text-xs font-bold text-ui-muted ${columnIndex === 0 ? 'min-w-[190px]' : 'whitespace-nowrap'}`}>
+                        className={`px-3 py-2 text-start text-xs font-bold text-ui-muted ${columnIndex === 0 ? 'sticky start-0 z-10 min-w-[190px] bg-ui-page-alt' : 'whitespace-nowrap'}`}>
                         <button type="button" onClick={() => changeSort(key)}
                           className="inline-flex items-center gap-1 hover:text-ui-primary"
                           aria-label={lang === 'ar' ? `ترتيب حسب ${key}` : `Sort by ${key}`}>
@@ -1611,7 +1628,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
                       {columns.map((key, columnIndex) => {
 
                         return (
-                          <td key={columnIndex} data-primary={columnIndex === 0} className={`px-3 py-2.5 text-ui-text ${columnIndex === 0 ? 'font-semibold' : 'tabular-nums'}`}>
+                          <td key={columnIndex} data-primary={columnIndex === 0} className={`px-3 py-2.5 text-ui-text ${columnIndex === 0 ? 'sticky start-0 bg-ui-surface font-semibold' : 'tabular-nums'}`}>
                             {renderReportCell(row, key)}
                           </td>
                         );
@@ -1619,8 +1636,26 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
                     </tr>
                   ))}
                 </tbody>
+                {totalsByColumn.size > 0 && (
+                  <tfoot className="sticky bottom-0 z-[5] border-t-2 border-ui-border bg-ui-page-alt">
+                    <tr>
+                      {columns.map((key, index) => (
+                        <td key={key} className={`whitespace-nowrap px-3 py-2 font-bold tabular-nums ${index === 0 ? 'sticky start-0 bg-ui-page-alt' : ''}`}>
+                          {totalsByColumn.has(key) ? formatFinancialCurrency(totalsByColumn.get(key), currency, lang) : index === 0 ? reportTotalLabel : null}
+                        </td>
+                      ))}
+                    </tr>
+                  </tfoot>
+                )}
               </table>
             </div>
+            {totalsByColumn.size > 0 && (
+              <dl className="mt-2 space-y-1 border-t border-ui-border px-2 py-2 text-xs sm:hidden" aria-label={reportTotalLabel}>
+                {[...totalsByColumn].map(([key, value]) => (
+                  <div key={key} className="flex justify-between gap-2"><dt>{key}</dt><dd className="font-bold">{formatFinancialCurrency(value, currency, lang)}</dd></div>
+                ))}
+              </dl>
+            )}
             {pagedRows.totalPages > 1 && (
               <nav className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-ui-border pt-3 text-xs text-ui-muted" aria-label={lang === 'ar' ? 'صفحات نتائج التقرير' : 'Report result pages'} data-testid="report-table-pagination">
                 <span>{lang === 'ar' ? `الصفحة ${pagedRows.page} من ${pagedRows.totalPages}` : `Page ${pagedRows.page} of ${pagedRows.totalPages}`}</span>

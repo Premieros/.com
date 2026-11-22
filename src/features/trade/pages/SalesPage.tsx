@@ -12,7 +12,7 @@ import { Select, Textarea } from '@/components/Input';
 import { Modal } from '@/components/Modal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { BranchBadge } from '@/components/BranchBadge';
-import { formatCurrency, formatDateTime } from '@/lib/format';
+import { formatFinancialCurrency, formatCurrency, formatDateTime } from '@/lib/format';
 import { logAudit } from '@/lib/audit';
 import { useBranchFilter } from '@/lib/useBranchFilter';
 import { useBranchScope } from '@/lib/branchScope';
@@ -80,7 +80,7 @@ export function SalesPage() {
   const [deleteSelectedConfirm, setDeleteSelectedConfirm] = useState(false);
   const { effectiveSettings } = useSettings();
   const { branches } = useBranches();
-  const currency = effectiveSettings(branchFilter)?.currency || 'EGP';
+  const currency = effectiveSettings(branchScope.selectedBranchIds.length === 1 ? branchScope.selectedBranchIds[0] : branchFilter)?.currency || 'EGP';
   const [viewSale, setViewSale] = useState<SaleRow | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customersBranchId, setCustomersBranchId] = useState('');
@@ -791,10 +791,10 @@ export function SalesPage() {
           <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')}
             onRowClick={openViewSale} showCheckbox selectedIds={selectedIds} onSelectionChange={setSelectedIds}
             tableId="sales-invoices-layout"
-            columnTotals={[
-              { key: 'total', label: isAr ? 'إجمالي الفواتير المعروضة' : 'Visible invoices total', value: (row) => row.total, format: (sum) => formatCurrency(sum, currency, lang) },
-              { key: 'paid_amount', label: isAr ? 'إجمالي المدفوع المعروض' : 'Visible paid total', value: (row) => row.paid_amount, format: (sum) => formatCurrency(sum, currency, lang) },
-            ]} />
+            columnTotals={branchScope.selectedBranchIds.length === 1 ? [
+              { key: 'total', label: isAr ? 'إجمالي الفواتير المعروضة' : 'Visible invoices total', value: (row) => Number(row.total), format: (sum) => formatFinancialCurrency(sum, currency, lang) },
+              { key: 'paid_amount', label: isAr ? 'إجمالي المدفوع المعروض' : 'Visible paid total', value: (row) => Number(row.paid_amount), format: (sum) => formatFinancialCurrency(sum, currency, lang) },
+            ] : undefined} />
         </div>
         <div className="border-t border-ui-border px-4 py-3">
           <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />

@@ -24,7 +24,7 @@ const columns: Column<Row>[] = [
 ];
 
 describe('shared DataTable scrolling and scoped footer', () => {
-  it('keeps sticky headings and a footer outside the internal scroll region', () => {
+  it('keeps sticky headings and aligned totals inside the table, with the row count outside', () => {
     const { container } = render(
       <DataTable columns={columns} data={rows} tableId="table-scoped-test"
         columnTotals={[{ key: 'amount', label: 'Visible amount', value: (r) => r.amount, format: (v) => v.toFixed(2) }]} />,
@@ -32,10 +32,12 @@ describe('shared DataTable scrolling and scoped footer', () => {
     const scroll = screen.getByTestId('data-table-scroll');
     const footer = screen.getByTestId('data-table-footer');
     expect(scroll.className).toContain('overflow-auto');
-    expect(scroll.className).toContain('max-h-');
+    expect(scroll).toHaveAttribute('data-table-viewport');
+    expect(scroll.querySelector('tfoot')?.className).toContain('sticky');
     expect(scroll.querySelector('thead')?.className).toContain('sticky');
     expect(scroll.contains(footer)).toBe(false);
     expect(footer).toHaveTextContent('Visible rows: 2');
+    expect(scroll.querySelector('tfoot tr')?.children[1]).toContainElement(screen.getByTestId('data-table-total-amount'));
     expect(screen.getByTestId('data-table-total-amount')).toHaveTextContent('35.00');
     expect(container.textContent).not.toContain('999');
   });

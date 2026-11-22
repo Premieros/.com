@@ -26,7 +26,8 @@ describe('compact above-table page controls', () => {
   it('scrolls rows inside a bounded table while keeping bold column labels and the footer visible', () => {
     expect(dataTable).toContain('data-testid="data-table-scroll"');
     expect(dataTable).toContain('overflow-auto overscroll-contain');
-    expect(dataTable).toContain('max-h-[clamp(260px,calc(100dvh-260px),820px)]');
+    expect(dataTable).toContain('data-table-viewport');
+    expect(dataTable).toContain('<tfoot className="sticky bottom-0');
     expect(dataTable).toContain('sticky top-0 z-20');
     expect(dataTable).toContain('font-extrabold uppercase');
     expect(dataTable).toContain('data-testid="data-table-footer"');

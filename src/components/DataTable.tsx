@@ -1,5 +1,6 @@
 import { type ChangeEvent, type ReactNode, isValidElement, useMemo, useRef, useState } from 'react';
 import { downloadTemplate, exportToExcel } from '@/lib/excel';
+import { useTableViewport } from './useTableViewport';
 import { BranchBadge } from './BranchBadge';
 import { useBranchScope } from '@/lib/branchScope';
 
@@ -232,6 +233,7 @@ export function DataTable<T extends { id?: string }>({
     });
   }, [columns, filteredData, sortState]);
 
+  const tableViewportRef = useTableViewport(internalScroll && !loading && !error);
   const visibleTotals = useMemo(() => (columnTotals ?? [])
     .filter((total) => visibleColumns.some((column) => column.key === total.key))
     .map((total) => {
@@ -595,7 +597,7 @@ export function DataTable<T extends { id?: string }>({
   const hasDataTools = !!onImportFile || enableExport || enableTemplate;
 
   return (
-    <div data-testid="data-table" className="relative min-w-0 max-w-full">
+    <div ref={tableViewportRef} data-testid="data-table" className="relative min-w-0 max-w-full">
       {(hasDataTools || enableColumnVisibility || hasActiveFilters) && (
         <div data-testid="data-table-toolbar" className="mb-3 flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-end sm:overflow-visible sm:pb-0">
           {onImportFile && (
@@ -670,7 +672,7 @@ export function DataTable<T extends { id?: string }>({
 
       {renderOpenFilterPanel()}
 
-      <div className={`space-y-3 sm:hidden ${internalScroll ? 'max-h-[clamp(240px,calc(100dvh-270px),720px)] overflow-y-auto overscroll-contain pe-1' : ''}`}>
+      <div className="space-y-3 sm:hidden">
         {enableColumnFilters && visibleColumns.some((col) => col.filterable !== false && col.key !== 'actions') && (
           <div data-testid="data-table-mobile-filters" className="ui-accent-card ui-accent-system flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto overscroll-x-contain rounded-xl border border-ui-border bg-ui-surface p-2 shadow-ui-sm [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {visibleColumns.filter((col) => col.filterable !== false && col.key !== 'actions').map((col) => (
@@ -694,6 +696,8 @@ export function DataTable<T extends { id?: string }>({
           </div>
         )}
 
+        <div data-table-viewport={internalScroll ? '' : undefined}
+          className={`space-y-3 ${internalScroll ? 'overflow-y-auto overscroll-contain pe-1' : ''}`}>
         {displayData.length === 0 ? (
           <div data-testid="table-empty" className="flex flex-col items-center justify-center py-12 text-ui-muted">
             <p className="text-sm font-medium text-ui-text">{hasActiveFilters ? labels.noData : (emptyMessage || 'No data')}</p>
@@ -758,9 +762,10 @@ export function DataTable<T extends { id?: string }>({
             )}
           </div>
         ))}
+        </div>
       </div>
 
-      <div data-testid="data-table-scroll" role="region" aria-label={isRtl ? 'صفوف الجدول القابلة للتمرير' : 'Scrollable table rows'} tabIndex={0} className={`ui-accent-top ui-accent-neutral hidden max-w-full overflow-auto overscroll-contain rounded-xl border border-ui-border bg-ui-surface shadow-ui-sm [scrollbar-gutter:stable] sm:block ${internalScroll ? 'max-h-[clamp(260px,calc(100dvh-260px),820px)]' : ''}`}>
+      <div data-testid="data-table-scroll" data-table-viewport={internalScroll ? '' : undefined} role="region" aria-label={isRtl ? 'صفوف الجدول القابلة للتمرير' : 'Scrollable table rows'} tabIndex={0} className={`ui-accent-top ui-accent-neutral hidden max-w-full overflow-auto overscroll-contain rounded-xl border border-ui-border bg-ui-surface shadow-ui-sm [scrollbar-gutter:stable] sm:block `}>
         <table className="w-full min-w-max text-sm">
           <thead className="sticky top-0 z-20 bg-ui-page-alt">
             <tr className="border-b border-ui-border bg-ui-page-alt">
@@ -770,10 +775,10 @@ export function DataTable<T extends { id?: string }>({
                     className="h-4 w-4 rounded border-ui-border-strong text-ui-primary focus:ring-ui-ring" />
                 </th>
               )}
-              {visibleColumns.map((col) => (
+              {visibleColumns.map((col, index) => (
                 <th
                   key={col.key}
-                  className={`sticky top-0 z-20 whitespace-nowrap bg-ui-page-alt px-4 py-3 text-start text-xs font-extrabold uppercase tracking-wide text-ui-text ${col.className || ''}`}
+                  className={`sticky top-0 z-20 whitespace-nowrap bg-ui-page-alt px-4 py-3 text-start text-xs font-extrabold uppercase tracking-wide text-ui-text ${index === 0 && !showCheckbox ? 'start-0 z-30' : ''} ${col.className || ''}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span>{col.header}</span>
@@ -808,20 +813,36 @@ export function DataTable<T extends { id?: string }>({
                       className="h-4 w-4 rounded border-ui-border-strong text-ui-primary focus:ring-ui-ring" />
                   </td>
                 )}
-                {visibleColumns.map((col) => (
-                  <td key={col.key} className={`px-4 py-3 font-medium text-ui-text ${col.className || ''}`}>
+                {visibleColumns.map((col, index) => (
+                  <td key={col.key} className={`px-4 py-3 font-medium text-ui-text ${index === 0 && !showCheckbox ? 'sticky start-0 z-[1] bg-ui-surface' : ''} ${col.className || ''}`}>
                     {renderCell(row, col)}
                   </td>
                 ))}
               </tr>
             ))}
           </tbody>
+          {visibleTotals.length > 0 && displayData.length > 0 && (
+            <tfoot className="sticky bottom-0 z-10 border-t-2 border-ui-border bg-ui-page-alt">
+              <tr>
+                {showCheckbox && <td />}
+                {visibleColumns.map((column, index) => {
+                  const total = visibleTotals.find((entry) => entry.key === column.key);
+                  return (
+                    <td key={column.key} className={`whitespace-nowrap px-4 py-2 font-bold tabular-nums text-ui-text ${index === 0 && !showCheckbox ? 'sticky start-0 bg-ui-page-alt' : ''} ${column.className || ''}`}>
+                      {index === 0 && !total && (isRtl ? 'إجمالي الصفوف المعروضة' : 'Visible rows total')}
+                      {total && <span data-testid={`data-table-total-${total.key}`} aria-label={total.label}>{total.format(total.sum)}</span>}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
       <div data-testid="data-table-footer" className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-ui-border px-2 py-2 text-xs font-semibold text-ui-muted" aria-live="polite">
         <span>{isRtl ? 'الصفوف المعروضة' : 'Visible rows'}: <strong className="tabular-nums text-ui-text">{displayData.length}</strong></span>
-        {visibleTotals.map((total) => (
-          <span key={total.key} data-testid={`data-table-total-${total.key}`} className="inline-flex items-center gap-2">
+        {displayData.length > 0 && visibleTotals.map((total) => (
+          <span key={total.key} className="inline-flex items-center gap-2 sm:hidden">
             {total.label}: <strong className="tabular-nums text-ui-text">{total.format(total.sum)}</strong>
           </span>
         ))}
