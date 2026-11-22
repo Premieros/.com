@@ -78,11 +78,6 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState('');
   const [page, setPage] = useState<'home' | 'categories' | 'cart' | 'visit'>('home');
-  useEffect(() => {
-    if (page !== 'categories') return;
-    const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-    categoriesRef.current?.scrollIntoView?.({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'center' });
-  }, [page]);
   const [favorites, setFavorites] = useState<string[]>([]);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [error, setError] = useState('');
@@ -97,7 +92,14 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
   const storageKey = `premier_qr_pending_v1_${token}`;
   // Each screen starts at its header, even after scrolling a long product list.
   const detailId = detail?.id;
-  useEffect(() => { document.documentElement.scrollTop = 0; }, [detailId, page]);
+  useEffect(() => {
+    if (page === 'categories' && !detailId) {
+      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+      categoriesRef.current?.scrollIntoView?.({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'center' });
+    } else {
+      document.documentElement.scrollTop = 0;
+    }
+  }, [detailId, page]);
   const activeBill = [...visit.tracking.bills].reverse().find(b => ['open', 'held'].includes(b.status));
   useEffect(() => { if (activeBill?.table_id) setTable(activeBill.table_id); }, [activeBill?.table_id]);
   useEffect(() => {
@@ -207,7 +209,7 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
         <label className="customer-note">{isBunker ? 'Notes for our team' : 'ملاحظات للموظف'}<textarea maxLength={300} placeholder={isBunker ? 'Any special requests?' : 'هل لديك طلب خاص؟'} value={note} disabled={disabled} onChange={e => setNote(e.target.value)} /></label>
       </div><div className="customer-detail-action"><button className="customer-primary" disabled={disabled} onClick={addProduct}>{isBunker ? 'Add to cart' : 'أضف إلى السلة'} <span>{(detail.price * quantity).toFixed(2)} {currency}</span></button></div>
     </> : <>
-      <header className="customer-header"><div className="customer-brand-icon">{appearance.logo_url ? <img src={appearance.logo_url} alt={isBunker ? 'BUNKER logo' : 'شعار الفرع'} /> : <UtensilsCrossed size={25} />}</div><div><h1>{appearance.brand_name || menu?.branch_name || (isBunker ? 'BUNKER' : 'أهلًا بك')}</h1><p><MapPin size={12} />{appearance.subtitle || (isBunker ? 'Burger & Specialty Coffee' : 'اختياراتك المفضلة، على طاولتك')}</p></div><button className="customer-favorite" aria-label={isBunker ? "Favorites" : "عرض المفضلة"} aria-pressed={onlyFavorites} onClick={() => { setOnlyFavorites(v => !v); setPage('home'); }}><Heart fill={onlyFavorites ? '#ff8a35' : 'none'} size={25} /></button></header>
+      <header className="customer-header"><div className="customer-brand-icon">{appearance.logo_url ? <img src={appearance.logo_url} alt={isBunker ? 'BUNKER logo' : 'شعار الفرع'} /> : <UtensilsCrossed size={25} />}</div><div><h1>{appearance.brand_name || menu?.branch_name || (isBunker ? 'BUNKER' : 'أهلًا بك')}</h1><p><MapPin size={12} />{appearance.subtitle || (isBunker ? 'Burger & Specialty Coffee' : 'منيو الفرع')}</p></div><button className="customer-favorite" aria-label={isBunker ? "Favorites" : "عرض المفضلة"} aria-pressed={onlyFavorites} onClick={() => { setOnlyFavorites(v => !v); setPage('home'); }}><Heart fill={onlyFavorites ? '#ff8a35' : 'none'} size={25} /></button></header>
       {isBunker && <BranchSocialLinks slug="bunker" />}
       {demoPreview && <p className="customer-demo-notice" role="status"><strong>MENU PREVIEW</strong> · Browse the current BUNKER menu and test checkout. No actual order or payment is created.</p>}
       {!demoPreview && <div className="customer-table"><label htmlFor="customer-table">{withoutTable ? (isBunker ? 'Order type' : 'نوع الطلب') : secure ? (isBunker ? 'Your table' : 'طاولتك المعتمدة') : (isBunker ? 'Choose a table' : 'اختر طاولتك')}</label>{withoutTable ? <strong>{pickup ? (isBunker ? 'Pickup' : 'استلام من المطعم') : (isBunker ? 'Delivery' : 'توصيل')}</strong> : <select id="customer-table" value={table} disabled={secure || disabled || !!activeBill} onChange={e => setTable(e.target.value)}><option value="">{isBunker ? 'Select a table' : 'اختر الطاولة'}</option>{menu?.tables?.map(t => <option key={t.id} value={t.id}>{t.name}{t.busy ? (isBunker ? ' · Occupied' : ' · مشغولة') : ''}</option>)}</select>}</div>}
