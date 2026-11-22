@@ -2,6 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 const mocks = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ rpc: mocks.rpc }) }));
+import { GuestVisitPanel } from '@/features/qr/GuestVisitPanel';
+import type { GuestBill, GuestIdentity } from '@/features/qr/service';
 import { GuestEntryGate, TableCamera } from '@/features/qr/GuestEntryGate';
 const token = 'a'.repeat(64);
 const identity = { id: 'visit', order_type: 'delivery', table_id: null, has_request: false, status: 'pending', pin_set: false };
@@ -50,6 +52,26 @@ describe('customer phone entry and recovery', () => {
     await screen.findByRole('heading', { name: 'طلبي وحسابي' }); expect(screen.queryByLabelText('رقم الهاتف')).not.toBeInTheDocument();
     expect(screen.getByLabelText('طاولتك المعتمدة')).toBeDisabled();
     await waitFor(() => expect(screen.getByLabelText('طاولتك المعتمدة')).toHaveValue('t1'));
+  });
+  it('keeps paid deliveries current until dispatch confirms delivery, then remembers the order on this device', async () => {
+    const visit: GuestIdentity = { ...identity, order_type: 'delivery', table_name: '' };
+    const bill: GuestBill = {
+      id: 'bill', order_number: 'POS-42', status: 'completed', kitchen_status: 'ready',
+      dispatch_status: 'on_the_way', payment_status: 'paid', table_id: '', table_name: '',
+      subtotal: 50, discount_amount: 0, discount_type: 'amount', tax_amount: 0,
+      total: 50, paid_amount: 50, refunded_amount: 0, balance: 0, items: [],
+    };
+    const props = { token, session: 'private-session', table: '', currency: 'ج.م', error: '', secure: true, refresh: async () => {}, newVisit: () => {} };
+    const view = render(<GuestVisitPanel {...props} tracking={{ ...empty, visit, bills: [bill] }} />);
+    expect(screen.getByText('توصيل · في الطريق إليك')).toBeInTheDocument();
+    view.rerender(<GuestVisitPanel {...props} tracking={{ ...empty, visit, bills: [{ ...bill, dispatch_status: 'delivered' }] }} />);
+    expect(screen.getByText('لا توجد طلبات حالية.')).toBeInTheDocument();
+    view.unmount();
+
+    render(<GuestEntryGate token={token} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'الطلبات السابقة على هذا الجهاز' }));
+    expect(screen.getByText('POS-42')).toBeInTheDocument();
+    expect(screen.getByText('تم التوصيل')).toBeInTheDocument();
   });
   it('stops all camera tracks after capture and bounds the JPEG size', async () => {
     const stop = vi.fn(); const captured = vi.fn();

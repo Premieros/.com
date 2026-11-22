@@ -692,3 +692,24 @@ body:has(.bunker-customer[data-bunker-theme="light"]){background:#eee6d9!importa
 .bunker-customer.customer-entry:not([data-bunker-theme="light"]) p { color: #f0ddc3; }
 .customer-order-type strong { font-size: 1rem; }
 .customer-order-type small { opacity: 1; }
+
+.customer-order-filters { display: flex; gap: 8px; margin-block: 16px; }
+.customer-order-filters button {
+  flex: 1;
+  border: 1px solid currentColor;
+  border-radius: 12px;
+  padding: 10px;
+  font-weight: 700;
+}
+.customer-order-filters button[aria-pressed="true"] {
+  background: color-mix(in srgb, currentColor 12%, transparent);
+}
+.customer-order-history { margin-block: 16px; }
+.customer-order-history h3 { font-size: 1.05rem; font-weight: 750; }
+.customer-order-history li {
+  margin-block: 8px;
+  padding: 10px;
+  border-radius: 12px;
+  background: color-mix(in srgb, currentColor 8%, transparent);
+}
+.customer-order-history li > div { display: flex; justify-content: space-between; gap: 10px; }
