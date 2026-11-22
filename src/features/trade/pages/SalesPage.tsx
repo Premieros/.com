@@ -626,9 +626,9 @@ export function SalesPage() {
         </div>
       </div>
     )},
-    { key: 'branch', header: t('branch'), className: 'w-[10%]', render: (r) => <BranchBadge name={branches.find((b) => b.id === r.branch_id)?.name || '-'} /> },
+    { key: 'branch', header: t('branch'), render: (r) => <BranchBadge name={branches.find((b) => b.id === r.branch_id)?.name || '-'} /> },
     { key: 'customer', header: t('customer'), className: 'w-[13%]', render: (r) => <span className="block max-w-60 truncate font-medium" title={r.customer?.name || ''}>{r.customer?.name || '-'}</span> },
-    { key: 'status', header: t('status'), className: 'w-[10%]', render: (r) => (
+    { key: 'status', header: t('status'), render: (r) => (
       <div className="flex items-center gap-1.5 break-words">
         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
           r.status === 'completed' ? 'bg-ui-success-soft text-ui-success' :
@@ -644,16 +644,16 @@ export function SalesPage() {
         )}
       </div>
     )},
-    { key: 'order_type', header: isAr ? 'المصدر' : 'Source', className: 'w-[10%]', render: (r) => <span className="text-ui-muted">{orderTypeLabelForSale(r.order_type) || '-'}</span> },
-    { key: 'total', header: t('total'), className: 'w-[10%] break-words text-end tabular-nums', mobilePriority: true, render: (r) => <span className="font-bold text-ui-text">{formatFinancialCurrency(r.total, currency, lang)}</span> },
-    { key: 'paid_amount', header: isAr ? 'المدفوع' : 'Paid', className: 'w-[10%] break-words text-end tabular-nums', render: (r) => formatFinancialCurrency(r.paid_amount, currency, lang) },
-    { key: 'payment_method', header: isAr ? 'طريقة الدفع' : 'Payment', className: 'w-[10%]', render: (r) => (
+    { key: 'order_type', header: isAr ? 'المصدر' : 'Source', render: (r) => <span className="text-ui-muted">{orderTypeLabelForSale(r.order_type) || '-'}</span> },
+    { key: 'total', header: t('total'), className: 'break-words text-end tabular-nums', mobilePriority: true, render: (r) => <span className="font-bold text-ui-text">{formatFinancialCurrency(r.total, currency, lang)}</span> },
+    { key: 'paid_amount', header: isAr ? 'المدفوع' : 'Paid', className: 'break-words text-end tabular-nums', render: (r) => formatFinancialCurrency(r.paid_amount, currency, lang) },
+    { key: 'payment_method', header: isAr ? 'طريقة الدفع' : 'Payment', render: (r) => (
       <span className="break-words rounded-full bg-ui-page-alt px-2.5 py-1 text-xs font-medium text-ui-muted">
         {PAYMENT_LABELS[r.payment_method] || r.payment_method}
       </span>
     )},
     { key: 'created_at', header: isAr ? 'التاريخ والوقت' : 'Created at', className: 'w-[14%] break-words', render: (r) => <span className="text-sm text-ui-subtle tabular-nums">{formatDateTime(r.created_at, lang)}</span> },
-    { key: 'actions', header: t('actions'), render: (r) => (
+    { key: 'actions', header: t('actions'), className: 'w-[15%]', render: (r) => (
       <div className="flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
         {canPreviewReceipt && (
           <button
