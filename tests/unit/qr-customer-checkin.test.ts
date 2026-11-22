@@ -58,6 +58,7 @@ describe('Phone check-in and private table visits on PostgreSQL', () => {
     await db.exec(sqlFile('supabase/migrations/20261122160000_customer_pickup_and_dispatch_tracking.sql'));
     await db.exec(sqlFile('supabase/migrations/20261122170000_delivery_address_at_checkout.sql'));
     await db.exec(sqlFile('supabase/migrations/20261122190000_change_customer_cart_fulfillment.sql'));
+    await db.exec('CREATE TABLE qr_private.branch_qr_links (branch_id uuid, token_hash text)');
     await db.exec(sqlFile('supabase/migrations/20261122200000_parallel_customer_orders.sql'));
   }, 30_000);
   beforeEach(async () => {
