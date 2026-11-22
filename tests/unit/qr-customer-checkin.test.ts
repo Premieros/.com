@@ -53,6 +53,9 @@ describe('Phone check-in and private table visits on PostgreSQL', () => {
     await db.exec(sqlFile('supabase/migrations/20261114023132_guest_tracking_qr_table_ordering.sql'));
     await db.exec(sqlFile('supabase/migrations/20260909225500_pos_service_order_details.sql'));
     await db.exec(sqlFile('supabase/migrations/20261114093244_customer_checkin_qr_table_ordering.sql'));
+    await db.exec("ALTER TABLE public.branches ADD COLUMN address text DEFAULT 'Pickup address'");
+    await db.exec(sqlFile('supabase/migrations/20261122140000_branch_delivery_dispatch.sql'));
+    await db.exec(sqlFile('supabase/migrations/20261122160000_customer_pickup_and_dispatch_tracking.sql'));
   }, 30_000);
   beforeEach(async () => {
     await db.exec('RESET ROLE');
@@ -114,10 +117,32 @@ describe('Phone check-in and private table visits on PostgreSQL', () => {
   });
   it('uses canonical delivery orders without a table, supports followups, calls, and safe retries',async()=>{
     await begin('delivery',null);const r=await place(session,key,null);const a=await approve(r.id,null);expect((await approve(r.id,null)).order_id).toBe(a.order_id);
-    const view=await track();expect(view.bills).toHaveLength(1);expect(view.bills[0]).toMatchObject({table_name:'طلب توصيل',total:57});
+    const view=await track();expect(view.bills).toHaveLength(1);expect(view.bills[0]).toMatchObject({table_name:null,total:57});
     const follow=await place(session,'50000000-0000-4000-8000-000000000002',null);expect((await approve(follow.id,null)).order_id).toBe(a.order_id);
     await anon();const c=await scalar<Result>('select public.qr_guest_call($1,$2,$3,null,\'check\',\'\') result',[token,session,key]);expect((await track()).calls[0].id).toBe(c.id);
     await db.exec('RESET ROLE');const order=await scalar<Result>('select to_jsonb(o) result from public.orders o where id=$1',[a.order_id]);expect(order).toMatchObject({table_id:null,order_type:'delivery',service_details:{phone:'+201012345678',address:'عنوان توصيل تجريبي'}});
+  });
+  it('creates pickup as takeaway, prevents table assignment, and preserves final tracking on the same device', async () => {
+    await expect(begin('pickup', table)).rejects.toThrow('QR_TABLE_LOCKED');
+    await begin('pickup', null);
+    const request = await place(session, key, null);
+    await expect(approve(request.id, table)).rejects.toThrow('QR_TABLE_LOCKED');
+    const accepted = await approve(request.id, null);
+    await db.exec('RESET ROLE');
+    expect(await scalar('select to_jsonb(o) result from public.orders o where id=$1', [accepted.order_id]))
+      .toMatchObject({ order_type: 'takeaway', table_id: null });
+    await db.query("UPDATE public.orders SET status='completed', kitchen_status='served' WHERE id=$1", [accepted.order_id]);
+    expect(await track()).toMatchObject({ visit: { closed: true }, bills: [{ kitchen_status: 'served' }] });
+    expect((await track(other)).bills).toEqual([]);
+  });
+  it('shows real dispatch state only for an authenticated visit capability', async () => {
+    await begin('delivery', null);
+    const request = await place(session, key, null);
+    const accepted = await approve(request.id, null);
+    await db.exec('RESET ROLE');
+    await db.query("INSERT INTO qr_private.delivery_dispatch (branch_id,order_id,status,updated_by) VALUES ($1,$2,'on_the_way',$3)", [branch, accepted.order_id, user]);
+    expect((await track()).bills[0]).toMatchObject({ dispatch_status: 'on_the_way' });
+    expect((await track(other)).bills).toEqual([]);
   });
   it('saves delivery with the current QR revision and rejects a stale POS draft',async()=>{
     await begin('delivery',null);const r=await place(session,key,null);const a=await approve(r.id,null);

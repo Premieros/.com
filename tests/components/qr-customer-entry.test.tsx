@@ -15,19 +15,22 @@ describe('customer phone entry and recovery', () => {
   afterEach(() => { cleanup(); vi.restoreAllMocks(); });
   it('never asks a new customer for a PIN and shows the two digits after the first submission', async () => {
     render(<GuestEntryGate token={token} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^توصيل/ }));
     fireEvent.change(await screen.findByLabelText('رقم الهاتف'), { target: { value: '01012345678' } });
     fireEvent.click(screen.getByRole('button', { name: 'متابعة' }));
     fireEvent.change(await screen.findByLabelText('اسمك'), { target: { value: 'عميل اختبار' } });
     fireEvent.click(screen.getByRole('button', { name: 'متابعة' }));
-    fireEvent.click(await screen.findByRole('button', { name: 'توصيل' }));
     fireEvent.change(screen.getByLabelText('عنوان التوصيل'), { target: { value: 'عنوان توصيل واضح' } });
-    fireEvent.click(screen.getByRole('button', { name: 'دخول المنيو' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'دخول المنيو' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'التصنيفات' }));
+    expect(screen.getByRole('button', { name: 'التصنيفات' })).toHaveAttribute('aria-current', 'page');
     fireEvent.click(await screen.findByRole('button', { name: 'إضافة Tea' }));
     fireEvent.click(screen.getByRole('button', { name: /أضف إلى السلة/ }));
     fireEvent.click(screen.getByRole('button', { name: /فتح السلة/ }));
     expect(screen.queryByLabelText('رمز استرجاع الطلب')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'إرسال الطلب للموظف' }));
     expect(await screen.findByText('07')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'طلبي وحسابي' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByText(/احتفظ به لفتح طلبك/)).toBeInTheDocument();
     expect(mocks.rpc.mock.calls.find(([name]) => name === 'qr_guest_place')?.[1]).toMatchObject({ p_table: null });
     expect(mocks.rpc.mock.calls.some(([name]) => name === 'qr_guest_resume')).toBe(false);
@@ -35,6 +38,7 @@ describe('customer phone entry and recovery', () => {
   it('requires a code for an active phone on a new device without revealing its bill first', async () => {
     mocks.rpc.mockImplementation(async (name: string) => ({ data: name === 'qr_guest_entry' ? { enabled: true } : { registered: true, needs_pin: true, pin_set: true }, error: null }));
     render(<GuestEntryGate token={token} />);
+    fireEvent.click(await screen.findByRole('button', { name: /^توصيل/ }));
     fireEvent.change(await screen.findByLabelText('رقم الهاتف'), { target: { value: '01012345678' } }); fireEvent.click(screen.getByRole('button', { name: 'متابعة' }));
     await screen.findByLabelText('رمز استرجاع الطلب'); expect(screen.queryByLabelText('اسمك')).not.toBeInTheDocument();
     expect(mocks.rpc.mock.calls.some(([name]) => name === 'qr_guest_track')).toBe(false);
