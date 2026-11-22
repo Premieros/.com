@@ -57,6 +57,7 @@ describe('Phone check-in and private table visits on PostgreSQL', () => {
     await db.exec(sqlFile('supabase/migrations/20261122140000_branch_delivery_dispatch.sql'));
     await db.exec(sqlFile('supabase/migrations/20261122160000_customer_pickup_and_dispatch_tracking.sql'));
     await db.exec(sqlFile('supabase/migrations/20261122170000_delivery_address_at_checkout.sql'));
+    await db.exec(sqlFile('supabase/migrations/20261122190000_change_customer_cart_fulfillment.sql'));
   }, 30_000);
   beforeEach(async () => {
     await db.exec('RESET ROLE');
@@ -135,6 +136,18 @@ describe('Phone check-in and private table visits on PostgreSQL', () => {
     const order = await checkout('سموحة، شارع النصر، عمارة 12');
     expect((await checkout('سموحة، شارع النصر، عمارة 12')).id).toBe(order.id);
     await expect(checkout('عنوان مختلف')).rejects.toThrow('QR_IDEMPOTENCY_CONFLICT');
+  });
+  it('changes the same unsent visit and keeps an already submitted request bound to its type', async () => {
+    await begin('delivery', null);
+    const change = (type: string, target: string | null = null, image: string | null = null) => scalar<import('../../src/features/qr/service').GuestIdentity>(
+      'select public.qr_guest_change_fulfillment($1,$2,$3,$4,$5) result', [token, session, type, target, image],
+    );
+    await expect(change('dine_in', table)).rejects.toThrow('QR_PHOTO_REQUIRED');
+    const dineIn = await change('dine_in', table, photo);
+    expect(dineIn).toMatchObject({ order_type: 'dine_in', table_id: table });
+    expect(await change('pickup')).toMatchObject({ id: dineIn.id, order_type: 'pickup', table_id: null });
+    await place(session, key, null);
+    await expect(change('delivery')).rejects.toThrow('QR_FULFILLMENT_LOCKED');
   });
   it('creates pickup as takeaway, prevents table assignment, and preserves final tracking on the same device', async () => {
     await expect(begin('pickup', table)).rejects.toThrow('QR_TABLE_LOCKED');
