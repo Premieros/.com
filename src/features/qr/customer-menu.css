@@ -612,7 +612,7 @@ body:has(.bunker-customer[data-bunker-theme="light"]){background:#eee6d9!importa
   --nav-glow: #83cbb7;
   --nav-shell: rgb(244 249 241 / 83%);
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0;
   padding: 6px;
   bottom: max(14px, env(safe-area-inset-bottom));
@@ -627,7 +627,7 @@ body:has(.bunker-customer[data-bunker-theme="light"]){background:#eee6d9!importa
 .customer-glass-marker {
   position: absolute;
   inset-block: -5px 0;
-  width: 25%;
+  width: calc(100% / 3);
   border-radius: 24px 24px 18px 18px;
   background: radial-gradient(ellipse at 50% 20%, color-mix(in srgb, var(--nav-glow) 44%, transparent), transparent 72%);
   transition: inset-inline-start 340ms cubic-bezier(.23, 1, .32, 1);
@@ -684,3 +684,11 @@ body:has(.bunker-customer[data-bunker-theme="light"]){background:#eee6d9!importa
 @media (prefers-reduced-motion: reduce) {
   .customer-glass-marker, .customer-glass-nav > button, .customer-glass-icon { transition: none; }
 }
+
+.customer-bottom.customer-glass-nav > button { font-size: 13px; font-weight: 750; color: #25443b; }
+.customer-bottom.customer-glass-nav > button[aria-current] { color: #173b30; }
+.bunker-customer .customer-bottom.customer-glass-nav > button { color: #ffefd8 !important; }
+.bunker-customer[data-bunker-theme="light"] .customer-bottom.customer-glass-nav > button { color: #36271c !important; }
+.bunker-customer.customer-entry:not([data-bunker-theme="light"]) p { color: #f0ddc3; }
+.customer-order-type strong { font-size: 1rem; }
+.customer-order-type small { opacity: 1; }

@@ -3,7 +3,7 @@ import { useBunkerPublicTheme } from './useBunkerPublicTheme';
 import { supabase } from '@/api';
 import { BranchSocialLinks } from './BranchSocialLinks';
 import { useEffect, useRef, useState } from 'react';
-import { ArrowRight, ChevronLeft, ChevronRight, Heart, Search, SlidersHorizontal, ShoppingBag, Home, Grid2X2, MapPin, Plus, Minus, UtensilsCrossed, ReceiptText, Check } from 'lucide-react';
+import { ArrowRight, ChevronLeft, ChevronRight, Heart, Search, SlidersHorizontal, ShoppingBag, Home, MapPin, Plus, Minus, UtensilsCrossed, ReceiptText, Check } from 'lucide-react';
 import { ProductImage } from '@/features/catalog/components/ProductImage';
 import { qrPublic } from '@/api/domains/qrPublic';
 import type { GuestIdentity, QrAppearance, QrItem, QrProduct, QrTable } from './service';
@@ -77,7 +77,7 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
   const [detail, setDetail] = useState<QrProduct | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState('');
-  const [page, setPage] = useState<'home' | 'categories' | 'cart' | 'visit'>('home');
+  const [page, setPage] = useState<'home' | 'cart' | 'visit'>('home');
   const [favorites, setFavorites] = useState<string[]>([]);
   const [onlyFavorites, setOnlyFavorites] = useState(false);
   const [error, setError] = useState('');
@@ -92,14 +92,7 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
   const storageKey = `premier_qr_pending_v1_${token}`;
   // Each screen starts at its header, even after scrolling a long product list.
   const detailId = detail?.id;
-  useEffect(() => {
-    if (page === 'categories' && !detailId) {
-      const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-      categoriesRef.current?.scrollIntoView?.({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'center' });
-    } else {
-      document.documentElement.scrollTop = 0;
-    }
-  }, [detailId, page]);
+  useEffect(() => { document.documentElement.scrollTop = 0; }, [detailId, page]);
   const activeBill = [...visit.tracking.bills].reverse().find(b => ['open', 'held'].includes(b.status));
   useEffect(() => { if (activeBill?.table_id) setTable(activeBill.table_id); }, [activeBill?.table_id]);
   useEffect(() => {
@@ -217,7 +210,7 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
       {error && <p role="alert" className="customer-alert">{error}</p>}
       {recoveryCode && <div className="customer-recovery" role="status"><strong>{isBunker ? 'Your recovery code:' : 'رمز استرجاع طلبك:'} <b dir="ltr">{recoveryCode}</b></strong><p>{isBunker ? 'Keep this code to open your order on another device. Do not share it. Ask our team for help if lost.' : 'احتفظ به لفتح طلبك من جهاز جديد. لا تشاركه مع الآخرين. إذا نسيته اطلب رمزًا جديدًا من الموظف.'}</p></div>}
       {receipt && <div role="status" className="customer-receipt"><Check size={26} /><strong>{isBunker ? 'Your order has reached our team' : 'وصل طلبك للموظف'}</strong><p>{receipt}</p><small>{isBunker ? 'Track your order under My Order.' : 'تابع حالة طلبك وحسابك من زر «طلبي».'}</small></div>}
-      {(page === 'home' || page === 'categories') ? <>
+      {page === 'home' ? <>
         <div className="customer-search"><Search size={21} /><input aria-label={isBunker ? "Search menu" : "ابحث في المنيو"} placeholder={isBunker ? "Search the menu" : "ابحث الآن"} value={query} onChange={e => setQuery(e.target.value)} /><button aria-label={isBunker ? 'Show all categories' : 'عرض كل التصنيفات'} onClick={() => { setCategory(''); document.getElementById('customer-categories')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}><SlidersHorizontal size={20} /></button></div>
         {!query && !onlyFavorites && (isBunker
           ? <div className="bunker-order-photo-grid" aria-label="BUNKER burgers and specialty coffee">
@@ -246,11 +239,10 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
       </section>}
       <nav className="customer-bottom customer-glass-nav" aria-label={isBunker ? 'Menu navigation' : 'تصفح المنيو'}>
         <span className="customer-glass-track" aria-hidden="true">
-          <span className="customer-glass-marker" style={{ insetInlineStart: `${['home', 'categories', 'cart', 'visit'].indexOf(page) * 25}%` }} />
+          <span className="customer-glass-marker" style={{ insetInlineStart: `${['home', 'cart', 'visit'].indexOf(page) * (100 / 3)}%` }} />
         </span>
         {([
           { id: 'home', Icon: Home, label: isBunker ? 'Home' : 'الرئيسية' },
-          { id: 'categories', Icon: Grid2X2, label: isBunker ? 'Categories' : 'التصنيفات' },
           { id: 'cart', Icon: ShoppingBag, label: isBunker ? 'Cart' : 'السلة' },
           { id: 'visit', Icon: ReceiptText, label: demoPreview ? 'Demo order' : isBunker ? 'My order' : 'طلبي' },
         ] as const).map(({ id, Icon, label }) => (
@@ -262,9 +254,7 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
             onClick={() => {
               setPage(id);
               const reducedMotion = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
-              if (id === 'categories' && page === 'categories') {
-                categoriesRef.current?.scrollIntoView?.({ behavior: reducedMotion ? 'instant' : 'smooth', block: 'center' });
-              } else if (id === 'home') {
+              if (id === 'home') {
                 window.scrollTo({ top: 0, behavior: reducedMotion ? 'instant' : 'smooth' });
               }
             }}
