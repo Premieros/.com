@@ -3,6 +3,7 @@ import { RefreshCw, ChefHat, CheckCircle2, UtensilsCrossed, Volume2, VolumeX, Al
 import { useLanguage } from '@/context/LanguageContext';
 import { useBranchFilter } from '@/lib/useBranchFilter';
 import { useCan } from '@/lib/permissions';
+import { isAuthSessionError } from '@/lib/authSessionError';
 import { userFacingErrorMessage } from '@/lib/userFacingError';
 import { DesignSurface, DesignPageHeader } from '@/components/design/DesignSurface';
 import { Button } from '@/components/Button';
@@ -60,6 +61,12 @@ export function KitchenDisplayPage() {
   const [stations, setStations] = useState<KitchenStation[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState('');
+  const [refreshInterrupted, setRefreshInterrupted] = useState(false);
+  const sessionRecovery = useRef<Promise<boolean> | null>(null);
+  const loadSequence = useRef(0);
+  const queueScope = JSON.stringify([branchFilter, station, canViewKds]);
+  const currentQueueScope = useRef(queueScope);
+  currentQueueScope.current = queueScope;
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [orderContext, setOrderContext] = useState<Record<string, { table_name: string | null; operator_name: string | null }>>({});
   const previousKitchenOrders = useRef<Set<string> | null>(null);
@@ -114,6 +121,8 @@ export function KitchenDisplayPage() {
   }, [branchFilter, canViewKds, station]);
 
   const load = useCallback(async () => {
+    const sequence = ++loadSequence.current;
+    const isCurrent = () => sequence === loadSequence.current && currentQueueScope.current === queueScope;
     const readStartedAt = Date.now();
     setLoading(true);
     try {
@@ -128,11 +137,25 @@ export function KitchenDisplayPage() {
       // Display refresh is READ-ONLY: elapsed time must never silently mark
       // a real order as served/completed or alter its inventory/payment state.
       // Authorized staff can still use the explicit status controls below.
-      const { data, error } = await supabase.rpc('get_kitchen_queue', {
+      const readQueue = () => supabase.rpc('get_kitchen_queue', {
         p_station: station || null,
         p_branch_id: branchFilter,
       });
-      if (error) throw error;
+      let result = await readQueue();
+      if (isAuthSessionError(result.error)) {
+        if (!sessionRecovery.current) {
+          sessionRecovery.current = supabase.auth.refreshSession()
+            .then(({ data, error }) => !error && Boolean(data.session))
+            .catch(() => false)
+            .finally(() => { sessionRecovery.current = null; });
+        }
+        if (await sessionRecovery.current) result = await readQueue();
+      }
+      if (!isCurrent()) return;
+      if (result.error) throw result.error;
+      setRefreshInterrupted(false);
+      setLoadError('');
+      const data = result.data;
       const newItems = (data ?? []) as KitchenQueueItem[];
       const currentIds = kitchenSentLineKeys(newItems);
       if (hasGenuinelyNewKitchenSend(previousKitchenOrders.current, newItems, previousQueueReadAt.current)) {
@@ -156,9 +179,10 @@ export function KitchenDisplayPage() {
         p_order_ids: orderIds,
         p_branch_id: branchFilter,
       });
+      if (!isCurrent()) return;
       if (contextError) {
         setOrderContext({});
-        setLoadError(userFacingErrorMessage(contextError, ar ? 'ar' : 'en'));
+        // Supplementary metadata must not generate a queue failure.
         return;
       }
 
@@ -169,13 +193,18 @@ export function KitchenDisplayPage() {
       setOrderContext(nextContext);
       setLoadError('');
     } catch (error) {
-      // Never turn a KDS transport/permission failure into a fake empty queue.
-      // Keep the last known cards visible and surface the error so staff can retry.
-      setLoadError(userFacingErrorMessage(error, ar ? 'ar' : 'en'));
+      if (!isCurrent()) return;
+      if (isAuthSessionError(error) || !navigator.onLine || /fetch|network|timeout/i.test(String((error as Error)?.message ?? error))) {
+        setRefreshInterrupted(true);
+        setLoadError('');
+      } else {
+        setRefreshInterrupted(false);
+        setLoadError(userFacingErrorMessage(error, ar ? 'ar' : 'en'));
+      }
     } finally {
-      setLoading(false);
+      if (isCurrent()) setLoading(false);
     }
-  }, [branchFilter, station, canViewKds, loadNotices]);
+  }, [ar, branchFilter, station, canViewKds, loadNotices, queueScope]);
 
   useEffect(() => {
     previousKitchenOrders.current = null;
@@ -188,14 +217,20 @@ export function KitchenDisplayPage() {
 
   useEffect(() => {
     if (!branchFilter || !canViewKds) return;
-    const unsubscribe = subscribePosRealtime({ branchId: branchFilter, onEvent: () => { void load(); }, debounceMs: 500 });
+    const unsubscribe = subscribePosRealtime({ branchId: branchFilter, onEvent: () => { void load(); }, debounceMs: 100 });
     return unsubscribe;
   }, [branchFilter, canViewKds, load]);
 
   useEffect(() => {
-    const id = setInterval(() => { void load(); }, 30000);
-    return () => clearInterval(id);
-  }, [load]);
+    if (!branchFilter || !canViewKds) return;
+    const refresh = () => { void load(); };
+    const id = setInterval(refresh, refreshInterrupted ? 5000 : 30000);
+    window.addEventListener('online', refresh);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener('online', refresh);
+    };
+  }, [branchFilter, canViewKds, load, refreshInterrupted]);
 
   const handleKitchenStatus = async (orderId: string, status: string) => {
     if (!canUpdateKds) {
@@ -299,6 +334,11 @@ export function KitchenDisplayPage() {
           <KitchenCompletedHistory key={`${branchFilter}:${station}`} branchId={branchFilter} station={station} ar={ar} />
         )}
 
+        {refreshInterrupted && (
+          <p role="status" className="text-xs text-ui-muted">
+            {ar ? 'توقف التحديث مؤقتًا، جارٍ إعادة الاتصال تلقائيًا…' : 'Updates paused. Reconnecting automatically…'}
+          </p>
+        )}
         {loadError && (
           <div data-testid="kds-load-error" className="flex flex-col gap-3 rounded-2xl border border-ui-danger/30 bg-ui-danger/10 p-4 text-ui-danger sm:flex-row sm:items-center sm:justify-between">
             <div className="flex min-w-0 items-start gap-2">
@@ -314,7 +354,7 @@ export function KitchenDisplayPage() {
           </div>
         )}
 
-        {loading && !items.length && !loadError && <div className="text-ui-muted py-8 text-center">{ar ? 'جاري التحميل...' : 'Loading...'}</div>}
+        {loading && !items.length && !loadError && !refreshInterrupted && <div className="text-ui-muted py-8 text-center">{ar ? 'جاري التحميل...' : 'Loading...'}</div>}
 
         {view === 'active' && <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {items.map(item => {
@@ -369,7 +409,7 @@ export function KitchenDisplayPage() {
           })}
         </div>}
 
-        {view === 'active' && !loading && !items.length && !loadError && <div className="text-center py-16 text-ui-muted"><ChefHat className="h-12 w-12 mx-auto mb-3 opacity-30" /><div className="text-lg">{ar ? 'لا توجد طلبات نشطة ضمن المحطات المسموح بها' : 'No active orders in your allowed stations'}</div></div>}
+        {view === 'active' && !loading && !items.length && !loadError && !refreshInterrupted && <div className="text-center py-16 text-ui-muted"><ChefHat className="h-12 w-12 mx-auto mb-3 opacity-30" /><div className="text-lg">{ar ? 'لا توجد طلبات نشطة ضمن المحطات المسموح بها' : 'No active orders in your allowed stations'}</div></div>}
       </div>
     </DesignSurface>
   );
