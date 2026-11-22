@@ -23,7 +23,7 @@ describe('customer phone entry and recovery', () => {
     fireEvent.change(screen.getByLabelText('عنوان التوصيل'), { target: { value: 'عنوان توصيل واضح' } });
     fireEvent.click(await screen.findByRole('button', { name: 'دخول المنيو' }));
     expect(await screen.findByRole('button', { name: 'الرئيسية' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.queryByRole('button', { name: 'التصنيفات', exact: true })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'التصنيفات' })).not.toBeInTheDocument();
     fireEvent.click(await screen.findByRole('button', { name: 'إضافة Tea' }));
     fireEvent.click(screen.getByRole('button', { name: /أضف إلى السلة/ }));
     fireEvent.click(screen.getByRole('button', { name: /فتح السلة/ }));
