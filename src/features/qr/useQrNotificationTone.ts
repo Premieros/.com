@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 export type KitchenBellMode = 'repeat' | 'once';
 
@@ -13,7 +13,7 @@ export function useQrNotificationTone(count: number, enabled: boolean, mode: Kit
   const [ready, setReady] = useState(false);
   const pulse = useCallback(() => {
     const audio = context.current;
-    if (!audio || audio.state !== 'running' || pending.current < 1) return;
+    if (!audio || audio.state !== 'running' || pending.current < 1) return false;
     [940, 1250].forEach((frequency, index) => {
       const oscillator = audio.createOscillator();
       const gain = audio.createGain();
@@ -27,17 +27,23 @@ export function useQrNotificationTone(count: number, enabled: boolean, mode: Kit
       oscillator.start(start); oscillator.stop(start + 0.56);
       oscillator.onended = () => { oscillator.disconnect(); gain.disconnect(); };
     });
+    return true;
   }, []);
   const unlock = useCallback(async () => {
     if (!enabled) return;
     try {
-      if (!context.current) context.current = new AudioContext();
+      if (!context.current) {
+        const audio = new AudioContext();
+        audio.onstatechange = () => setReady(audio.state === 'running');
+        context.current = audio;
+      }
       await context.current.resume();
       if (context.current.state === 'running') setReady(true);
     } catch { setReady(false); }
   }, [enabled]);
   useEffect(() => {
     if (!enabled) return;
+    if (mode === 'once') void unlock();
     const activate = () => { if (context.current?.state !== 'running') void unlock(); };
     window.addEventListener('pointerdown', activate);
     window.addEventListener('keydown', activate);
@@ -45,16 +51,14 @@ export function useQrNotificationTone(count: number, enabled: boolean, mode: Kit
       window.removeEventListener('pointerdown', activate);
       window.removeEventListener('keydown', activate);
     };
-  }, [enabled, unlock]);
-  useEffect(() => {
-    if (!enabled || !ready) return;
-    if (mode === 'once') {
-      if (count > lastPlayed.current) {
-        lastPlayed.current = count;
-        pulse();
-      }
-      return;
+  }, [enabled, mode, unlock]);
+  useLayoutEffect(() => {
+    if (mode === 'once' && enabled && ready && count > lastPlayed.current && pulse()) {
+      lastPlayed.current = count;
     }
+  }, [count, enabled, mode, pulse, ready]);
+  useEffect(() => {
+    if (mode !== 'repeat' || !enabled || !ready) return;
     if (count < 1) return;
     pulse();
     const timer = setInterval(pulse, 7000);
@@ -63,7 +67,10 @@ export function useQrNotificationTone(count: number, enabled: boolean, mode: Kit
   useEffect(() => () => {
     const audio = context.current;
     context.current = null;
-    if (audio) void audio.close().catch(() => {});
+    if (audio) {
+      audio.onstatechange = null;
+      void audio.close().catch(() => {});
+    }
   }, []);
   return { ready, unlock };
 }
