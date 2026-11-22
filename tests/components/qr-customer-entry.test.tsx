@@ -94,6 +94,29 @@ describe('customer phone entry and recovery', () => {
       method === 'qr_guest_entry' && args.p_session === originalSession)).toHaveLength(2));
   });
 
+  it('restores the original submission after another visit saves a separate retry', async () => {
+    const first = 'd'.repeat(64);
+    const second = 'e'.repeat(64);
+    const sharedKey = `premier_qr_pending_v1_${token}`;
+    const item = { product_id: 'p1', name: 'Tea', price: 25, quantity: 1, notes: '' };
+    localStorage.setItem(`premier_qr_visit_v1_${token}`, JSON.stringify({ secret: first, created: Date.now() }));
+    sessionStorage.setItem(sharedKey, JSON.stringify({ key: 'first-request', session: first, table: '', items: [item] }));
+    sessionStorage.setItem(`${sharedKey}:${second}`, JSON.stringify({ key: 'second-request', session: second, table: '', items: [{ ...item, quantity: 3 }] }));
+    mocks.rpc.mockImplementation(async (name: string) => ({
+      data: name === 'qr_guest_entry' ? { enabled: true, visit: identity }
+        : name === 'qr_guest_menu' ? menu : name === 'qr_guest_place' ? { id: 'first-request' } : empty,
+      error: null,
+    }));
+    render(<GuestEntryGate token={token} />);
+    await screen.findByRole('button', { name: 'إعادة إرسال نفس الطلب بأمان' });
+    expect(screen.getByLabelText('كمية Tea')).toHaveValue(1);
+    expect(sessionStorage.getItem(sharedKey)).toBeNull();
+    expect(JSON.parse(sessionStorage.getItem(`${sharedKey}:${first}`) || '{}').key).toBe('first-request');
+    fireEvent.click(screen.getByRole('button', { name: 'إعادة إرسال نفس الطلب بأمان' }));
+    await waitFor(() => expect(sessionStorage.getItem(`${sharedKey}:${first}`)).toBeNull());
+    expect(JSON.parse(sessionStorage.getItem(`${sharedKey}:${second}`) || '{}').key).toBe('second-request');
+  });
+
   it('requires a code for an active phone on a new device without revealing its bill first', async () => {
     mocks.rpc.mockImplementation(async (name: string) => ({ data: name === 'qr_guest_entry' ? { enabled: true } : { registered: true, needs_pin: true, pin_set: true }, error: null }));
     render(<GuestEntryGate token={token} />);

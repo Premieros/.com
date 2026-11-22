@@ -34,13 +34,16 @@ export function useGuestVisit(token: string, secure = false, providedSession?: s
   const [error, setError] = useState('');
   const generation = useRef(0);
   const currentToken = useRef(token);
+  const refreshSequence = useRef(0);
   const refresh = useCallback(async () => {
     const scope = generation.current;
+    const request = ++refreshSequence.current;
+    const isCurrent = () => scope === generation.current && request === refreshSequence.current;
     try {
       const { data, error: failure } = await (secure ? qrPublic.guestTrack : qrPublic.track)({ p_token: token, p_session: session });
       if (failure) throw failure;
-      if (scope === generation.current && Array.isArray(data?.requests) && Array.isArray(data?.bills) && Array.isArray(data?.calls)) { setTracking(data); setError(''); }
-    } catch (failure) { if (scope === generation.current) setError(qrError(failure)); }
+      if (isCurrent() && Array.isArray(data?.requests) && Array.isArray(data?.bills) && Array.isArray(data?.calls)) { setTracking(data); setError(''); }
+    } catch (failure) { if (isCurrent()) setError(qrError(failure)); }
   }, [token, session, secure]);
   useEffect(() => {
     if (currentToken.current !== token) { currentToken.current = token; setSession(readVisit(token)); }

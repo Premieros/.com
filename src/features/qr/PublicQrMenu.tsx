@@ -108,7 +108,8 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
   const categoryDrag = useRef<{ x: number; scroll: number; moved: boolean } | null>(null);
   const suppressCategoryClick = useRef(false);
   const [categoryScroll, setCategoryScroll] = useState({ back: false, next: false });
-  const storageKey = `premier_qr_pending_v1_${token}`;
+  const legacyStorageKey = `premier_qr_pending_v1_${token}`;
+  const storageKey = secure ? `${legacyStorageKey}:${session}` : legacyStorageKey;
   // Each screen starts at its header, even after scrolling a long product list.
   const detailId = detail?.id;
   useEffect(() => { document.documentElement.scrollTop = 0; }, [detailId, page]);
@@ -135,8 +136,15 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
     let alive = true;
     setMenu(null); setDemoPreview(false); setDemoOrder(null); setCart(Object.fromEntries((carriedItems ?? []).map(item => [item.product_id, item]))); setRetry(null); setError(''); setReceipt(''); setTable(initialIdentity?.table_id || ''); setDetail(null); setPage(carriedItems?.length ? 'cart' : initialIdentity?.has_request ? 'visit' : 'home');
     try {
-      const stored: Draft = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
+      const saved = sessionStorage.getItem(storageKey);
+      const stored: Draft | null = JSON.parse(saved ?? (secure ? sessionStorage.getItem(legacyStorageKey) : null) ?? 'null');
       if (stored?.key && Array.isArray(stored.items) && (!secure || stored.session === session)) {
+        if (!saved && secure) {
+          try {
+            sessionStorage.setItem(storageKey, JSON.stringify(stored));
+            sessionStorage.removeItem(legacyStorageKey);
+          } catch { /* Keep using the original copy if storage is full. */ }
+        }
         setRetry(stored); setTable(stored.table || ''); setPage('cart');
         setCart(Object.fromEntries(stored.items.map(item => [item.product_id, item])));
       }
@@ -158,7 +166,7 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
       } else setMenu(data);
     }).catch(failure => { if (alive) setError(customerError(failure)); });
     return () => { alive = false; };
-  }, [token, storageKey, initialIdentity, secure, session, carriedItems]);
+  }, [token, storageKey, legacyStorageKey, initialIdentity, secure, session, carriedItems]);
   async function changeFulfillment(type: GuestOrderType, selectedTable: string | null, photo: string | null) {
     if (!identity || !session || lock.current || retry) return false;
     if (hasSubmitted && !onStartNextOrder) return false;
