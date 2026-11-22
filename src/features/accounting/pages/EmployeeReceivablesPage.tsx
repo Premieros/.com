@@ -12,7 +12,7 @@ import { useToast } from '@/components/Toast';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
-import { formatCurrency } from '@/lib/format';
+import { formatFinancialCurrency, formatCurrency } from '@/lib/format';
 import { useBranchFilter } from '@/lib/useBranchFilter';
 import { useCan } from '@/lib/permissions';
 import type { ArAgingRow } from '@/lib/types';
@@ -202,6 +202,17 @@ export function EmployeeReceivablesPage() {
     return <EmployeeReceivableDetailPage customerId={selectedEmployeeId} onBack={() => setSelectedEmployeeId(null)} />;
   }
 
+  const receivableTotals = ([
+    ['open', 'open_amount', ar ? 'الرصيد المستحق' : 'Open balance'],
+    ['0_30', 'bucket_0_30', '0–30'],
+    ['31_60', 'bucket_31_60', '31–60'],
+    ['61_90', 'bucket_61_90', '61–90'],
+    ['90_plus', 'bucket_90_plus', '90+'],
+  ] as const).map(([key, field, label]) => ({
+    key, label, value: (row: (typeof filtered)[number]) => Number(row[field]),
+    format: (sum: number) => formatFinancialCurrency(sum, currency, lang),
+  }));
+
   return (
     <DesignSurface testId="employee-receivables-page">
       <DesignPageHeader
@@ -227,7 +238,7 @@ export function EmployeeReceivablesPage() {
         </button>
         {showHistoricalBalances && <EmployeeReceivablesAsOfPanel key={effectiveBranchId} branchId={effectiveBranchId} />}
       </>}
-      {!effectiveBranchId ? <DesignPanel><div className="py-8 text-center text-sm text-ui-muted">{ar ? 'اختر الفرع لعرض ذمم الموظفين.' : 'Select a branch to view employee receivables.'}</div></DesignPanel> : <DesignPanel><DataTable columns={columns} data={filtered} loading={loading} emptyMessage={ar ? 'لا توجد حسابات موظفين' : 'No employee accounts'} /></DesignPanel>}
+      {!effectiveBranchId ? <DesignPanel><div className="py-8 text-center text-sm text-ui-muted">{ar ? 'اختر الفرع لعرض ذمم الموظفين.' : 'Select a branch to view employee receivables.'}</div></DesignPanel> : <DesignPanel><DataTable columns={columns} data={filtered} columnTotals={receivableTotals} loading={loading} emptyMessage={ar ? 'لا توجد حسابات موظفين' : 'No employee accounts'} /></DesignPanel>}
 
       <Modal open={employeeModalOpen} onClose={() => setEmployeeModalOpen(false)} title={ar ? 'إضافة موظف' : 'Add Employee'}>
         <div className="space-y-4">

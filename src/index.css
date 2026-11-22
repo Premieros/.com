@@ -607,3 +607,21 @@
     padding-top: 0 !important;
   }
 }
+
+/* A table screen sizes its row viewport around the fixed shell and page controls. */
+[data-testid="app-main"]:has([data-table-viewport]) {
+  min-height: 0;
+  padding-bottom: calc(104px + env(safe-area-inset-bottom));
+}
+
+@media (min-width: 768px) {
+  [data-testid="app-main"]:has([data-table-viewport]) { padding-bottom: 57px; }
+}
+
+[data-testid="app-main"]:has([data-table-viewport]) > [data-testid="design-content-surface"] {
+  min-height: 0;
+}
+
+[data-table-viewport] {
+  max-height: var(--table-rows-height, clamp(144px, calc(100dvh - 310px), 820px));
+}

@@ -17,7 +17,7 @@ import { Button } from '@/components/Button';
 import { Select } from '@/components/Input';
 import { Modal } from '@/components/Modal';
 import { BranchBadge } from '@/components/BranchBadge';
-import { formatCurrency, formatDate, generateInvoiceNumber } from '@/lib/format';
+import { formatFinancialCurrency, formatCurrency, formatDate, generateInvoiceNumber } from '@/lib/format';
 import { exportToExcel } from '@/lib/excel';
 import { logAudit } from '@/lib/audit';
 import { useCan } from '@/lib/permissions';
@@ -66,7 +66,7 @@ export function PurchasesPage() {
     interceptDbError,
     startGuidance,
   } = useOperationalGuard();
-  const currency = effectiveSettings(branchFilter)?.currency || 'EGP';
+  const currency = effectiveSettings(branchScope.selectedBranchIds.length === 1 ? branchScope.selectedBranchIds[0] : branchFilter)?.currency || 'EGP';
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
@@ -652,7 +652,11 @@ export function PurchasesPage() {
         <DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} testId="purchases-search" />
       </DesignPanel>
       <DesignPanel testId="purchases-table-panel" className="ui-accent-purchase">
-        <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} onRowClick={viewPurchase} />
+        <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} onRowClick={viewPurchase}
+          columnTotals={branchScope.selectedBranchIds.length === 1 ? [
+            { key: 'total', label: lang === 'ar' ? 'إجمالي المشتريات المعروضة' : 'Visible purchases total', value: (row) => Number(row.total), format: (sum) => formatFinancialCurrency(sum, currency, lang) },
+            { key: 'supplier_outstanding', label: lang === 'ar' ? 'إجمالي المستحق للموردين' : 'Visible supplier outstanding', value: (row) => supplierOutstanding(row.total, row.paid_amount, row.returned_amount), format: (sum) => formatFinancialCurrency(sum, currency, lang) },
+          ] : undefined} />
         <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
       </DesignPanel>
 

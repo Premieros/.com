@@ -14,7 +14,7 @@ import { DataTable, type Column } from '@/components/DataTable';
 import { Button } from '@/components/Button';
 import { Input, Select, Textarea } from '@/components/Input';
 import { Modal } from '@/components/Modal';
-import { formatCurrency, formatDate, todayISO } from '@/lib/format';
+import { formatFinancialCurrency, formatCurrency, formatDate, todayISO } from '@/lib/format';
 import { exportToExcel } from '@/lib/excel';
 import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
@@ -68,7 +68,7 @@ export function ExpensesPage() {
   });
   const { effectiveSettings } = useSettings();
   const { branches } = useBranches();
-  const currency = effectiveSettings(branchFilter)?.currency || 'EGP';
+  const currency = effectiveSettings(branchScope.selectedBranchIds.length === 1 ? branchScope.selectedBranchIds[0] : branchFilter)?.currency || 'EGP';
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -377,7 +377,8 @@ export function ExpensesPage() {
             ? 'كل سجلات المصروفات ظاهرة هنا، بما فيها السجلات المعكوسة/الملغاة. السجل المعكوس يظهر مشطوبًا وحالته وسبب العكس واضحان؛ التقارير المالية الفعالة تعتمد السجلات المرحلة فقط.'
             : 'All expense records are shown, including reversed/voided rows. Reversed rows are struck through with status and reason visible; active financial reporting uses posted records only.'}
         </div>
-        <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} />
+        <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')}
+          columnTotals={branchScope.selectedBranchIds.length === 1 ? [{ key: 'amount', label: t('amount'), value: (row) => Number(row.amount), format: (sum) => formatFinancialCurrency(sum, currency, lang) }] : undefined} />
         <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
       </DesignPanel>
 

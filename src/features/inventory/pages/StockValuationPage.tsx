@@ -181,7 +181,8 @@ export function StockValuationPage() {
       </DesignPanel>
 
       <DesignPanel testId="valuation-table-panel">
-        <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} />
+        <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')}
+          columnTotals={[{ key: 'total_value', label: t('totalValue'), value: (row) => Number(row.total_value), format: (sum) => formatNumber(sum, 2) }]} />
       </DesignPanel>
     </DesignSurface>
   );
