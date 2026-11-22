@@ -4,7 +4,8 @@ const mocks = vi.hoisted(() => ({ rpc: vi.fn() }));
 vi.mock('@supabase/supabase-js', () => ({ createClient: () => ({ rpc: mocks.rpc }) }));
 import { GuestVisitPanel } from '@/features/qr/GuestVisitPanel';
 import type { GuestBill, GuestIdentity } from '@/features/qr/service';
-import { GuestEntryGate, TableCamera } from '@/features/qr/GuestEntryGate';
+import { TableCamera } from '@/features/qr/TableCamera';
+import { GuestEntryGate } from '@/features/qr/GuestEntryGate';
 const token = 'a'.repeat(64);
 const identity = { id: 'visit', order_type: 'delivery', table_id: null, has_request: false, status: 'pending', pin_set: false };
 const menu = { branch_name: 'مطعم اختبار', currency: 'ج.م', tables: [], products: [{ id: 'p1', name: 'Tea', price: 25 }] };
@@ -40,6 +41,29 @@ describe('customer phone entry and recovery', () => {
     expect(mocks.rpc.mock.calls.find(([name]) => name === 'qr_guest_place_delivery')?.[1]).toMatchObject({ p_address: 'سموحة، شارع النصر، عمارة 12' });
     expect(mocks.rpc.mock.calls.some(([name]) => name === 'qr_guest_resume')).toBe(false);
   });
+  it('switches delivery to pickup in the cart without dropping items or sending a table', async () => {
+    mocks.rpc.mockImplementation(async (name: string) => ({
+      data: name === 'qr_guest_entry' ? { enabled: true, visit: identity }
+        : name === 'qr_guest_menu' ? menu
+        : name === 'qr_guest_change_fulfillment' ? { ...identity, order_type: 'pickup' }
+        : name === 'qr_guest_place' ? { id: 'pickup-request' } : empty,
+      error: null,
+    }));
+    render(<GuestEntryGate token={token} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'إضافة Tea' }));
+    fireEvent.click(screen.getByRole('button', { name: /أضف إلى السلة/ }));
+    fireEvent.click(screen.getByRole('button', { name: /فتح السلة/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'تغيير نوع الطلب' }));
+    fireEvent.change(screen.getByLabelText('كيف تستلم طلبك؟'), { target: { value: 'pickup' } });
+    fireEvent.click(screen.getByRole('button', { name: 'اعتماد نوع الطلب' }));
+    await waitFor(() => expect(screen.queryByLabelText('كيف تستلم طلبك؟')).not.toBeInTheDocument());
+    expect(screen.getByText('استلام من المطعم')).toBeInTheDocument();
+    expect(screen.getByLabelText('كمية Tea')).toHaveValue(1);
+    expect(screen.queryByRole('button', { name: 'متابعة إلى العنوان' })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'إرسال الطلب للموظف' }));
+    expect(mocks.rpc.mock.calls.find(([name]) => name === 'qr_guest_place')?.[1]).toMatchObject({ p_table: null, p_items: [{ product_id: 'p1', quantity: 1 }] });
+  });
+
   it('requires a code for an active phone on a new device without revealing its bill first', async () => {
     mocks.rpc.mockImplementation(async (name: string) => ({ data: name === 'qr_guest_entry' ? { enabled: true } : { registered: true, needs_pin: true, pin_set: true }, error: null }));
     render(<GuestEntryGate token={token} />);
@@ -53,8 +77,9 @@ describe('customer phone entry and recovery', () => {
     mocks.rpc.mockImplementation(async (name: string) => ({ data: name === 'qr_guest_entry' ? { enabled: true, visit: tableVisit } : name === 'qr_guest_menu' ? { ...menu, tables: [{ id: 't1', name: 'Table A' }] } : empty, error: null }));
     render(<GuestEntryGate token={token} />);
     await screen.findByRole('heading', { name: 'طلبي وحسابي' }); expect(screen.queryByLabelText('رقم الهاتف')).not.toBeInTheDocument();
-    expect(screen.getByLabelText('طاولتك المعتمدة')).toBeDisabled();
-    await waitFor(() => expect(screen.getByLabelText('طاولتك المعتمدة')).toHaveValue('t1'));
+    fireEvent.click(screen.getByRole('button', { name: /فتح السلة/ }));
+    await screen.findByText('داخل المطعم · Table A');
+    expect(screen.queryByRole('button', { name: 'تغيير نوع الطلب' })).not.toBeInTheDocument();
   });
   it('keeps paid deliveries current until dispatch confirms delivery, then remembers the order on this device', async () => {
     const visit: GuestIdentity = { ...identity, order_type: 'delivery', table_name: '' };

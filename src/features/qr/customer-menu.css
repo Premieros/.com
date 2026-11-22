@@ -726,3 +726,16 @@ body:has(.bunker-customer[data-bunker-theme="light"]){background:#eee6d9!importa
   color: inherit;
   background: transparent;
 }
+
+.customer-cart-fulfillment { margin-block: 12px; }
+.customer-cart-fulfillment .customer-pickup-summary { justify-content: space-between; flex-wrap: wrap; }
+.customer-cart-fulfillment .customer-pickup-summary > div { display: grid; gap: 4px; }
+.customer-cart-fulfillment .customer-refresh { margin: 0; }
+.customer-cart-fulfillment select {
+  min-height: 44px;
+  border: 1px solid currentColor;
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: var(--customer-input-bg, #fffaf3);
+  color: #28251e;
+}

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-22T12:45:24.675Z",
+  "generated_at": "2026-11-22T13:00:34.148Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -1251,6 +1251,16 @@
         "session",
         "table",
         "token"
+      ]
+    },
+    {
+      "name": "qr_guest_change_fulfillment",
+      "params": [
+        "photo",
+        "session",
+        "table",
+        "token",
+        "type"
       ]
     },
     {
