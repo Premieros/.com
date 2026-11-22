@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-22T09:51:22.588Z",
+  "generated_at": "2026-11-22T12:29:52.199Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -1295,6 +1295,16 @@
         "key",
         "session",
         "table",
+        "token"
+      ]
+    },
+    {
+      "name": "qr_guest_place_delivery",
+      "params": [
+        "address",
+        "items",
+        "key",
+        "session",
         "token"
       ]
     },
