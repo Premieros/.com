@@ -1,3 +1,4 @@
+import { optimizePhoto } from '@/lib/optimizePhoto';
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/api';
 import { ImagePlus, Save, Loader2 } from 'lucide-react';
@@ -43,10 +44,11 @@ export function WebsitePhotosSettings({branchId}:{branchId:string}) {
   if(file.size>5*1024*1024){setError('Maximum photo size is 5 MB.');return;}
   setUploading(key);
   try{
-   const ext=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
+   const photo=await optimizePhoto(file,1600);
+   const ext=photo.type==='image/png'?'png':photo.type==='image/webp'?'webp':'jpg';
    const id=crypto.randomUUID();
    const path=`${branchId}/${key}/${id}.${ext}`;
-   const {error:e}=await supabase.storage.from(BUCKET).upload(path,file,{contentType:file.type,upsert:false,cacheControl:'3600'});
+   const {error:e}=await supabase.storage.from(BUCKET).upload(path,photo,{contentType:photo.type,upsert:false,cacheControl:'3600'});
    if(e)throw e;
    const {data}=supabase.storage.from(BUCKET).getPublicUrl(path);
    const updated={...photos,[key]:data.publicUrl};

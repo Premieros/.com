@@ -1,3 +1,4 @@
+import { optimizePhoto } from '@/lib/optimizePhoto';
 import { supabase } from '@/api';
 
 export const PRODUCT_IMAGES_BUCKET = 'product-images';
@@ -19,11 +20,12 @@ export async function uploadProductImage(file: File, branchId: string, productId
   validateProductImage(file);
   if (!branchId || !productId) throw new Error('MISSING_PRODUCT_IMAGE_SCOPE');
   const token = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-  const path = `${branchId}/${productId}/${token}.${safeExtension(file)}`;
-  const { error } = await supabase.storage.from(PRODUCT_IMAGES_BUCKET).upload(path, file, {
+  const photo = await optimizePhoto(file, 960);
+  const path = `${branchId}/${productId}/${token}.${safeExtension(photo)}`;
+  const { error } = await supabase.storage.from(PRODUCT_IMAGES_BUCKET).upload(path, photo, {
     cacheControl: '31536000',
     upsert: false,
-    contentType: file.type,
+    contentType: photo.type,
   });
   if (error) throw error;
   const { data } = supabase.storage.from(PRODUCT_IMAGES_BUCKET).getPublicUrl(path);

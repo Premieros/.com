@@ -64,6 +64,7 @@ export function KitchenDisplayPage() {
   const [refreshInterrupted, setRefreshInterrupted] = useState(false);
   const sessionRecovery = useRef<Promise<boolean> | null>(null);
   const loadSequence = useRef(0);
+  const queueReads = useRef(new Map<string, { pending: boolean; promise: Promise<void> }>());
   const queueScope = JSON.stringify([branchFilter, station, canViewKds]);
   const currentQueueScope = useRef(queueScope);
   currentQueueScope.current = queueScope;
@@ -120,7 +121,7 @@ export function KitchenDisplayPage() {
     }
   }, [branchFilter, canViewKds, station]);
 
-  const load = useCallback(async () => {
+  const readKitchen = useCallback(async () => {
     const sequence = ++loadSequence.current;
     const isCurrent = () => sequence === loadSequence.current && currentQueueScope.current === queueScope;
     const readStartedAt = Date.now();
@@ -205,6 +206,24 @@ export function KitchenDisplayPage() {
       if (isCurrent()) setLoading(false);
     }
   }, [ar, branchFilter, station, canViewKds, loadNotices, queueScope]);
+
+  const load = useCallback(() => {
+    const current = queueReads.current.get(queueScope);
+    if (current) {
+      current.pending = true;
+      return current.promise;
+    }
+    const read = { pending: false, promise: Promise.resolve() };
+    read.promise = Promise.resolve().then(async () => {
+      do {
+        read.pending = false;
+        if (currentQueueScope.current !== queueScope) break;
+        await readKitchen();
+      } while (read.pending);
+    }).finally(() => { queueReads.current.delete(queueScope); });
+    queueReads.current.set(queueScope, read);
+    return read.promise;
+  }, [queueScope, readKitchen]);
 
   useEffect(() => {
     previousKitchenOrders.current = null;
@@ -354,7 +373,11 @@ export function KitchenDisplayPage() {
           </div>
         )}
 
-        {loading && !items.length && !loadError && !refreshInterrupted && <div className="text-ui-muted py-8 text-center">{ar ? 'جاري التحميل...' : 'Loading...'}</div>}
+        {loading && !items.length && !loadError && !refreshInterrupted && <div role="status" aria-label={ar ? 'جارٍ تحميل طلبات المطبخ' : 'Loading kitchen orders'} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {Array.from({ length: 3 }, (_, index) => <div key={index} aria-hidden="true" className="h-32 motion-safe:animate-pulse rounded-2xl border border-ui-border bg-ui-surface p-4">
+            <div className="mb-4 h-4 w-1/2 rounded bg-ui-page-alt" /><div className="h-3 w-3/4 rounded bg-ui-page-alt" />
+          </div>)}
+        </div>}
 
         {view === 'active' && <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
           {items.map(item => {

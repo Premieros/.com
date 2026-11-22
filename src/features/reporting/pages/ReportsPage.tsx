@@ -1,3 +1,4 @@
+import { readBranchBatches } from '../readBranchBatches';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
@@ -375,10 +376,10 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         setSummary({ total: expenses.reduce((sum: number, expense: Record<string, unknown>) => sum + Number(expense.amount || 0), 0), count: expenses.length });
       } else if (reportType === 'profit') {
         const targetBranches = reportBranches;
-        const results = await Promise.all(targetBranches.map(async (branch) => {
+        const results = await readBranchBatches(targetBranches, async (branch) => {
           const result = await reporting.getIncomeStatement({ p_branch_id: branch.id, p_from_date: from, p_to_date: to });
           return { branch, statement: requireFinancialReport(result, 'income', branch.id) };
-        }));
+        });
         const rows = results.map(({ branch, statement }) => withBranch(branch.id, {
           [lang === 'ar' ? 'الفترة' : 'Period']: `${from} - ${to}`,
           [lang === 'ar' ? 'صافي الإيراد' : 'Net Revenue']: Number(statement?.net_revenue || 0),
@@ -448,7 +449,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         setSummary({ total: rows.reduce((sum, row) => sum + Number(row[lang === 'ar' ? 'الكمية' : 'Quantity'] || 0), 0), count: rows.length });
       } else if (reportType === 'sales_by_payment') {
         const targetBranchIds = reportBranchIds;
-        const results = await Promise.all(targetBranchIds.map((branchId) => reporting.getSalesByPaymentReport({
+        const results = await readBranchBatches(targetBranchIds, (branchId) => reporting.getSalesByPaymentReport({
           p_branch_id: branchId,
           p_from: fromTs,
           p_to: toExclusiveTs,
@@ -457,7 +458,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
           p_warehouse_id: filters.warehouse || null,
           p_cashier_id: filters.cashier || null,
           p_status: filters.status || null,
-        })));
+        }));
         const methodLabels: Record<string, string> = {
           cash: t('cash'),
           card: t('card'),
@@ -839,11 +840,11 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         setSummary({ total: rows.reduce((sum, row) => sum + Number(row[lang === 'ar' ? 'المبلغ المرتجع' : 'Refunded Amount'] || 0), 0), count: rows.length });
       } else if (reportType === 'financial_reconciliation') {
         const targetBranchIds = reportBranchIds;
-        const results = await Promise.all(targetBranchIds.map((branchId) => reporting.getFinancialReconciliationReport({
+        const results = await readBranchBatches(targetBranchIds, (branchId) => reporting.getFinancialReconciliationReport({
           p_branch_id: branchId,
           p_from: fromTs,
           p_to: toExclusiveTs,
-        })));
+        }));
         const reconciliationRows: Record<string, unknown>[] = [];
         let totalNetSales = 0;
         let mismatchCount = 0;
@@ -886,7 +887,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         setSummary({ total: totalNetSales, count: mismatchCount });
       } else if (reportType === 'daily_closing_range') {
         const targetBranches = reportBranches;
-        const results = await Promise.all(targetBranches.map(async (branch) => {
+        const results = await readBranchBatches(targetBranches, async (branch) => {
           const result = await reporting.getDayClosingRangeReport({
             p_branch_id: branch.id,
             p_from_date: allowed.from,
@@ -898,7 +899,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
             branchId: branch.id,
             rows: Array.isArray(payload.rows) ? payload.rows as Record<string, unknown>[] : [],
           };
-        }));
+        });
         const rows = results.flatMap(({ branchId, rows: dayRows }) => dayRows.map((row) => withBranch(branchId, {
           [lang === 'ar' ? 'اليوم' : 'Business Date']: String(row.business_date || ''),
           [lang === 'ar' ? 'إجمالي المبيعات' : 'Gross Sales']: Number(row.gross_sales || 0),
@@ -930,7 +931,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         });
       } else if (reportType === 'raw_material_consumption') {
         const targetBranches = reportBranches;
-        const results = await Promise.all(targetBranches.map(async (branch) => {
+        const results = await readBranchBatches(targetBranches, async (branch) => {
           const result = await reporting.getRawMaterialConsumptionReport({
             p_branch_id: branch.id,
             p_from_date: allowed.from,
@@ -938,7 +939,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
           });
           if (result.error) throw result.error;
           return { branchId: branch.id, rows: Array.isArray(result.data) ? result.data as Record<string, unknown>[] : [] };
-        }));
+        });
         const rows = results.flatMap(({ branchId, rows: rawRows }) => rawRows.map((row) => withBranch(branchId, {
           [lang === 'ar' ? 'الخامة' : 'Raw Material']: row.raw_material_name || '-',
           [lang === 'ar' ? 'الكود' : 'Code']: row.raw_material_code || '',
@@ -1002,7 +1003,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         });
       } else if (reportType === 'raw_material_financial') {
         const targetBranches = reportBranches;
-        const results = await Promise.all(targetBranches.map(async (branch) => {
+        const results = await readBranchBatches(targetBranches, async (branch) => {
           const result = await reporting.getRawMaterialFinancialReport({
             p_branch_id: branch.id,
             p_from_date: allowed.from,
@@ -1015,7 +1016,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
             summary: (payload.summary || {}) as Record<string, unknown>,
             rows: Array.isArray(payload.rows) ? payload.rows as Record<string, unknown>[] : [],
           };
-        }));
+        });
         const rows = results.flatMap(({ branchId, summary: financial, rows: rawRows }) => {
           const summaryRow = withBranch(branchId, {
             [lang === 'ar' ? 'الخامة' : 'Raw Material']: lang === 'ar' ? 'إجمالي الفترة' : 'Period Total',
@@ -1049,7 +1050,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         });
       } else if (reportType === 'sales_component_reconciliation') {
         const targetBranches = reportBranches;
-        const results = await Promise.all(targetBranches.map(async (branch) => {
+        const results = await readBranchBatches(targetBranches, async (branch) => {
           const result = await reporting.getSalesComponentReconciliationReport({
             p_branch_id: branch.id,
             p_from_date: allowed.from,
@@ -1062,7 +1063,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
             summary: (payload.summary || {}) as Record<string, unknown>,
             rows: Array.isArray(payload.rows) ? payload.rows as Record<string, unknown>[] : [],
           };
-        }));
+        });
         const rows = results.flatMap(({ branchId, summary: reconciliation, rows: rawRows }) => {
           const summaryRow = withBranch(branchId, {
             [lang === 'ar' ? 'الخامة' : 'Raw Material']: lang === 'ar' ? 'إجمالي الفترة' : 'Period Total',

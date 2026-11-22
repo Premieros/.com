@@ -436,24 +436,35 @@ export function PosWorkspacePage() {
         let cusq = supabase.from('customers').select('*');
         let catq = supabase.from('categories').select('*');
         let areaq = supabase.from('dining_areas').select('*');
-        const productQuery = fixedBranch
-          ? supabase.from('products').select('*').eq('branch_id', fixedBranch).eq('is_active', true)
-          : supabase.from('products').select('*').eq('is_active', true).order('name');
         if (fixedBranch) {
           cusq = cusq.eq('branch_id', fixedBranch);
           catq = catq.eq('branch_id', fixedBranch);
           areaq = areaq.eq('branch_id', fixedBranch);
         }
-        const [pRes, cRes, catRes, aRes] = await Promise.allSettled([
-          Promise.resolve(productQuery).then(result => {
-            // Customers and dining-area refreshes must not delay the catalog.
-            if (!cancelled && !result.error) {
+        const loadCatalog = async () => {
+          const products: Product[] = [];
+          let pageSize = 120;
+          while (!cancelled) {
+            let query = supabase.from('products').select('*').eq('is_active', true);
+            if (fixedBranch) query = query.eq('branch_id', fixedBranch);
+            const { data, error } = await query.order('name').order('id')
+              .range(products.length, products.length + pageSize - 1);
+            if (error) return { data: null, error };
+            const page = (data || []) as Product[];
+            products.push(...page);
+            if (cancelled) break;
+            if (!serverCatalogReceived) {
               serverCatalogReceived = true;
-              setProducts((result.data as Product[]) || []);
+              setProducts(products.slice());
               setLoading(false);
             }
-            return result;
-          }),
+            if (page.length < pageSize) break;
+            pageSize = 500;
+          }
+          return { data: products, error: null };
+        };
+        const [pRes, cRes, catRes, aRes] = await Promise.allSettled([
+          loadCatalog(),
           cusq.order('name'),
           catq.order('name'),
           areaq.order('name'),
@@ -732,9 +743,14 @@ export function PosWorkspacePage() {
 
   if (loading) {
     return (
-      <div className="h-screen flex flex-col items-center justify-center bg-ui-page gap-4">
-        <Logo variant="mark" size={56} tone="auto" />
-        <div className="animate-spin rounded-full h-10 w-10 border-2 border-ui-primary border-t-transparent" />
+      <div role="status" aria-label={isAr ? 'جارٍ تحميل شاشة البيع' : 'Loading point of sale'} className="min-h-screen bg-ui-page p-4">
+        <div aria-hidden="true" className="mb-4 h-14 rounded-xl border border-ui-border bg-ui-surface" />
+        <div aria-hidden="true" className="grid gap-4 motion-safe:animate-pulse lg:grid-cols-[2fr_1fr]">
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            {Array.from({ length: 6 }, (_, index) => <div key={index} className="h-24 rounded-xl border border-ui-border bg-ui-surface" />)}
+          </div>
+          <div className="h-48 rounded-xl border border-ui-border bg-ui-surface" />
+        </div>
       </div>
     );
   }
