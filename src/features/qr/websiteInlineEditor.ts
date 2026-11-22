@@ -52,10 +52,15 @@ export async function executeWebsiteEdit(request:EditorRequest) {
   if(request.file) {
    const file=request.file;
    if(!(file instanceof File) || !['image/jpeg','image/png','image/webp'].includes(file.type) || file.size>5*1024*1024 || !file.size) throw new Error('اختر صورة JPG أو PNG أو WebP بحجم لا يتجاوز 5 ميجابايت.');
+   // Read the file received from the site window before starting the Storage request.
+   // Send the image bytes directly instead of letting fetch read a cross-window File.
+   const bytes=await file.arrayBuffer().catch(()=>{
+    throw new Error('تعذرت قراءة الصورة. أعد اختيارها من جهازك.');
+   });
    const ext=file.type==='image/png'?'png':file.type==='image/webp'?'webp':'jpg';
    const path=`${BUNKER_BRANCH}/${request.key}/${crypto.randomUUID()}.${ext}`;
    const bucket=supabase.storage.from('branch-website-photos');
-   checked(await bucket.upload(path,file,{contentType:file.type,upsert:false,cacheControl:'3600'}));
+   checked(await bucket.upload(path,bytes,{contentType:file.type,upsert:false,cacheControl:'3600'}));
    url=bucket.getPublicUrl(path).data.publicUrl;
   } else {
    if(typeof request.value!=='string' || request.value.length>1500)throw new Error('رابط الصورة غير صالح.');
