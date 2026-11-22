@@ -12,7 +12,7 @@ const empty = { requests: [], bills: [], calls: [] };
 describe('customer phone entry and recovery', () => {
   beforeEach(() => {
     cleanup(); localStorage.clear(); sessionStorage.clear(); mocks.rpc.mockReset();
-    mocks.rpc.mockImplementation(async (name: string) => ({ data: name === 'qr_guest_entry' ? { enabled: true, tables: [] } : name === 'qr_guest_menu' ? menu : name === 'qr_guest_track' ? empty : name === 'qr_guest_lookup' ? { registered: false, needs_pin: false } : name === 'qr_guest_begin' ? identity : name === 'qr_guest_place' ? { id: 'request', recovery_code: '07' } : null, error: null }));
+    mocks.rpc.mockImplementation(async (name: string) => ({ data: name === 'qr_guest_entry' ? { enabled: true, tables: [] } : name === 'qr_guest_menu' ? menu : name === 'qr_guest_track' ? empty : name === 'qr_guest_lookup' ? { registered: false, needs_pin: false } : name === 'qr_guest_begin' ? identity : name === 'qr_guest_place_delivery' ? { id: 'request', recovery_code: '07' } : null, error: null }));
   });
   afterEach(() => { cleanup(); vi.restoreAllMocks(); });
   it('never asks a new customer for a PIN and shows the two digits after the first submission', async () => {
@@ -22,19 +22,22 @@ describe('customer phone entry and recovery', () => {
     fireEvent.click(screen.getByRole('button', { name: 'متابعة' }));
     fireEvent.change(await screen.findByLabelText('اسمك'), { target: { value: 'عميل اختبار' } });
     fireEvent.click(screen.getByRole('button', { name: 'متابعة' }));
-    fireEvent.change(screen.getByLabelText('عنوان التوصيل'), { target: { value: 'عنوان توصيل واضح' } });
-    fireEvent.click(await screen.findByRole('button', { name: 'دخول المنيو' }));
     expect(await screen.findByRole('button', { name: 'الرئيسية' })).toHaveAttribute('aria-current', 'page');
     expect(screen.queryByRole('button', { name: 'التصنيفات' })).not.toBeInTheDocument();
     fireEvent.click(await screen.findByRole('button', { name: 'إضافة Tea' }));
     fireEvent.click(screen.getByRole('button', { name: /أضف إلى السلة/ }));
     fireEvent.click(screen.getByRole('button', { name: /فتح السلة/ }));
     expect(screen.queryByLabelText('رمز استرجاع الطلب')).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'إرسال الطلب للموظف' }));
+    expect(screen.queryByLabelText('المنطقة')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'متابعة إلى العنوان' }));
+    fireEvent.change(screen.getByLabelText('المنطقة'), { target: { value: 'سموحة' } });
+    fireEvent.change(screen.getByLabelText('الشارع'), { target: { value: 'شارع النصر' } });
+    fireEvent.change(screen.getByLabelText('العمارة والدور أو الشقة'), { target: { value: 'عمارة 12' } });
+    fireEvent.click(screen.getByRole('button', { name: 'إرسال الطلب للمطعم' }));
     expect(await screen.findByText('07')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'طلبي وحسابي' })).toHaveAttribute('aria-current', 'page');
     expect(screen.getByText(/احتفظ به لفتح طلبك/)).toBeInTheDocument();
-    expect(mocks.rpc.mock.calls.find(([name]) => name === 'qr_guest_place')?.[1]).toMatchObject({ p_table: null });
+    expect(mocks.rpc.mock.calls.find(([name]) => name === 'qr_guest_place_delivery')?.[1]).toMatchObject({ p_address: 'سموحة، شارع النصر، عمارة 12' });
     expect(mocks.rpc.mock.calls.some(([name]) => name === 'qr_guest_resume')).toBe(false);
   });
   it('requires a code for an active phone on a new device without revealing its bill first', async () => {

@@ -56,6 +56,7 @@ describe('Phone check-in and private table visits on PostgreSQL', () => {
     await db.exec("ALTER TABLE public.branches ADD COLUMN address text DEFAULT 'Pickup address'");
     await db.exec(sqlFile('supabase/migrations/20261122140000_branch_delivery_dispatch.sql'));
     await db.exec(sqlFile('supabase/migrations/20261122160000_customer_pickup_and_dispatch_tracking.sql'));
+    await db.exec(sqlFile('supabase/migrations/20261122170000_delivery_address_at_checkout.sql'));
   }, 30_000);
   beforeEach(async () => {
     await db.exec('RESET ROLE');
@@ -121,6 +122,19 @@ describe('Phone check-in and private table visits on PostgreSQL', () => {
     const follow=await place(session,'50000000-0000-4000-8000-000000000002',null);expect((await approve(follow.id,null)).order_id).toBe(a.order_id);
     await anon();const c=await scalar<Result>('select public.qr_guest_call($1,$2,$3,null,\'check\',\'\') result',[token,session,key]);expect((await track()).calls[0].id).toBe(c.id);
     await db.exec('RESET ROLE');const order=await scalar<Result>('select to_jsonb(o) result from public.orders o where id=$1',[a.order_id]);expect(order).toMatchObject({table_id:null,order_type:'delivery',service_details:{phone:'+201012345678',address:'عنوان توصيل تجريبي'}});
+  });
+  it('requires a delivery address only at checkout and locks it on an idempotent submission', async () => {
+    await anon();
+    await scalar('select public.qr_guest_begin($1,$2,$3,$4,$5,null,null,null) result', [token, session, phone, 'عميل اختبار', 'delivery']);
+    await expect(place(session, key, null)).rejects.toThrow('QR_ADDRESS_REQUIRED');
+    const checkout = (address: string) => scalar<Result>(
+      'select public.qr_guest_place_delivery($1,$2,$3,$4,$5) result',
+      [token, session, key, JSON.stringify([item]), address],
+    );
+    await expect(checkout('')).rejects.toThrow('QR_ADDRESS_REQUIRED');
+    const order = await checkout('سموحة، شارع النصر، عمارة 12');
+    expect((await checkout('سموحة، شارع النصر، عمارة 12')).id).toBe(order.id);
+    await expect(checkout('عنوان مختلف')).rejects.toThrow('QR_IDEMPOTENCY_CONFLICT');
   });
   it('creates pickup as takeaway, prevents table assignment, and preserves final tracking on the same device', async () => {
     await expect(begin('pickup', table)).rejects.toThrow('QR_TABLE_LOCKED');

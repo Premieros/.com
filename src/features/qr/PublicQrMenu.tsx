@@ -12,7 +12,7 @@ import './customer-menu.css';
 import { useGuestVisit } from './useGuestVisit';
 import { GuestVisitPanel } from './GuestVisitPanel';
 
-interface Draft { key: string; items: QrItem[]; table: string; session?: string }
+interface Draft { key: string; items: QrItem[]; table: string; session?: string; address?: string }
 interface Menu { table_name: string; table_id: string; branch_name: string; currency: string; appearance?: QrAppearance; tables: QrTable[]; products: QrProduct[] }
 function foodSymbol(name: string) {
   if (/coffee|قهو|كافي|espresso|latte/i.test(name)) return '☕';
@@ -70,6 +70,11 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
   const [menu, setMenu] = useState<Menu | null>(null);
   const [demoPreview, setDemoPreview] = useState(false);
   const [demoOrder, setDemoOrder] = useState<{ items: QrItem[]; total: number; placedAt: string } | null>(null);
+  const [checkout, setCheckout] = useState(false);
+  const [area, setArea] = useState('');
+  const [street, setStreet] = useState('');
+  const [building, setBuilding] = useState('');
+  const [directions, setDirections] = useState('');
   const [cart, setCart] = useState<Record<string, QrItem>>({});
   const [table, setTable] = useState('');
   const [query, setQuery] = useState('');
@@ -140,7 +145,7 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
     }).catch(failure => { if (alive) setError(customerError(failure)); });
     return () => { alive = false; };
   }, [token, storageKey, identity, secure, session]);
-  async function submit() {
+  async function submit(address?: string) {
     if (demoPreview) {
       const selection = Object.values(cart).filter(item => item.quantity > 0);
       if (!selection.length) return;
@@ -150,14 +155,16 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
     }
     if (lock.current || (!retry && !table && !withoutTable)) return;
     lock.current = true; setBusy(true); setError('');
-    const draft = retry || { key: crypto.randomUUID(), items: Object.values(cart).filter(i => i.quantity > 0), table, session: visit.session };
+    const draft = retry || { key: crypto.randomUUID(), items: Object.values(cart).filter(i => i.quantity > 0), table, session: visit.session, address };
     // Old uncertain drafts remain on their original link's default table.
     const selectedTable = withoutTable ? '' : draft.table || menu?.table_id || '';
     setRetry({ ...draft, table: selectedTable });
     try {
       try { sessionStorage.setItem(storageKey, JSON.stringify({ ...draft, table: selectedTable })); } catch { /* In-memory fallback. */ }
       const payload = { p_token: token, p_key: draft.key, p_items: draft.items, p_table: selectedTable };
-      const { data, error: failure } = secure ? await qrPublic.guestSubmit({ ...payload, p_table: withoutTable ? null : selectedTable, p_session: visit.session }) : draft.session
+      const { data, error: failure } = secure && delivery && draft.address
+        ? await qrPublic.guestSubmitDelivery({ p_token: token, p_session: visit.session, p_key: draft.key, p_items: draft.items, p_address: draft.address })
+        : secure ? await qrPublic.guestSubmit({ ...payload, p_table: withoutTable ? null : selectedTable, p_session: visit.session }) : draft.session
         ? await qrPublic.submit({ ...payload, p_session: draft.session })
         : await qrPublic.submitLegacy(payload);
       if (failure) throw failure;
@@ -165,17 +172,18 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
       setReceipt(data.id);
       if (data.recovery_code) { setRecoveryCode(data.recovery_code); try { sessionStorage.setItem(`premier_qr_pin_${session}`, data.recovery_code); } catch { /* Display remains in memory. */ } }
       setCart({}); setRetry(null);
-      setPage('visit'); void visit.refresh();
+      setCheckout(false); setPage('visit'); void visit.refresh();
       try { sessionStorage.removeItem(storageKey); } catch { /* No storage. */ }
     } catch (failure) {
       setError(customerError(failure));
       const message = typeof failure === 'object' && failure && 'message' in failure ? String(failure.message) : '';
-      if (/QR_(PRICE_CHANGED|PRODUCT_UNAVAILABLE|INVALID_ITEMS|RATE_LIMITED|LINK_INVALID|TABLE_INVALID|DISABLED|SESSION_EXPIRED)/.test(message)) {
+      if (/QR_(PRICE_CHANGED|PRODUCT_UNAVAILABLE|INVALID_ITEMS|RATE_LIMITED|LINK_INVALID|TABLE_INVALID|DISABLED|SESSION_EXPIRED|ADDRESS_REQUIRED)/.test(message)) {
         setRetry(null);
         try { sessionStorage.removeItem(storageKey); } catch { /* No storage. */ }
       }
     } finally { lock.current = false; setBusy(false); }
   }
+  const needsDeliveryAddress = delivery && !identity?.has_delivery_address && !identity?.has_request && !receipt;
   const items = Object.values(cart).filter(i => i.quantity > 0);
   const total = items.reduce((sum, i) => sum + i.quantity * i.price, 0);
   const count = items.reduce((sum, i) => sum + i.quantity, 0);
@@ -234,7 +242,21 @@ export function PublicQrMenu({ token, identity, session, onClosed }: { token: st
           <span>{withoutTable ? menu?.branch_name : menu?.tables.find(option => option.id === table)?.name}</span>
         </div>}
         <div className="customer-total"><span>{isBunker ? 'Subtotal' : 'إجمالي الأصناف'}</span><strong>{total.toFixed(2)} {currency}</strong></div><p className="customer-table-hint">{demoPreview ? 'Demo only — no payment, tax invoice, or real order will be created.' : isBunker ? 'Taxes are calculated on your branch bill. Payment is handled by our team.' : 'الضرائب حسب فاتورة الفرع · الدفع لدى الموظف'}</p>
-        <button className="customer-primary" disabled={busy || (!retry && (!items.length || (!demoPreview && !table && !withoutTable)))} onClick={() => void submit()}>{demoPreview ? 'Simulate order — no charge' : busy ? (isBunker ? 'Sending…' : 'جارٍ الإرسال…') : retry ? (isBunker ? 'Retry the same order' : 'إعادة إرسال نفس الطلب بأمان') : (isBunker ? 'Place order' : 'إرسال الطلب للموظف')}</button>
+        {checkout && delivery && !retry && <form className="customer-delivery-checkout" onSubmit={event => {
+          event.preventDefault();
+          const address = [area, street, building, directions].map(value => value.trim()).filter(Boolean).join('، ');
+          if (area.trim() && street.trim() && building.trim()) void submit(address);
+        }}>
+          <h3>{isBunker ? 'Delivery address' : 'عنوان التوصيل'}</h3>
+          <label>{isBunker ? 'Area' : 'المنطقة'}<input required maxLength={80} value={area} onChange={event => setArea(event.target.value)} /></label>
+          <label>{isBunker ? 'Street' : 'الشارع'}<input required maxLength={140} value={street} onChange={event => setStreet(event.target.value)} /></label>
+          <label>{isBunker ? 'Building, floor or unit' : 'العمارة والدور أو الشقة'}<input required maxLength={100} value={building} onChange={event => setBuilding(event.target.value)} /></label>
+          <label>{isBunker ? 'Landmark or directions (optional)' : 'علامة مميزة أو تعليمات (اختياري)'}<textarea maxLength={150} value={directions} onChange={event => setDirections(event.target.value)} /></label>
+          <p>{isBunker ? 'The restaurant will confirm your delivery charge and total.' : 'المطعم يؤكد رسوم التوصيل والإجمالي بعد استلام الطلب.'}</p>
+          <button className="customer-primary" disabled={busy || !items.length}>{isBunker ? 'Send order to restaurant' : 'إرسال الطلب للمطعم'}</button>
+          <button type="button" className="customer-refresh" onClick={() => setCheckout(false)}>{isBunker ? 'Back to cart' : 'العودة للسلة'}</button>
+        </form>}
+        {(!checkout || retry) && <button className="customer-primary" disabled={busy || (!retry && (!items.length || (!demoPreview && !table && !withoutTable)))} onClick={() => needsDeliveryAddress && !retry ? setCheckout(true) : void submit()}>{demoPreview ? 'Simulate order — no charge' : busy ? (isBunker ? 'Sending…' : 'جارٍ الإرسال…') : retry ? (isBunker ? 'Retry the same order' : 'إعادة إرسال نفس الطلب بأمان') : needsDeliveryAddress ? (isBunker ? 'Continue to address' : 'متابعة إلى العنوان') : (isBunker ? 'Place order' : 'إرسال الطلب للموظف')}</button>}
         {retry && <p className="customer-alert">{isBunker ? 'Previous order status is uncertain. Retry the same request to prevent duplicates.' : 'نتيجة الطلب السابق غير مؤكدة. أعد إرساله بنفس الرقم لتجنب التكرار.'}</p>}
       </section>}
       <nav className="customer-bottom customer-glass-nav" aria-label={isBunker ? 'Menu navigation' : 'تصفح المنيو'}>

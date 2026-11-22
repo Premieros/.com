@@ -58,10 +58,10 @@ export function GuestEntryGate({ token }: { token: string }) {
   const [identity, setIdentity] = useState<GuestIdentity | null>(null);
   const history = useGuestOrderHistory(token);
   const [showHistory, setShowHistory] = useState(false);
-  const [step, setStep] = useState<'phone' | 'name' | 'type' | 'table' | 'delivery' | 'pickup' | 'pin'>('type');
+  const [step, setStep] = useState<'phone' | 'name' | 'type' | 'table' | 'pickup' | 'pin'>('type');
   const [orderType, setOrderType] = useState<GuestOrderType>('dine_in');
   const [phone, setPhone] = useState(''); const [name, setName] = useState(''); const [pin, setPin] = useState('');
-  const [photo, setPhoto] = useState(''); const [table, setTable] = useState(''); const [address, setAddress] = useState('');
+  const [photo, setPhoto] = useState(''); const [table, setTable] = useState('');
   const [camera, setCamera] = useState(false); const [error, setError] = useState(''); const [busy, setBusy] = useState(false);
   const [closed, setClosed] = useState(false); const lock = useRef(false);
   useEffect(() => {
@@ -85,10 +85,11 @@ export function GuestEntryGate({ token }: { token: string }) {
     else setStep('name');
   }
   async function continueOrder() {
-    setStep(orderType === 'dine_in' ? 'table' : orderType);
+    if (orderType === 'delivery') await begin('delivery');
+    else setStep(orderType === 'dine_in' ? 'table' : 'pickup');
   }
   async function begin(type: GuestOrderType) {
-    const { data, error: failure } = await qrPublic.begin({ p_token: token, p_session: session, p_phone: phone, p_name: name, p_type: type, p_table: type === 'dine_in' ? table : null, p_photo: type === 'dine_in' ? photo : null, p_address: type === 'delivery' ? address : null });
+    const { data, error: failure } = await qrPublic.begin({ p_token: token, p_session: session, p_phone: phone, p_name: name, p_type: type, p_table: type === 'dine_in' ? table : null, p_photo: type === 'dine_in' ? photo : null, p_address: null });
     if (failure) throw failure; setIdentity(data);
   }
   async function resume() {
@@ -96,13 +97,13 @@ export function GuestEntryGate({ token }: { token: string }) {
     const { data, error: failure } = await qrPublic.resume({ p_token: token, p_session: session, p_phone: phone, p_pin: pin });
     if (failure) throw failure; if (!data?.success) throw new Error(data?.error || 'QR_PIN_INVALID'); setIdentity(data.visit);
   }
-  function restart() { setIdentity(null); setClosed(false); setStep('type'); setPhone(''); setName(''); setPhoto(''); setTable(''); setAddress(''); setPin(''); setSession(resetVisit(token)); }
+  function restart() { setIdentity(null); setClosed(false); setStep('type'); setPhone(''); setName(''); setPhoto(''); setTable(''); setPin(''); setSession(resetVisit(token)); }
   if (entry?.enabled === false) return <PublicQrMenu token={token} />;
   if (identity && !closed) return <PublicQrMenu key={session} token={token} identity={identity} session={session} onClosed={() => { setIdentity(null); setClosed(true); }} />;
   return <main dir={isBunker ? "ltr" : "rtl"} data-bunker-theme={isBunker ? bunkerMode : undefined} className={`customer-app customer-entry${isBunker ? " bunker-customer" : ""}`}><header><span className="customer-eyebrow">{entry?.branch_name || (isBunker ? 'BUNKER' : 'Premier')}</span><h1>{closed ? (isBunker ? 'Visit complete' : 'انتهت زيارتك') : (isBunker ? 'Welcome to BUNKER' : 'أهلًا بك')}</h1><p>{closed ? (isBunker ? 'Your visit is complete. Start a new order any time.' : 'أُغلق الدخول لهذه الزيارة. يمكنك بدء طلب جديد.') : (isBunker ? 'Your orders, all in one place.' : 'طلبك وحسابك في مكان واحد')}</p></header>
     <CustomerSupportLink token={token} />
     {error && <p role="alert" className="customer-alert">{error}</p>}
-    {!entry ? <><p role="status">{isBunker ? 'Checking branch link…' : 'جارٍ التحقق من رابط الفرع…'}</p>{error && <button className="customer-primary" onClick={() => window.location.reload()}>{isBunker ? 'Try again' : 'إعادة المحاولة'}</button>}</> : closed ? <><ClosedOrder token={token} session={session} currency={entry.currency || ''} restart={restart} /><button className="customer-primary" onClick={restart}>{isBunker ? 'Start a new order' : 'بدء طلب جديد'}</button></> : <form onSubmit={e => { e.preventDefault(); void run(step === 'phone' ? lookup : step === 'pin' ? resume : step === 'table' ? () => begin('dine_in') : step === 'delivery' || step === 'pickup' ? () => begin(step) : continueOrder); }}>
+    {!entry ? <><p role="status">{isBunker ? 'Checking branch link…' : 'جارٍ التحقق من رابط الفرع…'}</p>{error && <button className="customer-primary" onClick={() => window.location.reload()}>{isBunker ? 'Try again' : 'إعادة المحاولة'}</button>}</> : closed ? <><ClosedOrder token={token} session={session} currency={entry.currency || ''} restart={restart} /><button className="customer-primary" onClick={restart}>{isBunker ? 'Start a new order' : 'بدء طلب جديد'}</button></> : <form onSubmit={e => { e.preventDefault(); void run(step === 'phone' ? lookup : step === 'pin' ? resume : step === 'table' ? () => begin('dine_in') : step === 'pickup' ? () => begin(step) : continueOrder); }}>
       {step === 'phone' && <><label>{isBunker ? 'Phone number' : 'رقم الهاتف'}<input type="tel" autoComplete="tel" inputMode="tel" required maxLength={24} value={phone} disabled={busy} onChange={e => setPhone(e.target.value)} /></label><p>{isBunker ? 'If you have an active order, you can reopen it with your recovery code.' : 'إذا كان لديك طلب نشط سنفتح طلبك بعد التحقق من رمز الاسترجاع.'}</p></>}
       {step === 'name' && <label>{isBunker ? 'Your name' : 'اسمك'}<input required autoComplete="name" minLength={2} maxLength={100} value={name} disabled={busy} onChange={e => setName(e.target.value)} /></label>}
       {step === 'pin' && <><label>{isBunker ? 'Recovery code' : 'رمز استرجاع الطلب'}<input required type="text" inputMode="numeric" autoComplete="off" minLength={2} maxLength={2} value={pin} onChange={e => setPin(normalizeRecoveryPin(e.target.value))} /></label><p>{isBunker ? 'Enter the two-digit code shown after your first order. Ask our team if you need a new one. Recovery locks after three wrong attempts.' : 'الرقمان اللذان ظهرا بعد إرسال أول طلب. إذا نسيتهما، اطلب رمزًا جديدًا من الموظف. بعد ٣ محاولات خاطئة يتوقف الاسترجاع.'}</p></>}
@@ -122,8 +123,7 @@ export function GuestEntryGate({ token }: { token: string }) {
       {step === 'type' && showHistory && <GuestPreviousOrders token={token} english={isBunker} />}
       {step === 'pickup' && <div className="customer-pickup-summary"><Store aria-hidden="true" size={22} /><div><strong>{entry.branch_name}</strong>{entry.branch_address && <p>{entry.branch_address}</p>}<p>{isBunker ? 'Collect your order at this branch once it is ready.' : 'استلم طلبك من هذا الفرع عند جاهزيته.'}</p></div></div>}
       {step === 'table' && <><h2>{isBunker ? 'Photograph your table number' : 'صوّر رقم طاولتك'}</h2><p>{isBunker ? 'Point your camera at the table number. Our team will confirm it or assign another table.' : 'وجّه الكاميرا لرقم الطاولة فقط. الموظف سيراجع الصورة ويؤكد الطاولة أو يختار لك بديلًا.'}</p>{photo ? <><img className="customer-table-photo" src={photo} alt={isBunker ? 'Table number photo' : 'صورة رقم الطاولة'} /><button type="button" className="customer-refresh" onClick={() => { setPhoto(''); setCamera(true); }}>{isBunker ? 'Retake photo' : 'إعادة التصوير'}</button></> : camera ? <TableCamera onCapture={image => { setPhoto(image); setCamera(false); }} /> : <button type="button" className="customer-primary" onClick={() => setCamera(true)}>{isBunker ? 'Open camera' : 'فتح الكاميرا'}</button>}<label>{isBunker ? 'Table number in photo' : 'رقم الطاولة الظاهر في الصورة'}<select required value={table} onChange={e => setTable(e.target.value)}><option value="">{isBunker ? 'Choose a table' : 'اختر الطاولة'}</option>{entry.tables?.map(t => <option key={t.id} value={t.id}>{t.name}{t.busy ? (isBunker ? ' · Occupied' : ' · مشغولة') : ''}</option>)}</select></label><p>{isBunker ? 'Your visit will be linked to this table. Our team can change it if needed.' : 'بعد الدخول ترتبط بهذه الطاولة، وتعديلها يكون لدى الموظف فقط.'}</p></>}
-      {step === 'delivery' && <label>{isBunker ? 'Delivery address' : 'عنوان التوصيل'}<textarea required minLength={5} maxLength={500} value={address} onChange={e => setAddress(e.target.value)} /></label>}
-      {step !== 'type' && <button className="customer-primary" disabled={busy || (step === 'table' && (!photo || !table))}>{busy ? (isBunker ? 'Checking…' : 'جارٍ التحقق…') : step === 'pin' ? (isBunker ? 'Open my order' : 'فتح طلبي') : step === 'table' || step === 'delivery' || step === 'pickup' ? (isBunker ? 'Open menu' : 'دخول المنيو') : (isBunker ? 'Continue' : 'متابعة')}</button>}
+      {step !== 'type' && <button className="customer-primary" disabled={busy || (step === 'table' && (!photo || !table))}>{busy ? (isBunker ? 'Checking…' : 'جارٍ التحقق…') : step === 'pin' ? (isBunker ? 'Open my order' : 'فتح طلبي') : step === 'table' || step === 'pickup' ? (isBunker ? 'Open menu' : 'دخول المنيو') : (isBunker ? 'Continue' : 'متابعة')}</button>}
       {step === 'phone' && <button type="button" className="customer-refresh" onClick={() => setStep('type')}>{isBunker ? 'Change order type' : 'تغيير نوع الطلب'}</button>}
       {step !== 'phone' && step !== 'type' && <button type="button" disabled={busy} className="customer-refresh" onClick={() => { setStep('phone'); setCamera(false); setError(''); }}>{isBunker ? 'Change phone number' : 'تغيير رقم الهاتف'}</button>}
     </form>}
