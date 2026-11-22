@@ -14,6 +14,7 @@ export const qrPublic = {
   guestMenu(p: { p_token: string; p_session: string }) { return rpc('qr_guest_menu', p); },
   guestTrack(p: { p_token: string; p_session: string }) { return rpc('qr_guest_track', p); },
   guestSubmit(p: { p_token: string; p_session: string; p_key: string; p_items: QrItem[]; p_table: string | null }) { return rpc('qr_guest_place', p); },
+  guestSubmitDelivery(p: { p_token: string; p_session: string; p_key: string; p_items: QrItem[]; p_address: string | null }) { return rpc('qr_guest_place_delivery', p); },
   guestCall(p: { p_token: string; p_session: string; p_key: string; p_table: string | null; p_kind: string; p_note: string }) { return rpc('qr_guest_call', p); },
   rating(p: { p_token: string; p_session: string }) { return rpc('qr_guest_rating', p); },
   rate(p: { p_token: string; p_session: string; p_overall: number; p_food: number; p_service: number; p_note: string }) { return rpc('qr_guest_rate', p); },

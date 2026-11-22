@@ -6,7 +6,7 @@ export interface QrAppearance { brand_name?: string; subtitle?: string; logo_url
 export interface QrSettings { enabled: boolean; checkin_enabled?: boolean; appearance: QrAppearance; reviewer_roles: string[] }
 export interface QrItem { product_id: string; quantity: number; price: number; notes: string; name?: string }
 export type GuestOrderType = 'dine_in' | 'delivery' | 'pickup';
-export interface GuestIdentity { id: string; order_type: GuestOrderType; table_id: string | null; table_name: string; has_request: boolean; status: string; pin_set: boolean }
+export interface GuestIdentity { has_delivery_address?: boolean; id: string; order_type: GuestOrderType; table_id: string | null; table_name: string; has_request: boolean; status: string; pin_set: boolean }
 export interface StaffVisit { id: string; order_type: string; status: string; order_id?: string; name: string; phone: string; table_name: string; pin_locked: boolean }
 export interface QrRequest { visit_id?: string; order_type?: string; customer_name?: string; customer_phone?: string; delivery_address?: string; has_photo?: boolean; photo_verified?: boolean; own_active_order_id?: string; own_active_table_id?: string; id: string; table_id: string | null; table_name: string; items: QrItem[]; created_at: string }
 export interface GuestRequest { id: string; status: string; items: QrItem[]; created_at: string; requested_table: string; assigned_table?: string }

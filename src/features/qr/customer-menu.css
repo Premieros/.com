@@ -713,3 +713,16 @@ body:has(.bunker-customer[data-bunker-theme="light"]){background:#eee6d9!importa
   background: color-mix(in srgb, currentColor 8%, transparent);
 }
 .customer-order-history li > div { display: flex; justify-content: space-between; gap: 10px; }
+
+.customer-delivery-checkout { display: grid; gap: 12px; margin-block: 18px; }
+.customer-delivery-checkout h3 { font-size: 1.125rem; font-weight: 750; }
+.customer-delivery-checkout label { display: grid; gap: 6px; font-weight: 650; }
+.customer-delivery-checkout input, .customer-delivery-checkout textarea {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid currentColor;
+  border-radius: 12px;
+  padding: 10px 12px;
+  color: inherit;
+  background: transparent;
+}
