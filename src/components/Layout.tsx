@@ -162,6 +162,7 @@ export function Layout({ children }: { children: ReactNode }) {
   }, [location.pathname, visibleItems]);
 
   const sidebarSectionLabel = (group: SidebarSection) => {
+    if (group === 'delivery') return ar ? 'التوصيل' : 'Delivery';
     if (group === 'orders') return ar ? 'الطلبات' : 'Orders';
     if (group === 'customers') return ar ? 'العملاء' : 'Customers';
     if (group === 'reports') return ar ? 'التقارير' : 'Reports';
