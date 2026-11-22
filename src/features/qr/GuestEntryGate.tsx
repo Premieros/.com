@@ -2,9 +2,10 @@ import { CustomerSupportLink } from '@/features/support/CustomerSupportLink';
 import { useBunkerPublicTheme } from './useBunkerPublicTheme';
 import { useEffect, useRef, useState } from 'react';
 import { qrPublic } from '@/api/domains/qrPublic';
-import { GuestVisitPanel } from './GuestVisitPanel';
+import { GuestPreviousOrders, GuestVisitPanel } from './GuestVisitPanel';
 import { PublicQrMenu } from './PublicQrMenu';
 import { readVisit, resetVisit, useGuestVisit } from './useGuestVisit';
+import { useGuestOrderHistory } from './guestOrderHistory';
 import { qrError, qrErrorEnglish } from './errors';
 import { normalizeRecoveryPin } from './normalizeRecoveryPin';
 import { Bike, Store, Utensils } from 'lucide-react';
@@ -55,6 +56,8 @@ export function GuestEntryGate({ token }: { token: string }) {
   const [session, setSession] = useState(() => readVisit(token));
   const [entry, setEntry] = useState<Entry | null>(null);
   const [identity, setIdentity] = useState<GuestIdentity | null>(null);
+  const history = useGuestOrderHistory(token);
+  const [showHistory, setShowHistory] = useState(false);
   const [step, setStep] = useState<'phone' | 'name' | 'type' | 'table' | 'delivery' | 'pickup' | 'pin'>('type');
   const [orderType, setOrderType] = useState<GuestOrderType>('dine_in');
   const [phone, setPhone] = useState(''); const [name, setName] = useState(''); const [pin, setPin] = useState('');
@@ -115,6 +118,8 @@ export function GuestEntryGate({ token }: { token: string }) {
           </button>
         ))}
       </div>}
+      {step === 'type' && history.length > 0 && <button type="button" className="customer-refresh" aria-expanded={showHistory} onClick={() => setShowHistory(value => !value)}>{isBunker ? 'Previous orders on this device' : 'الطلبات السابقة على هذا الجهاز'}</button>}
+      {step === 'type' && showHistory && <GuestPreviousOrders token={token} english={isBunker} />}
       {step === 'pickup' && <div className="customer-pickup-summary"><Store aria-hidden="true" size={22} /><div><strong>{entry.branch_name}</strong>{entry.branch_address && <p>{entry.branch_address}</p>}<p>{isBunker ? 'Collect your order at this branch once it is ready.' : 'استلم طلبك من هذا الفرع عند جاهزيته.'}</p></div></div>}
       {step === 'table' && <><h2>{isBunker ? 'Photograph your table number' : 'صوّر رقم طاولتك'}</h2><p>{isBunker ? 'Point your camera at the table number. Our team will confirm it or assign another table.' : 'وجّه الكاميرا لرقم الطاولة فقط. الموظف سيراجع الصورة ويؤكد الطاولة أو يختار لك بديلًا.'}</p>{photo ? <><img className="customer-table-photo" src={photo} alt={isBunker ? 'Table number photo' : 'صورة رقم الطاولة'} /><button type="button" className="customer-refresh" onClick={() => { setPhoto(''); setCamera(true); }}>{isBunker ? 'Retake photo' : 'إعادة التصوير'}</button></> : camera ? <TableCamera onCapture={image => { setPhoto(image); setCamera(false); }} /> : <button type="button" className="customer-primary" onClick={() => setCamera(true)}>{isBunker ? 'Open camera' : 'فتح الكاميرا'}</button>}<label>{isBunker ? 'Table number in photo' : 'رقم الطاولة الظاهر في الصورة'}<select required value={table} onChange={e => setTable(e.target.value)}><option value="">{isBunker ? 'Choose a table' : 'اختر الطاولة'}</option>{entry.tables?.map(t => <option key={t.id} value={t.id}>{t.name}{t.busy ? (isBunker ? ' · Occupied' : ' · مشغولة') : ''}</option>)}</select></label><p>{isBunker ? 'Your visit will be linked to this table. Our team can change it if needed.' : 'بعد الدخول ترتبط بهذه الطاولة، وتعديلها يكون لدى الموظف فقط.'}</p></>}
       {step === 'delivery' && <label>{isBunker ? 'Delivery address' : 'عنوان التوصيل'}<textarea required minLength={5} maxLength={500} value={address} onChange={e => setAddress(e.target.value)} /></label>}
