@@ -86,7 +86,8 @@ export function usePosOrder(input: UsePosOrderInput) {
   const mutationLockRef = useRef(false);
   const qrRevision = useRef(0);
   const pendingCheckoutRef = useRef<{ fingerprint: string; payload: ProcessSalePayload } | null>(null);
-  const [orderLoading, setOrderLoading] = useState(false);
+  const [settledOrderId, setSettledOrderId] = useState<string | null>(null);
+  const orderLoading = !!orderId && settledOrderId !== orderId;
   const [kitchenSending, setKitchenSending] = useState(false);
   const [kitchenSentItems, setKitchenSentItems] = useState<KitchenSendItem[]>([]);
   const [kitchenDispatch, setKitchenDispatch] = useState<KitchenStationDispatchSummary | null>(null);
@@ -118,23 +119,20 @@ export function usePosOrder(input: UsePosOrderInput) {
   }, [effSettings?.pos_default_payment_method]);
 
   useEffect(() => {
-    setActiveOrderId(orderId);
+    setSettledOrderId(null);
+    setActiveOrderId(null);
+    setActiveOrderNumber(null);
     qrRevision.current = 0;
     setActiveTable(null);
     setCart(EMPTY_CART);
     setCustomerId('');
     setDiscountAmount(0);
-    if (!orderId) {
-      setActiveOrderNumber(null);
-      setTableId(null);
-      setGuestCount(null);
-      setOrderType('takeaway');
-      setCart(EMPTY_CART);
-      setOrderNotes('');
-      return;
-    }
+    setTableId(null);
+    setGuestCount(null);
+    setOrderType('takeaway');
+    setOrderNotes('');
+    if (!orderId) return;
     let cancelled = false;
-    setOrderLoading(true);
     fetchOrderForWorkspace(orderId)
       .then(({ order, items, products: orderProducts, table }) => {
         if (cancelled) return;
@@ -143,7 +141,7 @@ export function usePosOrder(input: UsePosOrderInput) {
           show(isAr ? 'لا يمكن استئناف طلب منتهي' : 'Cannot resume a completed order', 'error');
           setActiveOrderId(null);
           setActiveOrderNumber(null);
-          setOrderLoading(false);
+          setSettledOrderId(orderId);
           return;
         }
         setOrderType(order.order_type as OrderType);
@@ -168,12 +166,12 @@ export function usePosOrder(input: UsePosOrderInput) {
         const cartItems = orderItemsToCart(items, orderProducts);
         if (cartItems.length > 0) setCart(cartItems);
         show(t('orderResumed'), 'success');
-        setOrderLoading(false);
+        setSettledOrderId(orderId);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         setCart(EMPTY_CART);
-        setOrderLoading(false);
+        setSettledOrderId(orderId);
         show(error instanceof Error ? error.message : 'ORDER_LOAD_FAILED', 'error');
       });
     return () => { cancelled = true; };

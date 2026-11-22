@@ -122,30 +122,36 @@ export async function fetchOrderForWorkspace(orderId: string): Promise<{ order: 
     throw new Error(access?.error || 'ORDER_OPERATOR_REQUIRED');
   }
 
-  const { data: o, error: orderError } = await supabase.from('orders').select('*').eq('id', orderId).maybeSingle();
-  if (orderError) throw orderError;
-  const order = (o as Order | null) || null;
-  if (!order) return { order: null, items: [], products: [], table: null };
-  // Authorization and hydration are separate reads. An order can close
-  // between them: never restore a terminal order to the cashier workspace.
-  if (order.status === 'completed') throw new Error('ORDER_CLOSED');
-  if (order.status === 'cancelled') throw new Error('ORDER_CANCELLED');
+  if (!access.branch_id) throw new Error('BRANCH_MISMATCH');
 
-  const { data: items, error: itemsError } = await supabase.from('order_items').select('*').eq('order_id', orderId);
-  if (itemsError) throw itemsError;
-  const itemRows = (items as OrderItem[]) || [];
-  const ids = itemRows.map((i) => i.product_id).filter(Boolean) as string[];
-  let products: Product[] = [];
-  if (ids.length > 0) {
-    const { data: prods, error: productsError } = await supabase.from('products').select('*').in('id', ids).eq('branch_id', order.branch_id);
-    if (productsError) throw productsError;
-    products = (prods as Product[]) || [];
-  }
-  const tableResult = order.table_id
-    ? await supabase.from('dining_tables').select('*').eq('id', order.table_id).eq('branch_id', order.branch_id).maybeSingle()
-    : null;
-  if (tableResult?.error) throw tableResult.error;
-  return { order, items: itemRows, products, table: (tableResult?.data as DiningTable | null) || null };
+  const { data, error } = await supabase.from('orders')
+    .select(`
+      *,
+      items:order_items!order_items_order_id_fkey(*, product:products!order_items_product_id_fkey(*)),
+      table:dining_tables!orders_table_id_fkey(*)
+    `)
+    .eq('id', orderId)
+    .eq('branch_id', access.branch_id)
+    .eq('items.product.branch_id', access.branch_id)
+    .eq('table.branch_id', access.branch_id)
+    .maybeSingle();
+  if (error) throw error;
+  const row = data as (Order & {
+    items: Array<OrderItem & { product: Product | null }>;
+    table: DiningTable | null;
+  }) | null;
+  if (!row) return { order: null, items: [], products: [], table: null };
+  // An order can close between authorization and the workspace read.
+  if (row.status === 'completed') throw new Error('ORDER_CLOSED');
+  if (row.status === 'cancelled') throw new Error('ORDER_CANCELLED');
+
+  const { items: rows, table, ...order } = row;
+  const products = new Map<string, Product>();
+  const items = rows.map(({ product, ...item }) => {
+    if (product) products.set(product.id, product);
+    return item;
+  });
+  return { order, items, products: [...products.values()], table };
 }
 
 export async function resolveMyActiveTableOrder(tableId: string): Promise<MyActiveTableOrderResolution> {

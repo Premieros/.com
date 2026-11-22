@@ -239,7 +239,7 @@ export function PosWorkspacePage() {
     stockMap: liveStockMap,
     onInventoryChanged: () => { void refreshLiveStockMap(); },
   });
-  const canModifyCurrentOrder = pos.activeOrderId ? perms.canEditOrder : perms.canCreateOrder;
+  const canModifyCurrentOrder = !pos.orderLoading && (pos.activeOrderId ? perms.canEditOrder : perms.canCreateOrder);
 
   useEffect(() => {
     if (pos.receiptSaleId) {
@@ -311,7 +311,7 @@ export function PosWorkspacePage() {
   }, [pos.activeOrderId, hasUnsentItems, isAr, show]);
 
   const handlePay = useCallback(() => {
-    if (!perms.canPay || !shiftChecked || pos.cart.length === 0) return;
+    if (!perms.canPay || !shiftChecked || pos.orderLoading || pos.cart.length === 0) return;
     if (blockUnsentOpenOrder()) return;
     if (posSurface.customerRequired && !pos.customerId) {
       setCustomerModalOpen(true);

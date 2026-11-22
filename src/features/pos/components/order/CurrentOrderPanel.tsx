@@ -4,6 +4,7 @@ import {
   ArrowRightLeft,
   Check,
   Clock,
+  Loader2,
   Minus,
   Percent,
   Plus,
@@ -94,6 +95,7 @@ export function CurrentOrderPanel({
   taxRate,
   taxAmount,
   total,
+  orderLoading,
   orderType,
   activeOrderNumber,
   activeOrderId,
@@ -388,7 +390,12 @@ export function CurrentOrderPanel({
       </div>
 
       <div className={`min-h-0 flex-1 overflow-y-auto ${empty ? 'p-3' : 'p-2.5'}`}>
-        {empty ? (
+        {orderLoading ? (
+          <div role="status" className="flex items-center justify-center gap-2 rounded-2xl bg-ui-page-alt/60 px-4 py-5 text-sm font-bold text-ui-muted">
+            <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
+            {isAr ? 'جارٍ تحميل أصناف الطلب…' : 'Loading order items…'}
+          </div>
+        ) : empty ? (
           <div data-testid="pos-empty-cart-state" className="rounded-2xl border border-dashed border-ui-border bg-ui-page-alt/60 px-4 py-5 text-center text-ui-subtle">
             <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-ui-surface"><ShoppingCart className="h-5 w-5 opacity-40" /></div>
             <p className="text-sm font-black text-ui-text">{t('emptyCart')}</p>
@@ -477,7 +484,7 @@ export function CurrentOrderPanel({
         )}
       </div>
 
-      {!empty && (
+      {!orderLoading && !empty && (
         <div className="shrink-0 border-t border-ui-border p-3">
           {orderType === 'delivery' && activeOrderId && <DeliveryFeeEditor key={activeOrderId} orderId={activeOrderId} currency={currency} canEdit={perms.canEditOrder} itemsTotal={total} />}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
