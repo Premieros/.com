@@ -45,3 +45,24 @@ it('checks image authorization before upload and preserves unrelated photos',asy
  expect(mock.rpc).toHaveBeenLastCalledWith('branch_website_photo_save_one',expect.objectContaining({p_key:'heroImage',p_url:'https://example.com/hero.jpg',p_previous:''}));
  await expect(executeWebsiteEdit({op:'delete',key:'heroImage'})).rejects.toThrow('غير مسموحة');
 });
+
+it('uploads the image bytes before publishing the photo URL',async()=>{
+ const bytes=Uint8Array.of(137,80,78,71).buffer;
+ const file=new File([bytes],'photo.png',{type:'image/png'});
+ const read=vi.fn().mockResolvedValue(bytes);
+ Object.defineProperty(file,'arrayBuffer',{value:read});
+ const url='https://example.com/gallery.png';
+ const upload=vi.fn().mockResolvedValue({error:null});
+ const getPublicUrl=vi.fn().mockReturnValue({data:{publicUrl:url}});
+ mock.storage.mockReturnValue({upload,getPublicUrl});
+ mock.rpc.mockResolvedValueOnce({data:{},error:null}).mockResolvedValueOnce({error:null});
+
+ await expect(executeWebsiteEdit({op:'image',key:'gallery1',file})).resolves.toEqual({key:'gallery1',value:url});
+ expect(read).toHaveBeenCalledOnce();
+ expect(mock.storage).toHaveBeenCalledWith('branch-website-photos');
+ expect(upload).toHaveBeenCalledWith(expect.stringMatching(/\/gallery1\/[^/]+\.png$/),bytes,{
+  contentType:'image/png',upsert:false,cacheControl:'3600',
+ });
+ expect(mock.rpc).toHaveBeenLastCalledWith('branch_website_photo_save_one',expect.objectContaining({p_key:'gallery1',p_url:url}));
+ expect(upload.mock.invocationCallOrder[0]).toBeLessThan(mock.rpc.mock.invocationCallOrder[1]);
+});
