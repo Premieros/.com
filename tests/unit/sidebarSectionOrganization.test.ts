@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 describe('Premier sidebar section organization', () => {
   it('keeps the visual sections in a predictable order', () => {
     expect(SIDEBAR_SECTION_ORDER).toEqual([
-      'main', 'orders', 'customers', 'reports', 'inventory', 'catalog', 'centers', 'marketplace', 'admin',
+      'main', 'orders', 'delivery', 'customers', 'reports', 'inventory', 'catalog', 'centers', 'marketplace', 'admin',
     ]);
   });
 
@@ -17,6 +17,7 @@ describe('Premier sidebar section organization', () => {
     };
     expect(group('dashboard')).toBe('main');
     expect(group('sales-invoices')).toBe('orders');
+    expect(group('delivery')).toBe('delivery');
     expect(group('pos')).toBe('centers');
     expect(group('kitchen-display')).toBe('centers');
     expect(group('operations-center')).toBe('centers');
@@ -40,9 +41,12 @@ describe('Premier sidebar section organization', () => {
     expect(group('super-admin')).toBe('admin');
   });
 
-  it('keeps Orders and Customers one-click links and sends Orders to sales invoices', () => {
+  it('keeps Orders, Delivery and Customers as one-click destinations', () => {
     const layout = readFileSync('src/components/Layout.tsx', 'utf8');
-    expect(layout).toContain("group === 'orders' || group === 'customers'");
+    expect(layout).toContain("group === 'orders' || group === 'delivery' || group === 'customers'");
+    expect(MENU_ITEMS.find((item) => item.id === 'delivery')).toMatchObject({
+      route: '/delivery', permission: 'pos.view',
+    });
     expect(MENU_ITEMS.find((item) => item.id === 'sales-invoices')).toMatchObject({
       label: { ar: 'الطلبات', en: 'Orders' },
       route: '/sales', permission: 'sales.view',
