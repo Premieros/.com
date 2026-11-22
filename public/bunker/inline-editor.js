@@ -3,6 +3,13 @@
  'use strict';
  const channel='bunker-editor-v1', origin='https://premieros-sage.vercel.app';
  const toggle=document.getElementById('editToggle');
+ const socialEdit=document.createElement('a');
+ socialEdit.href=origin+'/#/website-contact/d56aae83-f1b3-4153-9224-87594500368d';
+ socialEdit.target='_blank';socialEdit.rel='noopener noreferrer';
+ socialEdit.textContent='تعديل روابط التواصل';
+ socialEdit.hidden=true;
+ document.getElementById('bunkerSocial')?.after(socialEdit);
+
  const status=document.createElement('div');
  status.id='inlineEditorStatus';status.setAttribute('role','status');status.dir='rtl';document.body.append(status);
  const instructions=document.createElement('p');instructions.id='inlineEditorInstructions';
@@ -13,7 +20,7 @@
  let helloTimer=null,closeTimer=null;
  const tell=message=>{status.textContent=message;};
  function stop(){
-  active=false;connecting=false;document.body.classList.remove('website-editing');
+  socialEdit.hidden=true;active=false;connecting=false;document.body.classList.remove('website-editing');
   toggle.textContent='تعديل الموقع';
   if(helloTimer)clearInterval(helloTimer);if(closeTimer)clearInterval(closeTimer);
   for(const request of pending.values()){clearTimeout(request.timer);request.reject(new Error('انقطع اتصال التحرير. افتح وضع التعديل مجددًا.'));}pending.clear();
@@ -45,7 +52,7 @@
    const result=await request('load');if(!connecting)return;
    revision=result.revision;photos=result.photos||{};
    Object.assign(content,result.content,photos);render();
-   active=true;connecting=false;document.body.classList.add('website-editing');
+   socialEdit.hidden=false;active=true;connecting=false;document.body.classList.add('website-editing');
    document.querySelectorAll('[data-editable-text]').forEach(node=>node.tabIndex=0);
    toggle.textContent='إنهاء التعديل';tell('وضع التعديل متاح. اضغط مرتين على النص أو غيّر الصورة من زرها.');
    clearInterval(helloTimer);

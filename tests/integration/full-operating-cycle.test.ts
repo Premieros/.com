@@ -98,6 +98,33 @@ describe('full ERP/POS operating cycle', () => {
         [rawId, `CIR-${token}`, unitId, branchId],
       );
 
+      // The same opaque code works across visits, only for the originating branch.
+      await client.query('SET LOCAL ROLE anon');
+      const supportCode = (await client.query(
+        "select public.customer_support_start($1,'complaint','CI customer message') code", [branchId],
+      )).rows[0].code as string;
+      expect(supportCode).toMatch(/^[0-9a-f]{32}$/);
+      const retried = await client.query(
+        "select public.customer_support_start($1,'complaint','CI customer message',$2) code", [branchId, supportCode]);
+      expect(retried.rows[0].code).toBe(supportCode);
+      const publicMessages = await client.query('select public.customer_support_follow($1,$2) messages', [branchId, supportCode]);
+      expect(publicMessages.rows[0].messages).toHaveLength(1);
+      expect(publicMessages.rows[0].messages).toMatchObject([{ from_staff: false, body: 'CI customer message' }]);
+      await client.query('RESET ROLE');
+      await client.query('SAVEPOINT invalid_support_scope');
+      await expect(client.query('select public.customer_support_follow($1,$2)', [randomUUID(), supportCode]))
+        .rejects.toThrow('SUPPORT_CODE_INVALID');
+      await client.query('ROLLBACK TO SAVEPOINT invalid_support_scope');
+      await client.query('SET LOCAL ROLE authenticated');
+      const inbox = await client.query('select public.customer_support_staff_list($1) threads', [branchId]);
+      await client.query('select public.customer_support_staff_thread($1,$2,$3)',
+        [branchId, inbox.rows[0].threads[0].id, 'CI branch reply']);
+      await client.query('RESET ROLE');
+      const follow = await client.query('select public.customer_support_follow($1,$2) messages', [branchId, supportCode]);
+      expect(follow.rows[0].messages).toEqual(expect.arrayContaining([expect.objectContaining({ from_staff: true, body: 'CI branch reply' })]));
+      expect((await client.query("select has_function_privilege('anon','public.customer_support_staff_list(uuid,uuid)','execute') allowed"))
+        .rows[0].allowed).toBe(false);
+
       const atomicSku = `CI-ATOMIC-${token}`;
       const atomicProduct = { p_name: 'CI Product With Ingredients', p_branch_id: branchId, p_sku: atomicSku, p_sale_price: 15 };
       await client.query('SAVEPOINT invalid_product_recipe');

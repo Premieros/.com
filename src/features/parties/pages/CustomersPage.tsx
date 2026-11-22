@@ -1,3 +1,4 @@
+import { CustomerSupportInbox } from '@/features/support/CustomerSupportInbox';
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
 import { supabase } from '@/api';
@@ -65,6 +66,7 @@ export function CustomersPage() {
     branch_ids: branchScope.selectedBranchIds,
     pageSize: 100,
   });
+  const [supportOpen, setSupportOpen] = useState(false);
   const [search, setSearch] = useState('');
   const [customerView, setCustomerView] = useState<'all' | 'registered' | 'qr' | 'outstanding'>('all');
   const [qrGuests, setQrGuests] = useState<QrCustomerHistory[]>([]);
@@ -212,6 +214,11 @@ export function CustomersPage() {
     <DesignSurface testId="customers-page">
       <DesignPageHeader title={customerLabel} actions={
         <>
+          {can('customers.manage') && branchFilter && (
+            <Button variant="outline" size="sm" aria-pressed={supportOpen} onClick={() => setSupportOpen((open) => !open)}>
+              {supportOpen ? 'قائمة العملاء' : 'الشكاوى والاستفسارات'}
+            </Button>
+          )}
           {can('customers.manage') && (
             <Button size="sm" onClick={openAdd} data-testid="customers-add">
               <Plus className="w-4 h-4" /> {t('add')}
@@ -219,7 +226,11 @@ export function CustomersPage() {
           )}
         </>
       } />
-      <DesignPanel testId="customers-table-panel" bodyClassName="p-2 sm:p-3">
+      {supportOpen && can('customers.manage') && branchFilter ? (
+        <DesignPanel testId="customers-support-panel">
+          <CustomerSupportInbox key={branchFilter} branchId={branchFilter} />
+        </DesignPanel>
+      ) : <DesignPanel testId="customers-table-panel" bodyClassName="p-2 sm:p-3">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-ui-border pb-3">
           <div className="flex max-w-full gap-4 overflow-x-auto" role="tablist" aria-label={lang === 'ar' ? 'عرض العملاء' : 'Customer views'}>
             {([
@@ -272,7 +283,7 @@ export function CustomersPage() {
           templateFilename="customers-template"
         />
         <DesignPagination loaded={allRows.length} total={total + qrGuests.length} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
-      </DesignPanel>
+      </DesignPanel>}
       <Modal open={!!selectedQrGuest} onClose={() => setSelectedQrGuest(null)}
         title={lang === 'ar' ? 'تفاصيل عميل QR' : 'QR customer details'} size="lg">
         {selectedQrGuest && (

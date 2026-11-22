@@ -54,6 +54,15 @@ export function WebsiteSocialSettings({branchId}: {branchId:string}) {
             className="w-full rounded-xl border border-ui-border bg-ui-page px-3 py-3 text-ui-text" />
         </label>)}
       </div>
+      <details className="rounded-xl border border-ui-border p-3">
+        <summary className="cursor-pointer font-semibold">ربط موقع الفرع</summary>
+        <p className="mt-2 text-sm text-ui-muted">ضع المساحة التالية في تذييل الموقع ثم أضف السكربت. يمكن وضع رابط التعديل داخل محرر الموقع.</p>
+        <textarea readOnly rows={4} dir="ltr" aria-label="كود ربط موقع الفرع"
+          className="mt-2 w-full rounded-lg border border-ui-border bg-ui-page p-2 font-mono text-xs"
+          value={`<div data-premier-social-links></div>
+<script defer src="https://premieros-sage.vercel.app/branch-contact.js" data-branch="${branchId}"></script>
+<a href="https://premieros-sage.vercel.app/#/website-contact/${branchId}">تعديل روابط التواصل</a>`} />
+      </details>
       {error&&<p role="alert" className="text-sm text-red-600">{error}</p>}
       {status&&<p role="status" className="text-sm text-green-600">{status}</p>}
       <button type="button" onClick={()=>void save()} disabled={saving}
