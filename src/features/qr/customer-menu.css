@@ -739,3 +739,5 @@ body:has(.bunker-customer[data-bunker-theme="light"]){background:#eee6d9!importa
   background: var(--customer-input-bg, #fffaf3);
   color: #28251e;
 }
+.customer-order-switcher { display: grid; gap: 8px; margin-block: 12px; font-weight: 650; }
+.customer-order-switcher select { min-height: 44px; border-radius: 12px; padding: 8px; color: #28251e; background: #fffaf3; }

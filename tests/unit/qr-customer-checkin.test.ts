@@ -58,6 +58,7 @@ describe('Phone check-in and private table visits on PostgreSQL', () => {
     await db.exec(sqlFile('supabase/migrations/20261122160000_customer_pickup_and_dispatch_tracking.sql'));
     await db.exec(sqlFile('supabase/migrations/20261122170000_delivery_address_at_checkout.sql'));
     await db.exec(sqlFile('supabase/migrations/20261122190000_change_customer_cart_fulfillment.sql'));
+    await db.exec(sqlFile('supabase/migrations/20261122200000_parallel_customer_orders.sql'));
   }, 30_000);
   beforeEach(async () => {
     await db.exec('RESET ROLE');
@@ -148,6 +149,27 @@ describe('Phone check-in and private table visits on PostgreSQL', () => {
     expect(await change('pickup')).toMatchObject({ id: dineIn.id, order_type: 'pickup', table_id: null });
     await place(session, key, null);
     await expect(change('delivery')).rejects.toThrow('QR_FULFILLMENT_LOCKED');
+  });
+  it('starts a separately tracked pickup from a submitted delivery without changing its type', async () => {
+    await begin('delivery', null);
+    const startPickup = () => scalar<{ id: string; order_type: string; table_id: string | null }>(
+      "select public.qr_guest_start_next_order($1,$2,$3,'pickup',null,null) result", [token,session,other],
+    );
+    await expect(startPickup()).rejects.toThrow('QR_FULFILLMENT_LOCKED');
+    const delivery = await place(session, key, null);
+    const pickup = await startPickup();
+    expect(pickup).toMatchObject({ order_type: 'pickup', table_id: null });
+    expect((await startPickup()).id).toBe(pickup.id);
+    const secondKey = '50000000-0000-4000-8000-000000000002';
+    const secondRequest = await place(other, secondKey, null);
+    expect((await track(session)).requests.map(request => request.id)).toEqual([delivery.id]);
+    expect((await track(other)).requests.map(request => request.id)).toEqual([secondRequest.id]);
+    const deliverySale = await approve(delivery.id, null);
+    const pickupSale = await approve(secondRequest.id, null);
+    expect(deliverySale.order_id).not.toBe(pickupSale.order_id);
+    await db.exec('RESET ROLE');
+    expect((await db.query('select order_type from public.orders where id = any($1::uuid[]) order by order_type',
+      [[deliverySale.order_id,pickupSale.order_id]])).rows).toEqual([{ order_type:'delivery' },{ order_type:'takeaway' }]);
   });
   it('creates pickup as takeaway, prevents table assignment, and preserves final tracking on the same device', async () => {
     await expect(begin('pickup', table)).rejects.toThrow('QR_TABLE_LOCKED');
