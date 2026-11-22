@@ -63,7 +63,11 @@ export async function executeWebsiteEdit(request:EditorRequest) {
    if(parsed.protocol!=='https:' || parsed.username || parsed.password)throw new Error('استخدم رابط صورة HTTPS.');
    url=parsed.href;
   }
-  checked(await supabase.rpc('branch_website_photos_save',{p_branch:BUNKER_BRANCH,p_images:{...photos,[request.key!]:url}}));
+  // Atomically update just one image key, rejecting stale edits in the database.
+  // A client-side read/compare is insufficient when multiple editors save concurrently.
+  checked(await supabase.rpc('branch_website_photo_save_one',{
+   p_branch:BUNKER_BRANCH,p_key:request.key!,p_url:url,p_previous:request.previous||'',
+  }));
   return {key:request.key,value:url};
  }
  throw new Error('عملية غير مسموحة.');

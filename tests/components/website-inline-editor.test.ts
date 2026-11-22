@@ -42,6 +42,6 @@ it('checks image authorization before upload and preserves unrelated photos',asy
  mock.rpc.mockResolvedValueOnce({data:{coffeeImage:'https://example.com/coffee.jpg'},error:null})
   .mockResolvedValueOnce({data:null,error:null});
  await executeWebsiteEdit({op:'image',key:'heroImage',value:'https://example.com/hero.jpg'});
- expect(mock.rpc).toHaveBeenLastCalledWith('branch_website_photos_save',expect.objectContaining({p_images:{coffeeImage:'https://example.com/coffee.jpg',heroImage:'https://example.com/hero.jpg'}}));
+ expect(mock.rpc).toHaveBeenLastCalledWith('branch_website_photo_save_one',expect.objectContaining({p_key:'heroImage',p_url:'https://example.com/hero.jpg',p_previous:''}));
  await expect(executeWebsiteEdit({op:'delete',key:'heroImage'})).rejects.toThrow('غير مسموحة');
 });
