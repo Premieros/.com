@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from 'react';
 import { supabase } from '@/api';
 import { useAuth } from '@/context/AuthContext';
+import { isAuthSessionError } from '@/lib/authSessionError';
 import { userFacingErrorMessage } from '@/lib/userFacingError';
 
 // Unified, reusable paginated-rows hook (audit M7). Every list/table page that
@@ -125,9 +126,15 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
   const [total, setTotal] = useState<number | null>(() => initialCache?.total ?? null);
   const [hasMore, setHasMore] = useState(() => initialCache?.hasMore ?? false);
   const gen = useRef(0);
+  const scope = useRef({ queryKey, enabled });
+  const paginationRequest = useRef<number | null>(null);
+  const refreshRequest = useRef<number | null>(null);
 
   const setRows = useCallback<Dispatch<SetStateAction<T[]>>>((update) => {
+    if (scope.current.queryKey !== queryKey || !scope.current.enabled) return;
+    const activeScope = scope.current;
     setRowsState((previous) => {
+      if (scope.current !== activeScope) return previous;
       const next = typeof update === 'function'
         ? (update as (rows: T[]) => T[])(previous)
         : update;
@@ -181,7 +188,10 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
   // Synchronize display scope before paint. This prevents a branch/filter change
   // from flashing rows belonging to the previous scope while the server request starts.
   useLayoutEffect(() => {
+    scope.current = { queryKey, enabled };
     gen.current += 1;
+    paginationRequest.current = null;
+    refreshRequest.current = null;
     setError(null);
     setLoadingMore(false);
 
@@ -208,9 +218,12 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
   }, [queryKey, enabled]);
 
   const refresh = useCallback(async () => {
-    if (!enabled) return;
+    if (!enabled || scope.current.queryKey !== queryKey || !scope.current.enabled) return;
 
+    paginationRequest.current = null;
+    setLoadingMore(false);
     const g = ++gen.current;
+    refreshRequest.current = g;
     const cached = readSessionCache<T>(queryKey);
     // Stale-while-revalidate: keep already known rows visible and refresh quietly.
     setLoading(!cached);
@@ -220,13 +233,15 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
       // Identical concurrent PostgREST GET requests are already coalesced by
       // createPostgrestDedupingFetch, which also avoids attaching post-mutation
       // reads to older in-flight responses. Keep this hook focused on display SWR.
-      const { data, error: err } = await buildDataQuery(0, pageSize);
+      const { data, error: err, status } = await buildDataQuery(0, pageSize);
       if (g !== gen.current) return;
       if (err) {
         setError(userFacingErrorMessage(err));
         // If there is no safe session snapshot, fail empty. If there is one,
         // preserve it and surface the refresh error without blocking the user.
-        if (!cached) {
+        const denied = status === 401 || status === 403 || err.code === '42501' || isAuthSessionError(err);
+        if (denied) sessionRowsCache.delete(queryKey);
+        if (denied || !cached) {
           setRowsState([]);
           setTotal(0);
           setHasMore(false);
@@ -242,15 +257,23 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
       setHasMore(more);
       setTotal(nextTotal);
       writeSessionCache<T>(queryKey, { rows: page, hasMore: more, total: nextTotal });
+    } catch (failure) {
+      if (g === gen.current) setError(userFacingErrorMessage(failure));
     } finally {
-      if (g === gen.current) setLoading(false);
+      if (g === gen.current) {
+        refreshRequest.current = null;
+        setLoading(false);
+      }
     }
   }, [buildDataQuery, enabled, pageSize, queryKey]);
 
   const loadMore = useCallback(async () => {
-    if (!enabled || loading || loadingMore) return;
+    if (!enabled || loading || !hasMore || refreshRequest.current !== null || paginationRequest.current !== null
+      || scope.current.queryKey !== queryKey || !scope.current.enabled) return;
     const g = gen.current;
+    paginationRequest.current = g;
     setLoadingMore(true);
+    setError(null);
     try {
       const { data, error: err } = await buildDataQuery(rows.length, rows.length + pageSize);
       if (g !== gen.current) return;
@@ -262,6 +285,7 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
       const page = fetched.slice(0, pageSize);
       const more = fetched.length > pageSize;
       setRowsState((prev) => {
+        if (g !== gen.current) return prev;
         const next = [...prev, ...page];
         const nextTotal = more ? null : next.length;
         writeSessionCache<T>(queryKey, { rows: next, hasMore: more, total: nextTotal });
@@ -270,13 +294,25 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
       setHasMore(more);
       if (!more) setTotal(rows.length + page.length);
       else setTotal(null);
+    } catch (failure) {
+      if (g === gen.current) setError(userFacingErrorMessage(failure));
     } finally {
-      if (g === gen.current) setLoadingMore(false);
+      if (g === gen.current) {
+        paginationRequest.current = null;
+        setLoadingMore(false);
+      }
     }
-  }, [buildDataQuery, enabled, pageSize, queryKey, rows.length, loading, loadingMore]);
+  }, [buildDataQuery, enabled, pageSize, queryKey, rows.length, loading, hasMore]);
 
   const fetchAll = useCallback(async (): Promise<T[]> => {
     if (!enabled) return [];
+    const activeScope = scope.current;
+    const checkScope = () => {
+      if (scope.current !== activeScope || activeScope.queryKey !== queryKey || !activeScope.enabled) {
+        throw new Error('PAGINATED_SCOPE_CHANGED');
+      }
+    };
+    checkScope();
     // Export/read-all is intentionally database-first and NEVER reads from the
     // session display cache. Every matching server row is fetched in batches.
     const batchSize = Math.max(pageSize, 1000);
@@ -284,6 +320,7 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
     let offset = 0;
     while (true) {
       const { data, error: err } = await buildDataQuery(offset, offset + batchSize - 1);
+      checkScope();
       if (err) throw err;
       const batch = (data as T[]) || [];
       all.push(...batch);
@@ -291,7 +328,13 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
       offset += batch.length;
     }
     return all;
-  }, [buildDataQuery, enabled, pageSize]);
+  }, [buildDataQuery, enabled, pageSize, queryKey]);
+
+  useLayoutEffect(() => () => {
+    scope.current = { queryKey: '', enabled: false };
+    gen.current += 1;
+    paginationRequest.current = null;
+  }, []);
 
   useEffect(() => {
     if (!enabled) return;
