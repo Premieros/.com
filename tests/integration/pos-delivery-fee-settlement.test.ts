@@ -67,6 +67,8 @@ const isLocal=!!url&&/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url);
    const sql = method === 'split'
      ? `select public.process_sale_split($1,$2,$3,null,$4,20,0,'amount',2.8,0,27.8,$5::jsonb,'completed',$6::jsonb,$7,'delivery',null,$8,1) result`
      : `select public.process_sale($1,$2,$3,null,$4,20,0,'amount',2.8,0,27.8,$5::numeric,'cash','completed',$6::jsonb,$7,'delivery',null,$8,1) result`;
+   const readShift = async () => (await db.query('select public.get_shift_closing_report($1) result', [shift])).rows[0].result;
+   const openingCash = (await readShift()).expected_cash;
    const sale = (await db.query(sql, [invoice, branch, warehouse, user, payment, JSON.stringify(preview.items), shift, orderId])).rows[0].result;
    expect(sale, JSON.stringify(sale)).toMatchObject({ success: true });
    expect((await db.query(`select total::float8, tax_amount::float8, paid_amount::float8, delivery_fee_amount::float8
@@ -78,10 +80,31 @@ const isLocal=!!url&&/(?:localhost|127\.0\.0\.1|\[::1\])(?::\d+)?\//.test(url);
      from public.journal_entry_lines l join public.journal_entries j on j.id=l.journal_entry_id
      where j.reference_id=$1`, [sale.sale_id]);
    expect(journal.rows[0].delta).toBe(0);
+   const stock = async () => (await db.query(
+     'select quantity::float8 qty from public.inventory where warehouse_id=$1 and product_id=$2',
+     [warehouse, product],
+   )).rows[0].qty;
+   const paidShift = await readShift();
+   expect(paidShift).toMatchObject({ success: true, invoice_count: 1, net_sales: 27.8, returns: 0 });
+   expect(paidShift.expected_cash - openingCash).toBeCloseTo(method === 'split' ? 10 : 27.8, 2);
+   // Recipe-less POS items consume the branch's product-linked fallback raw.
+   const event = (await db.query('select component_snapshot from public.order_kitchen_inventory_events where order_id=$1', [orderId])).rows[0];
+   expect(event.component_snapshot).toMatchObject([{ quantity: 1 }]);
+   const rawStock = async () => (await db.query(
+     'select coalesce(sum(quantity),0)::float8 qty from public.raw_material_inventory where branch_id=$1 and raw_material_id=$2',
+     [branch, event.component_snapshot[0].raw_material_id],
+   )).rows[0].qty;
+   expect(await rawStock()).toBe(-1);
+   expect(await stock()).toBe(5);
    const item = (await db.query('select id from public.sale_items where sale_id=$1', [sale.sale_id])).rows[0];
    const refund = (await db.query("select public.process_refund($1,$2::jsonb,'CI full refund') result",
      [sale.sale_id, JSON.stringify([{ sale_item_id: item.id, quantity: 1 }])])).rows[0].result;
    expect(refund, JSON.stringify(refund)).toMatchObject({ success: true, refunded_amount: 27.8 });
+   const refundedShift = await readShift();
+   expect(refundedShift).toMatchObject({ success: true, invoice_count: 1, net_sales: 0, returns: 27.8, expected_cash: openingCash });
+   expect(await stock()).toBe(5);
+   expect(await rawStock()).toBe(0);
+
   } finally {
    await db.query('ROLLBACK');
   }
