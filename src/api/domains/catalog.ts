@@ -145,6 +145,9 @@ export const catalog = {
   replaceProductUnits(p: { p_product_id: string; p_units: unknown }): ApiResult<null> { return rpc('replace_product_units', p); },
   createRawMaterial(p: CreateRawMaterialInput): ApiResult<CreateRawMaterialResult> { return rpc('create_raw_material', p); },
   createProduct(p: CreateProductInput): ApiResult<CreateProductResult> { return rpc('create_product', p); },
+  createProductWithRawComponents(p: { p_product: CreateProductInput; p_items: DirectRawComponentInput[] }): ApiResult<CreateProductResult> {
+    return rpc('create_product_with_raw_components', p);
+  },
   getProductOperationalComposition(p: { p_product_id: string; p_branch_id?: string | null }): ApiResult<ProductOperationalComposition> {
     return rpc<ProductOperationalComposition>('get_product_operational_composition', p);
   },

@@ -495,6 +495,8 @@ export function CurrentOrderPanel({
           orderId={activeOrderId}
           orderItemId={splitOrderItemId}
           sourceTable={activeTable}
+          currency={currency}
+          savedLine={splitOrderItemMatches.length === 1 ? splitOrderItemMatches[0] : undefined}
           onCompleted={applyCompletedSplit}
         />
       )}
