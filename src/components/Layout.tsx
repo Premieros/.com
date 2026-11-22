@@ -1,9 +1,9 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
-  Activity, AlertTriangle, ArrowLeft, ArrowLeftRight, ArrowRight, BarChart3, BadgeDollarSign, Boxes, BookOpenText, Building2, Calculator, ChefHat,
+  Activity, AlertTriangle, ArrowDown, ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUp, BarChart3, BadgeDollarSign, Boxes, BookOpenText, Building2, Calculator, ChefHat,
   ChevronDown, ClipboardCheck, FileSpreadsheet, FileText, FlaskConical,
-  Globe, HandCoins, Landmark, Layers, LayoutDashboard, LayoutGrid, LogOut, Menu, Moon, NotebookPen,
+  Globe, GripVertical, HandCoins, Landmark, Layers, LayoutDashboard, LayoutGrid, LogOut, Menu, Moon, NotebookPen,
   Package, Receipt, Scale, ScrollText, Settings, ShoppingCart, SlidersHorizontal, Store, Sun,
   Tags, Timer, Trash2, Truck, UserCog, Users, Wallet, Warehouse, X,
 } from 'lucide-react';
@@ -73,7 +73,28 @@ const ICONS: Record<MenuIcon, ReactNode> = {
   importExport: <FileSpreadsheet className="h-5 w-5" />,
 };
 
+function readSidebarPreference<T>(key: string, fallback: T): unknown {
+  try {
+    return JSON.parse(window.localStorage.getItem(key) ?? 'null') ?? fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function saveSidebarPreference(key: string, value: unknown) {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Customization remains usable in memory when browser storage is unavailable.
+  }
+}
+
 export function Layout({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
+  return <AccountLayout key={user?.id ?? 'guest'}>{children}</AccountLayout>;
+}
+
+function AccountLayout({ children }: { children: ReactNode }) {
   const { t, lang, setLang } = useLanguage();
   const { theme, toggleTheme } = useTheme();
   const { user, signOut } = useAuth();
@@ -81,38 +102,28 @@ export function Layout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [desktopSidebarHidden, setDesktopSidebarHidden] = useState(() =>
-    typeof window !== 'undefined' && window.localStorage.getItem('premier:desktop-sidebar-hidden') === '1',
+  const preferenceKey = `premier:sidebar:${user?.id ?? 'guest'}`;
+  const [desktopSidebarHidden, setDesktopSidebarHidden] = useState(
+    () => readSidebarPreference(`${preferenceKey}:hidden`, false) === true,
   );
+  const [sectionOrder, setSectionOrder] = useState(() => {
+    const saved = readSidebarPreference(`${preferenceKey}:order`, []);
+    const valid = Array.isArray(saved)
+      ? saved.filter((section): section is SidebarSection => SIDEBAR_SECTION_ORDER.includes(section))
+      : [];
+    return [...new Set([...valid, ...SIDEBAR_SECTION_ORDER])];
+  });
+  const [editingSidebar, setEditingSidebar] = useState(false);
+  const [draggedSection, setDraggedSection] = useState<SidebarSection | null>(null);
   const [collapsed, setCollapsed] = useState<Record<string, boolean>>(() => {
-    const defaults: Record<string, boolean> = {
-      main: false,
-      orders: true,
-      customers: true,
-      centers: true,
-      catalog: true,
-      reports: true,
-      inventory: true,
-      operations: true,
-      people: true,
-      finance: true,
-      admin: true,
-    };
-    if (typeof window !== 'undefined') {
-      try {
-        const saved = JSON.parse(window.localStorage.getItem('premier:nav-collapsed-groups') || '{}') as Record<string, unknown>;
-        // Preserve each user's existing choices while new headings start
-        // collapsed rather than unexpectedly expanding old saved menus.
-        if (saved && typeof saved === 'object' && !Array.isArray(saved)) {
-          for (const key of Object.keys(defaults)) {
-            if (typeof saved[key] === 'boolean') defaults[key] = saved[key];
-          }
-        }
-      } catch {
-        // Use safe defaults if stored preferences are malformed.
-      }
-    }
-    return defaults;
+    const saved = readSidebarPreference(`${preferenceKey}:collapsed`, {});
+    return Object.fromEntries(SIDEBAR_SECTION_ORDER.map((section) => [
+      section,
+      saved && typeof saved === 'object' && section in saved
+        && typeof saved[section as keyof typeof saved] === 'boolean'
+        ? saved[section as keyof typeof saved]
+        : section !== 'main',
+    ]));
   });
   const ar = lang === 'ar';
   const branchFilter = useBranchFilter();
@@ -147,6 +158,7 @@ export function Layout({ children }: { children: ReactNode }) {
   // POS has a permanent top-bar shortcut. Reuse the exact same permission,
   // organization-module and route filters as every other navigation entry.
   const canOpenPos = visibleItems.some((item) => item.id === 'pos');
+  const canOpenSales = visibleItems.some((item) => item.id === 'sales-invoices');
   const grouped = useMemo(() => visibleItems.reduce<Partial<Record<SidebarSection, typeof visibleItems>>>((acc, item) => {
     if (item.id === 'pos') return acc;
     const section = sidebarSectionForItem(item);
@@ -182,14 +194,21 @@ export function Layout({ children }: { children: ReactNode }) {
   }, [activeMenuGroup]);
 
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem('premier:nav-collapsed-groups', JSON.stringify(collapsed));
-  }, [collapsed]);
+    saveSidebarPreference(`${preferenceKey}:collapsed`, collapsed);
+    saveSidebarPreference(`${preferenceKey}:hidden`, desktopSidebarHidden);
+    saveSidebarPreference(`${preferenceKey}:order`, sectionOrder);
+  }, [preferenceKey, collapsed, desktopSidebarHidden, sectionOrder]);
 
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    window.localStorage.setItem('premier:desktop-sidebar-hidden', desktopSidebarHidden ? '1' : '0');
-  }, [desktopSidebarHidden]);
+  const visibleSections = sectionOrder.filter((section) => grouped[section]?.length);
+
+  function moveSection(section: SidebarSection, target: SidebarSection) {
+    if (section === target) return;
+    setSectionOrder((current) => {
+      const reordered = current.filter((entry) => entry !== section);
+      reordered.splice(current.indexOf(target), 0, section);
+      return reordered;
+    });
+  }
 
   const mobilePrimaryItems = useMemo(() => {
     const priority = runtime.navigation.order;
@@ -261,6 +280,20 @@ export function Layout({ children }: { children: ReactNode }) {
             >
               <ShoppingCart className="h-4 w-4 shrink-0" />
               <span className="hidden xl:inline">{ar ? 'نقطة البيع' : 'Point of Sale'}</span>
+            </NavLink>
+          )}
+          {canOpenSales && (
+            <NavLink
+              data-testid="header-sales-shortcut"
+              to={APP_ROUTES.sales}
+              onPointerEnter={() => prefetchAppRoute(APP_ROUTES.sales)}
+              onFocus={() => prefetchAppRoute(APP_ROUTES.sales)}
+              aria-label={ar ? 'شاشة البيع' : 'Sales'}
+              title={ar ? 'شاشة البيع' : 'Sales'}
+              className={({ isActive }) => `flex h-9 shrink-0 items-center justify-center gap-2 rounded-xl border border-ui-border bg-ui-surface px-2.5 text-xs font-bold text-ui-text shadow-ui-xs transition hover:bg-ui-page-alt active:scale-95 sm:px-3 ${isActive ? 'border-ui-primary text-ui-primary' : ''}`}
+            >
+              <FileText className="h-4 w-4 shrink-0" />
+              <span className="hidden xl:inline">{ar ? 'شاشة البيع' : 'Sales'}</span>
             </NavLink>
           )}
         </div>
@@ -382,9 +415,63 @@ export function Layout({ children }: { children: ReactNode }) {
             )}
           </section>
 
-          {SIDEBAR_SECTION_ORDER.map((group) => {
+          {user && visibleSections.length > 1 && (
+            <div className="mb-2 flex items-center justify-between gap-1 px-2 text-xs">
+              <button
+                type="button"
+                aria-pressed={editingSidebar}
+                onClick={() => setEditingSidebar((editing) => !editing)}
+                className="rounded-md px-2 py-1.5 font-semibold hover:bg-ui-page-alt"
+              >
+                {editingSidebar ? (ar ? 'تم' : 'Done') : (ar ? 'ترتيب الأقسام' : 'Reorder sections')}
+              </button>
+              {editingSidebar && (
+                <button type="button" className="rounded-md px-2 py-1.5 hover:bg-ui-page-alt" onClick={() => setSectionOrder([...SIDEBAR_SECTION_ORDER])}>
+                  {ar ? 'استعادة الترتيب' : 'Reset order'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {visibleSections.map((group, index) => {
             const items = grouped[group] ?? [];
-            if (!items.length) return null;
+            if (editingSidebar) {
+              const label = sidebarSectionLabel(group);
+              const previous = visibleSections[index - 1];
+              const next = visibleSections[index + 1];
+              return (
+                <section
+                  key={group}
+                  data-testid={`nav-group-${group}`}
+                  className="mb-1 flex min-h-11 items-center gap-1 rounded-lg border border-ui-border px-2 text-sm"
+                  onDragOver={(event) => { if (draggedSection) event.preventDefault(); }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    if (draggedSection) moveSection(draggedSection, group);
+                    setDraggedSection(null);
+                  }}
+                >
+                  <span
+                    draggable
+                    className="cursor-grab touch-none p-1.5 active:cursor-grabbing"
+                    aria-hidden="true"
+                    onDragStart={(event) => {
+                      event.dataTransfer.effectAllowed = 'move';
+                      event.dataTransfer.setData('text/plain', group);
+                      setDraggedSection(group);
+                    }}
+                    onDragEnd={() => setDraggedSection(null)}
+                  ><GripVertical className="h-4 w-4" /></span>
+                  <span className="flex-1 truncate">{label}</span>
+                  <button type="button" disabled={!previous} onClick={() => moveSection(group, previous)} aria-label={ar ? `رفع ${label}` : `Move ${label} up`} className="p-1.5 hover:bg-ui-page-alt disabled:opacity-30">
+                    <ArrowUp className="h-4 w-4" />
+                  </button>
+                  <button type="button" disabled={!next} onClick={() => moveSection(group, next)} aria-label={ar ? `خفض ${label}` : `Move ${label} down`} className="p-1.5 hover:bg-ui-page-alt disabled:opacity-30">
+                    <ArrowDown className="h-4 w-4" />
+                  </button>
+                </section>
+              );
+            }
             // Orders (Sales Invoices) and Customers are one-click primary
             // destinations, not nested accordions. Other sections keep their
             // existing expand/collapse behavior and Premier visual styling.
