@@ -4,13 +4,24 @@ import type { GuestTracking } from './service';
 import { qrError } from './errors';
 
 const empty: GuestTracking = { requests: [], bills: [], calls: [] };
+export function createVisitSecret() {
+  return (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, '');
+}
+
+export function rememberVisit(token: string, secret: string) {
+  for (const name of ['localStorage', 'sessionStorage'] as const) {
+    try { window[name].setItem(`premier_qr_visit_v1_${token}`, JSON.stringify({ secret, created: Date.now() })); }
+    catch { /* Continue with the in-memory visit. */ }
+  }
+}
+
 export function readVisit(token: string) {
   const key = `premier_qr_visit_v1_${token}`;
   for (const name of ['localStorage', 'sessionStorage'] as const) {
     try { const storage = window[name]; const stored = JSON.parse(storage.getItem(key) || 'null'); if (/^[a-f0-9]{64}$/.test(stored?.secret) && Date.now() - stored.created < 86400000) return stored.secret as string; } catch { /* Storage unavailable. */ }
   }
-  const secret = (crypto.randomUUID() + crypto.randomUUID()).replace(/-/g, '');
-  for (const name of ['localStorage', 'sessionStorage'] as const) { try { const storage = window[name]; storage.setItem(key, JSON.stringify({ secret, created: Date.now() })); } catch { /* In-memory visit still works. */ } }
+  const secret = createVisitSecret();
+  rememberVisit(token, secret);
   return secret;
 }
 export function resetVisit(token: string) {

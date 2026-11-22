@@ -64,6 +64,36 @@ describe('customer phone entry and recovery', () => {
     expect(mocks.rpc.mock.calls.find(([name]) => name === 'qr_guest_place')?.[1]).toMatchObject({ p_table: null, p_items: [{ product_id: 'p1', quantity: 1 }] });
   });
 
+  it('moves unsent cart items to a new type after submission and keeps the original visit selectable', async () => {
+    const originalSession = 'd'.repeat(64);
+    const original = { ...identity, has_request: true };
+    localStorage.setItem(`premier_qr_visit_v1_${token}`, JSON.stringify({ secret: originalSession, created: Date.now() }));
+    mocks.rpc.mockImplementation(async (name: string, args?: { p_session?: string }) => ({
+      data: name === 'qr_guest_entry' ? { enabled: true, visit: args?.p_session === originalSession
+        ? original : { ...identity, id: 'pickup', order_type: 'pickup' } }
+        : name === 'qr_guest_menu' ? menu
+        : name === 'qr_guest_start_next_order' ? { ...identity, id: 'pickup', order_type: 'pickup' }
+        : empty,
+      error: null,
+    }));
+    render(<GuestEntryGate token={token} />);
+    await screen.findByRole('heading', { name: 'طلبي وحسابي' });
+    fireEvent.click(screen.getByRole('button', { name: 'الرئيسية' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'إضافة Tea' }));
+    fireEvent.click(screen.getByRole('button', { name: /أضف إلى السلة/ }));
+    fireEvent.click(screen.getByRole('button', { name: /فتح السلة/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'طلب جديد بنوع مختلف' }));
+    fireEvent.click(screen.getByRole('button', { name: 'بدء طلب جديد' }));
+    await waitFor(() => expect(screen.queryByLabelText('كيف تستلم طلبك؟')).not.toBeInTheDocument());
+    expect(await screen.findByText('استلام من المطعم')).toBeInTheDocument();
+    expect(screen.getByLabelText('كمية Tea')).toHaveValue(1);
+    fireEvent.click(screen.getByRole('button', { name: 'طلبي وحسابي' }));
+    const switcher = await screen.findByLabelText('فتح طلب آخر على هذا الجهاز');
+    fireEvent.change(switcher, { target: { value: originalSession } });
+    await waitFor(() => expect(mocks.rpc.mock.calls.filter(([method, args]) =>
+      method === 'qr_guest_entry' && args.p_session === originalSession)).toHaveLength(2));
+  });
+
   it('requires a code for an active phone on a new device without revealing its bill first', async () => {
     mocks.rpc.mockImplementation(async (name: string) => ({ data: name === 'qr_guest_entry' ? { enabled: true } : { registered: true, needs_pin: true, pin_set: true }, error: null }));
     render(<GuestEntryGate token={token} />);

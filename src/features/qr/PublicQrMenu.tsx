@@ -2,7 +2,7 @@ import { CustomerSupportLink } from '@/features/support/CustomerSupportLink';
 import { useBunkerPublicTheme } from './useBunkerPublicTheme';
 import { supabase } from '@/api';
 import { BranchSocialLinks } from './BranchSocialLinks';
-import { useEffect, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { ArrowRight, ChevronLeft, ChevronRight, Heart, Search, SlidersHorizontal, ShoppingBag, Home, MapPin, Plus, Minus, UtensilsCrossed, ReceiptText, Check } from 'lucide-react';
 import { ProductImage } from '@/features/catalog/components/ProductImage';
 import { qrPublic } from '@/api/domains/qrPublic';
@@ -48,7 +48,16 @@ function FoodImage({ product, large = false, demo = false }: { product: QrProduc
     className={`customer-image-content${large ? ' customer-image-large' : ''}`} imgClassName="customer-full-image" />;
 }
 
-export function PublicQrMenu({ token, identity: initialIdentity, session, onClosed }: { token: string; identity?: GuestIdentity; session?: string; onClosed?: () => void }) {
+export function PublicQrMenu({ token, identity: initialIdentity, session, onClosed, carriedItems, orderSwitcher, onStartNextOrder, onOrderSubmitted }: {
+  token: string;
+  identity?: GuestIdentity;
+  session?: string;
+  onClosed?: () => void;
+  carriedItems?: QrItem[];
+  orderSwitcher?: ReactNode;
+  onStartNextOrder?: (type: GuestOrderType, table: string | null, photo: string | null, items: QrItem[], sourceType: GuestOrderType) => Promise<void>;
+  onOrderSubmitted?: () => void;
+}) {
   const isBunker = token === '3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62';
   const bunkerMode = useBunkerPublicTheme(isBunker);
   const customerError = isBunker ? qrErrorEnglish : qrError;
@@ -124,7 +133,7 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
   }, [menu, detailId, page]);
   useEffect(() => {
     let alive = true;
-    setMenu(null); setDemoPreview(false); setDemoOrder(null); setCart({}); setRetry(null); setError(''); setReceipt(''); setTable(initialIdentity?.table_id || ''); setDetail(null); setPage(initialIdentity?.has_request ? 'visit' : 'home');
+    setMenu(null); setDemoPreview(false); setDemoOrder(null); setCart(Object.fromEntries((carriedItems ?? []).map(item => [item.product_id, item]))); setRetry(null); setError(''); setReceipt(''); setTable(initialIdentity?.table_id || ''); setDetail(null); setPage(carriedItems?.length ? 'cart' : initialIdentity?.has_request ? 'visit' : 'home');
     try {
       const stored: Draft = JSON.parse(sessionStorage.getItem(storageKey) || 'null');
       if (stored?.key && Array.isArray(stored.items) && (!secure || stored.session === session)) {
@@ -149,13 +158,18 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
       } else setMenu(data);
     }).catch(failure => { if (alive) setError(customerError(failure)); });
     return () => { alive = false; };
-  }, [token, storageKey, initialIdentity, secure, session]);
+  }, [token, storageKey, initialIdentity, secure, session, carriedItems]);
   async function changeFulfillment(type: GuestOrderType, selectedTable: string | null, photo: string | null) {
-    if (!session || lock.current || retry || receipt || identity?.has_request || visit.tracking.requests.length) return false;
+    if (!identity || !session || lock.current || retry) return false;
+    if (hasSubmitted && !onStartNextOrder) return false;
     lock.current = true;
     setChangingFulfillment(true);
     setError('');
     try {
+      if (hasSubmitted) {
+        await onStartNextOrder?.(type, selectedTable, photo, items, identity.order_type);
+        return true;
+      }
       const result = await qrPublic.changeFulfillment({
         p_token: token, p_session: session, p_type: type, p_table: selectedTable, p_photo: photo,
       });
@@ -200,6 +214,7 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
       if (failure) throw failure;
       if (!data?.id) throw new Error('QR_EMPTY_RESPONSE');
       setReceipt(data.id);
+      onOrderSubmitted?.();
       if (data.recovery_code) { setRecoveryCode(data.recovery_code); try { sessionStorage.setItem(`premier_qr_pin_${session}`, data.recovery_code); } catch { /* Display remains in memory. */ } }
       setCart({}); setRetry(null);
       setCheckout(false); setPage('visit'); void visit.refresh();
@@ -213,6 +228,7 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
       }
     } finally { lock.current = false; setBusy(false); }
   }
+  const hasSubmitted = Boolean(receipt || identity?.has_request || visit.tracking.requests.length);
   const needsDeliveryAddress = delivery && !identity?.has_delivery_address && !identity?.has_request && !receipt;
   const items = Object.values(cart).filter(i => i.quantity > 0);
   const total = items.reduce((sum, i) => sum + i.quantity * i.price, 0);
@@ -266,11 +282,11 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
         {menu && filtered.length === 0 && <p className="customer-empty">{isBunker ? 'No items available yet.' : 'لا توجد أصناف للعرض حاليًا.'}</p>}
         <div className="customer-products">{filtered.map(p => <article key={p.id} className="customer-product"><button className="customer-product-open" aria-label={isBunker ? `View details for ${p.name}` : `تفاصيل ${p.name}`} onClick={() => openProduct(p)}><div className="customer-product-image"><FoodImage key={p.id} product={p} demo={demoPreview} /></div><span className="customer-product-category">{p.category_name || (isBunker ? 'Menu' : 'منيو الفرع')}</span><h3>{p.name}</h3>{p.description && <p className="customer-product-description">{p.description}</p>}<strong className="customer-product-price">{Number(p.price).toFixed(2)} <small>{currency}</small></strong></button><button className="customer-add" aria-label={isBunker ? `Add ${p.name}` : `إضافة ${p.name}`} disabled={disabled} onClick={() => openProduct(p)}>{cart[p.id]?.quantity ? <span>{cart[p.id].quantity} {isBunker ? 'in cart' : 'في السلة'}</span> : <Plus size={20} />}</button></article>)}</div>
         {!retry && <button className="customer-refresh" disabled={busy} onClick={() => window.location.reload()}>{isBunker ? 'Refresh menu & prices' : 'تحديث المنيو والأسعار'}</button>}
-      </> : page === 'visit' && demoPreview ? <section className="customer-cart customer-demo-checkout" role="status"><div className="customer-section-title"><h2>{demoOrder ? 'Demo order confirmed' : 'Demo order preview'}</h2></div>{demoOrder ? <><p className="customer-demo-notice"><strong>SIMULATION ONLY</strong> · The products are in the branch catalog, but this test order was not sent to staff, the kitchen, or the sales system.</p><div className="customer-demo-summary">{demoOrder.items.map(item => <div key={item.product_id} className="customer-demo-summary-line"><span>{item.quantity} × {item.name}</span><strong>{(item.price * item.quantity).toFixed(2)} {currency}</strong>{item.notes && <small>Note: {item.notes}</small>}</div>)}</div><div className="customer-total"><span>Demo total</span><strong>{demoOrder.total.toFixed(2)} {currency}</strong></div><p className="customer-table-hint">No payment was taken. Your test order was not registered.</p><button className="customer-primary" onClick={() => { setDemoOrder(null); setPage('home'); }}>Try another order</button></> : <><p className="customer-demo-notice">Add products to your cart and press <strong>Simulate order</strong> to preview a confirmation without sending anything.</p><button className="customer-primary" onClick={() => setPage(items.length ? 'cart' : 'home')}>{items.length ? 'Continue to cart' : 'Explore menu'}</button></>}</section> : page === 'visit' ? <GuestVisitPanel secure={secure} key={visit.session} token={token} session={visit.session} table={table} currency={currency} tracking={visit.tracking} error={visit.error} refresh={visit.refresh} newVisit={() => { if (!retry) { visit.newVisit(); setReceipt(''); setTable(''); } }} /> : <section className="customer-cart"><div className="customer-section-title"><h2>{isBunker ? 'Your cart' : 'سلتك'}</h2><span>{count} {isBunker ? 'items' : 'أصناف'}</span></div>{items.length === 0 && !receipt && <div className="customer-empty"><ShoppingBag size={42} /><p>{isBunker ? 'Your cart is waiting for something delicious.' : 'سلتك في انتظار اختياراتك'}</p><button onClick={() => setPage('home')}>{isBunker ? 'Explore menu' : 'استكشف المنيو'}</button></div>}{items.map(i => <article className="customer-cart-item" key={i.product_id}><strong>{menu?.products.find(p => p.id === i.product_id)?.name || i.name || 'صنف'}</strong><span>{(i.price * i.quantity).toFixed(2)} {currency}</span><label>{isBunker ? 'Quantity' : 'الكمية'}<input aria-label={`كمية ${i.name || menu?.products.find(p => p.id === i.product_id)?.name}`} type="number" min="0" max="99" value={i.quantity} disabled={disabled} onChange={e => changeQuantity(i.product_id, Number(e.target.value))} /></label><label>{isBunker ? 'Notes' : 'ملاحظات'}<input maxLength={300} value={i.notes} disabled={disabled} onChange={e => setCart(c => ({ ...c, [i.product_id]: { ...c[i.product_id], notes: e.target.value } }))} /></label></article>)}
+      </> : page === 'visit' && demoPreview ? <section className="customer-cart customer-demo-checkout" role="status"><div className="customer-section-title"><h2>{demoOrder ? 'Demo order confirmed' : 'Demo order preview'}</h2></div>{demoOrder ? <><p className="customer-demo-notice"><strong>SIMULATION ONLY</strong> · The products are in the branch catalog, but this test order was not sent to staff, the kitchen, or the sales system.</p><div className="customer-demo-summary">{demoOrder.items.map(item => <div key={item.product_id} className="customer-demo-summary-line"><span>{item.quantity} × {item.name}</span><strong>{(item.price * item.quantity).toFixed(2)} {currency}</strong>{item.notes && <small>Note: {item.notes}</small>}</div>)}</div><div className="customer-total"><span>Demo total</span><strong>{demoOrder.total.toFixed(2)} {currency}</strong></div><p className="customer-table-hint">No payment was taken. Your test order was not registered.</p><button className="customer-primary" onClick={() => { setDemoOrder(null); setPage('home'); }}>Try another order</button></> : <><p className="customer-demo-notice">Add products to your cart and press <strong>Simulate order</strong> to preview a confirmation without sending anything.</p><button className="customer-primary" onClick={() => setPage(items.length ? 'cart' : 'home')}>{items.length ? 'Continue to cart' : 'Explore menu'}</button></>}</section> : page === 'visit' ? <>{orderSwitcher}<GuestVisitPanel secure={secure} key={visit.session} token={token} session={visit.session} table={table} currency={currency} tracking={visit.tracking} error={visit.error} refresh={visit.refresh} newVisit={() => { if (!retry) { visit.newVisit(); setReceipt(''); setTable(''); } }} /></> : <section className="customer-cart"><div className="customer-section-title"><h2>{isBunker ? 'Your cart' : 'سلتك'}</h2><span>{count} {isBunker ? 'items' : 'أصناف'}</span></div>{items.length === 0 && !receipt && <div className="customer-empty"><ShoppingBag size={42} /><p>{isBunker ? 'Your cart is waiting for something delicious.' : 'سلتك في انتظار اختياراتك'}</p><button onClick={() => setPage('home')}>{isBunker ? 'Explore menu' : 'استكشف المنيو'}</button></div>}{items.map(i => <article className="customer-cart-item" key={i.product_id}><strong>{menu?.products.find(p => p.id === i.product_id)?.name || i.name || 'صنف'}</strong><span>{(i.price * i.quantity).toFixed(2)} {currency}</span><label>{isBunker ? 'Quantity' : 'الكمية'}<input aria-label={`كمية ${i.name || menu?.products.find(p => p.id === i.product_id)?.name}`} type="number" min="0" max="99" value={i.quantity} disabled={disabled} onChange={e => changeQuantity(i.product_id, Number(e.target.value))} /></label><label>{isBunker ? 'Notes' : 'ملاحظات'}<input maxLength={300} value={i.notes} disabled={disabled} onChange={e => setCart(c => ({ ...c, [i.product_id]: { ...c[i.product_id], notes: e.target.value } }))} /></label></article>)}
         {!demoPreview && identity && <CartFulfillment type={identity.order_type}
           tableName={identity.table_name || menu?.tables.find(option => option.id === table)?.name}
           tables={menu?.tables ?? []} english={isBunker}
-          locked={busy || !!retry || !!receipt || identity.has_request || visit.tracking.requests.length > 0}
+          locked={busy || !!retry || (hasSubmitted && !onStartNextOrder)} newOrder={hasSubmitted}
           saving={changingFulfillment} editing={editingFulfillment} setEditing={setEditingFulfillment} onSave={changeFulfillment} />}
         <div className="customer-total"><span>{isBunker ? 'Subtotal' : 'إجمالي الأصناف'}</span><strong>{total.toFixed(2)} {currency}</strong></div><p className="customer-table-hint">{demoPreview ? 'Demo only — no payment, tax invoice, or real order will be created.' : isBunker ? 'Taxes are calculated on your branch bill. Payment is handled by our team.' : 'الضرائب حسب فاتورة الفرع · الدفع لدى الموظف'}</p>
         {!editingFulfillment && checkout && delivery && !retry && <form className="customer-delivery-checkout" onSubmit={event => {

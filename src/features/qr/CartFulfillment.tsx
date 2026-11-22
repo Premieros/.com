@@ -8,7 +8,7 @@ const types = {
   dine_in: ['داخل المطعم', 'Dine in'],
 } as const;
 
-export function CartFulfillment({ type, tableName, tables, english, locked, saving, editing, setEditing, onSave }: {
+export function CartFulfillment({ type, tableName, tables, english, locked, saving, editing, setEditing, newOrder, onSave }: {
   type: GuestOrderType;
   tableName?: string | null;
   tables: QrTable[];
@@ -16,6 +16,7 @@ export function CartFulfillment({ type, tableName, tables, english, locked, savi
   locked: boolean;
   saving: boolean;
   editing: boolean;
+  newOrder: boolean;
   setEditing: (editing: boolean) => void;
   onSave: (type: GuestOrderType, table: string | null, photo: string | null) => Promise<boolean>;
 }) {
@@ -33,12 +34,12 @@ export function CartFulfillment({ type, tableName, tables, english, locked, savi
         <strong>{types[type][english ? 1 : 0]}{type === 'dine_in' && tableName ? ` · ${tableName}` : ''}</strong>
       </div>
       {!locked && !editing && <button type="button" className="customer-refresh" onClick={() => {
-        setChoice(type);
+        setChoice(newOrder ? (type === 'delivery' ? 'pickup' : 'delivery') : type);
         setTable('');
         setPhoto('');
         setCamera(false);
         setEditing(true);
-      }}>{label('تغيير نوع الطلب', 'Change order type')}</button>}
+      }}>{newOrder ? label('طلب جديد بنوع مختلف', 'New order with a different type') : label('تغيير نوع الطلب', 'Change order type')}</button>}
     </div>
     {editing && !locked && <form className="customer-delivery-checkout" onSubmit={async event => {
       event.preventDefault();
@@ -47,12 +48,13 @@ export function CartFulfillment({ type, tableName, tables, english, locked, savi
         setCamera(false);
       }
     }}>
+      {newOrder && <p>{label('ستُستخدم محتويات السلة في الطلب الجديد. يمكنك الرجوع إلى الطلب الأول من «طلبي».', 'Your cart items will go into the new order. Reopen the first order from My order.')}</p>}
       <label>{label('كيف تستلم طلبك؟', 'How will you receive your order?')}
         <select value={choice} disabled={saving} onChange={event => {
           setChoice(event.target.value as GuestOrderType);
           setCamera(false);
         }}>
-          {(Object.entries(types) as Array<[GuestOrderType, readonly [string, string]]>).map(([id, names]) =>
+          {(Object.entries(types) as Array<[GuestOrderType, readonly [string, string]]>).filter(([id]) => !newOrder || id !== type).map(([id, names]) =>
             <option key={id} value={id}>{names[english ? 1 : 0]}</option>)}
         </select>
       </label>
@@ -70,7 +72,7 @@ export function CartFulfillment({ type, tableName, tables, english, locked, savi
             : <button type="button" className="customer-refresh" onClick={() => setCamera(true)}>{label('صوّر رقم الطاولة', 'Photograph the table number')}</button>}
       </>}
       <button className="customer-primary" disabled={saving || (selectingTable && (!table || !photo))}>
-        {saving ? label('جارٍ الحفظ…', 'Saving…') : label('اعتماد نوع الطلب', 'Apply order type')}
+        {saving ? label('جارٍ الحفظ…', 'Saving…') : (newOrder ? label('بدء طلب جديد', 'Start new order') : label('اعتماد نوع الطلب', 'Apply order type'))}
       </button>
       <button type="button" className="customer-refresh" disabled={saving} onClick={() => { setEditing(false); setCamera(false); }}>
         {label('إلغاء', 'Cancel')}

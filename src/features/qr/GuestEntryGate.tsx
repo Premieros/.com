@@ -5,12 +5,12 @@ import { qrPublic } from '@/api/domains/qrPublic';
 import { GuestPreviousOrders, GuestVisitPanel } from './GuestVisitPanel';
 import { TableCamera } from './TableCamera';
 import { PublicQrMenu } from './PublicQrMenu';
-import { readVisit, resetVisit, useGuestVisit } from './useGuestVisit';
+import { createVisitSecret, readVisit, rememberVisit, resetVisit, useGuestVisit } from './useGuestVisit';
 import { useGuestOrderHistory } from './guestOrderHistory';
 import { qrError, qrErrorEnglish } from './errors';
 import { normalizeRecoveryPin } from './normalizeRecoveryPin';
 import { Bike, Store, Utensils } from 'lucide-react';
-import type { GuestIdentity, GuestOrderType, QrTable } from './service';
+import type { GuestIdentity, GuestOrderType, QrItem, QrTable } from './service';
 import './customer-menu.css';
 
 function ClosedOrder({ token, session, currency, restart }: { token: string; session: string; currency: string; restart: () => void }) {
@@ -19,12 +19,24 @@ function ClosedOrder({ token, session, currency, restart }: { token: string; ses
     tracking={visit.tracking} error={visit.error} refresh={visit.refresh} newVisit={restart} />;
 }
 
+interface DeviceVisit { session: string; type: GuestOrderType; created: number }
+const visitListKey = (token: string) => `premier:qr-visits:${token}`;
+function readDeviceVisits(token: string): DeviceVisit[] {
+  try {
+    const raw: unknown = JSON.parse(localStorage.getItem(visitListKey(token)) ?? '[]');
+    return Array.isArray(raw) ? raw.filter(visit => /^[a-f0-9]{64}$/.test(visit?.session)
+      && ['delivery', 'pickup', 'dine_in'].includes(visit?.type) && Date.now() - visit.created < 86400000) : [];
+  } catch { return []; }
+}
 interface Entry { enabled: boolean; branch_name?: string; branch_address?: string; currency?: string; tables?: QrTable[]; visit?: GuestIdentity; closed?: boolean }
 export function GuestEntryGate({ token }: { token: string }) {
   const isBunker = token === '3236a6be44494d89ba2b2a4e7c55fb140564f5a6ae5f4db7bcd7ace6eadeaf62';
   const bunkerMode = useBunkerPublicTheme(isBunker);
   const customerError = isBunker ? qrErrorEnglish : qrError;
   const [session, setSession] = useState(() => readVisit(token));
+  const [deviceVisits, setDeviceVisits] = useState(() => readDeviceVisits(token));
+  const carriedCart = useRef<{ session: string; items: QrItem[] } | null>(null);
+  const nextAttempt = useRef<{ source: string; type: GuestOrderType; table: string | null; secret: string } | null>(null);
   const [entry, setEntry] = useState<Entry | null>(null);
   const [identity, setIdentity] = useState<GuestIdentity | null>(null);
   const history = useGuestOrderHistory(token);
@@ -69,12 +81,58 @@ export function GuestEntryGate({ token }: { token: string }) {
     if (failure) throw failure; if (!data?.success) throw new Error(data?.error || 'QR_PIN_INVALID'); setIdentity(data.visit);
   }
   function restart() { setIdentity(null); setClosed(false); setStep('type'); setPhone(''); setName(''); setPhoto(''); setTable(''); setPin(''); setSession(resetVisit(token)); }
+  function openVisit(secret: string) {
+    if (secret === session) return;
+    rememberVisit(token, secret);
+    setIdentity(null);
+    setEntry(null);
+    setSession(secret);
+  }
+  async function openNewOrder(type: GuestOrderType, targetTable: string | null, image: string | null, items: QrItem[], sourceType: GuestOrderType) {
+    if (!identity) return;
+    let attempt = nextAttempt.current;
+    if (!attempt || attempt.source !== session || attempt.type !== type || attempt.table !== targetTable) {
+      attempt = { source: session, type, table: targetTable, secret: createVisitSecret() };
+      nextAttempt.current = attempt;
+    }
+    const result = await qrPublic.startNextOrder({
+      p_token: token, p_session: session, p_next_session: attempt.secret,
+      p_type: type, p_table: targetTable, p_photo: image,
+    });
+    if (result.error || !result.data) throw result.error || new Error('QR_EMPTY_RESPONSE');
+    const now = Date.now();
+    const records = [
+      { session: attempt.secret, type, created: now },
+      { session, type: sourceType, created: deviceVisits.find(visit => visit.session === session)?.created ?? now },
+      ...deviceVisits.filter(visit => visit.session !== session && visit.session !== attempt.secret),
+    ].slice(0, 12);
+    setDeviceVisits(records);
+    try { localStorage.setItem(visitListKey(token), JSON.stringify(records)); } catch { /* Keep the list in memory. */ }
+    carriedCart.current = { session: attempt.secret, items };
+    nextAttempt.current = null;
+    openVisit(attempt.secret);
+  }
+  const orderTypeNames = { delivery: isBunker ? 'Delivery' : 'توصيل', pickup: isBunker ? 'Pickup' : 'استلام من المطعم', dine_in: isBunker ? 'Dine in' : 'داخل المطعم' };
+  const otherOrders = deviceVisits.filter(visit => visit.session !== session);
+  const orderSwitcher = otherOrders.length ? <label className="customer-order-switcher">
+    {isBunker ? 'Open another order on this device' : 'فتح طلب آخر على هذا الجهاز'}
+    <select value="" onChange={event => openVisit(event.target.value)}>
+      <option value="" disabled>{isBunker ? 'Choose an order' : 'اختر طلبًا'}</option>
+      {otherOrders.map(visit => <option key={visit.session} value={visit.session}>
+        {orderTypeNames[visit.type]} · {new Date(visit.created).toLocaleTimeString(isBunker ? 'en-GB' : 'ar-EG', { hour: '2-digit', minute: '2-digit' })}
+      </option>)}
+    </select>
+  </label> : null;
   if (entry?.enabled === false) return <PublicQrMenu token={token} />;
-  if (identity && !closed) return <PublicQrMenu key={session} token={token} identity={identity} session={session} onClosed={() => { setIdentity(null); setClosed(true); }} />;
+  if (identity && !closed) return <PublicQrMenu key={session} token={token} identity={identity} session={session}
+    carriedItems={carriedCart.current?.session === session ? carriedCart.current.items : undefined}
+    orderSwitcher={orderSwitcher} onStartNextOrder={openNewOrder}
+    onOrderSubmitted={() => { if (carriedCart.current?.session === session) carriedCart.current = null; }}
+    onClosed={() => { setIdentity(null); setClosed(true); }} />;
   return <main dir={isBunker ? "ltr" : "rtl"} data-bunker-theme={isBunker ? bunkerMode : undefined} className={`customer-app customer-entry${isBunker ? " bunker-customer" : ""}`}><header><span className="customer-eyebrow">{entry?.branch_name || (isBunker ? 'BUNKER' : 'Premier')}</span><h1>{closed ? (isBunker ? 'Visit complete' : 'انتهت زيارتك') : (isBunker ? 'Welcome to BUNKER' : 'أهلًا بك')}</h1><p>{closed ? (isBunker ? 'Your visit is complete. Start a new order any time.' : 'أُغلق الدخول لهذه الزيارة. يمكنك بدء طلب جديد.') : (isBunker ? 'Your orders, all in one place.' : 'طلبك وحسابك في مكان واحد')}</p></header>
     <CustomerSupportLink token={token} />
     {error && <p role="alert" className="customer-alert">{error}</p>}
-    {!entry ? <><p role="status">{isBunker ? 'Checking branch link…' : 'جارٍ التحقق من رابط الفرع…'}</p>{error && <button className="customer-primary" onClick={() => window.location.reload()}>{isBunker ? 'Try again' : 'إعادة المحاولة'}</button>}</> : closed ? <><ClosedOrder token={token} session={session} currency={entry.currency || ''} restart={restart} /><button className="customer-primary" onClick={restart}>{isBunker ? 'Start a new order' : 'بدء طلب جديد'}</button></> : <form onSubmit={e => { e.preventDefault(); void run(step === 'phone' ? lookup : step === 'pin' ? resume : step === 'table' ? () => begin('dine_in') : step === 'pickup' ? () => begin(step) : continueOrder); }}>
+    {!entry ? <><p role="status">{isBunker ? 'Checking branch link…' : 'جارٍ التحقق من رابط الفرع…'}</p>{error && <button className="customer-primary" onClick={() => window.location.reload()}>{isBunker ? 'Try again' : 'إعادة المحاولة'}</button>}</> : closed ? <>{orderSwitcher}<ClosedOrder token={token} session={session} currency={entry.currency || ''} restart={restart} /><button className="customer-primary" onClick={restart}>{isBunker ? 'Start a new order' : 'بدء طلب جديد'}</button></> : <form onSubmit={e => { e.preventDefault(); void run(step === 'phone' ? lookup : step === 'pin' ? resume : step === 'table' ? () => begin('dine_in') : step === 'pickup' ? () => begin(step) : continueOrder); }}>
       {step === 'phone' && <><label>{isBunker ? 'Phone number' : 'رقم الهاتف'}<input type="tel" autoComplete="tel" inputMode="tel" required maxLength={24} value={phone} disabled={busy} onChange={e => setPhone(e.target.value)} /></label><p>{isBunker ? 'If you have an active order, you can reopen it with your recovery code.' : 'إذا كان لديك طلب نشط سنفتح طلبك بعد التحقق من رمز الاسترجاع.'}</p></>}
       {step === 'name' && <label>{isBunker ? 'Your name' : 'اسمك'}<input required autoComplete="name" minLength={2} maxLength={100} value={name} disabled={busy} onChange={e => setName(e.target.value)} /></label>}
       {step === 'pin' && <><label>{isBunker ? 'Recovery code' : 'رمز استرجاع الطلب'}<input required type="text" inputMode="numeric" autoComplete="off" minLength={2} maxLength={2} value={pin} onChange={e => setPin(normalizeRecoveryPin(e.target.value))} /></label><p>{isBunker ? 'Enter the two-digit code shown after your first order. Ask our team if you need a new one. Recovery locks after three wrong attempts.' : 'الرقمان اللذان ظهرا بعد إرسال أول طلب. إذا نسيتهما، اطلب رمزًا جديدًا من الموظف. بعد ٣ محاولات خاطئة يتوقف الاسترجاع.'}</p></>}
