@@ -101,7 +101,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const data = sRes.data as Settings | null;
       setSettings(data);
       if (data) {
-        void SettingsRepository.saveGlobalSettings(data);
+        void SettingsRepository.saveGlobalSettings(data, sessionUserId);
         try {
           if (typeof localStorage !== 'undefined') {
             localStorage.setItem(`premier:cached_settings:${sessionUserId}`, JSON.stringify(data));
@@ -124,7 +124,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const bMap: Record<string, BranchSettings> = {};
       for (const row of (bRes.data as BranchSettings[]) || []) {
         bMap[row.branch_id] = row;
-        void SettingsRepository.saveBranchSettings(row.branch_id, row);
+        void SettingsRepository.saveBranchSettings(row.branch_id, row, sessionUserId);
       }
       setBranchSettingsMap(bMap);
       if (Object.keys(bMap).length > 0) {
@@ -268,10 +268,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     }
 
     setSettings(next);
-    await SettingsRepository.saveGlobalSettings(next);
+    await SettingsRepository.saveGlobalSettings(next, sessionUserId);
     await refresh();
     return true;
-  }, [settings, refresh]);
+  }, [settings, refresh, sessionUserId]);
 
   const saveBranchSettings = useCallback(async (branchId: string, patch: Partial<BranchSettings>): Promise<boolean> => {
     const hasNegativeStockPatch = Object.prototype.hasOwnProperty.call(patch, 'allow_negative_stock');
@@ -309,10 +309,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     } as BranchSettings;
 
     setBranchSettingsMap((prev) => ({ ...prev, [branchId]: updatedBranch }));
-    await SettingsRepository.saveBranchSettings(branchId, updatedBranch);
+    await SettingsRepository.saveBranchSettings(branchId, updatedBranch, sessionUserId);
     await refresh();
     return true;
-  }, [branchSettingsMap, refresh]);
+  }, [branchSettingsMap, refresh, sessionUserId]);
 
   return (
     <SettingsContext.Provider value={{ settings, loading, branchSettingsMap, effectiveSettings, refresh, save, saveBranchSettings }}>
