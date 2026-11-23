@@ -30,6 +30,14 @@ A protected config migration, explicit Settings UI toggle, and both on/off acces
 - Added **unapplied migration** `20261123120000_guard_sales_discount_updates.sql`, introducing an UPDATE-of-discount guard requiring `pos.discount` or POS-admin for positive discount changes. This migration requires integration testing of authorized adjustment workflows before any production application.
 - **Remaining financial attack-surface work:** check direct changes to `total`, `paid_amount`, `tax_amount`, `status` and sale items versus authoritative RPCs; verify approval request ownership, consumption and expiry. Neither the React patch nor the narrow migration proves full anti-tamper security.
 
+## Sales UPDATE attack-surface audit — latest read-only verification
+
+- `public.sales` is RLS-protected: direct `INSERT` is `WITH CHECK (false)`; authenticated `UPDATE` is permitted for branch-scoped users with `sales.manage` or POS admin. Table-level UPDATE privileges remain granted to `authenticated`, subject to RLS.
+- Live `sales` triggers include: discount guard **INSERT only**, employee-only credit guard on selected fields, work-authorization mutation guard on **all updates**, and other INSERT controls. The existing work-authorization guard does not by itself imply per-column financial immutability.
+- `SalesPage.saveSaleEdit` uses a protected `change_sale_payment_method` RPC for payment changes, then performs direct `supabase.from('sales').update({ customer_id, status, notes })` for permitted metadata edits. Investigate whether arbitrary status transitions can falsely mark a sale returned/completed without a proper refund/accounting RPC.
+- No UI-only fix can secure arbitrary PostgREST calls. Before deploying a migration, inventory supported financial mutation RPCs and implement server-enforced transition/field protections with SQL integration tests. Direct `UPDATE` of `total`, `paid_amount`, `tax_amount`, `refunded_amount` and invoice status remains a **review item**, not proven fully safe.
+- The newly staged discount-update trigger is a narrow defense-in-depth change; **do not treat it as comprehensive anti-tamper protection**. The migration is intentionally not applied.
+
 ## Release constraints
 
 No Vercel deployment, preview, spend-setting change, or promotion without fresh specific human approval. Existing production remains unchanged. CI green is not equivalent to browser E2E verification.
