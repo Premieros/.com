@@ -55,7 +55,7 @@ const disposable = Boolean(url && ['localhost','127.0.0.1','[::1]'].some(host =>
       const unauthorized=await db.query<{data:{success:boolean;error:string}}>(
         'select public.qr_guest_resume($1,$2,$3,$4) data',
         [foreignToken,nextSession,phone,persian]);
-      expect(unauthorized.rows[0].data).toMatchObject({success:false,error:'QR_PIN_INVALID'});
+      expect(unauthorized.rows[0].data).toMatchObject({success:false,error:'QR_RECOVERY_DISABLED'});
 
       const result=await db.query<{data:{success:boolean;visit:{id:string}}}>(
         'select public.qr_guest_resume($1,$2,$3,$4) data',
