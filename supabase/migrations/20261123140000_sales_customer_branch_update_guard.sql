@@ -10,9 +10,6 @@ SET search_path = 'public', 'pg_temp'
 AS $function$
 BEGIN
   IF NEW.customer_id IS NOT NULL
-     AND (TG_OP = 'INSERT'
-          OR NEW.customer_id IS DISTINCT FROM OLD.customer_id
-          OR NEW.branch_id IS DISTINCT FROM OLD.branch_id)
      AND NOT EXISTS (
        SELECT 1 FROM public.customers c
        WHERE c.id = NEW.customer_id AND c.branch_id = NEW.branch_id
