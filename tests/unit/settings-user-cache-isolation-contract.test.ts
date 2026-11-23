@@ -19,6 +19,17 @@ describe('settings cache avoids repeated parsing and cross-user bootstrap', () =
     expect(source).toContain('setBranchSettingsMap(next.branchMap)');
   });
 
+  it('scopes persisted repository caches to the authenticated user too', () => {
+    const repository = readFileSync('src/core/repositories/SettingsRepository.ts', 'utf8');
+    expect(repository).toContain('global_settings:${userId}');
+    expect(repository).toContain('branch_settings:${userId}:${branchId}');
+    expect(repository).toContain('premier:cached_branch_settings_map:${userId}');
+    expect(source).toContain('SettingsRepository.saveGlobalSettings(data, sessionUserId)');
+    expect(source).toContain('SettingsRepository.saveBranchSettings(row.branch_id, row, sessionUserId)');
+    expect(source).toContain('SettingsRepository.saveGlobalSettings(next, sessionUserId)');
+    expect(source).toContain('SettingsRepository.saveBranchSettings(branchId, updatedBranch, sessionUserId)');
+  });
+
   it('rejects stale asynchronous refreshes and preserves cached data on read errors', () => {
     expect(source).toContain('const epoch = ++refreshEpoch.current');
     expect(source).toContain('if (epoch !== refreshEpoch.current) return');
