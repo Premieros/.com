@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { applyBrandColor, applyDefaultSurface, applySurfaceColor, brandFromSettingsValue } from '../lib/brandColor';
 import { findUiTheme } from '../lib/themes';
@@ -41,11 +41,13 @@ interface SettingsContextValue {
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);
 
-function getInitialCachedSettings(): { settings: Settings | null; branchMap: Record<string, BranchSettings> } {
+function getInitialCachedSettings(userId: string | null): { settings: Settings | null; branchMap: Record<string, BranchSettings> } {
+  // Never show an unrelated operator's locally cached branch settings.
+  if (!userId) return { settings: null, branchMap: {} };
   try {
     if (typeof localStorage !== 'undefined') {
-      const s = localStorage.getItem('premier:cached_settings');
-      const b = localStorage.getItem('premier:cached_branch_settings_map');
+      const s = localStorage.getItem(`premier:cached_settings:${userId}`);
+      const b = localStorage.getItem(`premier:cached_branch_settings_map:${userId}`);
       return {
         settings: s ? (JSON.parse(s) as Settings) : null,
         branchMap: b ? (JSON.parse(b) as Record<string, BranchSettings>) : {},
@@ -58,17 +60,30 @@ function getInitialCachedSettings(): { settings: Settings | null; branchMap: Rec
 }
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const initialCache = getInitialCachedSettings();
+  const { session } = useAuth();
+  const sessionUserId = session?.user?.id ?? null;
+  // Lazy initialization avoids expensive localStorage JSON parsing on every
+  // provider re-render (settings updates, theme changes, timers, etc.).
+  const [initialCache] = useState(() => getInitialCachedSettings(sessionUserId));
   const [settings, setSettings] = useState<Settings | null>(initialCache.settings);
   const [branchSettingsMap, setBranchSettingsMap] = useState<Record<string, BranchSettings>>(initialCache.branchMap);
   const [loading, setLoading] = useState(!initialCache.settings);
+  const currentCacheUser = useRef(sessionUserId);
+  const refreshEpoch = useRef(0);
   const { applySystemTheme } = useTheme();
   const { applySystemLang } = useLanguage();
-  const { session } = useAuth();
 
-  const sessionUserId = session?.user?.id ?? null;
+  useEffect(() => {
+    if (currentCacheUser.current === sessionUserId) return;
+    currentCacheUser.current = sessionUserId;
+    const next = getInitialCachedSettings(sessionUserId);
+    setSettings(next.settings);
+    setBranchSettingsMap(next.branchMap);
+    setLoading(!next.settings);
+  }, [sessionUserId]);
 
   const refresh = useCallback(async () => {
+    const epoch = ++refreshEpoch.current;
     if (!sessionUserId) {
       setSettings(null);
       setBranchSettingsMap({});
@@ -80,13 +95,15 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         supabase.from('settings').select('*').maybeSingle(),
         supabase.from('branch_settings').select('*'),
       ]);
+      if (epoch !== refreshEpoch.current) return;
       const data = sRes.data as Settings | null;
+      setSettings(data);
       if (data) {
         setSettings(data);
         void SettingsRepository.saveGlobalSettings(data);
         try {
           if (typeof localStorage !== 'undefined') {
-            localStorage.setItem('premier:cached_settings', JSON.stringify(data));
+            localStorage.setItem(`premier:cached_settings:${sessionUserId}`, JSON.stringify(data));
           }
         } catch {
           // ignore
@@ -108,11 +125,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         bMap[row.branch_id] = row;
         void SettingsRepository.saveBranchSettings(row.branch_id, row);
       }
+      setBranchSettingsMap(bMap);
       if (Object.keys(bMap).length > 0) {
-        setBranchSettingsMap(bMap);
         try {
           if (typeof localStorage !== 'undefined') {
-            localStorage.setItem('premier:cached_branch_settings_map', JSON.stringify(bMap));
+            localStorage.setItem(`premier:cached_branch_settings_map:${sessionUserId}`, JSON.stringify(bMap));
           }
         } catch {
           // ignore
@@ -121,7 +138,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     } catch {
       // offline: maintain current cached settings
     } finally {
-      setLoading(false);
+      if (epoch === refreshEpoch.current) setLoading(false);
     }
   }, [sessionUserId, applySystemTheme, applySystemLang]);
 
