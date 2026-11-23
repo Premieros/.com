@@ -46,6 +46,14 @@ A protected config migration, explicit Settings UI toggle, and both on/off acces
 - Contract tests and `tests/sql/sales_direct_write_privileges_gate.sql` check the intended privilege set. **Before applying to production**, test all checkout, refunds, payment-method changes, archive, kitchen settlement event linkage, and cross-branch access on an isolated project. Security-definer changes need an explicit trigger-input forgery review as well.
 - This is an **unapplied** security migration: do not infer production has these protections.
 
+## Additional performance and test enforcement
+
+- `SettingsContext` now parses its initial local cache once, scopes localStorage keys by authenticated user, resets cached UI state on session-owner changes, rejects stale asynchronous fetch responses, and preserves cached data when either fetch fails.
+- `SettingsRepository` now accepts optional user-scoped IndexedDB/localStorage keys. Active SettingsContext writes use those scoped keys; legacy unscoped callers remain compatible and should be audited separately before claiming all offline caches are fully isolated. Cached settings are never a substitute for server permission checks.
+- `ManualPaymentApprovalsModal` now refreshes its pending-transfer queue every 15 seconds **only while the document is visible**, and immediately on return; manual refresh remains available.
+- The sales privilege SQL gate is now included in **both** disposable Postgres workflows: Fast Verify and Verify main. Do not treat the migration as deploy-ready until their latest head-SHA results pass, including DB replay.
+- The additional-code requirement remains **unimplemented pending selection of the precise operation code flow**. Do not disable login credentials, guest session transfer recovery, or server-side authorization while making optional extra prompts opt-in.
+
 ## Release constraints
 
 No Vercel deployment, preview, spend-setting change, or promotion without fresh specific human approval. Existing production remains unchanged. CI green is not equivalent to browser E2E verification.
