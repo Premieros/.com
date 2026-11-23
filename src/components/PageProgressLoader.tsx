@@ -20,11 +20,16 @@ export function PageLoadProgressProvider({ children }: { children: ReactNode }) 
   const activeLoads = useRef(0);
   const tickTimer = useRef<number | null>(null);
   const stallTimer = useRef<number | null>(null);
+  const frameTimer = useRef<number | null>(null);
 
   const clearTick = useCallback(() => {
     if (tickTimer.current !== null) {
       window.clearInterval(tickTimer.current);
       tickTimer.current = null;
+    }
+    if (frameTimer.current !== null) {
+      window.cancelAnimationFrame(frameTimer.current);
+      frameTimer.current = null;
     }
     if (stallTimer.current !== null) {
       window.clearTimeout(stallTimer.current);
@@ -42,10 +47,15 @@ export function PageLoadProgressProvider({ children }: { children: ReactNode }) 
     setProgress(0);
     stallTimer.current = window.setTimeout(() => {
       stallTimer.current = null;
+      if (tickTimer.current !== null) {
+        window.clearInterval(tickTimer.current);
+        tickTimer.current = null;
+      }
       setStalled(true);
     }, PAGE_LOADING_STALL_MS);
 
-    window.requestAnimationFrame(() => {
+    frameTimer.current = window.requestAnimationFrame(() => {
+      frameTimer.current = null;
       setProgress(8);
     });
 
