@@ -2,9 +2,9 @@ import { dbGet, dbPut } from './LocalDatabase';
 import type { Settings, BranchSettings } from '@/lib/types';
 
 export class SettingsRepository {
-  public static async getGlobalSettings(): Promise<Settings | null> {
+  public static async getGlobalSettings(userId?: string): Promise<Settings | null> {
     try {
-      const row = await dbGet<{ key: string; value: Settings }>('system_settings', 'global_settings');
+      const row = await dbGet<{ key: string; value: Settings }>('system_settings', userId ? `global_settings:${userId}` : 'global_settings');
       if (row?.value) {
         return row.value;
       }
@@ -14,7 +14,7 @@ export class SettingsRepository {
 
     if (typeof localStorage !== 'undefined') {
       try {
-        const cached = localStorage.getItem('premier:cached_settings');
+        const cached = localStorage.getItem(userId ? `premier:cached_settings:${userId}` : 'premier:cached_settings');
         if (cached) {
           return JSON.parse(cached) as Settings;
         }
@@ -25,15 +25,15 @@ export class SettingsRepository {
     return null;
   }
 
-  public static async saveGlobalSettings(settings: Settings): Promise<void> {
+  public static async saveGlobalSettings(settings: Settings, userId?: string): Promise<void> {
     try {
-      await dbPut('system_settings', { key: 'global_settings', value: settings });
+      await dbPut('system_settings', { key: userId ? `global_settings:${userId}` : 'global_settings', value: settings });
     } catch (e) {
       console.warn('Failed to save global settings to IndexedDB:', e);
     }
     if (typeof localStorage !== 'undefined') {
       try {
-        localStorage.setItem('premier:cached_settings', JSON.stringify(settings));
+        localStorage.setItem(userId ? `premier:cached_settings:${userId}` : 'premier:cached_settings', JSON.stringify(settings));
         if (settings.allow_negative_stock !== undefined) {
           localStorage.setItem('premier:allow_negative_stock:company', String(settings.allow_negative_stock));
         }
@@ -43,9 +43,9 @@ export class SettingsRepository {
     }
   }
 
-  public static async getBranchSettings(branchId: string): Promise<BranchSettings | null> {
+  public static async getBranchSettings(branchId: string, userId?: string): Promise<BranchSettings | null> {
     try {
-      const row = await dbGet<{ key: string; value: BranchSettings }>('system_settings', `branch_settings_${branchId}`);
+      const row = await dbGet<{ key: string; value: BranchSettings }>('system_settings', userId ? `branch_settings:${userId}:${branchId}` : `branch_settings_${branchId}`);
       if (row?.value) {
         return row.value;
       }
@@ -55,7 +55,7 @@ export class SettingsRepository {
 
     if (typeof localStorage !== 'undefined') {
       try {
-        const cachedMap = localStorage.getItem('premier:cached_branch_settings_map');
+        const cachedMap = localStorage.getItem(userId ? `premier:cached_branch_settings_map:${userId}` : 'premier:cached_branch_settings_map');
         if (cachedMap) {
           const map = JSON.parse(cachedMap) as Record<string, BranchSettings>;
           const branch = map[branchId];
@@ -68,18 +68,19 @@ export class SettingsRepository {
     return null;
   }
 
-  public static async saveBranchSettings(branchId: string, settings: BranchSettings): Promise<void> {
+  public static async saveBranchSettings(branchId: string, settings: BranchSettings, userId?: string): Promise<void> {
     try {
-      await dbPut('system_settings', { key: `branch_settings_${branchId}`, value: settings });
+      await dbPut('system_settings', { key: userId ? `branch_settings:${userId}:${branchId}` : `branch_settings_${branchId}`, value: settings });
     } catch (e) {
       console.warn('Failed to save branch settings to IndexedDB:', e);
     }
     if (typeof localStorage !== 'undefined') {
       try {
-        const cachedMap = localStorage.getItem('premier:cached_branch_settings_map');
+        const cacheKey = userId ? `premier:cached_branch_settings_map:${userId}` : 'premier:cached_branch_settings_map';
+        const cachedMap = localStorage.getItem(cacheKey);
         const map = cachedMap ? (JSON.parse(cachedMap) as Record<string, BranchSettings>) : {};
         map[branchId] = settings;
-        localStorage.setItem('premier:cached_branch_settings_map', JSON.stringify(map));
+        localStorage.setItem(cacheKey, JSON.stringify(map));
         const overrideKey = `premier:allow_negative_stock:branch_${branchId}`;
         if (typeof settings.allow_negative_stock === 'boolean') {
           localStorage.setItem(overrideKey, String(settings.allow_negative_stock));
