@@ -96,10 +96,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         supabase.from('branch_settings').select('*'),
       ]);
       if (epoch !== refreshEpoch.current) return;
+      // Retain the scoped cache when either network read fails.
+      if (sRes.error || bRes.error) throw sRes.error || bRes.error;
       const data = sRes.data as Settings | null;
       setSettings(data);
       if (data) {
-        setSettings(data);
         void SettingsRepository.saveGlobalSettings(data);
         try {
           if (typeof localStorage !== 'undefined') {
