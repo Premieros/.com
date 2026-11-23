@@ -24,6 +24,7 @@ import { useCan } from '@/lib/permissions';
 import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { invalidatePosCatalogCache } from '@/core/offline/invalidatePosCatalogCache';
 import { ProductImage } from '@/features/catalog/components/ProductImage';
 import { ProductImageAdjustModal, type ProductImageView } from '@/features/catalog/components/ProductImageAdjustModal';
@@ -62,12 +63,13 @@ export function ProductsPage() {
   const supportsComposition = supportsRawComposition || supportsComponentGroups;
   const itemLabel = runtime.terminology.item[lang === 'ar' ? 'ar' : 'en'];
   const [search, setSearch] = useState('');
+  const debouncedSearch = useDebouncedValue(search, 250);
   const { rows: products, loading, total, hasMore, loadMore, loadingMore, refresh: reloadProducts, fetchAll: fetchAllProducts } = usePaginatedRows<Product>({
     table: 'products',
     select: '*',
     order: { column: 'created_at', ascending: false },
     branch_id: branchFilter,
-    search: { term: search, columns: ['name', 'name_en', 'barcode', 'sku'] },
+    search: { term: debouncedSearch, columns: ['name', 'name_en', 'barcode', 'sku'] },
     pageSize: 100,
   });
   const [categories, setCategories] = useState<Category[]>([]);
