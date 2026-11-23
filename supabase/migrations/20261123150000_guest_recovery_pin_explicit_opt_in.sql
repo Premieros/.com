@@ -21,27 +21,34 @@ BEGIN
 END;
 $function$;
 
--- Independent save action. No direct client write to private tables.
-CREATE OR REPLACE FUNCTION public.qr_save_recovery_pin_setting(
-  p_branch uuid, p_enabled boolean
+-- Atomic settings save: existing customer settings and the recovery toggle
+-- must succeed/fail together so the UI never claims a partially saved policy.
+-- Keep the existing 5-argument RPC unchanged for older callers.
+CREATE OR REPLACE FUNCTION public.qr_save_customer_settings_with_recovery(
+  p_branch uuid, p_enabled boolean, p_appearance jsonb, p_roles text[],
+  p_checkin boolean, p_recovery boolean
 ) RETURNS void LANGUAGE plpgsql SECURITY DEFINER
 SET search_path TO ''
 AS $function$
 BEGIN
-  PERFORM qr_private.require_settings(p_branch);
-  IF p_enabled IS NULL THEN RAISE EXCEPTION 'QR_SETTINGS_INVALID'; END IF;
-  PERFORM 1 FROM public.branches WHERE id=p_branch FOR UPDATE;
-  INSERT INTO qr_private.branch_settings(branch_id, recovery_pin_enabled, updated_by)
-    VALUES(p_branch, p_enabled, auth.uid())
-  ON CONFLICT(branch_id) DO UPDATE SET
-    recovery_pin_enabled=excluded.recovery_pin_enabled,
-    updated_by=excluded.updated_by, updated_at=now();
+  IF p_recovery IS NULL THEN RAISE EXCEPTION 'QR_SETTINGS_INVALID'; END IF;
+  -- Performs branch-specific settings permission checks, branch lock, input
+  -- validation and the existing readiness restrictions in the same transaction.
+  PERFORM qr_private.save_customer_settings(
+    p_branch,p_enabled,p_appearance,p_roles,p_checkin
+  );
+  UPDATE qr_private.branch_settings
+    SET recovery_pin_enabled=p_recovery,
+        updated_by=auth.uid(), updated_at=now()
+    WHERE branch_id=p_branch;
 END;
 $function$;
-REVOKE ALL ON FUNCTION public.qr_save_recovery_pin_setting(uuid, boolean)
-  FROM PUBLIC, anon, authenticated;
-GRANT EXECUTE ON FUNCTION public.qr_save_recovery_pin_setting(uuid, boolean)
-  TO authenticated, service_role;
+REVOKE ALL ON FUNCTION public.qr_save_customer_settings_with_recovery(
+  uuid,boolean,jsonb,text[],boolean,boolean
+) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.qr_save_customer_settings_with_recovery(
+  uuid,boolean,jsonb,text[],boolean,boolean
+) TO authenticated, service_role;
 
 -- Lookup must never request a PIN when the option is off. It must also not
 -- pretend that a different device owns another person's active visit.
