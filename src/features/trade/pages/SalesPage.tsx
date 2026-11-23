@@ -19,6 +19,7 @@ import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { mergeEffectiveSettings, useSettings } from '@/context/SettingsContext';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { useBranches } from '@/hooks/useBranches';
 import type { BranchSettings, Customer, Settings } from '@/lib/types';
 import {
@@ -64,15 +65,18 @@ export function SalesPage() {
   const branchScope = useBranchScope();
   const can = useCan();
   const canViewSales = can('sales.view');
+  const [search, setSearch] = useState('');
+  const [searchAllInvoices, setSearchAllInvoices] = useState(false);
+  const debouncedInvoiceSearch = useDebouncedValue(searchAllInvoices ? search : '', 250);
   const { rows: items, loading, error, total, hasMore, loadMore, loadingMore, refresh: reloadSales } = usePaginatedRows<SaleRow>({
     table: 'sales',
     select: 'id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, delivery_fee_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
     filters: [{ column: 'is_archived', value: false }],
+    search: searchAllInvoices ? { term: debouncedInvoiceSearch, columns: ['invoice_number'] } : undefined,
     pageSize: 100,
   });
-  const [search, setSearch] = useState('');
   const [displayStatus, setDisplayStatus] = useState<'all' | 'today' | 'completed' | 'returned' | 'other'>('all');
   const [displayDate, setDisplayDate] = useState('');
   const [showViewFilters, setShowViewFilters] = useState(false);
@@ -135,7 +139,7 @@ export function SalesPage() {
     if (displayStatus === 'returned' && i.status !== 'returned') return false;
     if (displayStatus === 'other' && ['completed', 'returned'].includes(i.status)) return false;
     if (displayDate && localSaleDay(i.created_at) !== displayDate) return false;
-    if (!search.trim()) return true;
+    if (searchAllInvoices || !search.trim()) return true;
     const s = search.trim().toLowerCase();
     return (
       i.invoice_number?.toLowerCase().includes(s) ||
@@ -702,13 +706,19 @@ export function SalesPage() {
         <>
           <input
             data-testid="sales-search"
-            aria-label={isAr ? 'بحث في الفواتير المحمّلة' : 'Search loaded invoices'}
+            aria-label={searchAllInvoices ? (isAr ? 'بحث في كل أرقام الفواتير المسموح بها' : 'Search all authorized invoice numbers') : (isAr ? 'بحث في الفواتير المحمّلة' : 'Search loaded invoices')}
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder={isAr ? 'بحث في الفواتير...' : 'Search invoices...'}
+            placeholder={searchAllInvoices ? (isAr ? 'رقم الفاتورة في كل السجلات...' : 'Invoice number across all records...') : (isAr ? 'بحث في الفواتير المحمّلة...' : 'Search loaded invoices...')}
             className="h-9 w-32 min-w-0 rounded-lg border border-ui-border bg-ui-surface px-3 text-xs text-ui-text outline-none focus:border-ui-primary sm:w-52"
           />
+          <label className="inline-flex items-center gap-1.5 text-xs font-medium text-ui-muted">
+            <input type="checkbox" data-testid="sales-global-invoice-search" checked={searchAllInvoices}
+              onChange={(event) => { setSearchAllInvoices(event.target.checked); setSearch(''); }}
+              className="accent-brand-600" />
+            {isAr ? 'كل أرقام الفواتير' : 'All invoice numbers'}
+          </label>
           <Button variant="outline" size="sm"
             onClick={() => setShowViewFilters((value) => !value)}
             data-testid="sales-toggle-filters"
@@ -786,6 +796,7 @@ export function SalesPage() {
             ))}
           </div>
           <span className="shrink-0 text-xs font-medium text-ui-subtle" data-testid="sales-view-count">
+            {searchAllInvoices ? (isAr ? 'بحث شامل برقم الفاتورة فقط · ' : 'All invoice numbers only · ') : ''}
             {isAr ? `المعروض: ${filtered.length} من ${items.length} محمّلة` : `Showing ${filtered.length} of ${items.length} loaded`}
           </span>
         </div>
