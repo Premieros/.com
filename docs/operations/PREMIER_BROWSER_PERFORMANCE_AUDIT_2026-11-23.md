@@ -5,7 +5,7 @@ Scope: online-first BUNKER handoff. No production schema or data modifications.
 ## Verified implementation
 
 - **Products:** `ProductsPage` uses `usePaginatedRows`, 100 rows/page, branch-scoped `products` query, server-side case-insensitive search on `name`, `name_en`, `barcode`, `sku`, and an explicit Load More control. On this branch, typing is debounced 250ms before changing the server filter. Export remains a separate explicit full-data operation.
-- **Sales:** `SalesPage` uses 100-row server pages, branch-scope filtering, excludes archived records, sorts newest first. Its secondary UI search/status/date filters **only operate on loaded rows**, not the entire sale history; do not represent these as comprehensive search over all invoices.
+- **Sales:** `SalesPage` uses 100-row server pages, branch-scope filtering, excludes archived records, sorts newest first. An optional **All invoice numbers** checkbox now switches to debounced **server-side invoice_number** search throughout authorized sales history. The original search across loaded customer name/source order/status remains available when unchecked. The secondary status/date UI filters still operate on **loaded rows only**; never represent those as all-history filters or claim global customer/order search.
 - **Reports:** `fetchAllReportRows` reads the requested time range in 1,000-row server batches instead of silently accepting a default cap. This provides complete filtered report datasets but can still consume significant browser RAM on very large ranges; scalable aggregation/server-side pagination needs a separate design.
 - **KDS:** must retain complete branch-authorized active tickets in a bounded operational queue. Never paginate KDS in a way that hides active sent orders.
 
