@@ -54,6 +54,12 @@ A protected config migration, explicit Settings UI toggle, and both on/off acces
 - The sales privilege SQL gate is now included in **both** disposable Postgres workflows: Fast Verify and Verify main. Do not treat the migration as deploy-ready until their latest head-SHA results pass, including DB replay.
 - The additional-code requirement remains **unimplemented pending selection of the precise operation code flow**. Do not disable login credentials, guest session transfer recovery, or server-side authorization while making optional extra prompts opt-in.
 
+## Latest security findings and code-prompt clarification
+
+- Live DB review of `sales_customer_id_fkey` found it references `customers(id)` but does **not** compare branch IDs. A read-only count found **zero** existing cross-branch sale/customer links. Draft migration `20261123140000_sales_customer_branch_update_guard.sql` rejects a changed non-null customer ID unless `customers.branch_id = sales.branch_id`. Its trigger is verified in the disposable SQL CI gate; production remains unchanged.
+- **Guest recovery PIN is already opt-in through the branch setting `checkin_enabled`**: live `qr_private.entry` returns `enabled=false` when the flag is false; `GuestEntryGate` renders `PublicQrMenu` instead of the guest recovery flow. The recovery prompt appears when a phone lookup responds `needs_pin` for an active visit. A contract test now protects this behavior. Recovery on another device still needs its secret when check-in is on.
+- Do not confuse this existing guest recovery control with staff **login PIN** or manager **approval**. Neither of those is safe to remove without identifying the intended prompt and adding an equivalent server-enforced option. **Optional extra operational verification code remains unresolved**; the existing manager approval workflow is not a code-entry field.
+
 ## Release constraints
 
 No Vercel deployment, preview, spend-setting change, or promotion without fresh specific human approval. Existing production remains unchanged. CI green is not equivalent to browser E2E verification.
