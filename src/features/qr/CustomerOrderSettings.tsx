@@ -50,11 +50,12 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
     if (!settings) return;
     setBusy(true); setMessage('');
     try {
-      const { error } = await qr.saveSettings({ p_branch: branchId, p_enabled: settings.enabled, p_appearance: settings.appearance, p_roles: settings.reviewer_roles, p_checkin: !!settings.checkin_enabled });
+      const { error } = await qr.saveSettingsWithRecovery({
+        p_branch: branchId, p_enabled: settings.enabled, p_appearance: settings.appearance,
+        p_roles: settings.reviewer_roles, p_checkin: !!settings.checkin_enabled,
+        p_recovery: !!settings.recovery_pin_enabled,
+      });
       if (error) throw error;
-      // Persist the independent recovery toggle with a permission-checked RPC.
-      const recovery = await qr.saveRecoveryPinSetting({ p_branch: branchId, p_enabled: !!settings.recovery_pin_enabled });
-      if (recovery.error) throw recovery.error;
       setMessage('تم حفظ إعدادات طلبات العملاء لهذا الفرع فقط.');
       void loadReadiness();
     } catch (failure) { const message = failure instanceof Error ? failure.message : String(failure); setMessage((message.includes('BUNKER_LIVE_NOT_READY') || message.includes('QR_DEMO_PRODUCTS_NOT_APPROVED')) ? 'لا يمكن تفعيل طلبات BUNKER قبل إكمال التكاليف والمخزون أو الوصفات وصلاحيات الموظفين والمخزن والطاولات وربط المطبخ. راجع بطاقة الجاهزية أعلاه.' : qrError(failure)); } finally { setBusy(false); }
