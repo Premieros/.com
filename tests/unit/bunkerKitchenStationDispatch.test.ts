@@ -40,6 +40,35 @@ describe('BUNKER kitchen/barista dispatch safety', () => {
     expect(result.stations.map(s => s.station_code).sort()).toEqual(['barista','kitchen']);
     expect(result.stations.every(s => s.state === 'queued')).toBe(true);
   });
+  it('uses the actual BUNKER station codes kit and بار without duplicate local tickets', async () => {
+    mocks.enqueue.mockResolvedValue({ queuedStations: ['kit', 'بار'] });
+    const items = [item('kit', 'burger'), item('بار', 'hot-coffee'), item('بار', 'iced-coffee')];
+    const result = await dispatchKitchenStations({ ...args, items });
+    expect(mocks.enqueue).toHaveBeenCalledTimes(1);
+    expect(mocks.enqueue).toHaveBeenCalledWith(expect.objectContaining({
+      branchId: 'bunker',
+      items,
+    }));
+    expect(mocks.local).not.toHaveBeenCalled();
+    expect(result.status).toBe('complete');
+    expect(result.stations).toEqual(expect.arrayContaining([
+      expect.objectContaining({ station_code: 'kit', item_count: 1, state: 'queued' }),
+      expect.objectContaining({ station_code: 'بار', item_count: 2, state: 'queued' }),
+    ]));
+    expect(result.stations).toHaveLength(2);
+    expect(result.failed_stations).toEqual([]);
+  });
+  it('falls back only for the BUNKER barista when kitchen kit is cloud-queued', async () => {
+    mocks.enqueue.mockResolvedValue({ queuedStations: ['kit'] });
+    const result = await dispatchKitchenStations({ ...args, items: [
+      item('kit', 'burger'), item('بار', 'coffee'),
+    ] });
+    expect(result.status).toBe('complete');
+    expect(mocks.local).toHaveBeenCalledTimes(1);
+    expect(mocks.local.mock.calls[0][0]).toEqual([
+      expect.objectContaining({ station_code: 'بار' }),
+    ]);
+  });
   it('falls back only for a station not accepted by cloud', async () => {
     mocks.enqueue.mockResolvedValue({ queuedStations: ['kitchen'] });
     const result = await dispatchKitchenStations({ ...args,
