@@ -1,5 +1,5 @@
 -- Draft security migration; applied by disposable CI migration replay only.
--- Protect sales metadata edits from cross-branch customer re-assignment.
+-- Protect sale creation and metadata edits from cross-branch customer association.
 -- Existing FK only validates customers(id), not (id, branch_id).
 SET LOCAL lock_timeout = '3s';
 SET LOCAL statement_timeout = '30s';
@@ -9,8 +9,10 @@ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = 'public', 'pg_temp'
 AS $function$
 BEGIN
-  IF NEW.customer_id IS DISTINCT FROM OLD.customer_id
-     AND NEW.customer_id IS NOT NULL
+  IF NEW.customer_id IS NOT NULL
+     AND (TG_OP = 'INSERT'
+          OR NEW.customer_id IS DISTINCT FROM OLD.customer_id
+          OR NEW.branch_id IS DISTINCT FROM OLD.branch_id)
      AND NOT EXISTS (
        SELECT 1 FROM public.customers c
        WHERE c.id = NEW.customer_id AND c.branch_id = NEW.branch_id
@@ -27,5 +29,5 @@ REVOKE ALL ON FUNCTION public.guard_sale_customer_branch_update()
 
 DROP TRIGGER IF EXISTS trg_sales_customer_branch_update_guard ON public.sales;
 CREATE TRIGGER trg_sales_customer_branch_update_guard
-BEFORE UPDATE OF customer_id ON public.sales
+BEFORE INSERT OR UPDATE OF customer_id, branch_id ON public.sales
 FOR EACH ROW EXECUTE FUNCTION public.guard_sale_customer_branch_update();
