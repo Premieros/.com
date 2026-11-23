@@ -83,11 +83,12 @@ BEGIN
 END;
 $function$;
 
--- Defense in depth: a forged direct resume RPC cannot bypass the branch toggle
--- or revive a takeover using a previously issued code.
-CREATE OR REPLACE FUNCTION public.qr_guest_resume(
+-- The publicly exposed wrapper remains SECURITY INVOKER. Anon users cannot
+-- SELECT qr_private.branch_settings, so enforce the flag in a restricted
+-- SECURITY DEFINER helper instead of reading the private table as anon.
+CREATE OR REPLACE FUNCTION qr_private.resume_visit_if_enabled(
   p_token text, p_session text, p_phone text, p_pin text
-) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO ''
+) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO ''
 AS $function$
 DECLARE v_scope qr_private.table_links;
 BEGIN
@@ -100,6 +101,19 @@ BEGIN
   END IF;
   RETURN qr_private.resume_visit(p_token,p_session,p_phone,p_pin);
 END;
+$function$;
+REVOKE ALL ON FUNCTION qr_private.resume_visit_if_enabled(text,text,text,text)
+  FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION qr_private.resume_visit_if_enabled(text,text,text,text)
+  TO anon, authenticated, service_role;
+
+-- Keep the original public RPC as SECURITY INVOKER so it does not enlarge the
+-- set of anonymous-callable SECURITY DEFINER functions in public.
+CREATE OR REPLACE FUNCTION public.qr_guest_resume(
+  p_token text, p_session text, p_phone text, p_pin text
+) RETURNS jsonb LANGUAGE sql SECURITY INVOKER SET search_path TO ''
+AS $function$
+  SELECT qr_private.resume_visit_if_enabled(p_token,p_session,p_phone,p_pin)
 $function$;
 REVOKE ALL ON FUNCTION public.qr_guest_resume(text,text,text,text)
   FROM PUBLIC, anon, authenticated;
