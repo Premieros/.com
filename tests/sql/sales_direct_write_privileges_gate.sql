@@ -29,6 +29,15 @@ BEGIN
     RAISE EXCEPTION 'Authenticated role must not TRUNCATE financial sale items';
   END IF;
   IF NOT EXISTS (
+    SELECT 1 FROM pg_trigger t
+    WHERE t.tgrelid = 'public.sales'::regclass
+      AND t.tgname = 'trg_sales_customer_branch_update_guard'
+      AND NOT t.tgisinternal
+      AND t.tgenabled <> 'D'
+  ) THEN
+    RAISE EXCEPTION 'Cross-branch customer association guard must be active';
+  END IF;
+  IF NOT EXISTS (
     SELECT 1 FROM pg_proc p
     WHERE p.oid='public.sync_sale_source_order_from_kitchen_event()'::regprocedure
       AND p.prosecdef
