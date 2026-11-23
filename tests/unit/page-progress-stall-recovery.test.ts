@@ -16,8 +16,20 @@ describe('route loading stall recovery', () => {
   it('clears watchdog and animation timers when loading ends or provider unmounts', () => {
     expect(source).toContain('window.clearTimeout(stallTimer.current)');
     expect(source).toContain('window.clearInterval(tickTimer.current)');
+    expect(source).toContain('window.cancelAnimationFrame(frameTimer.current)');
+    expect(source).toContain('frameTimer.current = window.requestAnimationFrame(');
     expect(source).toContain('clearTick();\n    setProgress(100)');
     expect(source).toContain('useEffect(() => () => {\n    clearTick();');
+  });
+
+  it('stops background progress ticks once a page stall is reported', () => {
+    const watchdog = source.slice(
+      source.indexOf('stallTimer.current = window.setTimeout('),
+      source.indexOf('frameTimer.current = window.requestAnimationFrame('),
+    );
+    expect(watchdog).toContain('window.clearInterval(tickTimer.current)');
+    expect(watchdog).toContain('tickTimer.current = null');
+    expect(watchdog).toContain('setStalled(true)');
   });
 
   it('never implicitly retries or submits a business operation on the watchdog', () => {
