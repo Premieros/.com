@@ -22,6 +22,12 @@ BEGIN
   IF has_table_privilege('authenticated', 'public.sales', 'TRUNCATE') THEN
     RAISE EXCEPTION 'Authenticated role must not TRUNCATE financial sales';
   END IF;
+  IF has_table_privilege('authenticated', 'public.sales', 'DELETE') THEN
+    RAISE EXCEPTION 'Authenticated role must not DELETE financial sales';
+  END IF;
+  IF has_table_privilege('authenticated', 'public.sale_items', 'TRUNCATE') THEN
+    RAISE EXCEPTION 'Authenticated role must not TRUNCATE financial sale items';
+  END IF;
   IF NOT EXISTS (
     SELECT 1 FROM pg_proc p
     WHERE p.oid='public.sync_sale_source_order_from_kitchen_event()'::regprocedure
