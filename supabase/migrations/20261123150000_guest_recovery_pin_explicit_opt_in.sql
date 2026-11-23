@@ -87,7 +87,7 @@ $function$;
 -- or revive a takeover using a previously issued code.
 CREATE OR REPLACE FUNCTION public.qr_guest_resume(
   p_token text, p_session text, p_phone text, p_pin text
-) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path TO ''
+) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path TO ''
 AS $function$
 DECLARE v_scope qr_private.table_links;
 BEGIN
