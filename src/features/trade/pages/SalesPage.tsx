@@ -20,6 +20,7 @@ import { useCan } from '@/lib/permissions';
 import { mergeEffectiveSettings, useSettings } from '@/context/SettingsContext';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
 import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { localSaleDayBounds } from '../saleDateFilters';
 import { useBranches } from '@/hooks/useBranches';
 import type { BranchSettings, Customer, Settings } from '@/lib/types';
 import {
@@ -29,16 +30,6 @@ import {
   openPrintWindow,
   type ReceiptData,
 } from '@/features/pos/utils/printing';
-
-/** Local calendar-day bounds, converted to UTC for database filters. */
-function localDayBounds(day: string): { start: string; end: string } | null {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
-  const [year, month, date] = day.split('-').map(Number);
-  const start = new Date(year, month - 1, date);
-  if (start.getFullYear() !== year || start.getMonth() !== month - 1 || start.getDate() !== date) return null;
-  const end = new Date(year, month - 1, date + 1);
-  return { start: start.toISOString(), end: end.toISOString() };
-}
 
 interface SaleRow {
   id: string;
@@ -83,7 +74,7 @@ export function SalesPage() {
   const now = new Date();
   const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
     String(now.getDate()).padStart(2, '0')].join('-');
-  const dateBounds = localDayBounds(displayDate || (displayStatus === 'today' ? today : ''));
+  const dateBounds = localSaleDayBounds(displayDate || (displayStatus === 'today' ? today : ''));
   const { rows: items, loading, error, total, hasMore, loadMore, loadingMore, refresh: reloadSales } = usePaginatedRows<SaleRow>({
     table: 'sales',
     select: 'id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, delivery_fee_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))',
