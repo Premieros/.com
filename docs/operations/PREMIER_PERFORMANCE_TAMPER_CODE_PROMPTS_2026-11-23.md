@@ -38,6 +38,14 @@ A protected config migration, explicit Settings UI toggle, and both on/off acces
 - No UI-only fix can secure arbitrary PostgREST calls. Before deploying a migration, inventory supported financial mutation RPCs and implement server-enforced transition/field protections with SQL integration tests. Direct `UPDATE` of `total`, `paid_amount`, `tax_amount`, `refunded_amount` and invoice status remains a **review item**, not proven fully safe.
 - The newly staged discount-update trigger is a narrow defense-in-depth change; **do not treat it as comprehensive anti-tamper protection**. The migration is intentionally not applied.
 
+## Direct financial-write lockdown (staged, never applied to production)
+
+- The sale metadata editor no longer exposes arbitrary status transitions or sends `status` in a direct `sales.update`. Marking a sale returned belongs to the protected refund procedure.
+- Live schema inspection found the `authenticated` role has table-level UPDATE on **all** `sales` columns, and TRUNCATE; RLS limits accessible rows, **not writable columns**. Ordinary users could attempt updating protected fields on rows their roles can manage.
+- Draft migration `20261123130000_limit_direct_sales_update_columns.sql` revokes broad authenticated UPDATE and TRUNCATE, granting only `customer_id` and `notes`. Settlement linkage is preserved by elevating the already-installed `sync_sale_source_order_from_kitchen_event` trigger to owner execution, retaining its branch/equality guards, with PUBLIC EXECUTE revoked.
+- Contract tests and `tests/sql/sales_direct_write_privileges_gate.sql` check the intended privilege set. **Before applying to production**, test all checkout, refunds, payment-method changes, archive, kitchen settlement event linkage, and cross-branch access on an isolated project. Security-definer changes need an explicit trigger-input forgery review as well.
+- This is an **unapplied** security migration: do not infer production has these protections.
+
 ## Release constraints
 
 No Vercel deployment, preview, spend-setting change, or promotion without fresh specific human approval. Existing production remains unchanged. CI green is not equivalent to browser E2E verification.
