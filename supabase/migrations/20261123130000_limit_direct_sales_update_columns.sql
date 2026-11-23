@@ -26,6 +26,16 @@ GRANT UPDATE (customer_id, notes) ON TABLE public.sales TO authenticated;
 REVOKE TRUNCATE ON TABLE public.sales FROM authenticated;
 REVOKE TRUNCATE ON TABLE public.sales FROM anon;
 
+-- Destructive deletion is not a supported financial workflow. Full returns are
+-- handled by process_refund, while old returned invoices are archived through
+-- archive_returned_sale. Prevent even branch managers from bypassing those.
+REVOKE DELETE ON TABLE public.sales FROM authenticated;
+REVOKE DELETE ON TABLE public.sales FROM anon;
+
+-- Sale-line RLS already blocks direct deletion, but TRUNCATE bypasses RLS.
+REVOKE TRUNCATE ON TABLE public.sale_items FROM authenticated;
+REVOKE TRUNCATE ON TABLE public.sale_items FROM anon;
+
 -- Protected SECURITY DEFINER business RPCs retain their owner privileges.
 -- Test refund, settlement, payment-method change, archive and event sync in
 -- disposable CI before applying to any production project.
