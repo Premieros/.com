@@ -33,6 +33,15 @@ These component/unit tests use mocks. They do not prove that database persistenc
 - Any order that bypasses cashier approval or routes to the wrong KDS station blocks handoff.
 - Offline LAN sync / Windows is a later upgrade, not included in this online acceptance.
 
+## Station-access audit — 2026-11-23 (production SQL, read only)
+
+- Active station codes relevant to handoff: kitchen `kit`, barista `بار`. Legacy `main` is also active.
+- `public.user_kitchen_station_assignments` contains **zero** rows for BUNKER (zero assigned users).
+- The deployed `public.get_my_kitchen_stations(p_branch_id)` function checks auth and branch permission, then uses this condition: `NOT v_has_assignments OR EXISTS (... assignment for station ...)`. **A branch-authorized account with no explicit station assignment sees all active stations (except literal code `cashier`)**, not zero stations.
+- `KitchenDisplayPage` calls this RPC and offers `All Allowed Stations` as the default; station-specific KDS visibility is therefore **not proven** by the current product-to-station mapping.
+- **BLOCKER:** Before accepting physical kitchen/barista separation, create independently authenticated staff users through supported admin flows, explicitly assign kitchen staff to `kit` and barista staff to `بار`, verify per-user KDS read behavior, and decide whether production's no-assignment-means-all fallback should be removed via a reviewed migration. Do **not** deploy a fail-closed replacement blindly: it would hide all KDS stations from currently unassigned users.
+- No staff account was provisioned, station assignment modified, order created, or payment inserted during this verification.
+
 ## Current acceptance state
 
 - All three CI workflows (Fast Verify, Verify main, Readiness audit tests) **passed** for commit `cad757c22446e3a6549b37686bdca9d0ecc23a3c` (2026-11-23). Future commits must be checked independently.
