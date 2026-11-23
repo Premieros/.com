@@ -4,6 +4,7 @@ DECLARE
   v_default text;
   v_lookup text;
   v_resume text;
+  v_guard text;
   v_saver text;
 BEGIN
   SELECT column_default INTO v_default FROM information_schema.columns
@@ -23,10 +24,15 @@ BEGIN
 
   SELECT pg_get_functiondef('public.qr_guest_resume(text,text,text,text)'::regprocedure)
     INTO v_resume;
-  IF position('QR_RECOVERY_DISABLED' IN v_resume)=0
-     OR position('qr_private.resume_visit' IN v_resume)=0
+  IF position('qr_private.resume_visit_if_enabled' IN v_resume)=0
   THEN
-    RAISE EXCEPTION 'Guest resume must be server gated';
+    RAISE EXCEPTION 'Guest resume must call the restricted server gate';
+  END IF;
+  SELECT pg_get_functiondef('qr_private.resume_visit_if_enabled(text,text,text,text)'::regprocedure)
+    INTO v_guard;
+  IF position('QR_RECOVERY_DISABLED' IN v_guard)=0
+     OR position('qr_private.resume_visit(' IN v_guard)=0 THEN
+    RAISE EXCEPTION 'Private recovery helper must check the explicit toggle';
   END IF;
 
   SELECT pg_get_functiondef(
