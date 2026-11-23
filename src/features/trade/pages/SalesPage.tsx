@@ -552,9 +552,10 @@ export function SalesPage() {
     }
 
     if (canEditSaleMetadata) {
+      // Invoice lifecycle changes must go through authoritative refund/payment RPCs,
+      // never the general-purpose metadata editor.
       const { error } = await supabase.from('sales').update({
         customer_id: editForm.customer_id || null,
-        status: editForm.status,
         notes: editForm.notes || null,
       }).eq('id', viewSale.id);
       if (error) { show(error.message, 'error'); return; }
@@ -864,11 +865,9 @@ export function SalesPage() {
                 <option value="transfer">{t('transfer')}</option>
                 <option value="credit" disabled>{t('credit')}</option>
               </Select>
-              <Select label={t('status')} value={editForm.status} disabled={!canEditSaleMetadata} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
-                <option value="completed">{isAr ? 'مكتملة' : 'Completed'}</option>
-                <option value="pending">{isAr ? 'قيد الانتظار' : 'Pending'}</option>
-                <option value="returned">{isAr ? 'مرتجعة' : 'Returned'}</option>
-              </Select>
+              <div className="text-sm text-ui-muted">
+                {isAr ? 'حالة الفاتورة تُعدّل فقط عبر إجراءات الدفع والمرتجع المعتمدة.' : 'Invoice status is managed by the authorized payment and refund workflows.'}
+              </div>
               <div />
             </div>
             <Textarea label={t('notes')} value={editForm.notes} disabled={!canEditSaleMetadata} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} rows={2} />
