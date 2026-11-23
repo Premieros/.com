@@ -63,6 +63,9 @@ export function GuestEntryGate({ token }: { token: string }) {
     const { data, error: failure } = await qrPublic.lookup({ p_token: token, p_session: session, p_phone: phone });
     if (failure) throw failure;
     if (data?.visit) setIdentity(data.visit);
+    else if (data?.recovery_unavailable) {
+      setError(isBunker ? 'This order is open on another device. Ask our staff for help or continue on the original device.' : 'الطلب مفتوح على جهاز آخر. استخدم الجهاز الأصلي أو اطلب مساعدة الموظف.');
+    }
     else if (data?.needs_pin) { setStep('pin'); if (!data.pin_set) setError(isBunker ? 'This visit is open on another device. Ask our team for a recovery code.' : 'هذه الزيارة مفتوحة على جهاز آخر. اطلب رمز استرجاع من الموظف.'); }
     else if (data?.registered) await continueOrder();
     else setStep('name');
