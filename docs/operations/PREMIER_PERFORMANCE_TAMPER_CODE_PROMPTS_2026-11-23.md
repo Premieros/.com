@@ -23,6 +23,13 @@ Treat optional **extra verification or approval codes** as **OFF by default**. D
 
 A protected config migration, explicit Settings UI toggle, and both on/off access-control tests are required before implementing this workflow. Do not force a verification prompt when a confirmed optional configuration is disabled, or silently bypass a server-required secret when enabled.
 
+## Follow-up hardening staged in PR (not deployed)
+
+- Discount manager-approval UI now snapshots the submitted type and value, locks inputs while pending, and consumes an approved request once per open component session. This prevents client UI drift and duplicate notification handling but is **not** server-side authorization.
+- Read-only DB check found `public.guard_sale_discount()` attached to `public.sales` **BEFORE INSERT only**. The authenticated `sales` UPDATE policy permits updates for users with `sales.manage` or POS-admin within a permitted branch, and the role has UPDATE table privilege. Therefore discount changes made via UPDATE had no equivalent trigger permission check (other RPC/trigger constraints may apply).
+- Added **unapplied migration** `20261123120000_guard_sales_discount_updates.sql`, introducing an UPDATE-of-discount guard requiring `pos.discount` or POS-admin for positive discount changes. This migration requires integration testing of authorized adjustment workflows before any production application.
+- **Remaining financial attack-surface work:** check direct changes to `total`, `paid_amount`, `tax_amount`, `status` and sale items versus authoritative RPCs; verify approval request ownership, consumption and expiry. Neither the React patch nor the narrow migration proves full anti-tamper security.
+
 ## Release constraints
 
 No Vercel deployment, preview, spend-setting change, or promotion without fresh specific human approval. Existing production remains unchanged. CI green is not equivalent to browser E2E verification.
