@@ -26,6 +26,11 @@ const disposable = Boolean(url && ['localhost','127.0.0.1','[::1]'].some(host =>
         [branch,'Recovery branch',org,foreignBranch,'Different branch']);
       await db.query('insert into public.dining_tables(id,branch_id,name) values($1,$2,$3),($4,$5,$6)',
         [table,branch,'Table A',foreignTable,foreignBranch,'Table B']);
+      // Existing legacy PIN recovery expectation applies only to explicitly
+      // opted-in branches. Unconfigured branches now default to PIN OFF.
+      await db.query(
+        'insert into qr_private.branch_settings(branch_id,recovery_pin_enabled) values($1,true)',
+        [branch]);
       await db.query(
         `insert into qr_private.table_links(table_id,branch_id,token_hash,enabled,generation)
          values($1,$2,encode(sha256(convert_to($3,'UTF8')),'hex'),true,$4)`,
