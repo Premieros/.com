@@ -1436,6 +1436,17 @@
       ]
     },
     {
+      "name": "qr_save_customer_settings_with_recovery",
+      "params": [
+        "appearance",
+        "branch",
+        "checkin",
+        "enabled",
+        "recovery",
+        "roles"
+      ]
+    },
+    {
       "name": "qr_save_order",
       "params": [
         "payload",
