@@ -11,8 +11,10 @@ describe('sales direct write least privilege', () => {
     expect(sql).not.toContain('GRANT UPDATE (source_order_id');
   });
 
-  it('removes TRUNCATE, which cannot be limited by row-level security', () => {
+  it('removes TRUNCATE and destructive sale DELETE from client privileges', () => {
     expect(sql).toContain('REVOKE TRUNCATE ON TABLE public.sales FROM authenticated');
+    expect(sql).toContain('REVOKE TRUNCATE ON TABLE public.sale_items FROM authenticated');
+    expect(sql).toContain('REVOKE DELETE ON TABLE public.sales FROM authenticated');
   });
 
   it('preserves the existing settlement source-order trigger through owner execution', () => {
