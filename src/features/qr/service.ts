@@ -3,7 +3,7 @@ import { qr } from '@/api/domains/qr';
 export interface QrProduct { id: string; name: string; description?: string; price: number; image_url?: string; category_id?: string; category_name?: string }
 export interface QrTable { id: string; name: string; busy: boolean }
 export interface QrAppearance { brand_name?: string; subtitle?: string; logo_url?: string; banner_image_url?: string; banner_text?: string }
-export interface QrSettings { enabled: boolean; checkin_enabled?: boolean; appearance: QrAppearance; reviewer_roles: string[] }
+export interface QrSettings { enabled: boolean; checkin_enabled?: boolean; recovery_pin_enabled?: boolean; appearance: QrAppearance; reviewer_roles: string[] }
 export interface QrItem { product_id: string; quantity: number; price: number; notes: string; name?: string }
 export type GuestOrderType = 'dine_in' | 'delivery' | 'pickup';
 export interface GuestIdentity { has_delivery_address?: boolean; id: string; order_type: GuestOrderType; table_id: string | null; table_name: string; has_request: boolean; status: string; pin_set: boolean }
