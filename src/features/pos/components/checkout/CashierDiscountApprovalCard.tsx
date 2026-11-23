@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/api';
 
 export function CashierDiscountApprovalCard({
@@ -20,6 +20,10 @@ export function CashierDiscountApprovalCard({
   const [requestId, setRequestId] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'pending' | 'approved' | 'rejected'>('idle');
   const [busy, setBusy] = useState(false);
+  const approvedRequest = useRef<string | null>(null);
+  const submittedRequest = useRef<{ type: 'amount' | 'percent'; value: number } | null>(null);
+  const onApprovedRef = useRef(onApproved);
+  onApprovedRef.current = onApproved;
 
   useEffect(() => setType(currentType), [currentType]);
 
@@ -44,8 +48,11 @@ export function CashierDiscountApprovalCard({
           };
 
           if (next.status === 'approved') {
+            const submitted = submittedRequest.current;
+            if (!submitted || approvedRequest.current === requestId) return;
+            approvedRequest.current = requestId;
             setStatus('approved');
-            onApproved(type, type === 'percent' ? Math.min(amount, 100) : Math.min(amount, Math.max(subtotal, 0)));
+            onApprovedRef.current(submitted.type, submitted.value);
           } else if (next.status === 'rejected' || next.status === 'expired') {
             setStatus('rejected');
           }
@@ -56,12 +63,12 @@ export function CashierDiscountApprovalCard({
     return () => {
       void supabase.removeChannel(channel);
     };
-  }, [requestId, type, amount, subtotal, onApproved]);
+  }, [requestId]);
 
   if (canDirectDiscount) return null;
 
   const request = async () => {
-    if (amount <= 0 || reason.trim().length < 3) return;
+    if (busy || status === 'pending' || amount <= 0 || reason.trim().length < 3) return;
 
     const normalizedInput = type === 'percent'
       ? Math.min(amount, 100)
@@ -93,6 +100,9 @@ export function CashierDiscountApprovalCard({
       } | null;
 
       if (res?.success && res.request_id) {
+        // The approved action must match exactly what was submitted for review.
+        submittedRequest.current = { type, value: normalizedInput };
+        approvedRequest.current = null;
         setRequestId(res.request_id);
         setStatus('pending');
       }
@@ -111,6 +121,7 @@ export function CashierDiscountApprovalCard({
         <select
           value={type}
           onChange={(e) => setType(e.target.value as 'amount' | 'percent')}
+          disabled={busy || status === 'pending'}
           className="rounded-xl border border-ui-border bg-ui-surface-raised px-3 py-2 text-sm"
         >
           <option value="amount">{ar ? 'قيمة' : 'Amount'}</option>
@@ -122,6 +133,7 @@ export function CashierDiscountApprovalCard({
           min={0}
           value={amount || ''}
           onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
+          disabled={busy || status === 'pending'}
           className="rounded-xl border border-ui-border bg-ui-surface-raised px-3 py-2 text-sm"
           placeholder={ar ? 'قيمة الخصم' : 'Discount'}
         />
@@ -130,6 +142,7 @@ export function CashierDiscountApprovalCard({
       <input
         value={reason}
         onChange={(e) => setReason(e.target.value)}
+        disabled={busy || status === 'pending'}
         className="mt-2 w-full rounded-xl border border-ui-border bg-ui-surface-raised px-3 py-2 text-sm"
         placeholder={ar ? 'سبب الخصم (إجباري)' : 'Reason (required)'}
       />
