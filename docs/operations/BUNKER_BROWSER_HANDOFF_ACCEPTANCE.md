@@ -13,7 +13,7 @@ These component/unit tests use mocks. They do not prove that database persistenc
 ## Required end-to-end run (record run ID and screenshot/video or DB evidence)
 
 1. Open **independent sessions** for cashier, kitchen, barista and three captains; keep each session logged in with its intended branch/role.
-2. Captain 1 creates a dine-in order containing a food item and a coffee. Record order ID and table number; check only food appears on kitchen and only coffee on barista.
+2. Captain 1 creates a dine-in order containing a burger (station `kit`) and a coffee (station `بار`). Record order ID and table number; check only food appears on `kit` and only coffee on `بار`; check that no historical `main` ticket is created.
 3. Captains 2/3 update separate tables concurrently. Refresh all sessions and confirm no missing/duplicate lines.
 4. Customer opens branch site -> Order Now -> Dine-in; QR table session creates a pending request. Confirm kitchen/barista see **nothing before cashier acceptance**.
 5. Cashier rejects one customer request: confirm rejection on customer page, no kitchen send, no invoice.
@@ -27,11 +27,17 @@ These component/unit tests use mocks. They do not prove that database persistenc
 
 ## Blocking gates
 
-- Destination mapping currently needs separate sign-off: categories all mapped to `main` at a prior database inspection; retest current mapping, do not modify production silently.
+- Destination mapping was approved and updated after that prior `main` snapshot. The current production category mapping is **Burgers/Sides/Desserts → `kit`** and **Hot Coffee/Iced Coffee → `بار`**, validated read-only. Still require a sign-off that the *logged-in physical kitchen/barista screens* are actually bound to those exact station codes. Do not rerun historical remap scripts.
 - Never remove or alter historical payments/ledgers in a cleanup by deleting only invoices. Preserve pre-test snapshot and uniquely tagged test order IDs.
 - Release only when CI succeeds on head SHA and every practical scenario has a PASS record. A green PR alone does not authorize production changes.
 - Any order that bypasses cashier approval or routes to the wrong KDS station blocks handoff.
 - Offline LAN sync / Windows is a later upgrade, not included in this online acceptance.
+
+## Current acceptance state
+
+- All three CI workflows (Fast Verify, Verify main, Readiness audit tests) **passed** for commit `cad757c22446e3a6549b37686bdca9d0ecc23a3c` (2026-11-23). Future commits must be checked independently.
+- Exact station codes verified in production DB without creating orders: `kit` and `بار`.
+- **No** real multi-session acceptance scenario has passed. This gate remains **NOT READY**.
 
 ## Evidence template
 
