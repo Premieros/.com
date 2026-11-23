@@ -30,6 +30,16 @@ import {
   type ReceiptData,
 } from '@/features/pos/utils/printing';
 
+/** Local calendar-day bounds, converted to UTC for database filters. */
+function localDayBounds(day: string): { start: string; end: string } | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return null;
+  const [year, month, date] = day.split('-').map(Number);
+  const start = new Date(year, month - 1, date);
+  if (start.getFullYear() !== year || start.getMonth() !== month - 1 || start.getDate() !== date) return null;
+  const end = new Date(year, month - 1, date + 1);
+  return { start: start.toISOString(), end: end.toISOString() };
+}
+
 interface SaleRow {
   id: string;
   invoice_number: string;
@@ -68,17 +78,27 @@ export function SalesPage() {
   const [search, setSearch] = useState('');
   const [searchAllInvoices, setSearchAllInvoices] = useState(false);
   const debouncedInvoiceSearch = useDebouncedValue(searchAllInvoices ? search : '', 250);
+  const [displayStatus, setDisplayStatus] = useState<'all' | 'today' | 'completed' | 'returned' | 'other'>('all');
+  const [displayDate, setDisplayDate] = useState('');
+  const now = new Date();
+  const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0')].join('-');
+  const dateBounds = localDayBounds(displayDate || (displayStatus === 'today' ? today : ''));
   const { rows: items, loading, error, total, hasMore, loadMore, loadingMore, refresh: reloadSales } = usePaginatedRows<SaleRow>({
     table: 'sales',
     select: 'id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, delivery_fee_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
-    filters: [{ column: 'is_archived', value: false }],
+    filters: [
+      { column: 'is_archived', value: false },
+      ...(['completed', 'returned'].includes(displayStatus) ? [{ column: 'status', value: displayStatus }] : []),
+    ],
+    exclude: displayStatus === 'other' ? { column: 'status', values: ['completed', 'returned'] } : undefined,
+    min: dateBounds ? { column: 'created_at', value: dateBounds.start } : undefined,
+    maxExclusive: dateBounds ? { column: 'created_at', value: dateBounds.end } : undefined,
     search: searchAllInvoices ? { term: debouncedInvoiceSearch, columns: ['invoice_number'] } : undefined,
     pageSize: 100,
   });
-  const [displayStatus, setDisplayStatus] = useState<'all' | 'today' | 'completed' | 'returned' | 'other'>('all');
-  const [displayDate, setDisplayDate] = useState('');
   const [showViewFilters, setShowViewFilters] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -124,29 +144,14 @@ export function SalesPage() {
     setCustomersBranchId(branchId);
   }
 
-  const localSaleDay = (value: string) => {
-    const date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return '';
-    return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'),
-      String(date.getDate()).padStart(2, '0')].join('-');
-  };
-  const today = localSaleDay(new Date().toISOString());
-  // Presentation filters apply to the currently loaded, permission-scoped page.
-  // The repository query, financial actions and branch authorization remain unchanged.
-  const filtered = items.filter((i) => {
-    if (displayStatus === 'today' && localSaleDay(i.created_at) !== today) return false;
-    if (displayStatus === 'completed' && i.status !== 'completed') return false;
-    if (displayStatus === 'returned' && i.status !== 'returned') return false;
-    if (displayStatus === 'other' && ['completed', 'returned'].includes(i.status)) return false;
-    if (displayDate && localSaleDay(i.created_at) !== displayDate) return false;
-    if (searchAllInvoices || !search.trim()) return true;
-    const s = search.trim().toLowerCase();
-    return (
-      i.invoice_number?.toLowerCase().includes(s) ||
-      i.source_order?.order_number?.toLowerCase().includes(s) ||
-      i.customer?.name?.toLowerCase().includes(s) ||
-      i.status?.toLowerCase().includes(s)
-    );
+  // Status/date filter the full authorized history before paging.
+  // Customer/order text remains a loaded-page search in legacy mode.
+  const filtered = searchAllInvoices || !search.trim() ? items : items.filter((i) => {
+    const term = search.trim().toLowerCase();
+    return i.invoice_number?.toLowerCase().includes(term) ||
+      i.source_order?.order_number?.toLowerCase().includes(term) ||
+      i.customer?.name?.toLowerCase().includes(term) ||
+      i.status?.toLowerCase().includes(term);
   });
 
   const branchNameForSale = (sale: SaleRow) =>
@@ -761,7 +766,7 @@ export function SalesPage() {
                 <CalendarDays className="h-4 w-4 text-ui-subtle" />
                 <input id="sales-view-date" data-testid="sales-view-date" type="date"
                   className="min-w-0 bg-transparent text-sm text-ui-text outline-none"
-                  value={displayDate} onChange={(event) => setDisplayDate(event.target.value)} />
+                  value={displayDate} onChange={(event) => { setDisplayDate(event.target.value); if (displayStatus === 'today') setDisplayStatus('all'); }} />
               </span>
             </label>
             {(displayDate || search || displayStatus !== 'all') && (
@@ -785,7 +790,7 @@ export function SalesPage() {
             ] as const).map(([key, label]) => (
               <button key={key} type="button" data-testid={`sales-view-tab-${key}`}
                 aria-pressed={displayStatus === key}
-                onClick={() => setDisplayStatus(key)}
+                onClick={() => { setDisplayStatus(key); if (key === 'today') setDisplayDate(''); }}
                 className={`shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition ${
                   displayStatus === key
                     ? 'bg-brand-600/10 text-brand-600 dark:text-brand-400'
@@ -797,7 +802,7 @@ export function SalesPage() {
           </div>
           <span className="shrink-0 text-xs font-medium text-ui-subtle" data-testid="sales-view-count">
             {searchAllInvoices ? (isAr ? 'بحث شامل برقم الفاتورة فقط · ' : 'All invoice numbers only · ') : ''}
-            {isAr ? `المعروض: ${filtered.length} من ${items.length} محمّلة` : `Showing ${filtered.length} of ${items.length} loaded`}
+            {isAr ? `المعروض: ${filtered.length} من ${items.length} محمّلة من النتائج المطابقة` : `Showing ${filtered.length} of ${items.length} loaded matching records`}
           </span>
         </div>
         <div className="min-w-0 px-3 py-3 sm:px-4 sales-invoices-layout">
