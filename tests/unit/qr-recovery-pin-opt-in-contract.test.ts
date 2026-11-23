@@ -18,6 +18,7 @@ describe('guest recovery PIN is separate and explicitly opt-in', () => {
     expect(entry).toContain("else if (data?.recovery_unavailable)");
     expect(entry).toContain("else if (data?.needs_pin) { setStep('pin')");
     expect(sql).toContain("'QR_RECOVERY_DISABLED'");
+    expect(sql).toContain('qr_private.resume_visit_if_enabled(p_token,p_session,p_phone,p_pin)');
     expect(sql).toContain('qr_private.resume_visit(p_token,p_session,p_phone,p_pin)');
   });
   it('only lets branch settings managers change the policy', () => {
