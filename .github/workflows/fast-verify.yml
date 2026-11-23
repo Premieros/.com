@@ -109,6 +109,8 @@ jobs:
         run: node scripts/db/verify-schema.js
       - name: Verify sales column-write security on disposable PostgreSQL
         run: node scripts/db/apply-migration.js --file tests/sql/sales_direct_write_privileges_gate.sql
+      - name: Verify guest recovery PIN policy on disposable PostgreSQL
+        run: node scripts/db/apply-migration.js --file tests/sql/qr_recovery_pin_policy_gate.sql
       - name: Prepare integration fixtures
         run: |
           node scripts/db/apply-migration.js --file supabase/ci/disable_subscription_guard.sql
