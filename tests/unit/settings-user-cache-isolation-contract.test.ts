@@ -24,8 +24,10 @@ describe('settings cache avoids repeated parsing and cross-user bootstrap', () =
     expect(repository).toContain('global_settings:${userId}');
     expect(repository).toContain('branch_settings:${userId}:${branchId}');
     expect(repository).toContain('premier:cached_branch_settings_map:${userId}');
-    expect(source).toContain('SettingsRepository.saveGlobalSettings(data, sessionUserId)');
-    expect(source).toContain('SettingsRepository.saveBranchSettings(row.branch_id, row, sessionUserId)');
+    expect(source).toContain('SettingsRepository.replaceUserSnapshot(sessionUserId, data, bMap)');
+    expect(repository).toContain('cursor.key === globalKey || cursor.key.startsWith(branchPrefix)');
+    expect(repository).toContain('cursor.delete()');
+    expect(repository).toContain("db.transaction('system_settings', 'readwrite')");
     expect(source).toContain('SettingsRepository.saveGlobalSettings(next, sessionUserId)');
     expect(source).toContain('SettingsRepository.saveBranchSettings(branchId, updatedBranch, sessionUserId)');
   });
