@@ -107,18 +107,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       if (sRes.error || bRes.error) throw sRes.error || bRes.error;
       const data = sRes.data as Settings | null;
       setSettings(data);
-      if (!data) {
-        try { localStorage.removeItem(`premier:cached_settings:${sessionUserId}`); } catch { /* unavailable */ }
-      }
       if (data) {
-        void SettingsRepository.saveGlobalSettings(data, sessionUserId);
-        try {
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(`premier:cached_settings:${sessionUserId}`, JSON.stringify(data));
-          }
-        } catch {
-          // ignore
-        }
         const uiPreset = findUiTheme(data.brand_color);
         if (uiPreset) {
           applyBrandColor(uiPreset.brandHue, uiPreset.brandSat);
@@ -134,18 +123,9 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const bMap: Record<string, BranchSettings> = {};
       for (const row of (bRes.data as BranchSettings[]) || []) {
         bMap[row.branch_id] = row;
-        void SettingsRepository.saveBranchSettings(row.branch_id, row, sessionUserId);
       }
       setBranchSettingsMap(bMap);
-      {
-        try {
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem(`premier:cached_branch_settings_map:${sessionUserId}`, JSON.stringify(bMap));
-          }
-        } catch {
-          // ignore
-        }
-      }
+      void SettingsRepository.replaceUserSnapshot(sessionUserId, data, bMap);
       setVerifiedUser(sessionUserId);
     } catch {
       // offline: maintain current cached settings
