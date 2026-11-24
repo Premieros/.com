@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, ChefHat, CheckCircle2, UtensilsCrossed, Volume2, VolumeX, AlertTriangle, User } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
+import { useAuth } from '@/context/AuthContext';
 import { useBranchFilter } from '@/lib/useBranchFilter';
 import { useCan } from '@/lib/permissions';
 import { isAuthSessionError } from '@/lib/authSessionError';
@@ -49,12 +50,30 @@ function modifierText(value: unknown, ar: boolean): string {
 }
 
 export function KitchenDisplayPage() {
-  const { lang } = useLanguage();
-  const ar = lang === 'ar';
+  const { user } = useAuth();
   const branchFilter = useBranchFilter();
   const can = useCan();
-  const canViewKds = can('pos.kds_view');
-  const canUpdateKds = can('pos.kds_update');
+  const canViewKds = Boolean(user) && can('pos.kds_view');
+  const canUpdateKds = canViewKds && can('pos.kds_update');
+  const accessScope = JSON.stringify([user?.id, branchFilter, canViewKds, canUpdateKds]);
+
+  return (
+    <KitchenDisplay
+      key={accessScope}
+      branchFilter={branchFilter}
+      canViewKds={canViewKds}
+      canUpdateKds={canUpdateKds}
+    />
+  );
+}
+
+function KitchenDisplay({ branchFilter, canViewKds, canUpdateKds }: {
+  branchFilter: string | null;
+  canViewKds: boolean;
+  canUpdateKds: boolean;
+}) {
+  const { lang } = useLanguage();
+  const ar = lang === 'ar';
   const [station, setStation] = useState('');
   const [view, setView] = useState<'active' | 'completed'>('active');
   const [items, setItems] = useState<KitchenQueueItem[]>([]);
@@ -68,6 +87,7 @@ export function KitchenDisplayPage() {
   const queueScope = JSON.stringify([branchFilter, station, canViewKds]);
   const currentQueueScope = useRef(queueScope);
   currentQueueScope.current = queueScope;
+  useEffect(() => () => { loadSequence.current++; }, []);
   const [soundEnabled, setSoundEnabled] = useState(true);
   const [orderContext, setOrderContext] = useState<Record<string, { table_name: string | null; operator_name: string | null }>>({});
   const previousKitchenOrders = useRef<Set<string> | null>(null);
@@ -95,7 +115,7 @@ export function KitchenDisplayPage() {
       setStations([]);
       setLoadError(userFacingErrorMessage(error, ar ? 'ar' : 'en'));
     }
-  }, [branchFilter, canViewKds]);
+  }, [ar, branchFilter, canViewKds]);
 
   const loadNotices = useCallback(async () => {
     if (!branchFilter || !canViewKds) {
@@ -109,6 +129,7 @@ export function KitchenDisplayPage() {
         p_station: station || null,
         p_limit: 24,
       });
+      if (currentQueueScope.current !== queueScope) return;
       if (error) throw error;
       const result = data as { success?: boolean; rows?: KitchenTransferNotice[] } | null;
       if (!result?.success || !Array.isArray(result.rows)) throw new Error('KDS_TRANSFER_NOTICES_UNAVAILABLE');
@@ -117,9 +138,9 @@ export function KitchenDisplayPage() {
     } catch {
       // Notices are supplemental; a failure must not disguise the main KDS
       // queue or erase already-sent work.
-      setNoticeError(true);
+      if (currentQueueScope.current === queueScope) setNoticeError(true);
     }
-  }, [branchFilter, canViewKds, station]);
+  }, [branchFilter, canViewKds, queueScope, station]);
 
   const readKitchen = useCallback(async () => {
     const sequence = ++loadSequence.current;
@@ -143,6 +164,7 @@ export function KitchenDisplayPage() {
         p_branch_id: branchFilter,
       });
       let result = await readQueue();
+      if (!isCurrent()) return;
       if (isAuthSessionError(result.error)) {
         if (!sessionRecovery.current) {
           sessionRecovery.current = supabase.auth.refreshSession()
@@ -150,7 +172,7 @@ export function KitchenDisplayPage() {
             .catch(() => false)
             .finally(() => { sessionRecovery.current = null; });
         }
-        if (await sessionRecovery.current) result = await readQueue();
+        if (await sessionRecovery.current && isCurrent()) result = await readQueue();
       }
       if (!isCurrent()) return;
       if (result.error) throw result.error;

@@ -106,3 +106,9 @@ OPEN = unresolved; PARTIAL = incomplete mitigation; CODE = patch committed, veri
 - R03: Audited settings repository callers across the application. All current callers supply the authenticated user ID. Removed unscoped reads and writes and the unused shared negative-stock projection. Settings refresh removes the obsolete settings keys from localStorage and IndexedDB while preserving other users' scoped settings and unrelated offline records. The current application does not read the old keys.
 - Local checks: 18 tests across settings isolation, negative stock, and post-commit caching passed. Two negative-stock source assertions were updated to track the existing pending-sale and confirmed-movement paths.
 - The KDS review applies across branches. Station assignment is enforced for assigned users, while unassigned users with KDS access can still see branch-wide queues. Before removing that fallback, inventory existing staff-to-station assignments and verify read and update access with separate accounts in each affected branch. Operational acceptance and financial reconciliation remain open.
+
+### Batch 10 — 2026-11-24
+
+- [Verify main](https://github.com/Premieros/.com/actions/runs/45488344841) and the three companion workflows passed on batch 9 head `d1aaa468d52a166ff439935ef1a607162b3542a1`.
+- R07/R13: Kitchen display state now resets when the user, branch or KDS view/update permission changes. Older queue reads are invalidated and stale transfer notices cannot overwrite the current station filter. A component regression switches branches and accounts before their requests finish and verifies that cards from the previous scope disappear, including when view permission is revoked.
+- Server station assignments and branch access policies require separate acceptance. The application fix applies to every branch. Verify actual station coverage and independent staff sessions before enabling stricter assignment requirements or approving a merge.
