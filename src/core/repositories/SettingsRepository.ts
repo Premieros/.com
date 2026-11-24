@@ -1,7 +1,66 @@
-import { dbGet, dbPut } from './LocalDatabase';
+import { dbGet, dbPut, getLocalDb } from './LocalDatabase';
 import type { Settings, BranchSettings } from '@/lib/types';
 
 export class SettingsRepository {
+  /** Replace only the authenticated user's cached rows. Never clear the
+   * entire store: other users and unrelated offline settings share it.
+   * The localStorage snapshot is published synchronously, and IndexedDB
+   * deletes obsolete branch keys and writes replacements in one transaction.
+   */
+  public static async replaceUserSnapshot(
+    userId: string,
+    settings: Settings | null,
+    branchMap: Record<string, BranchSettings>,
+  ): Promise<void> {
+    if (!userId) return;
+    const globalKey = `global_settings:${userId}`;
+    const branchPrefix = `branch_settings:${userId}:`;
+    try {
+      if (typeof localStorage !== 'undefined') {
+        if (settings) localStorage.setItem(`premier:cached_settings:${userId}`, JSON.stringify(settings));
+        else localStorage.removeItem(`premier:cached_settings:${userId}`);
+        localStorage.setItem(`premier:cached_branch_settings_map:${userId}`, JSON.stringify(branchMap));
+        // Legacy stock policy consumers are not yet migrated. Preserve their
+        // existing projection until all consumers can be safely updated.
+        if (settings?.allow_negative_stock !== undefined) {
+          localStorage.setItem('premier:allow_negative_stock:company', String(settings.allow_negative_stock));
+        }
+        for (const [branchId, row] of Object.entries(branchMap)) {
+          const key = `premier:allow_negative_stock:branch_${branchId}`;
+          if (typeof row.allow_negative_stock === 'boolean') localStorage.setItem(key, String(row.allow_negative_stock));
+          else localStorage.removeItem(key);
+        }
+      }
+    } catch { /* cache unavailable */ }
+    try {
+      const db = await getLocalDb();
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction('system_settings', 'readwrite');
+        const store = tx.objectStore('system_settings');
+        const request = store.openCursor();
+        request.onsuccess = () => {
+          const cursor = request.result;
+          if (cursor) {
+            if (typeof cursor.key === 'string' && (cursor.key === globalKey || cursor.key.startsWith(branchPrefix))) {
+              cursor.delete();
+            }
+            cursor.continue();
+            return;
+          }
+          if (settings) store.put({ key: globalKey, value: settings });
+          for (const [branchId, row] of Object.entries(branchMap)) {
+            store.put({ key: branchPrefix + branchId, value: row });
+          }
+        };
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+        tx.onabort = () => reject(tx.error);
+      });
+    } catch (error) {
+      console.warn('Failed to replace scoped settings snapshot:', error);
+    }
+  }
+
   public static async getGlobalSettings(userId?: string): Promise<Settings | null> {
     try {
       const row = await dbGet<{ key: string; value: Settings }>('system_settings', userId ? `global_settings:${userId}` : 'global_settings');
