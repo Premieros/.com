@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/api';
+import type { ItemPayload } from '../../utils/cart';
 
 export function CashierDiscountApprovalCard({
   subtotal,
   branchId,
   orderId,
+  cart,
   currentType,
   onApproved,
   ar,
@@ -13,6 +15,7 @@ export function CashierDiscountApprovalCard({
   subtotal: number;
   branchId?: string;
   orderId?: string | null;
+  cart?: ItemPayload[];
   currentType: 'amount' | 'percent';
   onApproved: (type: 'amount' | 'percent', amount: number) => void;
   ar: boolean;
@@ -32,7 +35,7 @@ export function CashierDiscountApprovalCard({
   const submittedSubtotal = useRef<number | null>(null);
   const submittedScope = useRef('');
   const currentScope = useRef('');
-  currentScope.current = JSON.stringify([branchId ?? null, orderId ?? null]);
+  currentScope.current = JSON.stringify([branchId ?? null, orderId ?? null, cart ?? null]);
   const subtotalRef = useRef(subtotal);
   subtotalRef.current = subtotal;
   const onApprovedRef = useRef(onApproved);
@@ -114,9 +117,9 @@ export function CashierDiscountApprovalCard({
     const normalizedInput = type === 'percent'
       ? Math.min(amount, 100)
       : Math.min(amount, Math.max(subtotal, 0));
-    const monetaryDiscount = type === 'percent'
+    const monetaryDiscount = Math.round((type === 'percent'
       ? (Math.max(subtotal, 0) * normalizedInput) / 100
-      : normalizedInput;
+      : normalizedInput) * 100) / 100;
     if (monetaryDiscount <= 0) return;
 
     const requestScope = currentScope.current;
@@ -133,7 +136,8 @@ export function CashierDiscountApprovalCard({
         p_payload: {
           ...(branchId ? { branch_id: branchId } : {}),
           discount_amount: monetaryDiscount,
-          discount_type: orderId ? 'amount' : type,
+          discount_type: 'amount',
+          ...(cart ? { cart } : {}),
           requested_value: normalizedInput,
           subtotal,
         },
@@ -148,9 +152,7 @@ export function CashierDiscountApprovalCard({
       if (failure) { setError(failure.message); return; }
       if (res?.success && res.request_id) {
         // The approved action must match exactly what was submitted for review.
-        submittedRequest.current = orderId
-          ? { type: 'amount', value: monetaryDiscount }
-          : { type, value: normalizedInput };
+        submittedRequest.current = { type: 'amount', value: monetaryDiscount };
         submittedScope.current = requestScope;
         submittedSubtotal.current = subtotal;
         approvedRequest.current = null;
