@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { Eye, Scale, Plus, Trash2, RotateCcw, Maximize2, Minimize2 } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
@@ -71,6 +71,9 @@ export function JournalPage() {
   const [viewing, setViewing] = useState<ScopedJournalDto | null>(null);
   const [viewStatus, setViewStatus] = useState<'POSTED' | 'REVERSED' | 'OTHER' | null>(null);
   const [viewStatusLoading, setViewStatusLoading] = useState(false);
+  const viewRequest = useRef(0);
+  const reversalTarget = useRef<string | null>(null);
+  const reversalInFlight = useRef(false);
   const [reverseOpen, setReverseOpen] = useState(false);
   const [reverseReason, setReverseReason] = useState('');
   const [reversing, setReversing] = useState(false);
@@ -135,7 +138,21 @@ export function JournalPage() {
     }
   }, [manualOpen, manualLines.length]);
 
+  const closeJournal = () => {
+    if (reversalInFlight.current) return;
+    ++viewRequest.current;
+    reversalTarget.current = null;
+    setReverseOpen(false);
+    setViewing(null);
+    setViewStatus(null);
+    setViewStatusLoading(false);
+  };
+
   const openJournal = async (entry: ScopedJournalDto) => {
+    if (reversalInFlight.current) return;
+    const request = ++viewRequest.current;
+    reversalTarget.current = null;
+    setReverseOpen(false);
     setViewing(entry);
     setViewStatus(null);
     setViewStatusLoading(true);
@@ -144,6 +161,7 @@ export function JournalPage() {
       .eq('id', entry.id)
       .eq('branch_id', entry.branch_id)
       .maybeSingle();
+    if (request !== viewRequest.current) return;
     // Never offer a reversal when the status cannot be verified.
     if (error || !data) {
       setViewStatus(null);
@@ -157,12 +175,13 @@ export function JournalPage() {
   };
 
   const submitReversal = async () => {
-    if (!viewing || !can('accounting.reconciliation.manage') || viewStatus !== 'POSTED' || reversing) return;
+    if (!viewing || !can('accounting.reconciliation.manage') || viewStatus !== 'POSTED' || reversing || reversalInFlight.current || reversalTarget.current !== viewing.id || viewing.reference_type === 'journal_reversal') return;
     const reason = reverseReason.trim();
     if (reason.length < 3) {
       show(isAr ? 'يجب كتابة سبب للعكس (3 أحرف على الأقل)' : 'Enter a reversal reason (at least 3 characters)', 'error');
       return;
     }
+    reversalInFlight.current = true;
     setReversing(true);
     try {
       const { data, error } = await api.accounting.reverseJournalEntry({
@@ -174,12 +193,17 @@ export function JournalPage() {
       show(data.already_reversed
         ? (isAr ? 'تم عكس القيد مسبقًا' : 'Entry was already reversed')
         : (isAr ? 'تم إنشاء قيد عكسي بنجاح' : 'Reversal entry posted successfully'), 'success');
+      ++viewRequest.current;
+      reversalTarget.current = null;
       setReverseOpen(false);
       setReverseReason('');
       setViewing(null);
       setViewStatus(null);
       await load();
+    } catch (failure) {
+      show(failure instanceof Error ? failure.message : t('error'), 'error');
     } finally {
+      reversalInFlight.current = false;
       setReversing(false);
     }
   };
@@ -334,7 +358,7 @@ export function JournalPage() {
         </>
       )}
 
-      <Modal open={!!viewing} onClose={() => setViewing(null)} title={viewing ? `${viewing.entry_number} - ${viewing.description || ''}` : ''} size="lg">
+      <Modal open={!!viewing} onClose={closeJournal} title={viewing ? `${viewing.entry_number} - ${viewing.description || ''}` : ''} size="lg">
         {viewing && (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-4 text-sm">
@@ -374,7 +398,7 @@ export function JournalPage() {
             <div className="flex justify-end gap-2">
               {can('accounting.reconciliation.manage') && viewStatus === 'POSTED'
                 && viewing.reference_type !== 'journal_reversal' && (
-                  <Button variant="danger" onClick={() => { setReverseReason(''); setReverseOpen(true); }}>
+                  <Button variant="danger" onClick={() => { reversalTarget.current = viewing.id; setReverseReason(''); setReverseOpen(true); }}>
                     <RotateCcw className="w-4 h-4" />
                     {isAr ? 'عكس القيد' : 'Reverse entry'}
                   </Button>
@@ -382,7 +406,7 @@ export function JournalPage() {
               {viewStatusLoading && (
                 <span className="text-xs text-ui-muted self-center">{t('loading')}</span>
               )}
-              <Button variant="secondary" onClick={() => setViewing(null)}>{t('close')}</Button>
+              <Button variant="secondary" onClick={closeJournal}>{t('close')}</Button>
             </div>
           </div>
         )}
