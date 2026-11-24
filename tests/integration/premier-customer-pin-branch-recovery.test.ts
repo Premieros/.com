@@ -57,6 +57,15 @@ const disposable = Boolean(url && ['localhost','127.0.0.1','[::1]'].some(host =>
         [foreignToken,nextSession,phone,persian]);
       expect(unauthorized.rows[0].data).toMatchObject({success:false,error:'QR_RECOVERY_DISABLED'});
 
+      // Exercise branch isolation independently of the policy-disabled shortcut.
+      await db.query(
+        'insert into qr_private.branch_settings(branch_id,recovery_pin_enabled) values($1,true)',
+        [foreignBranch]);
+      const crossBranch=await db.query<{data:{success:boolean;error:string}}>(
+        'select public.qr_guest_resume($1,$2,$3,$4) data',
+        [foreignToken,nextSession,phone,persian]);
+      expect(crossBranch.rows[0].data).toMatchObject({success:false,error:'QR_PIN_INVALID'});
+
       const result=await db.query<{data:{success:boolean;visit:{id:string}}}>(
         'select public.qr_guest_resume($1,$2,$3,$4) data',
         [stableToken,nextSession,phone,persian]);
