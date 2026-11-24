@@ -11,12 +11,12 @@ OPEN = unresolved; PARTIAL = incomplete mitigation; CODE = patch committed, veri
 | R03 | P1 | Isolate user settings and invalidate stale async writes/cache | PARTIAL |
 | R04 | P1 | Bind journal status and reversal confirmation to selected entry | CODE |
 | R05 | P1 | Make invoice metadata/payment saves explicitly independent or atomic | CODE |
-| R06 | P1 | Financial RPC/column grants, ledger and refund integration verification | OPEN |
+| R06 | P1 | Financial RPC/column grants, ledger and refund integration verification | PARTIAL |
 | R07 | P1 | Kitchen/barista explicit staff assignment and least privilege | BLOCKED |
 | R08 | P2 | QR recovery enabled in both branches: cross-branch denial | CODE |
 | R09 | P2 | QR check-in/recovery toggle policy | CODE |
-| R10 | P2 | Business day versus browser calendar date | OPEN |
-| R11 | P2 | Stable sales pagination under concurrent inserts | OPEN |
+| R10 | P2 | Business day versus browser calendar date | PARTIAL |
+| R11 | P2 | Stable sales pagination under concurrent inserts | CODE |
 | R12 | P2 | Historical station remap NULL guard and concurrency | PARTIAL |
 | R13 | P1 | Independent cashier/captain/kitchen/barista/customer browser acceptance | BLOCKED |
 | R14 | P1 | Backup/restore checkpoint and financial reconciliation | BLOCKED |
@@ -35,3 +35,13 @@ OPEN = unresolved; PARTIAL = incomplete mitigation; CODE = patch committed, veri
 - R09: `d71f257` explicitly documents that recovery preference is retained when check-in is disabled. No silent backend policy change.
 - R06/R07/R10/R11/R13/R14 remain unresolved. No staging/production DB or Vercel changes performed. No merge.
 - Last implementation head before this log update: `7147897129f790b148b097803ef84910ca136b7d`. CI for new head not yet verified. 
+
+### Batch 2 — 2026-11-24
+- Baseline head `47a78cf64268ed8bcdc45b787b11a7bb4881d89f`: [POS recovery](https://github.com/Premieros/.com/actions/runs/45417634383), [QR security](https://github.com/Premieros/.com/actions/runs/45417631830), [readiness](https://github.com/Premieros/.com/actions/runs/45417632669) succeeded. [Verify main](https://github.com/Premieros/.com/actions/runs/45417631978) verify job passed API contract, lint, typecheck, unit tests, build and readiness; DB and browser jobs were cancelled following newer commits. Do not count them as passed.
+- R11: `9512462`, `d0d1d86`, `af62940`, `81faef8`: sales opt-in keyset uses created_at DESC, id DESC, preserves exact DB timestamps, validates cursor values and uses strict tuple boundaries for load-more/export. Other callers retain existing offset behavior. Unit tests added; verify real PostgREST multi-page results and concurrent insertion behavior before PASS. Keyset does not constitute a transaction snapshot.
+- R10: `af62940` labels the existing device calendar filter explicitly; branch business-day policy and timezone implementation remain unresolved. No accounting-day semantics changed without verified requirements.
+- Additional scope protection: `af62940` disables SalesPage pagination until permission and nonempty resolved branch scope exist.
+- R06: `c510d1c` strengthens disposable CI SQL gate to enumerate all real sales columns (only notes/customer_id may be updated directly by authenticated) and verify anon destructive privileges. Financial RPCs, trigger inputs, payment/refund/ledger and stock reconciliation still need verification.
+- R01/R03: no server-side approval/cart binding or comprehensive legacy stock cache fix this batch. GitHub code search returned no matches for relevant symbols; cannot safely infer authoritative RPC implementations or all legacy callers. Further source discovery and runtime tests needed.
+- R07/R13/R14 remain BLOCKED (physical independent users, end-to-end evidence, backup/restore and reconciliation). No production mutation, deployment, or merge.
+- Implementation head before this log: `c510d1c4616be16c3191526bc091cdafa45ca509`. Latest head CI pending; do not keep pushing during CI just to record transient states.
