@@ -139,7 +139,8 @@ function AccountLayout({ children }: { children: ReactNode }) {
 
   const showBackButton = location.pathname !== APP_ROUTES.dashboard;
   const isReportsWorkspace = location.pathname === APP_ROUTES.reports || location.pathname === '/reports/view';
-  const fullWidthContent = location.pathname === APP_ROUTES.dashboard || isReportsWorkspace;
+  // Back-office data grids need the full workspace, not a 1600px cap.
+  const fullWidthContent = true;
 
   const visibleItems = useMemo(() => {
     const order = new Map(runtime.navigation.order.map((id, index) => [id, index]));
@@ -584,7 +585,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
         )}
-        <main data-testid="app-main" className="min-h-[calc(100vh-68px)] bg-ui-page px-4 pb-36 pt-6 sm:px-6 sm:pb-24 sm:pt-7 lg:px-9 lg:pb-24 lg:pt-8">
+        <main data-testid="app-main" className="min-h-[calc(100vh-68px)] bg-ui-page px-3 pb-36 pt-6 sm:px-5 sm:pb-24 sm:pt-7 lg:px-6 lg:pb-24 lg:pt-8">
           <div
             data-testid="design-content-surface"
             className={`min-h-[calc(100vh-68px)] w-full min-w-0 space-y-5 ${fullWidthContent ? 'max-w-none' : 'mx-auto max-w-[1600px]'}`}
