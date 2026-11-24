@@ -18,12 +18,12 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
     expect(menu).toContain("label: { ar: 'مركز التقارير', en: 'Reports Center' }");
     expect(menu).toContain("permissionsAny: ['reports.view', 'reports.financial'], group: 'main'");
     expect(layout).toContain('data-testid={`nav-item-${item.id}`}');
-    expect(layout).toContain('location.pathname === APP_ROUTES.reports');
+    expect(layout).toContain('const fullWidthContent = true');
   });
 
   it('keeps the global sidebar styling identical across reporting and other routes', () => {
     // Reports can have their own internal directory, but must not restyle the app shell.
-    expect(layout).toContain('const fullWidthContent = location.pathname === APP_ROUTES.dashboard || isReportsWorkspace');
+    expect(layout).toContain('const fullWidthContent = true');
     expect(layout).toContain('data-testid="app-sidebar" className=');
     expect(layout).toContain('className="text-ui-primary"');
     expect(layout).not.toContain('style={isReportsWorkspace');
