@@ -3,14 +3,12 @@
 DO $test$
 DECLARE
   col text;
-  privileged text[] := ARRAY[
-    'subtotal', 'discount_amount', 'discount_type', 'tax_amount',
-    'bonus_amount', 'total', 'paid_amount', 'refunded_amount',
-    'payment_method', 'status', 'branch_id', 'warehouse_id',
-    'invoice_number', 'source_order_id', 'is_archived'
-  ];
 BEGIN
-  FOREACH col IN ARRAY privileged LOOP
+  -- Enumerate actual columns so new or omitted financial fields cannot escape the gate.
+  FOR col IN SELECT attname::text FROM pg_attribute
+    WHERE attrelid = 'public.sales'::regclass AND attnum > 0 AND NOT attisdropped
+      AND attname NOT IN ('customer_id', 'notes')
+  LOOP
     IF has_column_privilege('authenticated', 'public.sales', col, 'UPDATE') THEN
       RAISE EXCEPTION 'Authenticated role can directly update protected sales field %', col;
     END IF;
@@ -27,6 +25,11 @@ BEGIN
   END IF;
   IF has_table_privilege('authenticated', 'public.sale_items', 'TRUNCATE') THEN
     RAISE EXCEPTION 'Authenticated role must not TRUNCATE financial sale items';
+  END IF;
+  IF has_table_privilege('anon', 'public.sales', 'TRUNCATE')
+     OR has_table_privilege('anon', 'public.sales', 'DELETE')
+     OR has_table_privilege('anon', 'public.sale_items', 'TRUNCATE') THEN
+    RAISE EXCEPTION 'Anonymous role retains destructive sales privileges';
   END IF;
   IF NOT EXISTS (
     SELECT 1 FROM pg_trigger t
