@@ -124,7 +124,7 @@ export function createSaleOperationKey(): string {
   return `sale:${createOfflineToken()}`;
 }
 
-async function queueOfflineSale(p: ProcessSalePayload, allowNegative: boolean, startedOffline: boolean): Promise<string> {
+async function queueOfflineSale(p: ProcessSalePayload, allowNegative: boolean, startedOffline: boolean, expectedOwnerId: string): Promise<string> {
   // Revalidate at the durable write boundary: connectivity can change after
   // processSaleForOrder's initial offline check while settings load.
   if (!hasValidOfflineSaleItems(p.p_items)) throw new Error('OFFLINE_SALE_INVALID_ITEMS');
@@ -167,6 +167,7 @@ async function queueOfflineSale(p: ProcessSalePayload, allowNegative: boolean, s
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   const originatingUserId = sessionData.session?.user?.id || null;
   if (sessionError || !originatingUserId) throw new Error('AUTH_REQUIRED_OFFLINE');
+  if (originatingUserId !== expectedOwnerId) throw new Error('OFFLINE_SALE_OWNER_CHANGED');
 
   const id = `offline_sale_${createOfflineToken()}`;
   const operationKey = p.p_client_operation_key?.trim() || id;
@@ -293,10 +294,16 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   // contain an older value even after the manager enabled negative stock.
   // Offline capture intentionally falls back to the last cached branch setting.
   const explicitlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-  const branchSettings = await SettingsRepository.getBranchSettings(p.p_branch_id);
-  const globalSettings = await SettingsRepository.getGlobalSettings();
-  let allowNegative = branchSettings?.allow_negative_stock ?? globalSettings?.allow_negative_stock ?? false;
-  if (!explicitlyOffline) {
+  // Capture the owner before reading any cache, not only at durable enqueue.
+  const { data: initialSession, error: initialSessionError } = await supabase.auth.getSession();
+  const expectedOwnerId = initialSession.session?.user?.id;
+  if (initialSessionError || !expectedOwnerId) return { result: null, error: 'AUTH_REQUIRED' };
+  let allowNegative = false;
+  if (explicitlyOffline) {
+    const branchSettings = await SettingsRepository.getBranchSettings(p.p_branch_id, expectedOwnerId);
+    const globalSettings = await SettingsRepository.getGlobalSettings(expectedOwnerId);
+    allowNegative = branchSettings?.allow_negative_stock ?? globalSettings?.allow_negative_stock ?? false;
+  } else {
     const { data: serverAllowsNegative, error: policyError } = await supabase.rpc(
       'pos_branch_negative_stock_policy', { p_branch_id: p.p_branch_id },
     );
@@ -370,7 +377,7 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
       return { result: null, error: 'MANUAL_PAYMENT_REQUIRES_ONLINE_APPROVAL' };
     }
     try {
-      const queuedId = await queueOfflineSale(p, allowNegative, explicitlyOffline);
+      const queuedId = await queueOfflineSale(p, allowNegative, explicitlyOffline, expectedOwnerId);
       return {
         result: {
           success: true,
