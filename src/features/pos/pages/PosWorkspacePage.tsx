@@ -813,6 +813,7 @@ export function PosWorkspacePage() {
       orderType={pos.orderType}
       activeTable={pos.activeTable}
       activeOrderNumber={pos.activeOrderNumber}
+      activeOrderId={pos.activeOrderId}
       guestCount={pos.guestCount}
       onGuestCountChange={pos.setGuestCount}
       customerId={pos.customerId}
