@@ -61,6 +61,20 @@ describe('cashier discount approval recovery', () => {
     expect(screen.getByRole('alert').textContent).toContain('Order subtotal changed');
   });
 
+  it('requests a persisted order explicitly and rejects an approval after switching orders', async () => {
+    const onApproved = vi.fn();
+    const view = render(<CashierDiscountApprovalCard {...props(onApproved)} branchId="branch-a" orderId="order-a" />);
+    request();
+    await waitFor(() => expect(events.length).toBe(1));
+    expect(mocks.rpc).toHaveBeenCalledWith('request_manager_approval', expect.objectContaining({
+      p_entity_type: 'order', p_entity_id: 'order-a',
+      p_payload: expect.objectContaining({ branch_id: 'branch-a', discount_amount: 20, discount_type: 'amount' }),
+    }));
+    view.rerender(<CashierDiscountApprovalCard {...props(onApproved)} branchId="branch-a" orderId="order-b" />);
+    act(() => events[0]({ new: { status: 'approved' } }));
+    expect(onApproved).not.toHaveBeenCalled();
+  });
+
   it('ignores delayed approved events from a rejected request after a new request starts', async () => {
     const onApproved = vi.fn();
     render(<CashierDiscountApprovalCard {...props(onApproved)} />);
