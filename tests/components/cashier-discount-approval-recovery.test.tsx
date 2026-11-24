@@ -89,6 +89,26 @@ describe('cashier discount approval recovery', () => {
     expect(onApproved).not.toHaveBeenCalled();
   });
 
+  it('shows request failure and permits a retry without applying a discount', async () => {
+    const onApproved = vi.fn();
+    mocks.rpc.mockResolvedValueOnce({ data: null, error: { message: 'Request unavailable' } });
+    render(<CashierDiscountApprovalCard {...props(onApproved)} />);
+    request();
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Request unavailable'));
+    expect(onApproved).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Send approval request' }));
+    await waitFor(() => expect(events.length).toBe(1));
+  });
+
+  it('unlocks the form when the pending request has expired without a Realtime update', async () => {
+    const onApproved = vi.fn();
+    readStatus.mockResolvedValue({ data: { status: 'pending', expires_at: '2000-01-01T00:00:00Z' }, error: null });
+    render(<CashierDiscountApprovalCard {...props(onApproved)} />);
+    request();
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Rejected' })).toBeTruthy());
+    expect(onApproved).not.toHaveBeenCalled();
+  });
+
   it('ignores delayed approved events from a rejected request after a new request starts', async () => {
     const onApproved = vi.fn();
     render(<CashierDiscountApprovalCard {...props(onApproved)} />);
