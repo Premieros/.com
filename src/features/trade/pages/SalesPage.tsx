@@ -558,7 +558,18 @@ export function SalesPage() {
         customer_id: editForm.customer_id || null,
         notes: editForm.notes || null,
       }).eq('id', viewSale.id);
-      if (error) { show(error.message, 'error'); return; }
+      if (error) {
+        if (paymentChanged) {
+          show(isAr
+            ? 'تم تغيير طريقة الدفع بالفعل، لكن تعذر حفظ العميل والملاحظات. أعد فتح الفاتورة للتحقق.'
+            : 'Payment method changed, but customer/notes could not be saved. Reopen the invoice to verify.', 'error');
+          setViewSale(null);
+          reloadSales();
+        } else {
+          show(error.message, 'error');
+        }
+        return;
+      }
     }
 
     await logAudit('update', 'sales', viewSale.id, paymentChanged ? { payment_method: editForm.payment_method } : undefined);
