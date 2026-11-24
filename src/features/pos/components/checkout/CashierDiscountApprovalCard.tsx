@@ -51,7 +51,7 @@ export function CashierDiscountApprovalCard({
     let terminal = false;
     let reading = false;
     const isCurrent = () => active && activeRequest.current === requestId && !terminal;
-    const acceptStatus = (next: { status?: string }) => {
+    const acceptStatus = (next: { status?: string; expires_at?: string }) => {
       if (!isCurrent()) return;
       if (next.status === 'approved') {
         const submitted = submittedRequest.current;
@@ -65,7 +65,8 @@ export function CashierDiscountApprovalCard({
         }
         setStatus('approved');
         onApprovedRef.current(submitted.type, submitted.value);
-      } else if (next.status === 'rejected' || next.status === 'expired') {
+      } else if (next.status === 'rejected' || next.status === 'expired' || next.status === 'consumed' ||
+        (next.status === 'pending' && next.expires_at && Date.parse(next.expires_at) <= Date.now())) {
         terminal = true;
         setStatus('rejected');
       }
@@ -75,7 +76,7 @@ export function CashierDiscountApprovalCard({
       reading = true;
       try {
         const { data, error: failure } = await supabase.from('approval_requests')
-          .select('status').eq('id', requestId).maybeSingle();
+          .select('status,expires_at').eq('id', requestId).maybeSingle();
         if (!isCurrent()) return;
         if (failure || !data) {
           setError(ar ? 'تعذر التحقق من الموافقة؛ ستتم إعادة المحاولة.' : 'Unable to verify approval; retrying.');
@@ -94,7 +95,7 @@ export function CashierDiscountApprovalCard({
       .on('postgres_changes', {
         event: 'UPDATE', schema: 'public', table: 'approval_requests',
         filter: `id=eq.${requestId}`,
-      }, payload => acceptStatus(payload.new as { status?: string }))
+      }, payload => acceptStatus(payload.new as { status?: string; expires_at?: string }))
       .subscribe(state => { if (state === 'SUBSCRIBED') void reconcile(); });
     void reconcile();
     const timer = window.setInterval(() => { void reconcile(); }, 10_000);
