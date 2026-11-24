@@ -54,15 +54,18 @@ const isLocal=Boolean(url&&['localhost','127.0.0.1','[::1]'].includes(new URL(ur
    const settle=async(invoice:string,paid:number)=>(await db.query<{result:{success:boolean,error?:string,sale_id?:string}}>(
     "select public.process_sale_split($1,$2,$3,null,$4,20,5,'amount',0,0,15,$5::jsonb,'completed',$6::jsonb,$7,'takeaway',null,null,1) result",
     [invoice,branch,warehouse,cashier,JSON.stringify([{payment_method:'cash',amount:7},{payment_method:'card',amount:paid-7}]),JSON.stringify(cart),shift])).rows[0].result;
+   const contextCount=async()=>Number((await db.query<{count:string}>('select count(*)::text count from private.discount_settlement_context where transaction_id=txid_current()')).rows[0].count);
    const failed=await settle(`FAIL-${tag}`,14);
    expect(failed).toMatchObject({success:false,error:'SPLIT_PAYMENT_TOTAL_MISMATCH'});
    expect(await status()).toBe('approved');
+   expect(await contextCount()).toBe(0);
    const unchanged=await db.query<{qty:string,count:string}>("select (select quantity::text from public.inventory where warehouse_id=$1 and product_id=$2) qty,(select count(*)::text from public.sales where branch_id=$3) count",[warehouse,product,branch]);
    expect(Number(unchanged.rows[0].qty)).toBe(5);
    expect(unchanged.rows[0].count).toBe('0');
    const success=await settle(`GOOD-${tag}`,15);
    expect(success.success,JSON.stringify(success)).toBe(true);
    expect(await status()).toBe('consumed');
+   expect(await contextCount()).toBe(0);
    expect(await settle(`REUSE-${tag}`,15)).toMatchObject({success:false,error:'MANAGER_APPROVAL_REQUIRED'});
    const final=await db.query<{qty:string,count:string,audit_count:string,journal_delta:string}>(`
     select (select quantity::text from public.inventory where warehouse_id=$1 and product_id=$2) qty,
@@ -74,6 +77,25 @@ const isLocal=Boolean(url&&['localhost','127.0.0.1','[::1]'].includes(new URL(ur
    expect(final.rows[0].count).toBe('1');
    expect(final.rows[0].audit_count).toBe('1');
    expect(Number(final.rows[0].journal_delta)).toBeCloseTo(0,5);
+
+   // Real PostgreSQL client role cannot write the protected financial column
+   // or create its own internal settlement capability.
+   const privileges=await db.query<{direct_discount:boolean,forge_context:boolean}>(
+     "select has_column_privilege('authenticated','public.sales','discount_amount','UPDATE') direct_discount,has_table_privilege('authenticated','private.discount_settlement_context','INSERT') forge_context");
+   expect(privileges.rows[0]).toEqual({direct_discount:false,forge_context:false});
+   await db.query('SAVEPOINT client_discount_update');
+   await db.query('SET LOCAL ROLE authenticated');
+   try {
+     await expect(db.query('update public.sales set discount_amount=6 where id=$1',[success.sale_id])).rejects.toMatchObject({code:'42501'});
+   } finally { await db.query('ROLLBACK TO SAVEPOINT client_discount_update'); }
+   // The trigger itself still rejects unauthorized changes even if a
+   // privileged SQL writer reaches the table with cashier auth claims.
+   await db.query('SAVEPOINT trigger_discount_update');
+   try {
+     await expect(db.query('update public.sales set discount_amount=6 where id=$1',[success.sale_id])).rejects.toThrow('DISCOUNT_NOT_ALLOWED');
+   } finally { await db.query('ROLLBACK TO SAVEPOINT trigger_discount_update'); }
+   expect(await contextCount()).toBe(0);
+   expect(Number((await db.query<{discount_amount:string}>('select discount_amount from public.sales where id=$1',[success.sale_id])).rows[0].discount_amount)).toBe(5);
   }finally{await db.query('ROLLBACK');await db.end();}
  });
 });
