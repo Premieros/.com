@@ -633,3 +633,22 @@
     min-height: var(--table-rows-height, clamp(144px, calc(100dvh - 310px), 820px));
   }
 }
+
+/* Journal focus mode is a deliberate full-screen ledger workspace. It must
+   use the available height for rows, rather than the normal dashboard cap. */
+[data-testid="journal-expanded-table"] > [data-testid="data-table"] {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+[data-testid="journal-expanded-table"] [data-table-viewport] {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+}
+[data-testid="journal-expanded-table"] [data-testid="data-table-toolbar"],
+[data-testid="journal-expanded-table"] [data-testid="data-table-footer"] {
+  flex-shrink: 0;
+}
