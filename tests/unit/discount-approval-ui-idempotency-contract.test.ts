@@ -24,6 +24,12 @@ describe('discount approval UI must not change or replay an approved action', ()
     expect(source).toContain("if (busy || status === 'pending' || amount <= 0");
   });
 
+  it('checks authoritative request status after subscribing and on visibility return', () => {
+    expect(source).toContain(".from('approval_requests')");
+    expect(source).toContain("state === 'SUBSCRIBED'");
+    expect(source).toContain('submittedSubtotal.current !== subtotalRef.current');
+    expect(source).toContain("role=\"alert\"");
+  });
   it('retains server-side manager-approval requests, rather than direct client authorization', () => {
     expect(source).toContain("supabase.rpc('request_manager_approval'");
     expect(source).toContain("p_action_type: 'discount'");
