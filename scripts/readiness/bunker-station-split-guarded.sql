@@ -15,7 +15,9 @@ DECLARE
   v_bar uuid;
   v_changed integer;
 BEGIN
-  -- Prevent concurrent station remaps while resolving expected state.
+  -- Prevent concurrent station remaps that use this same lock.
+  -- This does NOT synchronize ordinary order writers. Historical script only:
+  -- never execute without an approved maintenance window with order intake stopped.
   PERFORM pg_advisory_xact_lock(hashtextextended('bunker-demo-station-routing:' || v_branch::text, 0));
   SELECT id INTO STRICT v_main FROM public.kitchen_stations
    WHERE branch_id=v_branch AND code='main' AND is_active;
@@ -41,9 +43,9 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM public.categories c
     WHERE c.branch_id=v_branch
-      AND c.kitchen_station_id NOT IN (
+      AND (c.kitchen_station_id IS NULL OR c.kitchen_station_id NOT IN (
         v_main, CASE WHEN c.name IN ('Hot Coffee','Iced Coffee') THEN v_bar ELSE v_kitchen END
-      )
+      ))
   ) THEN RAISE EXCEPTION 'BUNKER_UNEXPECTED_EXISTING_ROUTING'; END IF;
 
   UPDATE public.categories c
