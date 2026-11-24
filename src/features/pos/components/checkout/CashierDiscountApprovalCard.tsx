@@ -20,8 +20,12 @@ export function CashierDiscountApprovalCard({
   const [requestId, setRequestId] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'pending' | 'approved' | 'rejected'>('idle');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
   const approvedRequest = useRef<string | null>(null);
   const submittedRequest = useRef<{ type: 'amount' | 'percent'; value: number } | null>(null);
+  const submittedSubtotal = useRef<number | null>(null);
+  const subtotalRef = useRef(subtotal);
+  subtotalRef.current = subtotal;
   const onApprovedRef = useRef(onApproved);
   onApprovedRef.current = onApproved;
 
@@ -31,36 +35,51 @@ export function CashierDiscountApprovalCard({
   useEffect(() => {
     if (!requestId) return;
 
+    let active = true;
+    const acceptStatus = (next: { status?: string }) => {
+      if (!active) return;
+      if (next.status === 'approved') {
+        const submitted = submittedRequest.current;
+        if (!submitted || approvedRequest.current === requestId) return;
+        approvedRequest.current = requestId;
+        if (submittedSubtotal.current !== subtotalRef.current) {
+          setStatus('rejected');
+          setError(ar ? 'تغير إجمالي الطلب. أرسل طلب موافقة جديدًا.' : 'Order subtotal changed. Request a new approval.');
+          return;
+        }
+        setStatus('approved');
+        onApprovedRef.current(submitted.type, submitted.value);
+      } else if (next.status === 'rejected' || next.status === 'expired') {
+        setStatus('rejected');
+      }
+    };
+    const reconcile = async () => {
+      if (!active || document.visibilityState !== 'visible') return;
+      const { data, error: failure } = await supabase.from('approval_requests')
+        .select('status').eq('id', requestId).maybeSingle();
+      if (!active) return;
+      if (failure) {
+        setError(ar ? 'تعذر التحقق من الموافقة؛ ستتم إعادة المحاولة.' : 'Unable to verify approval; retrying.');
+      } else if (data) {
+        setError('');
+        acceptStatus(data);
+      }
+    };
     const channel = supabase
       .channel(`discount-approval-${requestId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'approval_requests',
-          filter: `id=eq.${requestId}`,
-        },
-        (payload) => {
-          const next = payload.new as {
-            status?: string;
-            payload?: Record<string, unknown>;
-          };
-
-          if (next.status === 'approved') {
-            const submitted = submittedRequest.current;
-            if (!submitted || approvedRequest.current === requestId) return;
-            approvedRequest.current = requestId;
-            setStatus('approved');
-            onApprovedRef.current(submitted.type, submitted.value);
-          } else if (next.status === 'rejected' || next.status === 'expired') {
-            setStatus('rejected');
-          }
-        },
-      )
-      .subscribe();
-
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'approval_requests',
+        filter: `id=eq.${requestId}`,
+      }, payload => acceptStatus(payload.new as { status?: string }))
+      .subscribe(state => { if (state === 'SUBSCRIBED') void reconcile(); });
+    void reconcile();
+    const timer = window.setInterval(() => { if (approvedRequest.current !== requestId) void reconcile(); }, 10_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') void reconcile(); };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
       void supabase.removeChannel(channel);
     };
   }, [requestId]);
@@ -79,9 +98,10 @@ export function CashierDiscountApprovalCard({
     if (monetaryDiscount <= 0) return;
 
     setBusy(true);
+    setError('');
 
     try {
-      const { data } = await supabase.rpc('request_manager_approval', {
+      const { data, error: failure } = await supabase.rpc('request_manager_approval', {
         p_action_type: 'discount',
         p_entity_type: 'sale',
         p_entity_id: null,
@@ -99,13 +119,19 @@ export function CashierDiscountApprovalCard({
         request_id?: string;
       } | null;
 
+      if (failure) { setError(failure.message); return; }
       if (res?.success && res.request_id) {
         // The approved action must match exactly what was submitted for review.
         submittedRequest.current = { type, value: normalizedInput };
+        submittedSubtotal.current = subtotal;
         approvedRequest.current = null;
         setRequestId(res.request_id);
         setStatus('pending');
+      } else {
+        setError(ar ? 'تعذر إرسال طلب الموافقة.' : 'Could not request approval.');
       }
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : (ar ? 'تعذر إرسال الطلب.' : 'Request failed.'));
     } finally {
       setBusy(false);
     }
@@ -147,6 +173,7 @@ export function CashierDiscountApprovalCard({
         placeholder={ar ? 'سبب الخصم (إجباري)' : 'Reason (required)'}
       />
 
+      {error && <p role="alert" className="mt-2 text-xs text-ui-danger">{error}</p>}
       <button
         type="button"
         onClick={() => void request()}
