@@ -16,12 +16,15 @@ export function useTableViewport(enabled = true) {
         .find((element) => element.getClientRects().length > 0);
       if (!viewport) return;
       const bounds = viewport.getBoundingClientRect();
-      const padding = Number.parseFloat(getComputedStyle(main).paddingBottom) || 0;
-      const contentBelow = Math.max(0, main.getBoundingClientRect().bottom - bounds.bottom - padding);
+      // getBoundingClientRect() already returns viewport-relative coordinates.
+      // Subtracting window.scrollY again can shrink the table to its minimum.
+      // Reserve room for the table's own footer, not the entire page's height.
+      const tableFooter = root.querySelector<HTMLElement>('[data-testid="data-table-footer"]');
+      const footerHeight = tableFooter?.getBoundingClientRect().height ?? 0;
       const bottom = footer?.getClientRects().length
         ? Math.min(window.innerHeight, footer.getBoundingClientRect().top)
         : window.innerHeight;
-      const available = Math.max(144, Math.floor(bottom - bounds.top - window.scrollY - contentBelow - 8));
+      const available = Math.max(144, Math.floor(bottom - bounds.top - footerHeight - 16));
       const next = `${available}px`;
       if (root.style.getPropertyValue('--table-rows-height') !== next) {
         root.style.setProperty('--table-rows-height', next);
