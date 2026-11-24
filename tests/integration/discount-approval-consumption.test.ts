@@ -5,7 +5,7 @@ import {describe,expect,it} from 'vitest';
 const url=process.env.SUPABASE_DB_URL;
 const isLocal=Boolean(url&&['localhost','127.0.0.1','[::1]'].includes(new URL(url).hostname));
 (isLocal?describe:describe.skip)('Discount approval atomic consumption',()=>{
- it('keeps an approved discount after a failed split payment, consumes it on success, and rejects reuse',async()=>{
+ it('preserves failed split approvals, completes authorized split and normal sales, and denies direct mutation',async()=>{
   const db=new Client({connectionString:url});
   await db.connect();
   const org=randomUUID(),branch=randomUUID(),warehouse=randomUUID(),user=randomUUID(),product=randomUUID();
@@ -96,6 +96,32 @@ const isLocal=Boolean(url&&['localhost','127.0.0.1','[::1]'].includes(new URL(ur
    } finally { await db.query('ROLLBACK TO SAVEPOINT trigger_discount_update'); }
    expect(await contextCount()).toBe(0);
    expect(Number((await db.query<{discount_amount:string}>('select discount_amount from public.sales where id=$1',[success.sale_id])).rows[0].discount_amount)).toBe(5);
+   // The normal cash checkout shares the same trusted write boundary.
+   const normal=async(invoice:string)=>(await db.query<{result:{success:boolean,error?:string,sale_id?:string}}>(
+     "select public.process_sale($1,$2,$3,null,$4,20,5,'amount',0,0,15,15,'cash','completed',$5::jsonb,$6,'takeaway',null,null,1) result",
+     [invoice,branch,warehouse,cashier,JSON.stringify(cart),shift])).rows[0].result;
+   expect(await normal(`NOAPP-${tag}`)).toMatchObject({success:false,error:'MANAGER_APPROVAL_REQUIRED'});
+   const nextRequest=await db.query<{result:{success:boolean,request_id:string}}>(
+     "select public.request_manager_approval('discount','sale',null,$1::jsonb,'CI normal discount') result",
+     [JSON.stringify({branch_id:branch,subtotal:20,discount_amount:5,discount_type:'amount',cart})]);
+   expect(nextRequest.rows[0].result.success).toBe(true);
+   const nextId=nextRequest.rows[0].result.request_id;
+   expect(nextId).not.toBe(approvalId);
+   await asUser(user);
+   expect((await db.query<{result:{success:boolean}}>('select public.decide_manager_approval($1,true,null) result',[nextId])).rows[0].result.success).toBe(true);
+   await asUser(cashier);
+   const cashSale=await normal(`CASH-${tag}`);
+   expect(cashSale.success,JSON.stringify(cashSale)).toBe(true);
+   expect((await db.query<{status:string}>('select status from public.approval_requests where id=$1',[nextId])).rows[0].status).toBe('consumed');
+   expect(await contextCount()).toBe(0);
+   const cashCheck=await db.query<{qty:string,count:string,journal_delta:string}>(`
+     select (select quantity::text from public.inventory where warehouse_id=$1 and product_id=$2) qty,
+       (select count(*)::text from public.sales where branch_id=$3) count,
+       (select coalesce(sum(l.debit-l.credit),0)::text from public.journal_entry_lines l join public.journal_entries j on j.id=l.journal_entry_id where j.reference_id=$4) journal_delta
+   `,[warehouse,product,branch,cashSale.sale_id]);
+   expect(Number(cashCheck.rows[0].qty)).toBe(3);
+   expect(cashCheck.rows[0].count).toBe('2');
+   expect(Number(cashCheck.rows[0].journal_delta)).toBeCloseTo(0,5);
   }finally{await db.query('ROLLBACK');await db.end();}
  });
 });
