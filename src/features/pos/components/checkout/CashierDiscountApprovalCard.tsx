@@ -3,12 +3,16 @@ import { supabase } from '@/api';
 
 export function CashierDiscountApprovalCard({
   subtotal,
+  branchId,
+  orderId,
   currentType,
   onApproved,
   ar,
   canDirectDiscount,
 }: {
   subtotal: number;
+  branchId?: string;
+  orderId?: string | null;
   currentType: 'amount' | 'percent';
   onApproved: (type: 'amount' | 'percent', amount: number) => void;
   ar: boolean;
@@ -26,6 +30,9 @@ export function CashierDiscountApprovalCard({
   const requesting = useRef(false);
   const submittedRequest = useRef<{ type: 'amount' | 'percent'; value: number } | null>(null);
   const submittedSubtotal = useRef<number | null>(null);
+  const submittedScope = useRef('');
+  const currentScope = useRef('');
+  currentScope.current = JSON.stringify([branchId ?? null, orderId ?? null]);
   const subtotalRef = useRef(subtotal);
   subtotalRef.current = subtotal;
   const onApprovedRef = useRef(onApproved);
@@ -48,7 +55,7 @@ export function CashierDiscountApprovalCard({
         if (!submitted || approvedRequest.current === requestId) return;
         approvedRequest.current = requestId;
         terminal = true;
-        if (submittedSubtotal.current !== subtotalRef.current) {
+        if (submittedSubtotal.current !== subtotalRef.current || submittedScope.current !== currentScope.current) {
           setStatus('rejected');
           setError(ar ? 'تغير إجمالي الطلب. أرسل طلب موافقة جديدًا.' : 'Order subtotal changed. Request a new approval.');
           return;
@@ -112,6 +119,7 @@ export function CashierDiscountApprovalCard({
       : normalizedInput;
     if (monetaryDiscount <= 0) return;
 
+    const requestScope = currentScope.current;
     requesting.current = true;
     activeRequest.current = null;
     setBusy(true);
@@ -120,11 +128,12 @@ export function CashierDiscountApprovalCard({
     try {
       const { data, error: failure } = await supabase.rpc('request_manager_approval', {
         p_action_type: 'discount',
-        p_entity_type: 'sale',
-        p_entity_id: null,
+        p_entity_type: orderId ? 'order' : 'sale',
+        p_entity_id: orderId ?? null,
         p_payload: {
+          ...(branchId ? { branch_id: branchId } : {}),
           discount_amount: monetaryDiscount,
-          discount_type: type,
+          discount_type: orderId ? 'amount' : type,
           requested_value: normalizedInput,
           subtotal,
         },
@@ -139,7 +148,10 @@ export function CashierDiscountApprovalCard({
       if (failure) { setError(failure.message); return; }
       if (res?.success && res.request_id) {
         // The approved action must match exactly what was submitted for review.
-        submittedRequest.current = { type, value: normalizedInput };
+        submittedRequest.current = orderId
+          ? { type: 'amount', value: monetaryDiscount }
+          : { type, value: normalizedInput };
+        submittedScope.current = requestScope;
         submittedSubtotal.current = subtotal;
         approvedRequest.current = null;
         activeRequest.current = res.request_id;
