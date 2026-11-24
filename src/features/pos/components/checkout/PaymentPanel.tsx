@@ -19,6 +19,7 @@ import {
 import { orderTypeLabel } from '../../utils/format';
 import { parseCarNotes, parseDeliveryNotes } from '../../utils/orderLabels';
 import { CashierDiscountApprovalCard } from './CashierDiscountApprovalCard';
+import { cartToItems } from '../../utils/cart';
 
 interface PaymentPanelProps {
   branchId: string;
@@ -371,6 +372,7 @@ export function PaymentPanel(p: PaymentPanelProps) {
             subtotal={p.subtotal}
             branchId={p.branchId}
             orderId={p.activeOrderId}
+            cart={cartToItems(p.cart)}
             currentType={p.discountType}
             ar={isAr}
             canDirectDiscount={p.canDirectDiscount === true}
