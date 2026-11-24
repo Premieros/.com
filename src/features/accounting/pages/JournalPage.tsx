@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Eye, Scale, Plus, Trash2, RotateCcw } from 'lucide-react';
+import { Eye, Scale, Plus, Trash2, RotateCcw, Maximize2, Minimize2 } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -61,6 +61,11 @@ export function JournalPage() {
   const { branches } = useBranches();
   const [items, setItems] = useState<ScopedJournalDto[]>([]);
   const [loading, setLoading] = useState(true);
+  // Journal tables are the main workspace on desktop. Start in the expanded
+  // view so even short datasets never hide rows below tiny scroll windows.
+  const [tableExpanded, setTableExpanded] = useState(
+    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches,
+  );
   const [search, setSearch] = useState('');
   const [refType, setRefType] = useState('');
   const [viewing, setViewing] = useState<ScopedJournalDto | null>(null);
@@ -244,38 +249,90 @@ export function JournalPage() {
 
   return (
     <DesignSurface testId="journal-page">
-      <DesignPageHeader
-        title={t('journalEntries')}
-        subtitle={t('journal')}
-        actions={can('accounting.journal.post') && (
-          <Button size="sm" onClick={() => { if (can('accounting.journal.post')) setManualOpen(true); }}><Plus className="w-4 h-4" /> {t('postManualJournal')}</Button>
-        )}
-      />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title={t('journalEntries')} value={String(items.length)} icon={<Scale className="w-5 h-5" />} color="brand" />
-        <StatCard title={t('totalDebit')} value={formatCurrency(items.reduce((s, e) => s + Number(e.debit_total), 0), currency, lang)} icon={<Scale className="w-5 h-5" />} color="blue" />
-        <StatCard title={t('totalCredit')} value={formatCurrency(items.reduce((s, e) => s + Number(e.credit_total), 0), currency, lang)} icon={<Scale className="w-5 h-5" />} color="amber" />
-        <StatCard title={t('balance')} value={formatCurrency(items.reduce((s, e) => s + Number(e.debit_total) - Number(e.credit_total), 0), currency, lang)} icon={<Scale className="w-5 h-5" />} color="green" />
-      </div>
-
-      <DesignPanel testId="journal-search-panel">
-        <div className="flex flex-col sm:flex-row gap-4 items-end justify-between">
-          <DesignSearch value={search} onChange={setSearch} className="flex-1 w-full" label={t('search')} placeholder={t('search')} testId="journal-search" />
-          <div className="flex flex-wrap items-end gap-3">
+      {tableExpanded ? (
+        <div data-testid="journal-expanded-workspace"
+          className="fixed inset-x-0 bottom-14 top-[68px] z-[54] flex min-h-0 flex-col gap-2 overflow-hidden bg-ui-page p-2 sm:p-3">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-bold text-ui-text">{t('journalEntries')}</h2>
+              <span className="rounded-lg border border-ui-border bg-ui-surface px-2 py-1 text-xs font-semibold text-ui-muted">
+                {items.length} {isAr ? 'قيد' : 'entries'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {can('accounting.journal.post') && (
+                <Button size="sm" onClick={() => setManualOpen(true)}>
+                  <Plus className="w-4 h-4" /> {t('postManualJournal')}
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => setTableExpanded(false)}>
+                <Minimize2 className="w-4 h-4" />
+                {isAr ? 'العرض العادي' : 'Normal view'}
+              </Button>
+            </div>
+          </div>
+          <div data-testid="journal-expanded-filters"
+            className="flex shrink-0 flex-wrap items-end gap-2 rounded-xl border border-ui-border bg-ui-surface p-2">
+            <div className="min-w-[170px] flex-[2]">
+              <DesignSearch value={search} onChange={setSearch} className="w-full"
+                label={t('search')} placeholder={t('search')} testId="journal-expanded-search" />
+            </div>
             <Select label={t('referenceType')} value={refType} onChange={(e) => setRefType(e.target.value)}>
               <option value="">{t('allTypes')}</option>
               {Object.entries(REF_TYPE_KEYS).map(([value, key]) => <option key={value} value={value}>{t(key as never)}</option>)}
             </Select>
-            <Input label={t('from')} type="date" value={from} min={history.minDate} onChange={(e) => setFrom(history.clampRange(e.target.value, to).from)} />
-            <Input label={t('to')} type="date" value={to} onChange={(e) => { const allowed = history.clampRange(from, e.target.value); setFrom(allowed.from); setTo(allowed.to); }} />
+            <Input label={t('from')} type="date" value={from} min={history.minDate}
+              onChange={(e) => setFrom(history.clampRange(e.target.value, to).from)} />
+            <Input label={t('to')} type="date" value={to}
+              onChange={(e) => { const allowed = history.clampRange(from, e.target.value); setFrom(allowed.from); setTo(allowed.to); }} />
+          </div>
+          <div data-testid="journal-expanded-table" className="min-h-0 min-w-0 flex-1 overflow-hidden">
+            <DataTable columns={columns} data={items} loading={loading} emptyMessage={t('noData')} />
           </div>
         </div>
-      </DesignPanel>
-
-      <DesignPanel testId="journal-table-panel">
-        <DataTable columns={columns} data={items} loading={loading} emptyMessage={t('noData')} />
-      </DesignPanel>
+      ) : (
+        <>
+          <DesignPageHeader
+            title={t('journalEntries')}
+            subtitle={t('journal')}
+            actions={(
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => setTableExpanded(true)}>
+                  <Maximize2 className="w-4 h-4" />
+                  {isAr ? 'تكبير الجدول' : 'Expand table'}
+                </Button>
+                {can('accounting.journal.post') && (
+                  <Button size="sm" onClick={() => setManualOpen(true)}>
+                    <Plus className="w-4 h-4" /> {t('postManualJournal')}
+                  </Button>
+                )}
+              </div>
+            )}
+          />
+          <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard title={t('journalEntries')} value={String(items.length)} icon={<Scale className="w-5 h-5" />} color="brand" />
+            <StatCard title={t('totalDebit')} value={formatCurrency(items.reduce((sum, entry) => sum + Number(entry.debit_total), 0), currency, lang)} icon={<Scale className="w-5 h-5" />} color="blue" />
+            <StatCard title={t('totalCredit')} value={formatCurrency(items.reduce((sum, entry) => sum + Number(entry.credit_total), 0), currency, lang)} icon={<Scale className="w-5 h-5" />} color="amber" />
+            <StatCard title={t('balance')} value={formatCurrency(items.reduce((sum, entry) => sum + Number(entry.debit_total) - Number(entry.credit_total), 0), currency, lang)} icon={<Scale className="w-5 h-5" />} color="green" />
+          </div>
+          <DesignPanel testId="journal-search-panel">
+            <div className="flex flex-col flex-wrap items-end justify-between gap-4 sm:flex-row">
+              <DesignSearch value={search} onChange={setSearch} className="w-full flex-1" label={t('search')} placeholder={t('search')} testId="journal-search" />
+              <div className="flex flex-wrap items-end gap-3">
+                <Select label={t('referenceType')} value={refType} onChange={(e) => setRefType(e.target.value)}>
+                  <option value="">{t('allTypes')}</option>
+                  {Object.entries(REF_TYPE_KEYS).map(([value, key]) => <option key={value} value={value}>{t(key as never)}</option>)}
+                </Select>
+                <Input label={t('from')} type="date" value={from} min={history.minDate} onChange={(e) => setFrom(history.clampRange(e.target.value, to).from)} />
+                <Input label={t('to')} type="date" value={to} onChange={(e) => { const allowed = history.clampRange(from, e.target.value); setFrom(allowed.from); setTo(allowed.to); }} />
+              </div>
+            </div>
+          </DesignPanel>
+          <DesignPanel testId="journal-table-panel">
+            <DataTable columns={columns} data={items} loading={loading} emptyMessage={t('noData')} />
+          </DesignPanel>
+        </>
+      )}
 
       <Modal open={!!viewing} onClose={() => setViewing(null)} title={viewing ? `${viewing.entry_number} - ${viewing.description || ''}` : ''} size="lg">
         {viewing && (
