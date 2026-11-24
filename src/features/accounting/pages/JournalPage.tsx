@@ -64,7 +64,7 @@ export function JournalPage() {
   // Journal tables are the main workspace on desktop. Start in the expanded
   // view so even short datasets never hide rows below tiny scroll windows.
   const [tableExpanded, setTableExpanded] = useState(
-    () => typeof window !== 'undefined' && window.matchMedia('(min-width: 768px)').matches,
+    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 768px)').matches,
   );
   const [search, setSearch] = useState('');
   const [refType, setRefType] = useState('');
