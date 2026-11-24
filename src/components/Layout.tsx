@@ -138,7 +138,6 @@ function AccountLayout({ children }: { children: ReactNode }) {
   const canOpenSettings = can('settings.manage');
 
   const showBackButton = location.pathname !== APP_ROUTES.dashboard;
-  const isReportsWorkspace = location.pathname === APP_ROUTES.reports || location.pathname === '/reports/view';
   // Back-office data grids need the full workspace, not a 1600px cap.
   const fullWidthContent = true;
 
