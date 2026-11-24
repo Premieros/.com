@@ -625,3 +625,11 @@
 [data-table-viewport] {
   max-height: var(--table-rows-height, clamp(144px, calc(100dvh - 310px), 820px));
 }
+
+/* Keep desktop tables full-height even with only one or two records. The
+   table viewport is independently scrollable and never hides the shell footer. */
+@media (min-width: 640px) {
+  [data-testid="app-main"] [data-table-viewport] {
+    min-height: var(--table-rows-height, clamp(144px, calc(100dvh - 310px), 820px));
+  }
+}
