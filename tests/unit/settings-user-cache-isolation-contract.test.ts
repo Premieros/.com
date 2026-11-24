@@ -28,6 +28,11 @@ describe('settings cache avoids repeated parsing and cross-user bootstrap', () =
     expect(repository).toContain('cursor.key === globalKey || cursor.key.startsWith(branchPrefix)');
     expect(repository).toContain('cursor.delete()');
     expect(repository).toContain("db.transaction('system_settings', 'readwrite')");
+    expect(repository).toContain("cursor.key === 'global_settings'");
+    expect(repository).toContain("localStorage.removeItem('premier:cached_settings')");
+    expect(repository).not.toContain('userId?: string');
+    expect(repository).not.toContain('userId ?');
+    expect(repository).not.toContain("localStorage.setItem('premier:allow_negative_stock:");
     expect(source).toContain('SettingsRepository.saveGlobalSettings(next, sessionUserId)');
     expect(source).toContain('SettingsRepository.saveBranchSettings(branchId, updatedBranch, sessionUserId)');
   });

@@ -115,7 +115,13 @@ describe('Negative Stock: Architectural & UI Contract Verification', () => {
     expect(paymentService).toContain('INSUFFICIENT_STOCK');
     // Offline movements stay pending; server-confirmed movements are explicitly synced
     expect(paymentService).toContain('InventoryRepository.recordLocalMovement');
-    expect(paymentService).toContain('synced: true');
+    expect(paymentService).toContain('pending_sync: true');
+    expect(paymentService).toContain('await cacheConfirmedSaleMovements(');
+    const confirmationCache = fs.readFileSync(
+      path.join(root, 'src/features/pos/services/saleConfirmationCache.ts'),
+      'utf8',
+    );
+    expect(confirmationCache).toContain('synced: true');
   });
 
   it('verifies the server policy migration persists company/branch controls and debt-backed oversell', () => {
@@ -137,7 +143,8 @@ describe('Negative Stock: Architectural & UI Contract Verification', () => {
       'utf8',
     );
     expect(posHook).toContain('input.effSettings?.allow_negative_stock === true');
-    expect(posHook).toContain('rawShortageOnly: Object.fromEntries(input.products.map((product) => [product.id, allowNegative]))');
+    expect(posHook).toContain('Object.fromEntries(input.products.map(product => [product.id, allowNegative]))');
+    expect(posHook).toContain('usePosOrderBase({ ...input, rawShortageOnly })');
   });
 });
 
