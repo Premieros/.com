@@ -32,6 +32,14 @@ describe('settings cache avoids repeated parsing and cross-user bootstrap', () =
     expect(source).toContain('SettingsRepository.saveBranchSettings(branchId, updatedBranch, sessionUserId)');
   });
 
+  it('reads offline sale policy only from the originating cashier scope and rejects owner switches', () => {
+    const payment = readFileSync('src/features/pos/services/payment.ts', 'utf8');
+    expect(payment).toContain('SettingsRepository.getBranchSettings(p.p_branch_id, expectedOwnerId)');
+    expect(payment).toContain('SettingsRepository.getGlobalSettings(expectedOwnerId)');
+    expect(payment).toContain('originatingUserId !== expectedOwnerId');
+    expect(payment).not.toContain('SettingsRepository.getGlobalSettings()');
+  });
+
   it('rejects stale asynchronous refreshes and preserves cached data on read errors', () => {
     expect(source).toContain('const epoch = ++refreshEpoch.current');
     expect(source).toContain('if (epoch !== refreshEpoch.current) return');
