@@ -251,7 +251,7 @@ export function JournalPage() {
     <DesignSurface testId="journal-page">
       {tableExpanded ? (
         <div data-testid="journal-expanded-workspace"
-          className="fixed inset-x-0 bottom-14 top-[68px] z-[54] flex min-h-0 flex-col gap-2 overflow-hidden bg-ui-page p-2 sm:p-3">
+          className="fixed inset-0 z-[65] flex min-h-0 flex-col gap-2 overflow-hidden bg-ui-page p-2 sm:p-3">
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-3">
               <h2 className="text-base font-bold text-ui-text">{t('journalEntries')}</h2>
