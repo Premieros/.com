@@ -75,6 +75,20 @@ describe('cashier discount approval recovery', () => {
     expect(onApproved).not.toHaveBeenCalled();
   });
 
+  it('rejects a different cart at the same subtotal', async () => {
+    const onApproved = vi.fn();
+    const line = { product_id: 'a', unit_name: 'piece', quantity: 1, unit_price: 100, discount_amount: 0, bonus_quantity: 0, total: 100, modifier_option_ids: [] };
+    const view = render(<CashierDiscountApprovalCard {...props(onApproved)} cart={[line]} />);
+    request();
+    await waitFor(() => expect(events.length).toBe(1));
+    expect(mocks.rpc).toHaveBeenCalledWith('request_manager_approval', expect.objectContaining({
+      p_payload: expect.objectContaining({ cart: [line], discount_type: 'amount' }),
+    }));
+    view.rerender(<CashierDiscountApprovalCard {...props(onApproved)} cart={[{ ...line, product_id: 'b' }]} />);
+    act(() => events[0]({ new: { status: 'approved' } }));
+    expect(onApproved).not.toHaveBeenCalled();
+  });
+
   it('ignores delayed approved events from a rejected request after a new request starts', async () => {
     const onApproved = vi.fn();
     render(<CashierDiscountApprovalCard {...props(onApproved)} />);
