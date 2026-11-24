@@ -1907,6 +1907,7 @@
     "inventory_unit_productions",
     "inventory_unit_recipes",
     "inventory_units",
+    "journal_entries",
     "kitchen_stations",
     "measurement_units",
     "order_items",
