@@ -47,6 +47,24 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Sale source-order sync trigger must execute as its owner';
   END IF;
+  FOR col IN SELECT unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE','TRUNCATE']) LOOP
+    IF has_table_privilege('authenticated', 'private.discount_settlement_context', col)
+      OR has_table_privilege('anon', 'private.discount_settlement_context', col) THEN
+      RAISE EXCEPTION 'Client retains private discount capability privilege %', col;
+    END IF;
+  END LOOP;
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_class
+    WHERE oid='private.discount_settlement_context'::regclass AND relrowsecurity
+  ) THEN
+    RAISE EXCEPTION 'Private discount settlement context must have RLS enabled';
+  END IF;
+  IF has_function_privilege('authenticated',
+    'public._process_sale_core(text,uuid,uuid,uuid,uuid,numeric,numeric,text,numeric,numeric,numeric,numeric,text,text,jsonb,uuid,text,uuid,uuid,integer)', 'EXECUTE')
+    OR has_function_privilege('anon',
+    'public._process_sale_core(text,uuid,uuid,uuid,uuid,numeric,numeric,text,numeric,numeric,numeric,numeric,text,text,jsonb,uuid,text,uuid,uuid,integer)', 'EXECUTE') THEN
+    RAISE EXCEPTION 'Client can bypass the financial settlement RPC boundary';
+  END IF;
   FOR col IN SELECT unnest(ARRAY['INSERT','UPDATE','DELETE','TRUNCATE']) LOOP
     IF has_table_privilege('authenticated', 'public.approval_requests', col)
       OR has_table_privilege('anon', 'public.approval_requests', col) THEN
