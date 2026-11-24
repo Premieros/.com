@@ -18,6 +18,11 @@ describe('journal reversal UI contract', () => {
     expect(page).toContain('disabled={reversing || reverseReason.trim().length < 3}');
   });
 
+  it('invalidates stale detail responses and binds reversal confirmation to the selected entry', () => {
+    expect(page).toContain('if (request !== viewRequest.current) return');
+    expect(page).toContain('reversalTarget.current !== viewing.id');
+    expect(page).toContain('if (reversalInFlight.current) return');
+  });
   it('refreshes journals only after a successful response', () => {
     expect(page).toContain('if (!data?.success)');
     expect(page).toContain('await load();');
