@@ -47,5 +47,21 @@ BEGIN
   ) THEN
     RAISE EXCEPTION 'Sale source-order sync trigger must execute as its owner';
   END IF;
+  FOR col IN SELECT unnest(ARRAY['INSERT','UPDATE','DELETE','TRUNCATE']) LOOP
+    IF has_table_privilege('authenticated', 'public.approval_requests', col)
+      OR has_table_privilege('anon', 'public.approval_requests', col) THEN
+      RAISE EXCEPTION 'Client retains direct approval write privilege %', col;
+    END IF;
+  END LOOP;
+  IF NOT has_table_privilege('authenticated', 'public.approval_requests', 'SELECT') THEN
+    RAISE EXCEPTION 'Approval status read must remain available through RLS';
+  END IF;
+  IF EXISTS (
+    SELECT 1 FROM pg_proc p JOIN pg_namespace n ON n.oid=p.pronamespace
+    WHERE n.nspname='public' AND p.proname IN ('process_sale','process_sale_split')
+      AND position('(entity_id IS NULL OR entity_id IS NOT DISTINCT FROM p_order_id)' IN pg_get_functiondef(p.oid)) > 0
+  ) THEN
+    RAISE EXCEPTION 'Settlement retains wildcard discount approval target';
+  END IF;
 END;
 $test$;
