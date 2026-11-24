@@ -6,7 +6,7 @@ SET LOCAL statement_timeout = '30s';
 -- Ignore presentation-only values (notes, display prices, total), which
 -- canonical sale pricing derives independently. Preserve duplicates.
 CREATE OR REPLACE FUNCTION public.discount_approval_cart(p_items jsonb)
-RETURNS jsonb LANGUAGE plpgsql IMMUTABLE SET search_path = public, pg_temp AS $
+RETURNS jsonb LANGUAGE plpgsql IMMUTABLE SET search_path = public, pg_temp AS $cart$
 BEGIN
   IF jsonb_typeof(p_items) IS DISTINCT FROM 'array' THEN RETURN NULL; END IF;
   IF jsonb_array_length(p_items) = 0 THEN RETURN NULL; END IF;
@@ -30,7 +30,7 @@ EXCEPTION WHEN invalid_text_representation OR numeric_value_out_of_range OR inva
   -- Malformed request payloads cannot block unrelated valid approvals.
   RETURN NULL;
 END;
-$;
+$cart$;
 REVOKE ALL ON FUNCTION public.discount_approval_cart(jsonb) FROM PUBLIC, anon, authenticated;
 
 DO $migration$
