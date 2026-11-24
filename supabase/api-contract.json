@@ -1889,6 +1889,7 @@
   ],
   "tables": [
     "approval_policies",
+    "approval_requests",
     "audit_log",
     "branch_settings",
     "branches",
