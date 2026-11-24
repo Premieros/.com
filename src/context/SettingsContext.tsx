@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { applyBrandColor, applyDefaultSurface, applySurfaceColor, brandFromSettingsValue } from '../lib/brandColor';
 import { findUiTheme } from '../lib/themes';
@@ -70,11 +70,16 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(!initialCache.settings);
   const currentCacheUser = useRef(sessionUserId);
   const refreshEpoch = useRef(0);
+  const sessionEpoch = useRef(0);
+  const [verifiedUser, setVerifiedUser] = useState<string | null>(null);
   const { applySystemTheme } = useTheme();
   const { applySystemLang } = useLanguage();
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (currentCacheUser.current === sessionUserId) return;
+    ++refreshEpoch.current;
+    ++sessionEpoch.current;
+    setVerifiedUser(null);
     currentCacheUser.current = sessionUserId;
     const next = getInitialCachedSettings(sessionUserId);
     setSettings(next.settings);
@@ -83,6 +88,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [sessionUserId]);
 
   const refresh = useCallback(async () => {
+    if (currentCacheUser.current !== sessionUserId) return;
     const epoch = ++refreshEpoch.current;
     if (!sessionUserId) {
       setSettings(null);
@@ -96,10 +102,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         supabase.from('branch_settings').select('*'),
       ]);
       if (epoch !== refreshEpoch.current) return;
+      if (currentCacheUser.current !== sessionUserId) return;
       // Retain the scoped cache when either network read fails.
       if (sRes.error || bRes.error) throw sRes.error || bRes.error;
       const data = sRes.data as Settings | null;
       setSettings(data);
+      if (!data) {
+        try { localStorage.removeItem(`premier:cached_settings:${sessionUserId}`); } catch { /* unavailable */ }
+      }
       if (data) {
         void SettingsRepository.saveGlobalSettings(data, sessionUserId);
         try {
@@ -127,7 +137,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         void SettingsRepository.saveBranchSettings(row.branch_id, row, sessionUserId);
       }
       setBranchSettingsMap(bMap);
-      if (Object.keys(bMap).length > 0) {
+      {
         try {
           if (typeof localStorage !== 'undefined') {
             localStorage.setItem(`premier:cached_branch_settings_map:${sessionUserId}`, JSON.stringify(bMap));
@@ -136,6 +146,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
           // ignore
         }
       }
+      setVerifiedUser(sessionUserId);
     } catch {
       // offline: maintain current cached settings
     } finally {
@@ -148,7 +159,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   useEffect(() => {
-    if (!sessionUserId || Object.keys(branchSettingsMap).length === 0) return;
+    if (!sessionUserId || verifiedUser !== sessionUserId || Object.keys(branchSettingsMap).length === 0) return;
 
     const eligible = Object.values(branchSettingsMap).filter(
       (row) => row.auto_close_shift_at_day_end && row.business_day_mode === 'fixed_time',
@@ -187,6 +198,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
 
     const run = async (row: BranchSettings) => {
+      if (cancelled || currentCacheUser.current !== sessionUserId) return;
       const { data, error } = await supabase.rpc('try_auto_close_branch_shift', {
         p_branch_id: row.branch_id,
       });
@@ -241,7 +253,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       for (const timer of timers.values()) window.clearTimeout(timer);
       timers.clear();
     };
-  }, [sessionUserId, branchSettingsMap]);
+  }, [sessionUserId, verifiedUser, branchSettingsMap]);
 
 
   const effectiveSettings = useCallback(
@@ -254,7 +266,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   );
 
   const save = useCallback(async (patch: Partial<Settings>): Promise<boolean> => {
-    if (!settings?.id) return false;
+    if (!settings?.id || !sessionUserId || currentCacheUser.current !== sessionUserId) return false;
+    const ownerEpoch = sessionEpoch.current;
 
     const next = { ...settings, ...patch };
     const { error } = await supabase
@@ -267,13 +280,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
+    if (ownerEpoch !== sessionEpoch.current || currentCacheUser.current !== sessionUserId) return false;
     setSettings(next);
     await SettingsRepository.saveGlobalSettings(next, sessionUserId);
+    if (ownerEpoch !== sessionEpoch.current) return false;
     await refresh();
     return true;
   }, [settings, refresh, sessionUserId]);
 
   const saveBranchSettings = useCallback(async (branchId: string, patch: Partial<BranchSettings>): Promise<boolean> => {
+    if (!sessionUserId || currentCacheUser.current !== sessionUserId) return false;
+    const ownerEpoch = sessionEpoch.current;
     const hasNegativeStockPatch = Object.prototype.hasOwnProperty.call(patch, 'allow_negative_stock');
     const requestedNegativeStock = patch.allow_negative_stock;
 
@@ -308,8 +325,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         : existing?.allow_negative_stock,
     } as BranchSettings;
 
+    if (ownerEpoch !== sessionEpoch.current || currentCacheUser.current !== sessionUserId) return false;
     setBranchSettingsMap((prev) => ({ ...prev, [branchId]: updatedBranch }));
     await SettingsRepository.saveBranchSettings(branchId, updatedBranch, sessionUserId);
+    if (ownerEpoch !== sessionEpoch.current) return false;
     await refresh();
     return true;
   }, [branchSettingsMap, refresh, sessionUserId]);
