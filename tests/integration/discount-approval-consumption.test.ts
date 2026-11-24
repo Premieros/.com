@@ -9,7 +9,7 @@ const isLocal=Boolean(url&&['localhost','127.0.0.1','[::1]'].includes(new URL(ur
   const db=new Client({connectionString:url});
   await db.connect();
   const org=randomUUID(),branch=randomUUID(),warehouse=randomUUID(),user=randomUUID(),product=randomUUID();
-  const tag=randomUUID().replace(/-/g,'').slice(0,12),key='sale:'+randomUUID();
+  const tag=randomUUID().replace(/-/g,'').slice(0,12);
   const email=`ci-split-${tag}@ci.invalid`;
   await db.query('BEGIN');
   try{
