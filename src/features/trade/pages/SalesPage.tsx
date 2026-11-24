@@ -80,6 +80,8 @@ export function SalesPage() {
     select: 'id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, delivery_fee_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
+    enabled: canViewSales && !branchScope.loading && branchScope.selectedBranchIds.length > 0,
+    createdAtIdKeyset: true,
     filters: [
       { column: 'is_archived', value: false },
       ...(['completed', 'returned'].includes(displayStatus) ? [{ column: 'status', value: displayStatus }] : []),
@@ -764,7 +766,7 @@ export function SalesPage() {
         <DesignPanel testId="sales-search-panel" bodyClassName="px-3 py-2">
           <div className="flex flex-wrap items-end gap-2" data-testid="sales-expanded-filters">
             <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted" htmlFor="sales-view-date">
-              <span>{isAr ? 'تاريخ الإنشاء' : 'Creation date'}</span>
+              <span>{isAr ? 'تاريخ الإنشاء (توقيت الجهاز)' : 'Creation date (device time)'}</span>
               <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-ui-border bg-ui-surface px-3">
                 <CalendarDays className="h-4 w-4 text-ui-subtle" />
                 <input id="sales-view-date" data-testid="sales-view-date" type="date"
@@ -786,7 +788,7 @@ export function SalesPage() {
           <div className="flex max-w-full items-center gap-1 overflow-x-auto" role="group" aria-label={isAr ? 'عرض الفواتير حسب الحالة' : 'Invoice display filter'}>
             {([
               ['all', isAr ? 'الكل' : 'All'],
-              ['today', isAr ? 'اليوم' : 'Today'],
+              ['today', isAr ? 'اليوم (تقويمي)' : 'Today (calendar)'],
               ['completed', isAr ? 'مكتملة' : 'Completed'],
               ['returned', isAr ? 'مرتجعة' : 'Returned'],
               ['other', isAr ? 'أخرى' : 'Other'],
