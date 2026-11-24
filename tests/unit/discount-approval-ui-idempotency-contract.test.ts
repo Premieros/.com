@@ -8,7 +8,10 @@ const source = readFileSync(
 
 describe('discount approval UI must not change or replay an approved action', () => {
   it('binds Realtime approval to the exact submitted discount rather than live input values', () => {
-    expect(source).toContain('submittedRequest.current = { type, value: normalizedInput }');
+    expect(source).toContain(': { type, value: normalizedInput };');
+    expect(source).toContain("? { type: 'amount', value: monetaryDiscount }");
+    expect(source).toContain('p_entity_id: orderId ?? null');
+    expect(source).toContain('submittedScope.current !== currentScope.current');
     expect(source).toContain('onApprovedRef.current(submitted.type, submitted.value)');
     expect(source).not.toContain('onApproved(type, type ===');
   });
