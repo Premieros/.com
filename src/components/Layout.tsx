@@ -354,7 +354,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
             <X className="h-4 w-4" />
           </button>
         </div>
-        <nav data-testid="app-navigation" className="h-[calc(100%-68px)] overflow-y-auto px-2 py-5">
+        <nav data-testid="app-navigation" className="premier-motion-navigation h-[calc(100%-68px)] overflow-y-auto px-2 py-5">
           <section data-testid="mobile-sidebar-controls" className="mb-4 grid gap-3 rounded-2xl border border-ui-border bg-ui-surface/80 p-3 lg:hidden">
             <div className="flex min-w-0 items-center gap-3">
               <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ui-primary-soft text-sm font-black text-ui-primary">
@@ -515,8 +515,14 @@ function AccountLayout({ children }: { children: ReactNode }) {
                   </span>
                   <ChevronDown className={`h-4 w-4 shrink-0 transition-transform duration-150 ${collapsed[group] ? '-rotate-90' : ''}`} />
                 </button>
-                {!collapsed[group] && (
-                  <div id={`nav-group-items-${group}`} className="mt-0.5 space-y-0.5 pb-2">
+                <div
+                  id={`nav-group-items-${group}`}
+                  data-testid={`nav-group-panel-${group}`}
+                  aria-hidden={collapsed[group]}
+                  className={`premier-motion-nav-panel ${collapsed[group] ? 'premier-motion-nav-panel--closed' : ''}`}
+                >
+                  <div className="premier-motion-nav-panel-inner">
+                    <div className="mt-0.5 space-y-0.5 pb-2">
                     {items.map((item) => (
                       <NavLink
                         data-testid={`nav-item-${item.id}`}
@@ -526,6 +532,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
                         onFocus={() => prefetchAppRoute(item.route)}
                         onTouchStart={() => prefetchAppRoute(item.route)}
                         onClick={() => setMobileOpen(false)}
+                        tabIndex={collapsed[group] ? -1 : undefined}
                         aria-current={location.pathname === item.route || location.pathname.startsWith(`${item.route}/`) ? 'page' : undefined}
                         className={({ isActive }) => `group flex min-h-[42px] items-center gap-2.5 rounded-lg ps-12 pe-3 text-sm transition-colors ${isActive || location.pathname.startsWith(`${item.route}/`) ? 'bg-[#c8c8cd] font-bold text-[#17171d] dark:bg-ui-page-alt dark:text-ui-text' : 'font-medium text-[#34343a] hover:bg-[#e5e5eb] dark:text-ui-muted dark:hover:bg-ui-page-alt'}`}
                       >
@@ -537,8 +544,9 @@ function AccountLayout({ children }: { children: ReactNode }) {
                         )}</span>
                       </NavLink>
                     ))}
+                    </div>
                   </div>
-                )}
+                </div>
               </section>
             );
           })}
