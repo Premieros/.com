@@ -30,6 +30,7 @@ export const workspaceSections: WorkspaceSection[] = [
     anchor: routes.sales,
     links: [
       { route: routes.sales, label: ['الفواتير', 'Invoices'] },
+      { route: routes.orderBoard, permission: 'floor_plan.view', label: ['لوحة الطلبات', 'Order board'] },
       { route: routes.floorPlan, permission: 'floor_plan.view', label: ['الطلبات النشطة', 'Active orders'] },
       { route: routes.delivery, label: ['التوصيل', 'Delivery'] },
       { route: routes.kitchenDisplay, label: ['المطبخ', 'Kitchen'] },
@@ -39,6 +40,7 @@ export const workspaceSections: WorkspaceSection[] = [
     anchor: routes.inventoryCenter,
     links: [
       { route: routes.inventoryCenter, label: ['نظرة عامة', 'Overview'] },
+      { route: routes.stockHealth, permission: 'inventory.view', label: ['صحة المخزون', 'Stock health'] },
       { route: routes.stockBalances, permission: 'inventory.view', relatedPaths: [routes.inventory], label: ['الأرصدة', 'Balances'] },
       { route: routes.warehouses, permission: 'warehouses.view', label: ['المستودعات', 'Warehouses'] },
       { route: routes.inventoryLedger, permission: 'inventory.ledger.view', label: ['الحركات', 'Movements'] },
@@ -84,6 +86,7 @@ export const workspaceSections: WorkspaceSection[] = [
     anchor: routes.reports,
     links: [
       { route: routes.reports, label: ['نظرة عامة', 'Overview'] },
+      { route: routes.orderHours, permission: 'reports.view', label: ['أوقات الذروة', 'Peak hours'] },
       { route: routes.consumptionReport, permission: 'reports.view', label: ['الاستهلاك', 'Consumption'] },
       { route: routes.monthReview, permission: 'reports.view', label: ['مراجعة الشهر', 'Month review'] },
       { route: routes.periodDocuments, permission: 'reports.view', label: ['مستندات الفترة', 'Period documents'] },

@@ -1,9 +1,11 @@
 import { readBranchBatches } from '../readBranchBatches';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { Download, TrendingUp, ShoppingCart, Receipt, Package, BarChart3, CreditCard, Users, List, Layers, AlertTriangle, FileDown, Printer, UserCheck, RotateCcw, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { costing, reporting, supabase } from '@/api';
+import { useAuth } from '@/context/AuthContext';
+import { stashReportReturnView, takeReportReturnView } from '../reportReturnView';
 import { useLanguage } from '@/context/LanguageContext';
 import { useTableViewport } from '@/components/useTableViewport';
 import { PageHeader, Card } from '@/components/PageHeader';
@@ -85,16 +87,21 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
   const reportBranchIds = branchScope.selectedBranchIds;
+  const { user } = useAuth();
+  const location = useLocation();
+  const [params] = useSearchParams();
+  const returnKey = `${user?.id ?? ''}:${branchScope.scopeKey}:${location.key}:${controlledReportType ?? ''}`;
+  const [restored] = useState(() => standalone && user?.id ? takeReportReturnView(returnKey) : undefined);
   const [reportType, setReportType] = useState<ReportType>(controlledReportType || 'sales');
-  const [from, setFrom] = useState(() => controlledFrom || history.minDate || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
-  const [to, setTo] = useState(() => controlledTo || todayISO());
+  const [from, setFrom] = useState(() => restored?.from || controlledFrom || history.minDate || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => restored?.to || controlledTo || todayISO());
   const [period, setPeriod] = useState<PeriodKey>('custom');
   const [data, setData] = useState<Record<string, unknown>[]>([]);
-  const [tableSearch, setTableSearch] = useState('');
-  const [tableSort, setTableSort] = useState<string | null>(null);
-  const [tableSortDirection, setTableSortDirection] = useState<ReportSortDirection>('asc');
-  const [tablePage, setTablePage] = useState(1);
-  const [tablePageSize, setTablePageSize] = useState(25);
+  const [tableSearch, setTableSearch] = useState(restored?.search ?? '');
+  const [tableSort, setTableSort] = useState<string | null>(restored?.sort ?? null);
+  const [tableSortDirection, setTableSortDirection] = useState<ReportSortDirection>(restored?.sortDirection ?? 'asc');
+  const [tablePage, setTablePage] = useState(restored?.page ?? 1);
+  const [tablePageSize, setTablePageSize] = useState(restored?.pageSize ?? 25);
   const presentedRows = useMemo(
     () => filterAndSortReportRows(data, tableSearch, tableSort, tableSortDirection),
     [data, tableSearch, tableSort, tableSortDirection],
@@ -108,7 +115,14 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   const [loading, setLoading] = useState(false);
   const [reportError, setReportError] = useState(false);
   const [reportFailure, setReportFailure] = useState<ReportFailure | null>(null);
-  const [filters, setFilters] = useState<ReportFilters>({});
+  const [filters, setFilters] = useState<ReportFilters>(() => {
+    if (restored) return restored.filters;
+    const orderType = params.get('order_type');
+    return standalone && orderType && [...ORDER_TYPE_OPTIONS, 'car', 'quick', 'other'].includes(orderType)
+      && REPORT_FILTER_DIMS[reportType].includes('order_type') ? { order_type: orderType } : {};
+  });
+  const appliedReport = useRef({ from, to, filters });
+  const initialScroll = useRef(restored?.scrollY);
   const [filtersDirty, setFiltersDirty] = useState(false);
   const [detailFiltersOpen, setDetailFiltersOpen] = useState(false);
   const filtersBeforeEditing = useRef<{ from: string; to: string; period: PeriodKey; filters: ReportFilters; dirty: boolean } | null>(null);
@@ -318,6 +332,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   }, [reportType, branchScope.scopeKey, branches, history.unlimited, queryVersion, reportBranchIds]);
 
   async function loadReport() {
+    appliedReport.current = { from, to, filters };
     setLoading(true);
     setReportError(false);
     setReportFailure(null);
@@ -1169,6 +1184,24 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     }
   }
 
+  useEffect(() => {
+    if (loading || !data.length || initialScroll.current === undefined) return;
+    const position = initialScroll.current;
+    initialScroll.current = undefined;
+    const frame = requestAnimationFrame(() => window.scrollTo(0, position));
+    return () => cancelAnimationFrame(frame);
+  }, [loading, data.length]);
+
+  const openSourceSale = (saleId: string) => {
+    if (standalone && user?.id) {
+      stashReportReturnView(returnKey, {
+        ...appliedReport.current, search: tableSearch, sort: tableSort, sortDirection: tableSortDirection,
+        page: tablePage, pageSize: tablePageSize, scrollY: window.scrollY,
+      });
+    }
+    navigate(`${APP_ROUTES.sales}?saleId=${encodeURIComponent(saleId)}`);
+  };
+
   const changeSort = (column: string) => {
     setTableSortDirection((previous) => tableSort === column ? (previous === 'asc' ? 'desc' : 'asc') : 'asc');
     setTableSort(column);
@@ -1323,7 +1356,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   const filterOptions = (dim: ReportFilterKey): { value: string; label: string }[] => {
     const name = (value: string, english: string | null) => (lang === 'ar' ? value : (english || value));
     switch (dim) {
-      case 'order_type': return ORDER_TYPE_OPTIONS.map((value) => ({ value, label: orderTypeLabels[value] || value }));
+      case 'order_type': return [...ORDER_TYPE_OPTIONS, 'car', 'quick', 'other'].map((value) => ({ value, label: orderTypeLabels[value] || value }));
       case 'payment_method': return PAYMENT_METHOD_OPTIONS.map((value) => ({ value, label: paymentMethodLabels[value] || value }));
       case 'status': return SALE_STATUS_OPTIONS.map((value) => ({ value, label: statusLabels[value] || value }));
       case 'warehouse': return options.warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }));
@@ -1365,7 +1398,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     return (
       <button type="button"
         className="font-semibold text-ui-primary underline-offset-2 hover:underline focus-visible:underline"
-        onClick={() => navigate(`${APP_ROUTES.sales}?saleId=${encodeURIComponent(saleId)}`)}
+        onClick={() => openSourceSale(saleId)}
         aria-label={lang === 'ar' ? `عرض مصدر الفاتورة ${display}` : `Open source sale ${display}`}>
         {display}
       </button>

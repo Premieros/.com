@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useSearchParams } from 'react-router-dom';
 import { Plus, CheckCircle2, XCircle, ArrowLeftRight, Trash2 } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
@@ -38,6 +38,8 @@ export function TransfersPage() {
   const scopedBranchCsv = scopedBranchIds.join(',');
   const history = useHistoryAccess();
   const location = useLocation();
+  const [params] = useSearchParams();
+  const suggestedItem = params.get('item');
   const { guardTransfer, interceptDbError, startGuidance } = useOperationalGuard();
 
   const { rows: transfers, loading, error, total, hasMore, loadMore, loadingMore, refresh: reloadTransfers } = usePaginatedRows<TransferRow>({
@@ -112,7 +114,11 @@ export function TransfersPage() {
     const from = warehouses.find((w) => w.branch_id === sourceBranchId)?.id || '';
     const to = warehouses.find((w) => w.branch_id === destinationBranchId)?.id || '';
     setForm({ source_branch_id: sourceBranchId, destination_branch_id: destinationBranchId, from_warehouse_id: from, to_warehouse_id: to, reason: '', notes: '' });
-    setLines([{ ...EMPTY_LINE }]);
+    const item = rawMaterials.find((raw) => raw.id === suggestedItem && raw.branch_id === sourceBranchId);
+    const destinationMatches = item ? rawMaterials.filter((raw) => raw.branch_id === destinationBranchId
+      && raw.unit_id === item.unit_id && normalizeRawName(raw.name) === normalizeRawName(item.name)) : [];
+    const destinationItem = destinationBranchId === sourceBranchId ? item : destinationMatches.length === 1 ? destinationMatches[0] : undefined;
+    setLines([{ ...EMPTY_LINE, item_id: item?.id || '', destination_item_id: destinationItem?.id || '' }]);
     setModalOpen(true);
   };
 

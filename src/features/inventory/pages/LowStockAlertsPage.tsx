@@ -1,4 +1,5 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { useNavigate } from 'react-router-dom';
 import { RefreshCw, Trash2 } from 'lucide-react';
 import { supabase } from '@/api';
@@ -29,6 +30,7 @@ export function LowStockAlertsPage() {
   const isAr = lang === 'ar';
   const { show } = useToast();
   const branchFilter = useBranchFilter();
+  const record = useRecordFocus('item');
 
   const [rows, setRows] = useState<LowStockAlertRow[]>([]);
   const [summary, setSummary] = useState<{ out_count?: number; low_count?: number; ok_count?: number }>({});
@@ -106,6 +108,7 @@ export function LowStockAlertsPage() {
     ...r,
     id: `${r.product_id}-${r.warehouse_id || 'n/a'}`,
   })).filter((r) => {
+    if (record.id && r.product_id !== record.id) return false;
     if (statusFilter !== 'all' && r.status !== statusFilter) return false;
     if (!search) return true;
     const q = search.toLowerCase();
@@ -172,12 +175,14 @@ export function LowStockAlertsPage() {
       default_cost: Number(r.raw_material!.default_cost) || 0,
     }));
     const rawLines = buildRawReorderLines(rawRows);
-    const lines = [...productLines, ...rawLines];
+    const lines = [...productLines, ...rawLines].filter((line) =>
+      !record.id || line.product_id === record.id || line.raw_material_id === record.id,
+    );
     if (requestId !== reorderRequestId.current) return;
     setReorderItems(lines);
     setQtyOverride(Object.fromEntries(lines.map((l) => [l.key, l.suggested_qty])));
     setLoadingReorder(false);
-  }, [t]);
+  }, [t, record.id]);
 
   const openReorder = () => {
     const effBranch = branchFilter || branchId || user?.branch_id || visibleBranches[0]?.id || '';
@@ -270,13 +275,14 @@ export function LowStockAlertsPage() {
     <DesignSurface testId="low-stock-alerts-page">
       <DesignPageHeader title={t('lowStockAlerts')} subtitle={isAr ? 'تنبيهات إعادة الطلب للمنتجات المنخفضة أو النافدة' : 'Reorder alerts for low or out-of-stock products'} actions={
         <>
-          {can('purchases.manage') && (
+          {(can('purchases.manage') || can('procurement.request.create')) && (
             <Button size="sm" onClick={openReorder} data-testid="low-stock-reorder"><RefreshCw className="w-4 h-4" /> {t('reorder')}</Button>
           )}
           <Button variant="outline" size="sm" onClick={handleExport}>{t('exportExcel')}</Button>
         </>
       } />
 
+      {record.id && <RecordFocus onClear={record.clear} />}
       <DesignPanel testId="alerts-summary-panel">
         <div className="grid sm:grid-cols-3 gap-3">
           <div className="rounded-ui-lg border border-ui-border bg-ui-page p-4">

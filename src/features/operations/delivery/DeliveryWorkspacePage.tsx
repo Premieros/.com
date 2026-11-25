@@ -1,3 +1,4 @@
+import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { Plus, RefreshCw, Truck } from 'lucide-react';
@@ -32,6 +33,7 @@ export default function DeliveryWorkspacePage() {
 
 function DeliveryWorkspace({ branch }: { branch: string }) {
   const can = useCan();
+  const record = useRecordFocus();
   const [tab, setTab] = useState<'orders' | Kind>('orders');
   const [history, setHistory] = useState(false);
   const [data, setData] = useState<Workspace>({ orders: [], directory: [] });
@@ -161,8 +163,9 @@ function DeliveryWorkspace({ branch }: { branch: string }) {
       </>}
     </div>
     {notice && <p role="status" className="text-sm text-ui-muted">{notice}</p>}
+    {tab === 'orders' && record.id && <RecordFocus onClear={record.clear} />}
     {tab === 'orders' ? <DataTable tableId="delivery-orders" columns={orderColumns}
-      data={data.orders.filter((row) => !driverFilter || row.driver_id === driverFilter)} loading={loading}
+      data={data.orders.filter((row) => (!record.id || record.id === row.id) && (!driverFilter || row.driver_id === driverFilter))} loading={loading}
       error={!entry && !order ? error : null} emptyMessage="لا توجد طلبات توصيل في هذا العرض." />
       : <DataTable key={tab} tableId={`delivery-${tab}`} columns={entryColumns}
         data={data.directory.filter((item) => item.kind === tab)} loading={loading}

@@ -1,3 +1,4 @@
+import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { useMemo, useState } from 'react';
 import { AlertTriangle, Clock } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -32,9 +33,11 @@ interface BatchRow {
 export function InventoryBatchesPage() {
   const { t, lang } = useLanguage();
   const isAr = lang === 'ar';
+  const record = useRecordFocus();
   const branchFilter = useBranchFilter();
   const { rows: batches, loading, error, total, hasMore, loadMore, loadingMore } = usePaginatedRows<BatchRow>({
     table: 'raw_material_batches',
+    filters: record.id ? [{ column: 'id', value: record.id }] : undefined,
     select: '*, raw_material:raw_materials(*), warehouse:warehouses(*), branch:branches(*)',
     order: { column: 'created_at', ascending: false },
     branch_id: branchFilter,
@@ -53,6 +56,7 @@ export function InventoryBatchesPage() {
 
   const rowsWithStatus = useMemo(() => batches.map((batch) => ({ ...batch, days: daysUntilExpiry(batch.expiry_date) })), [batches]);
   const filtered = rowsWithStatus.filter((batch) => {
+    if (record.id) return batch.id === record.id;
     if (warehouseId && batch.warehouse_id !== warehouseId) return false;
     if (filter === 'positive' && Number(batch.quantity) <= 0) return false;
     if (filter === 'expiring' && (batch.days === null || batch.days > 90 || batch.days < 0)) return false;
@@ -85,6 +89,7 @@ export function InventoryBatchesPage() {
 
   return (
     <DesignSurface testId="inventory-batches-page">
+      {record.id && <RecordFocus onClear={record.clear} />}
       <DesignPageHeader
         title={isAr ? 'دفعات الخامات FIFO' : 'Raw Material FIFO Batches'}
         subtitle={isAr ? 'عرض دفعات الخامات الفعلية داخل المخازن. الإضافة تتم من الشراء والجرد والحركات التشغيلية، وليس بإنشاء رصيد منتج.' : 'View actual raw-material lots by warehouse. Lots are created by purchasing, stock count and operational movements, not finished-product stock.'}

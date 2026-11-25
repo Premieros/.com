@@ -10,6 +10,7 @@ import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { formatFinancialCurrency } from '@/lib/format';
 import { canonicalReportCurrency, sharedReportCurrency } from '../reportCurrency';
+import { APP_ROUTES } from '@/core/navigation/routes';
 import { DashboardBreakdown } from '@/features/dashboard/components/DashboardBreakdown';
 import { comparisonPeriod } from '../reportComparison';
 import { addIsoDays, reportDateRangeUtc } from '@/lib/businessTime';
@@ -128,10 +129,12 @@ export function ReportsShowcase({
     drive_thru: { ar: 'طلبات السيارات', en: 'Drive through' },
     online: { ar: 'الطلبات الإلكترونية', en: 'Online' },
   };
+  const orderDetailRoute = `${APP_ROUTES.reportView}?${new URLSearchParams({ type: 'detailed_invoices', from, to })}`;
   const orderTypes = (current?.orderTypes || []).map(({ key, count }) => ({
     key,
     label: (channelNames[key] || { ar: key, en: key })[isAr ? 'ar' : 'en'],
     value: count,
+    href: key === 'other' ? undefined : `${orderDetailRoute}&order_type=${encodeURIComponent(key)}`,
   }));
   const paymentTotals = new Map<string, number>();
   for (const { method, total } of current?.paymentMethods ?? []) {

@@ -13,6 +13,7 @@ export function InventoryCenterPage() {
   const ar = lang === 'ar';
 
   const actions: CenterTileItem[] = [
+    { id: 'health', ar: 'صحة المخزون', en: 'Stock Health', descriptionAr: 'أيام التغطية والأرصدة الراكدة والصلاحية.', descriptionEn: 'Coverage, idle stock and expiry.', route: APP_ROUTES.stockHealth, permission: can('inventory.view') && canAccessPath(APP_ROUTES.stockHealth), icon: PackageSearch, accent: 'inventory' },
     { id: 'stock', ar: 'أرصدة المنتجات والخامات والمصنّعات', en: 'All Stock Balances', descriptionAr: 'عرض أرصدة الأصناف وحالتها.', descriptionEn: 'View current stock balances and status.', route: APP_ROUTES.stockBalances, permission: can('inventory.view') && canAccessPath(APP_ROUTES.stockBalances), icon: Boxes, accent: 'inventory' },
     { id: 'warehouses', ar: 'المستودعات', en: 'Warehouses', descriptionAr: 'إدارة المستودعات والأرصدة.', descriptionEn: 'Manage warehouses and balances.', route: APP_ROUTES.warehouses, permission: can('warehouses.view') && canAccessPath(APP_ROUTES.warehouses), icon: Warehouse, accent: 'inventory' },
     { id: 'ledger', ar: 'دفتر حركة المخزون', en: 'Inventory Ledger', descriptionAr: 'تتبع كل حركة دخول وخروج وتحويل.', descriptionEn: 'Trace stock receipts, issues, and transfers.', route: APP_ROUTES.inventoryLedger, permission: can('inventory.ledger.view') && canAccessPath(APP_ROUTES.inventoryLedger), icon: FileBarChart, accent: 'inventory' },

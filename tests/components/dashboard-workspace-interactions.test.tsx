@@ -98,8 +98,8 @@ describe('dashboard workspace controls', () => {
 describe('reports overview interactions', () => {
   it('keeps invoice counts and payment amounts distinct while switching analyses locally', async () => {
     loadSnapshot.mockClear();
-    render(<ReportsShowcase isAr={false} allowedReportTypes={new Set(['sales', 'sales_by_payment', 'detailed_invoices'])}
-      onSelectReport={vi.fn()} from="2026-11-19" to="2026-11-25" hasAuthorizedBranches verifiedIncome={null} />);
+    render(<MemoryRouter><ReportsShowcase isAr={false} allowedReportTypes={new Set(['sales', 'sales_by_payment', 'detailed_invoices'])}
+      onSelectReport={vi.fn()} from="2026-11-19" to="2026-11-25" hasAuthorizedBranches verifiedIncome={null} /></MemoryRouter>);
 
     expect(await screen.findByText('Cash')).toBeVisible();
     expect(screen.getByText('Takeaway')).toBeVisible();

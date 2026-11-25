@@ -49,7 +49,7 @@ type Sale = {
   discount_amount: number | null;
   branch?: RelatedName | RelatedName[] | null;
 };
-type StockAlert = { key: string; name: string; quantity: number; threshold: number };
+type StockAlert = { key: string; itemId: string; name: string; quantity: number; threshold: number };
 type RawStockMaster = { id: string; branch_id: string | null; name: string; min_stock: number | null; is_active: boolean | null };
 type RawStockBalance = { raw_material_id: string; branch_id: string | null; quantity: number | null };
 type UnitStockMaster = { id: string; branch_id: string | null; name: string; min_stock: number | null; low_stock_threshold: number | null; is_active: boolean | null };
@@ -124,6 +124,7 @@ function buildStockAlerts(
       const key = `${row.branch_id || ''}:${row.id}`;
       return {
         key: `raw:${key}`,
+        itemId: row.id,
         name: row.name,
         quantity: rawQty.get(key) || 0,
         threshold: Number(row.min_stock ?? defaultThreshold),
@@ -136,6 +137,7 @@ function buildStockAlerts(
       const key = `${row.branch_id || ''}:${row.id}`;
       return {
         key: `unit:${key}`,
+        itemId: row.id,
         name: row.name,
         quantity: unitQty.get(key) || 0,
         threshold: Number(row.low_stock_threshold ?? row.min_stock ?? defaultThreshold),
@@ -624,19 +626,22 @@ export function DashboardDataPage() {
   const period = periodWindow(range);
   const dates = history.clampRange(businessDateISO(period.start), businessDateISO(period.end));
   const canCompare = history.unlimited;
-  const reportLink = (type: ReportType) => {
+  const reportLink = (type: ReportType, orderType?: string) => {
     const report = REPORT_REGISTRY.find((entry) => entry.key === type);
     if (!canViewReports || !canAccessPath(APP_ROUTES.reportView) || !report
       || !report.permissions.every((permission) => can(permission as Permission))
       || !businessReportAllowed(runtime, type, report.category)) return undefined;
-    return `${APP_ROUTES.reportView}?${new URLSearchParams({ type, from: dates.from, to: dates.to }).toString()}`;
+    return `${APP_ROUTES.reportView}?${new URLSearchParams({ type, from: dates.from, to: dates.to, ...(orderType ? { order_type: orderType } : {}) }).toString()}`;
   };
   const analysis = {
     sales: { title: ar ? 'حركة صافي المبيعات' : 'Net sales performance', href: reportLink('sales') },
     orders: { title: ar ? 'الطلبات حسب النوع' : 'Orders by type', href: reportLink('detailed_invoices') },
     payments: { title: ar ? 'صافي المدفوعات حسب الطريقة' : 'Net payments by method', href: reportLink('sales_by_payment') },
   }[metric];
-  const orderBreakdown = orderRows.map(([key, value]) => ({ key, label: orderLabels[key]?.[ar ? 0 : 1] || key, value }));
+  const orderBreakdown = orderRows.map(([key, value]) => ({
+    key, label: orderLabels[key]?.[ar ? 0 : 1] || key, value,
+    href: key === 'other' ? undefined : reportLink('detailed_invoices', key),
+  }));
   const paymentBreakdown = paymentRows.map(([key, value]) => ({ key, label: paymentLabels[key]?.[ar ? 0 : 1] || key, value }));
   const renderAnalysis = (large: boolean) => metric === 'sales' ? (
     <div className={`min-w-0 text-ui-primary ${large ? 'h-[min(55vh,24rem)]' : 'h-72'}`} dir="ltr">
@@ -751,7 +756,7 @@ export function DashboardDataPage() {
         </section>
       )}
 
-      {canViewInventory && lowStock.length > 0 && <Card className="ui-accent-alert border-ui-warning/30"><div className="mb-3 flex items-center gap-2 font-black text-ui-warning"><AlertTriangle className="h-5 w-5" />{ar ? 'تنبيه المخزون المنخفض' : 'Low stock alert'}</div><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">{lowStock.map((row) => <Link key={row.key} to="/inventory" className="rounded-xl bg-ui-page-alt p-3"><p className="truncate text-sm font-bold text-ui-text">{row.name || '—'}</p><p className="mt-1 text-xs text-ui-warning">{formatNumber(row.quantity, 3)} / {formatNumber(row.threshold, 3)}</p></Link>)}</div></Card>}
+      {canViewInventory && lowStock.length > 0 && <Card className="ui-accent-alert border-ui-warning/30"><div className="mb-3 flex items-center gap-2 font-black text-ui-warning"><AlertTriangle className="h-5 w-5" />{ar ? 'تنبيه المخزون المنخفض' : 'Low stock alert'}</div><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">{lowStock.map((row) => <Link key={row.key} to={canAccessPath(APP_ROUTES.stockBalances) ? `${APP_ROUTES.stockBalances}?record=${row.itemId}` : APP_ROUTES.inventory} className="rounded-xl bg-ui-page-alt p-3"><p className="truncate text-sm font-bold text-ui-text">{row.name || '—'}</p><p className="mt-1 text-xs text-ui-warning">{formatNumber(row.quantity, 3)} / {formatNumber(row.threshold, 3)}</p></Link>)}</div></Card>}
     </>}
   </div></div>;
 }

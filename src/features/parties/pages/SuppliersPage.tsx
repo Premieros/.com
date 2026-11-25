@@ -1,3 +1,4 @@
+import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { useEffect, useState } from 'react';
 import { Plus, Edit2, Trash2, Trophy, FileText } from 'lucide-react';
 import { supabase } from '@/api';
@@ -32,6 +33,7 @@ export function SuppliersPage() {
   const { t, lang } = useLanguage();
   const { show } = useToast();
   const can = useCan();
+  const record = useRecordFocus();
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
   const { runtime } = useOrganizationModules();
@@ -39,6 +41,7 @@ export function SuppliersPage() {
   const { guidedContext, completePrerequisiteAndReturn } = useGuidedWorkflow();
   const { rows: items, loading, total, hasMore, loadMore, loadingMore, refresh: reloadSuppliers, fetchAll: fetchAllSuppliers } = usePaginatedRows<Supplier>({
     table: 'suppliers',
+    filters: record.id ? [{ column: 'id', value: record.id }] : undefined,
     select: '*',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
@@ -81,7 +84,7 @@ export function SuppliersPage() {
   }, [branchScope.scopeKey]);
 
   const balanceFor = (supplier: Supplier) => Number(openBalances[supplier.id] || 0);
-  const filtered = items.filter((s) => !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.phone?.includes(search));
+  const filtered = items.filter((s) => record.id ? s.id === record.id : !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.phone?.includes(search));
   const openAdd = () => { setEditing(null); setBusinessAttributes({}); setForm({ name: '', name_en: '', phone: '', email: '', address: '', tax_number: '', balance: 0, notes: '', branch_id: branchFilter || '' }); setModalOpen(true); };
   const openEdit = (s: Supplier) => { setEditing(s); setBusinessAttributes(((s as Supplier & { business_attributes?: Record<string, unknown> }).business_attributes) || {}); setForm({ name: s.name, name_en: s.name_en || '', phone: s.phone || '', email: s.email || '', address: s.address || '', tax_number: s.tax_number || '', balance: s.balance, notes: s.notes || '', branch_id: s.branch_id || branchFilter || '' }); setModalOpen(true); };
 
@@ -169,6 +172,7 @@ export function SuppliersPage() {
 
   return (
     <DesignSurface testId="suppliers-page">
+      {record.id && <RecordFocus onClear={record.clear} />}
       <DesignPageHeader title={supplierLabel} actions={
         <>
           {can('purchases.evaluation') && (
