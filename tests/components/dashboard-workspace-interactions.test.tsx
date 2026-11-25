@@ -89,7 +89,7 @@ describe('dashboard workspace controls', () => {
     expect(screen.getByText('Cash')).toBeVisible();
     expect(loadSnapshot).toHaveBeenCalledTimes(1);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Month', exact: true }));
+    fireEvent.click(screen.getByRole('button', { name: /^Month$/ }));
     await waitFor(() => expect(loadSnapshot).toHaveBeenCalledTimes(2));
   });
 });
