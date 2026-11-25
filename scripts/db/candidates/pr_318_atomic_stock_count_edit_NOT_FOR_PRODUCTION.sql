@@ -3,7 +3,7 @@
 -- Keep the privileged operation in a non-exposed schema, lock only an authorized draft,
 -- never change data or return protected rows, and retain the existing client table ACLs.
 CREATE FUNCTION private.pr318_lock_stock_count_draft(p_count_id uuid)
-RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $count_lock$
 DECLARE v_branch uuid; v_status text;
 BEGIN
   IF auth.uid() IS NULL OR public.can_permission('inventory.count.create') IS NOT TRUE THEN
@@ -14,7 +14,7 @@ BEGIN
       AND public.user_may_access_branch(c.branch_id) IS TRUE FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'COUNT_EDIT_DENIED'; END IF;
   IF v_status IS DISTINCT FROM 'draft' THEN RAISE EXCEPTION 'COUNT_NOT_DRAFT'; END IF;
-END; $;
+END; $count_lock$;
 REVOKE ALL ON FUNCTION private.pr318_lock_stock_count_draft(uuid) FROM PUBLIC,anon,authenticated;
 GRANT EXECUTE ON FUNCTION private.pr318_lock_stock_count_draft(uuid) TO authenticated;
 

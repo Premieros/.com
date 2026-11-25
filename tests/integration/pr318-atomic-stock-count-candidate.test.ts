@@ -25,7 +25,10 @@ const disposable=Boolean(url && ['localhost','127.0.0.1','[::1]'].includes(new U
       await db.query("insert into public.products(id,name,sku,branch_id,product_type,cost_price,sale_price) values($1,'CI Count first',$2,$3,'ready',1,2),($4,'CI Count second',$5,$3,'ready',1,2)",[pid,'CI-F-'+tag,branch,second,'CI-S-'+tag]);
       await db.query("insert into public.stock_counts(id,branch_id,warehouse_id,status) values($1,$2,$3,'draft')",[count,branch,wh]);
       await db.query("insert into public.stock_count_items(stock_count_id,product_id,system_quantity,counted_quantity,unit_cost) values($1,$2,2,2,1)",[count,pid]);
-      await db.query(readFileSync('scripts/db/candidates/pr_318_atomic_stock_count_edit_NOT_FOR_PRODUCTION.sql','utf8'));
+      const candidate=readFileSync('scripts/db/candidates/pr_318_atomic_stock_count_edit_NOT_FOR_PRODUCTION.sql','utf8');
+      expect(candidate.match(/\$count_lock\$/g)).toHaveLength(2);
+      expect(candidate).not.toMatch(/AS \$\n|END; \$;/);
+      await db.query(candidate);
       const call='select public.pr318_edit_stock_count_candidate($1,$2,$3) result';
       const acl=(await db.query("select has_table_privilege('authenticated','public.stock_counts','UPDATE') count_write,has_table_privilege('authenticated','public.stock_count_items','UPDATE') item_write,has_function_privilege('anon','private.pr318_lock_stock_count_draft(uuid)','EXECUTE') anon_lock,has_function_privilege('anon','public.pr318_edit_stock_count_candidate(uuid,jsonb,jsonb)','EXECUTE') anon_edit")).rows[0];
       expect(acl).toEqual({count_write:false,item_write:false,anon_lock:false,anon_edit:false});
