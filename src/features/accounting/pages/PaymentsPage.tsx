@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { HandCoins, Phone, User, Building2 } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
@@ -62,6 +62,9 @@ export function PaymentsPage() {
   const [collecting, setCollecting] = useState<ScopedArAgingRow | null>(null);
   const [openInvoices, setOpenInvoices] = useState<{ id: string; invoice_number: string; open: number }[]>([]);
   const [saving, setSaving] = useState(false);
+  const paymentLock = useRef(false);
+  const invoiceRequest = useRef(0);
+  const [invoiceScope, setInvoiceScope] = useState('');
   const [form, setForm] = useState({ sale_id: '', amount: '', payment_method: 'cash', notes: '' });
 
   const [paying, setPaying] = useState<ScopedApAgingRow | null>(null);
@@ -119,9 +122,13 @@ export function PaymentsPage() {
       show(lang === 'ar' ? 'حدد فرع هذا الصف كفرع الإجراء أولاً.' : 'Select this row\'s branch as the action branch first.', 'warning');
       return;
     }
+    if (paymentLock.current) return;
+    const request = ++invoiceRequest.current;
+    setInvoiceScope('');
+    setOpenInvoices([]);
     setCollecting(row);
     setForm({ sale_id: '', amount: String(row.open_amount), payment_method: 'cash', notes: '' });
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('sales')
       .select('id, invoice_number, total, paid_amount, refunded_amount')
       .eq('customer_id', row.customer_id)
@@ -131,7 +138,10 @@ export function PaymentsPage() {
     const inv = ((data as { id: string; invoice_number: string; total: number; paid_amount: number; refunded_amount: number | null }[]) || [])
       .map((s) => ({ id: s.id, invoice_number: s.invoice_number, open: Number(s.total) - Number(s.paid_amount) - Number(s.refunded_amount || 0) }))
       .filter((s) => s.open > 0);
+    if (request !== invoiceRequest.current) return;
+    if (error) { show(error.message, 'error'); return; }
     setOpenInvoices(inv);
+    setInvoiceScope('ar:' + row.branch_id + ':' + row.customer_id);
   }
 
   async function openPay(row: ScopedApAgingRow) {
@@ -140,6 +150,10 @@ export function PaymentsPage() {
       show(lang === 'ar' ? 'حدد فرع هذا الصف كفرع الإجراء أولاً.' : 'Select this row\'s branch as the action branch first.', 'warning');
       return;
     }
+    if (paymentLock.current) return;
+    const request = ++invoiceRequest.current;
+    setInvoiceScope('');
+    setOpenApInvoices([]);
     setPaying(row);
     const preferredSource =
       treasurySources.find((source) => source.branch_id === effectiveBranchFilter && source.kind === 'branch_cash')
@@ -151,7 +165,7 @@ export function PaymentsPage() {
       treasury_account_id: preferredSource?.id || '',
       notes: '',
     });
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('purchases')
       .select('id, invoice_number, total, paid_amount, returned_amount')
       .eq('supplier_id', row.supplier_id)
@@ -161,15 +175,20 @@ export function PaymentsPage() {
     const inv = ((data as { id: string; invoice_number: string; total: number; paid_amount: number; returned_amount: number | null }[]) || [])
       .map((s) => ({ id: s.id, invoice_number: s.invoice_number, open: Number(s.total) - Number(s.paid_amount) - Number(s.returned_amount || 0) }))
       .filter((s) => s.open > 0);
+    if (request !== invoiceRequest.current) return;
+    if (error) { show(error.message, 'error'); return; }
     setOpenApInvoices(inv);
+    setInvoiceScope('ap:' + row.branch_id + ':' + row.supplier_id);
   }
 
   const collect = async () => {
     if (!can('sales.payment.receive')) return;
-    if (!collecting) return;
+    if (!collecting || paymentLock.current || collecting.branch_id !== effectiveBranchFilter || invoiceScope !== 'ar:' + collecting.branch_id + ':' + collecting.customer_id) return;
     const amount = Number(form.amount);
-    if (!amount || amount <= 0) { show(t('required'), 'error'); return; }
+    if (!Number.isFinite(amount) || amount <= 0) { show(t('required'), 'error'); return; }
+    paymentLock.current = true;
     setSaving(true);
+    try {
     const { data, error } = await api.accounting.receivePayment( {
       p_customer_id: collecting.customer_id,
       p_branch_id: effectiveBranchFilter,
@@ -178,7 +197,6 @@ export function PaymentsPage() {
       p_sale_id: form.sale_id || null,
       p_notes: form.notes || null,
     });
-    setSaving(false);
     if (error) { show(error.message, 'error'); return; }
     const r = data as { success: boolean; error?: string; detail?: string; reference_number?: string } | null;
     if (!r?.success) { show(r?.detail || r?.error || t('error'), 'error'); return; }
@@ -187,17 +205,21 @@ export function PaymentsPage() {
     setCollecting(null);
     loadAging();
     reloadPayments();
+    } catch { show(lang === 'ar' ? 'تعذر تأكيد نتيجة الدفعة. راجع الدفعات قبل إعادة المحاولة.' : 'Payment outcome unconfirmed. Check payments before retrying.', 'error'); setCollecting(null); loadAging(); reloadPayments(); }
+    finally { paymentLock.current = false; setSaving(false); }
   };
 
   const paySupplier = async () => {
     if (!can('procurement.payment.create')) return;
-    if (!paying) return;
+    if (!paying || paymentLock.current || paying.branch_id !== effectiveBranchFilter || invoiceScope !== 'ap:' + paying.branch_id + ':' + paying.supplier_id) return;
     const amount = Number(apForm.amount);
-    if (!amount || amount <= 0 || !apForm.treasury_account_id || !effectiveBranchFilter) {
+    if (!Number.isFinite(amount) || amount <= 0 || !apForm.treasury_account_id || !effectiveBranchFilter) {
       show(t('required'), 'error');
       return;
     }
+    paymentLock.current = true;
     setSaving(true);
+    try {
     const { data, error } = await api.accounting.paySupplierFromTreasury({
       p_supplier_id: paying.supplier_id,
       p_branch_id: effectiveBranchFilter,
@@ -206,7 +228,6 @@ export function PaymentsPage() {
       p_purchase_id: apForm.purchase_id || null,
       p_notes: apForm.notes || null,
     });
-    setSaving(false);
     if (error) { show(error.message, 'error'); return; }
     const r = data as { success: boolean; error?: string; detail?: string; reference_number?: string } | null;
     if (!r?.success) {
@@ -226,6 +247,8 @@ export function PaymentsPage() {
     void api.accounting.getAccessibleTreasuryAccounts({
       p_branch_id: effectiveBranchFilter,
     }).then(({ data: sources }) => setTreasurySources((sources as TreasurySource[]) || []));
+    } catch { show(lang === 'ar' ? 'تعذر تأكيد نتيجة الدفعة. راجع الدفعات قبل إعادة المحاولة.' : 'Payment outcome unconfirmed. Check payments before retrying.', 'error'); setPaying(null); void loadAging(); reloadSupplierPayments(); }
+    finally { paymentLock.current = false; setSaving(false); }
   };
 
   const columns: Column<ScopedArAgingRow>[] = [
@@ -363,7 +386,7 @@ export function PaymentsPage() {
             <Textarea label={t('paymentNotes')} value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={2} />
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setCollecting(null)}>{t('cancel')}</Button>
-              <Button onClick={collect} disabled={saving}><HandCoins className="w-4 h-4" /> {saving ? t('loading') : t('collect')}</Button>
+              <Button onClick={collect} disabled={saving || !collecting || collecting.branch_id !== effectiveBranchFilter || invoiceScope !== 'ar:' + collecting.branch_id + ':' + collecting.customer_id}><HandCoins className="w-4 h-4" /> {saving ? t('loading') : t('collect')}</Button>
             </div>
           </div>
         )}
@@ -436,7 +459,7 @@ export function PaymentsPage() {
             <Textarea label={t('paymentNotes')} value={apForm.notes} onChange={(e) => setApForm({ ...apForm, notes: e.target.value })} rows={2} />
             <div className="flex justify-end gap-2">
               <Button variant="secondary" onClick={() => setPaying(null)}>{t('cancel')}</Button>
-              <Button onClick={paySupplier} disabled={saving}><HandCoins className="w-4 h-4" /> {saving ? t('loading') : t('paySupplier')}</Button>
+              <Button onClick={paySupplier} disabled={saving || !paying || paying.branch_id !== effectiveBranchFilter || invoiceScope !== 'ap:' + paying.branch_id + ':' + paying.supplier_id}><HandCoins className="w-4 h-4" /> {saving ? t('loading') : t('paySupplier')}</Button>
             </div>
           </div>
         )}
