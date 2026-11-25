@@ -49,3 +49,6 @@ Head 60565c84ea1c98661600ac132be29d920a3cf1f8, Verify main run 45622353072: 170/
 
 ## Candidate SQL syntax repair
 Verify main run 45628291273 failed before execution of the stock count candidate (SQLSTATE 42601, invalid single-dollar function-body delimiter). The previous source substitution collapsed a double dollar in the private helper; replaced the delimiters with explicit paired named tags and added an assertion on the persisted SQL before compiling it. No ACL changes; existing cross-branch, anonymous, stale, rollback and zero-count tests remain mandatory. Re-run CI before acceptance. No production mutation.
+
+## Canonical promotion preparation
+Head 69be8f8039cb96bf86beba6542aca3e433239eed passed Verify main (687 unit, 171 integration, 3 browser), POS recovery and Windows print agent. Temporary GitHub workflow generates the new migration path via Supabase CLI, without database connectivity or credentials; no production changes. Follow-up must promote reviewed SQL, adapt regression tests to canonical functions, update UI and generated API contract, remove temporary workflow and pass full CI before release.
