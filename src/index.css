@@ -625,3 +625,97 @@
 [data-table-viewport] {
   max-height: var(--table-rows-height, clamp(144px, calc(100dvh - 310px), 820px));
 }
+
+/* Keep desktop tables full-height even with only one or two records. The
+   table viewport is independently scrollable and never hides the shell footer. */
+@media (min-width: 640px) {
+  [data-testid="app-main"] [data-table-viewport] {
+    min-height: var(--table-rows-height, clamp(144px, calc(100dvh - 310px), 820px));
+  }
+}
+
+/* Journal focus mode is a deliberate full-screen ledger workspace. It must
+   use the available height for rows, rather than the normal dashboard cap. */
+[data-testid="journal-expanded-table"] > [data-testid="data-table"] {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+}
+[data-testid="journal-expanded-table"] [data-table-viewport] {
+  flex: 1 1 auto;
+  min-height: 0;
+  max-height: none;
+  overflow: auto;
+}
+[data-testid="journal-expanded-table"] [data-testid="data-table-toolbar"],
+[data-testid="journal-expanded-table"] [data-testid="data-table-footer"] {
+  flex-shrink: 0;
+}
+
+/* Premier motion foundation, phase 1. No palette, typography or geometry changes. */
+:root {
+  --premier-motion-micro: 160ms;
+  --premier-motion-navigation: 280ms;
+  --premier-motion-content: 340ms;
+  --premier-motion-stagger: 45ms;
+  --premier-motion-easing: cubic-bezier(0.22, 1, 0.36, 1);
+}
+.premier-motion-nav-panel {
+  display: grid;
+  grid-template-rows: 1fr;
+  opacity: 1;
+  transition:
+    grid-template-rows var(--premier-motion-navigation) var(--premier-motion-easing),
+    opacity var(--premier-motion-micro) ease;
+}
+.premier-motion-nav-panel--closed {
+  grid-template-rows: 0fr;
+  opacity: 0;
+  pointer-events: none;
+}
+.premier-motion-nav-panel-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.premier-motion-navigation [data-testid^="nav-item-"] {
+  transition:
+    background-color var(--premier-motion-micro) ease,
+    color var(--premier-motion-micro) ease,
+    transform var(--premier-motion-micro) var(--premier-motion-easing);
+}
+.premier-motion-navigation [data-testid^="nav-item-"]:active {
+  transform: scale(0.985);
+}
+.premier-motion-navigation [data-testid^="nav-item-"][aria-current="page"] {
+  animation: premier-navigation-settle var(--premier-motion-navigation) var(--premier-motion-easing) both;
+}
+@keyframes premier-navigation-settle {
+  from { transform: translateY(2px); }
+  to { transform: translateY(0); }
+}
+/* Representative page: content-only entrance; existing dashboard cards stay unchanged. */
+.premier-motion-dashboard {
+  animation: premier-content-enter var(--premier-motion-content) var(--premier-motion-easing) both;
+}
+.premier-motion-dashboard [data-testid="dashboard-permission-kpis"] > * {
+  animation: premier-content-enter var(--premier-motion-content) var(--premier-motion-easing) both;
+}
+.premier-motion-dashboard [data-testid="dashboard-permission-kpis"] > :nth-child(2) { animation-delay: var(--premier-motion-stagger); }
+.premier-motion-dashboard [data-testid="dashboard-permission-kpis"] > :nth-child(3) { animation-delay: calc(var(--premier-motion-stagger) * 2); }
+.premier-motion-dashboard [data-testid="dashboard-permission-kpis"] > :nth-child(4) { animation-delay: calc(var(--premier-motion-stagger) * 3); }
+@keyframes premier-content-enter {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .premier-motion-nav-panel,
+  .premier-motion-navigation [data-testid^="nav-item-"] {
+    transition: none !important;
+  }
+  .premier-motion-navigation [data-testid^="nav-item-"][aria-current="page"],
+  .premier-motion-dashboard,
+  .premier-motion-dashboard [data-testid="dashboard-permission-kpis"] > * {
+    animation: none !important;
+  }
+}

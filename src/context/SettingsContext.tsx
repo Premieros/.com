@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { supabase } from '../lib/supabase';
 import { applyBrandColor, applyDefaultSurface, applySurfaceColor, brandFromSettingsValue } from '../lib/brandColor';
 import { findUiTheme } from '../lib/themes';
@@ -41,11 +41,13 @@ interface SettingsContextValue {
 
 const SettingsContext = createContext<SettingsContextValue | undefined>(undefined);
 
-function getInitialCachedSettings(): { settings: Settings | null; branchMap: Record<string, BranchSettings> } {
+function getInitialCachedSettings(userId: string | null): { settings: Settings | null; branchMap: Record<string, BranchSettings> } {
+  // Never show an unrelated operator's locally cached branch settings.
+  if (!userId) return { settings: null, branchMap: {} };
   try {
     if (typeof localStorage !== 'undefined') {
-      const s = localStorage.getItem('premier:cached_settings');
-      const b = localStorage.getItem('premier:cached_branch_settings_map');
+      const s = localStorage.getItem(`premier:cached_settings:${userId}`);
+      const b = localStorage.getItem(`premier:cached_branch_settings_map:${userId}`);
       return {
         settings: s ? (JSON.parse(s) as Settings) : null,
         branchMap: b ? (JSON.parse(b) as Record<string, BranchSettings>) : {},
@@ -58,17 +60,36 @@ function getInitialCachedSettings(): { settings: Settings | null; branchMap: Rec
 }
 
 export function SettingsProvider({ children }: { children: ReactNode }) {
-  const initialCache = getInitialCachedSettings();
+  const { session } = useAuth();
+  const sessionUserId = session?.user?.id ?? null;
+  // Lazy initialization avoids expensive localStorage JSON parsing on every
+  // provider re-render (settings updates, theme changes, timers, etc.).
+  const [initialCache] = useState(() => getInitialCachedSettings(sessionUserId));
   const [settings, setSettings] = useState<Settings | null>(initialCache.settings);
   const [branchSettingsMap, setBranchSettingsMap] = useState<Record<string, BranchSettings>>(initialCache.branchMap);
   const [loading, setLoading] = useState(!initialCache.settings);
+  const currentCacheUser = useRef(sessionUserId);
+  const refreshEpoch = useRef(0);
+  const sessionEpoch = useRef(0);
+  const [verifiedUser, setVerifiedUser] = useState<string | null>(null);
   const { applySystemTheme } = useTheme();
   const { applySystemLang } = useLanguage();
-  const { session } = useAuth();
 
-  const sessionUserId = session?.user?.id ?? null;
+  useLayoutEffect(() => {
+    if (currentCacheUser.current === sessionUserId) return;
+    ++refreshEpoch.current;
+    ++sessionEpoch.current;
+    setVerifiedUser(null);
+    currentCacheUser.current = sessionUserId;
+    const next = getInitialCachedSettings(sessionUserId);
+    setSettings(next.settings);
+    setBranchSettingsMap(next.branchMap);
+    setLoading(!next.settings);
+  }, [sessionUserId]);
 
   const refresh = useCallback(async () => {
+    if (currentCacheUser.current !== sessionUserId) return;
+    const epoch = ++refreshEpoch.current;
     if (!sessionUserId) {
       setSettings(null);
       setBranchSettingsMap({});
@@ -80,17 +101,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         supabase.from('settings').select('*').maybeSingle(),
         supabase.from('branch_settings').select('*'),
       ]);
+      if (epoch !== refreshEpoch.current) return;
+      if (currentCacheUser.current !== sessionUserId) return;
+      // Retain the scoped cache when either network read fails.
+      if (sRes.error || bRes.error) throw sRes.error || bRes.error;
       const data = sRes.data as Settings | null;
+      setSettings(data);
       if (data) {
-        setSettings(data);
-        void SettingsRepository.saveGlobalSettings(data);
-        try {
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem('premier:cached_settings', JSON.stringify(data));
-          }
-        } catch {
-          // ignore
-        }
         const uiPreset = findUiTheme(data.brand_color);
         if (uiPreset) {
           applyBrandColor(uiPreset.brandHue, uiPreset.brandSat);
@@ -106,22 +123,14 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       const bMap: Record<string, BranchSettings> = {};
       for (const row of (bRes.data as BranchSettings[]) || []) {
         bMap[row.branch_id] = row;
-        void SettingsRepository.saveBranchSettings(row.branch_id, row);
       }
-      if (Object.keys(bMap).length > 0) {
-        setBranchSettingsMap(bMap);
-        try {
-          if (typeof localStorage !== 'undefined') {
-            localStorage.setItem('premier:cached_branch_settings_map', JSON.stringify(bMap));
-          }
-        } catch {
-          // ignore
-        }
-      }
+      setBranchSettingsMap(bMap);
+      void SettingsRepository.replaceUserSnapshot(sessionUserId, data, bMap);
+      setVerifiedUser(sessionUserId);
     } catch {
       // offline: maintain current cached settings
     } finally {
-      setLoading(false);
+      if (epoch === refreshEpoch.current) setLoading(false);
     }
   }, [sessionUserId, applySystemTheme, applySystemLang]);
 
@@ -130,7 +139,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   }, [refresh]);
 
   useEffect(() => {
-    if (!sessionUserId || Object.keys(branchSettingsMap).length === 0) return;
+    if (!sessionUserId || verifiedUser !== sessionUserId || Object.keys(branchSettingsMap).length === 0) return;
 
     const eligible = Object.values(branchSettingsMap).filter(
       (row) => row.auto_close_shift_at_day_end && row.business_day_mode === 'fixed_time',
@@ -169,6 +178,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
     };
 
     const run = async (row: BranchSettings) => {
+      if (cancelled || currentCacheUser.current !== sessionUserId) return;
       const { data, error } = await supabase.rpc('try_auto_close_branch_shift', {
         p_branch_id: row.branch_id,
       });
@@ -223,7 +233,7 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       for (const timer of timers.values()) window.clearTimeout(timer);
       timers.clear();
     };
-  }, [sessionUserId, branchSettingsMap]);
+  }, [sessionUserId, verifiedUser, branchSettingsMap]);
 
 
   const effectiveSettings = useCallback(
@@ -236,7 +246,8 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   );
 
   const save = useCallback(async (patch: Partial<Settings>): Promise<boolean> => {
-    if (!settings?.id) return false;
+    if (!settings?.id || !sessionUserId || currentCacheUser.current !== sessionUserId) return false;
+    const ownerEpoch = sessionEpoch.current;
 
     const next = { ...settings, ...patch };
     const { error } = await supabase
@@ -249,13 +260,17 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
       return false;
     }
 
+    if (ownerEpoch !== sessionEpoch.current || currentCacheUser.current !== sessionUserId) return false;
     setSettings(next);
-    await SettingsRepository.saveGlobalSettings(next);
+    await SettingsRepository.saveGlobalSettings(next, sessionUserId);
+    if (ownerEpoch !== sessionEpoch.current) return false;
     await refresh();
     return true;
-  }, [settings, refresh]);
+  }, [settings, refresh, sessionUserId]);
 
   const saveBranchSettings = useCallback(async (branchId: string, patch: Partial<BranchSettings>): Promise<boolean> => {
+    if (!sessionUserId || currentCacheUser.current !== sessionUserId) return false;
+    const ownerEpoch = sessionEpoch.current;
     const hasNegativeStockPatch = Object.prototype.hasOwnProperty.call(patch, 'allow_negative_stock');
     const requestedNegativeStock = patch.allow_negative_stock;
 
@@ -290,11 +305,13 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
         : existing?.allow_negative_stock,
     } as BranchSettings;
 
+    if (ownerEpoch !== sessionEpoch.current || currentCacheUser.current !== sessionUserId) return false;
     setBranchSettingsMap((prev) => ({ ...prev, [branchId]: updatedBranch }));
-    await SettingsRepository.saveBranchSettings(branchId, updatedBranch);
+    await SettingsRepository.saveBranchSettings(branchId, updatedBranch, sessionUserId);
+    if (ownerEpoch !== sessionEpoch.current) return false;
     await refresh();
     return true;
-  }, [branchSettingsMap, refresh]);
+  }, [branchSettingsMap, refresh, sessionUserId]);
 
   return (
     <SettingsContext.Provider value={{ settings, loading, branchSettingsMap, effectiveSettings, refresh, save, saveBranchSettings }}>

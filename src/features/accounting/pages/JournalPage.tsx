@@ -1,5 +1,5 @@
-import { useEffect, useState, useCallback } from 'react';
-import { Eye, Scale, Plus, Trash2 } from 'lucide-react';
+import { useEffect, useState, useCallback, useRef } from 'react';
+import { Eye, Scale, Plus, Trash2, RotateCcw, Maximize2, Minimize2 } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -61,9 +61,22 @@ export function JournalPage() {
   const { branches } = useBranches();
   const [items, setItems] = useState<ScopedJournalDto[]>([]);
   const [loading, setLoading] = useState(true);
+  // Journal tables are the main workspace on desktop. Start in the expanded
+  // view so even short datasets never hide rows below tiny scroll windows.
+  const [tableExpanded, setTableExpanded] = useState(
+    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(min-width: 768px)').matches,
+  );
   const [search, setSearch] = useState('');
   const [refType, setRefType] = useState('');
   const [viewing, setViewing] = useState<ScopedJournalDto | null>(null);
+  const [viewStatus, setViewStatus] = useState<'POSTED' | 'REVERSED' | 'OTHER' | null>(null);
+  const [viewStatusLoading, setViewStatusLoading] = useState(false);
+  const viewRequest = useRef(0);
+  const reversalTarget = useRef<string | null>(null);
+  const reversalInFlight = useRef(false);
+  const [reverseOpen, setReverseOpen] = useState(false);
+  const [reverseReason, setReverseReason] = useState('');
+  const [reversing, setReversing] = useState(false);
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
   const primaryBranchId = user?.branch_id && branches.some((branch) => branch.id === user.branch_id)
@@ -125,6 +138,76 @@ export function JournalPage() {
     }
   }, [manualOpen, manualLines.length]);
 
+  const closeJournal = () => {
+    if (reversalInFlight.current) return;
+    ++viewRequest.current;
+    reversalTarget.current = null;
+    setReverseOpen(false);
+    setViewing(null);
+    setViewStatus(null);
+    setViewStatusLoading(false);
+  };
+
+  const openJournal = async (entry: ScopedJournalDto) => {
+    if (reversalInFlight.current) return;
+    const request = ++viewRequest.current;
+    reversalTarget.current = null;
+    setReverseOpen(false);
+    setViewing(entry);
+    setViewStatus(null);
+    setViewStatusLoading(true);
+    const { data, error } = await supabase.from('journal_entries')
+      .select('posting_status, reversal_of')
+      .eq('id', entry.id)
+      .eq('branch_id', entry.branch_id)
+      .maybeSingle();
+    if (request !== viewRequest.current) return;
+    // Never offer a reversal when the status cannot be verified.
+    if (error || !data) {
+      setViewStatus(null);
+    } else {
+      const status = data.posting_status === 'POSTED' && !data.reversal_of
+        ? 'POSTED' : data.posting_status === 'REVERSED' || data.reversal_of
+          ? 'REVERSED' : 'OTHER';
+      setViewStatus(status);
+    }
+    setViewStatusLoading(false);
+  };
+
+  const submitReversal = async () => {
+    if (!viewing || !can('accounting.reconciliation.manage') || viewStatus !== 'POSTED' || reversing || reversalInFlight.current || reversalTarget.current !== viewing.id || viewing.reference_type === 'journal_reversal') return;
+    const reason = reverseReason.trim();
+    if (reason.length < 3) {
+      show(isAr ? 'يجب كتابة سبب للعكس (3 أحرف على الأقل)' : 'Enter a reversal reason (at least 3 characters)', 'error');
+      return;
+    }
+    reversalInFlight.current = true;
+    setReversing(true);
+    try {
+      const { data, error } = await api.accounting.reverseJournalEntry({
+        p_entry_id: viewing.id,
+        p_reason: reason,
+      });
+      if (error) { show(error.message, 'error'); return; }
+      if (!data?.success) { show(data?.detail || data?.error || t('error'), 'error'); return; }
+      show(data.already_reversed
+        ? (isAr ? 'تم عكس القيد مسبقًا' : 'Entry was already reversed')
+        : (isAr ? 'تم إنشاء قيد عكسي بنجاح' : 'Reversal entry posted successfully'), 'success');
+      ++viewRequest.current;
+      reversalTarget.current = null;
+      setReverseOpen(false);
+      setReverseReason('');
+      setViewing(null);
+      setViewStatus(null);
+      await load();
+    } catch (failure) {
+      show(failure instanceof Error ? failure.message : t('error'), 'error');
+    } finally {
+      reversalInFlight.current = false;
+      setReversing(false);
+    }
+  };
+
   const refLabel = (type: string) => {
     const key = REF_TYPE_KEYS[type];
     if (!key) return type;
@@ -143,7 +226,7 @@ export function JournalPage() {
       const ok = Math.abs(Number(e.debit_total) - Number(e.credit_total)) < 0.01;
       return ok ? <span className="inline-flex items-center gap-1 text-ui-success dark:text-ui-success text-xs font-semibold"><Scale className="w-3.5 h-3.5" />{formatCurrency(Number(e.debit_total), currency, lang)}</span> : <span className="text-ui-danger text-xs font-semibold">{t('notBalanced')}</span>;
     } },
-    { key: 'actions', header: t('actions'), render: (e) => <Button size="sm" variant="outline" onClick={() => setViewing(e)}><Eye className="w-4 h-4" /> {t('view')}</Button> },
+    { key: 'actions', header: t('actions'), render: (e) => <Button size="sm" variant="outline" onClick={() => { void openJournal(e); }}><Eye className="w-4 h-4" /> {t('view')}</Button> },
   ];
 
   const manualTotals = manualLines.reduce((acc, l) => ({
@@ -190,40 +273,92 @@ export function JournalPage() {
 
   return (
     <DesignSurface testId="journal-page">
-      <DesignPageHeader
-        title={t('journalEntries')}
-        subtitle={t('journal')}
-        actions={can('accounting.journal.post') && (
-          <Button size="sm" onClick={() => { if (can('accounting.journal.post')) setManualOpen(true); }}><Plus className="w-4 h-4" /> {t('postManualJournal')}</Button>
-        )}
-      />
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard title={t('journalEntries')} value={String(items.length)} icon={<Scale className="w-5 h-5" />} color="brand" />
-        <StatCard title={t('totalDebit')} value={formatCurrency(items.reduce((s, e) => s + Number(e.debit_total), 0), currency, lang)} icon={<Scale className="w-5 h-5" />} color="blue" />
-        <StatCard title={t('totalCredit')} value={formatCurrency(items.reduce((s, e) => s + Number(e.credit_total), 0), currency, lang)} icon={<Scale className="w-5 h-5" />} color="amber" />
-        <StatCard title={t('balance')} value={formatCurrency(items.reduce((s, e) => s + Number(e.debit_total) - Number(e.credit_total), 0), currency, lang)} icon={<Scale className="w-5 h-5" />} color="green" />
-      </div>
-
-      <DesignPanel testId="journal-search-panel">
-        <div className="flex flex-col sm:flex-row gap-4 items-end justify-between">
-          <DesignSearch value={search} onChange={setSearch} className="flex-1 w-full" label={t('search')} placeholder={t('search')} testId="journal-search" />
-          <div className="flex flex-wrap items-end gap-3">
+      {tableExpanded ? (
+        <div data-testid="journal-expanded-workspace"
+          className="fixed inset-0 z-[65] flex min-h-0 flex-col gap-2 overflow-hidden bg-ui-page p-2 sm:p-3">
+          <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <h2 className="text-base font-bold text-ui-text">{t('journalEntries')}</h2>
+              <span className="rounded-lg border border-ui-border bg-ui-surface px-2 py-1 text-xs font-semibold text-ui-muted">
+                {items.length} {isAr ? 'قيد' : 'entries'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {can('accounting.journal.post') && (
+                <Button size="sm" onClick={() => setManualOpen(true)}>
+                  <Plus className="w-4 h-4" /> {t('postManualJournal')}
+                </Button>
+              )}
+              <Button size="sm" variant="outline" onClick={() => setTableExpanded(false)}>
+                <Minimize2 className="w-4 h-4" />
+                {isAr ? 'العرض العادي' : 'Normal view'}
+              </Button>
+            </div>
+          </div>
+          <div data-testid="journal-expanded-filters"
+            className="flex shrink-0 flex-wrap items-end gap-2 rounded-xl border border-ui-border bg-ui-surface p-2">
+            <div className="min-w-[170px] flex-[2]">
+              <DesignSearch value={search} onChange={setSearch} className="w-full"
+                label={t('search')} placeholder={t('search')} testId="journal-expanded-search" />
+            </div>
             <Select label={t('referenceType')} value={refType} onChange={(e) => setRefType(e.target.value)}>
               <option value="">{t('allTypes')}</option>
               {Object.entries(REF_TYPE_KEYS).map(([value, key]) => <option key={value} value={value}>{t(key as never)}</option>)}
             </Select>
-            <Input label={t('from')} type="date" value={from} min={history.minDate} onChange={(e) => setFrom(history.clampRange(e.target.value, to).from)} />
-            <Input label={t('to')} type="date" value={to} onChange={(e) => { const allowed = history.clampRange(from, e.target.value); setFrom(allowed.from); setTo(allowed.to); }} />
+            <Input label={t('from')} type="date" value={from} min={history.minDate}
+              onChange={(e) => setFrom(history.clampRange(e.target.value, to).from)} />
+            <Input label={t('to')} type="date" value={to}
+              onChange={(e) => { const allowed = history.clampRange(from, e.target.value); setFrom(allowed.from); setTo(allowed.to); }} />
+          </div>
+          <div data-testid="journal-expanded-table" className="min-h-0 min-w-0 flex-1 overflow-hidden">
+            <DataTable columns={columns} data={items} loading={loading} emptyMessage={t('noData')} />
           </div>
         </div>
-      </DesignPanel>
+      ) : (
+        <>
+          <DesignPageHeader
+            title={t('journalEntries')}
+            subtitle={t('journal')}
+            actions={(
+              <div className="flex flex-wrap items-center gap-2">
+                <Button size="sm" variant="outline" onClick={() => setTableExpanded(true)}>
+                  <Maximize2 className="w-4 h-4" />
+                  {isAr ? 'تكبير الجدول' : 'Expand table'}
+                </Button>
+                {can('accounting.journal.post') && (
+                  <Button size="sm" onClick={() => setManualOpen(true)}>
+                    <Plus className="w-4 h-4" /> {t('postManualJournal')}
+                  </Button>
+                )}
+              </div>
+            )}
+          />
+          <div className="grid grid-cols-1 gap-4 mb-6 sm:grid-cols-2 lg:grid-cols-4">
+            <StatCard title={t('journalEntries')} value={String(items.length)} icon={<Scale className="w-5 h-5" />} color="brand" />
+            <StatCard title={t('totalDebit')} value={formatCurrency(items.reduce((sum, entry) => sum + Number(entry.debit_total), 0), currency, lang)} icon={<Scale className="w-5 h-5" />} color="blue" />
+            <StatCard title={t('totalCredit')} value={formatCurrency(items.reduce((sum, entry) => sum + Number(entry.credit_total), 0), currency, lang)} icon={<Scale className="w-5 h-5" />} color="amber" />
+            <StatCard title={t('balance')} value={formatCurrency(items.reduce((sum, entry) => sum + Number(entry.debit_total) - Number(entry.credit_total), 0), currency, lang)} icon={<Scale className="w-5 h-5" />} color="green" />
+          </div>
+          <DesignPanel testId="journal-search-panel">
+            <div className="flex flex-col flex-wrap items-end justify-between gap-4 sm:flex-row">
+              <DesignSearch value={search} onChange={setSearch} className="w-full flex-1" label={t('search')} placeholder={t('search')} testId="journal-search" />
+              <div className="flex flex-wrap items-end gap-3">
+                <Select label={t('referenceType')} value={refType} onChange={(e) => setRefType(e.target.value)}>
+                  <option value="">{t('allTypes')}</option>
+                  {Object.entries(REF_TYPE_KEYS).map(([value, key]) => <option key={value} value={value}>{t(key as never)}</option>)}
+                </Select>
+                <Input label={t('from')} type="date" value={from} min={history.minDate} onChange={(e) => setFrom(history.clampRange(e.target.value, to).from)} />
+                <Input label={t('to')} type="date" value={to} onChange={(e) => { const allowed = history.clampRange(from, e.target.value); setFrom(allowed.from); setTo(allowed.to); }} />
+              </div>
+            </div>
+          </DesignPanel>
+          <DesignPanel testId="journal-table-panel">
+            <DataTable columns={columns} data={items} loading={loading} emptyMessage={t('noData')} />
+          </DesignPanel>
+        </>
+      )}
 
-      <DesignPanel testId="journal-table-panel">
-        <DataTable columns={columns} data={items} loading={loading} emptyMessage={t('noData')} />
-      </DesignPanel>
-
-      <Modal open={!!viewing} onClose={() => setViewing(null)} title={viewing ? `${viewing.entry_number} - ${viewing.description || ''}` : ''} size="lg">
+      <Modal open={!!viewing} onClose={closeJournal} title={viewing ? `${viewing.entry_number} - ${viewing.description || ''}` : ''} size="lg">
         {viewing && (
           <div className="space-y-4">
             <div className="flex flex-wrap gap-4 text-sm">
@@ -260,11 +395,44 @@ export function JournalPage() {
                 </tbody>
               </table>
             </div>
-            <div className="flex justify-end">
-              <Button variant="secondary" onClick={() => setViewing(null)}>{t('close')}</Button>
+            <div className="flex justify-end gap-2">
+              {can('accounting.reconciliation.manage') && viewStatus === 'POSTED'
+                && viewing.reference_type !== 'journal_reversal' && (
+                  <Button variant="danger" onClick={() => { reversalTarget.current = viewing.id; setReverseReason(''); setReverseOpen(true); }}>
+                    <RotateCcw className="w-4 h-4" />
+                    {isAr ? 'عكس القيد' : 'Reverse entry'}
+                  </Button>
+                )}
+              {viewStatusLoading && (
+                <span className="text-xs text-ui-muted self-center">{t('loading')}</span>
+              )}
+              <Button variant="secondary" onClick={closeJournal}>{t('close')}</Button>
             </div>
           </div>
         )}
+      </Modal>
+
+      <Modal open={reverseOpen && !!viewing}
+        onClose={() => { if (!reversing) setReverseOpen(false); }}
+        title={isAr ? 'تأكيد عكس القيد' : 'Confirm journal reversal'}>
+        <div className="space-y-4">
+          <p className="text-sm text-ui-muted">
+            {isAr
+              ? `سيتم إنشاء قيد عكسي مستقل للقيد ${viewing?.entry_number || ''}، مع الاحتفاظ بالقيد الأصلي وسجل التدقيق. لا يمكن التراجع عن هذه العملية بحذف القيد.`
+              : `A separate reversing entry will be posted for ${viewing?.entry_number || ''}. The original entry and audit trail will remain intact.`}
+          </p>
+          <Input label={isAr ? 'سبب العكس' : 'Reversal reason'} value={reverseReason}
+            onChange={(e) => setReverseReason(e.target.value)}
+            placeholder={isAr ? 'مثال: إلغاء قيد تجريبي قبل التسليم' : 'e.g. Reversing a demo entry before handover'} />
+          <div className="flex justify-end gap-2">
+            <Button variant="secondary" disabled={reversing} onClick={() => setReverseOpen(false)}>{t('cancel')}</Button>
+            <Button variant="danger" disabled={reversing || reverseReason.trim().length < 3}
+              onClick={() => { void submitReversal(); }}>
+              <RotateCcw className="w-4 h-4" />
+              {reversing ? t('loading') : (isAr ? 'تأكيد عكس القيد' : 'Confirm reversal')}
+            </Button>
+          </div>
+        </div>
       </Modal>
 
       <Modal open={manualOpen} onClose={() => { setManualOpen(false); setManualDesc(''); setManualLines([]); }} title={t('postManualJournal')} size="lg">

@@ -19,6 +19,8 @@ import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { mergeEffectiveSettings, useSettings } from '@/context/SettingsContext';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
+import { localSaleDayBounds } from '../saleDateFilters';
 import { useBranches } from '@/hooks/useBranches';
 import type { BranchSettings, Customer, Settings } from '@/lib/types';
 import {
@@ -64,17 +66,32 @@ export function SalesPage() {
   const branchScope = useBranchScope();
   const can = useCan();
   const canViewSales = can('sales.view');
+  const [search, setSearch] = useState('');
+  const [searchAllInvoices, setSearchAllInvoices] = useState(false);
+  const debouncedInvoiceSearch = useDebouncedValue(searchAllInvoices ? search : '', 250);
+  const [displayStatus, setDisplayStatus] = useState<'all' | 'today' | 'completed' | 'returned' | 'other'>('all');
+  const [displayDate, setDisplayDate] = useState('');
+  const now = new Date();
+  const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0')].join('-');
+  const dateBounds = localSaleDayBounds(displayDate || (displayStatus === 'today' ? today : ''));
   const { rows: items, loading, error, total, hasMore, loadMore, loadingMore, refresh: reloadSales } = usePaginatedRows<SaleRow>({
     table: 'sales',
     select: 'id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, delivery_fee_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
-    filters: [{ column: 'is_archived', value: false }],
+    enabled: canViewSales && !branchScope.loading && branchScope.selectedBranchIds.length > 0,
+    createdAtIdKeyset: true,
+    filters: [
+      { column: 'is_archived', value: false },
+      ...(['completed', 'returned'].includes(displayStatus) ? [{ column: 'status', value: displayStatus }] : []),
+    ],
+    exclude: displayStatus === 'other' ? { column: 'status', values: ['completed', 'returned'] } : undefined,
+    min: dateBounds ? { column: 'created_at', value: dateBounds.start } : undefined,
+    maxExclusive: dateBounds ? { column: 'created_at', value: dateBounds.end } : undefined,
+    search: searchAllInvoices ? { term: debouncedInvoiceSearch, columns: ['invoice_number'] } : undefined,
     pageSize: 100,
   });
-  const [search, setSearch] = useState('');
-  const [displayStatus, setDisplayStatus] = useState<'all' | 'today' | 'completed' | 'returned' | 'other'>('all');
-  const [displayDate, setDisplayDate] = useState('');
   const [showViewFilters, setShowViewFilters] = useState(false);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -120,29 +137,14 @@ export function SalesPage() {
     setCustomersBranchId(branchId);
   }
 
-  const localSaleDay = (value: string) => {
-    const date = new Date(value);
-    if (!Number.isFinite(date.getTime())) return '';
-    return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, '0'),
-      String(date.getDate()).padStart(2, '0')].join('-');
-  };
-  const today = localSaleDay(new Date().toISOString());
-  // Presentation filters apply to the currently loaded, permission-scoped page.
-  // The repository query, financial actions and branch authorization remain unchanged.
-  const filtered = items.filter((i) => {
-    if (displayStatus === 'today' && localSaleDay(i.created_at) !== today) return false;
-    if (displayStatus === 'completed' && i.status !== 'completed') return false;
-    if (displayStatus === 'returned' && i.status !== 'returned') return false;
-    if (displayStatus === 'other' && ['completed', 'returned'].includes(i.status)) return false;
-    if (displayDate && localSaleDay(i.created_at) !== displayDate) return false;
-    if (!search.trim()) return true;
-    const s = search.trim().toLowerCase();
-    return (
-      i.invoice_number?.toLowerCase().includes(s) ||
-      i.source_order?.order_number?.toLowerCase().includes(s) ||
-      i.customer?.name?.toLowerCase().includes(s) ||
-      i.status?.toLowerCase().includes(s)
-    );
+  // Status/date filter the full authorized history before paging.
+  // Customer/order text remains a loaded-page search in legacy mode.
+  const filtered = searchAllInvoices || !search.trim() ? items : items.filter((i) => {
+    const term = search.trim().toLowerCase();
+    return i.invoice_number?.toLowerCase().includes(term) ||
+      i.source_order?.order_number?.toLowerCase().includes(term) ||
+      i.customer?.name?.toLowerCase().includes(term) ||
+      i.status?.toLowerCase().includes(term);
   });
 
   const branchNameForSale = (sale: SaleRow) =>
@@ -552,12 +554,24 @@ export function SalesPage() {
     }
 
     if (canEditSaleMetadata) {
+      // Invoice lifecycle changes must go through authoritative refund/payment RPCs,
+      // never the general-purpose metadata editor.
       const { error } = await supabase.from('sales').update({
         customer_id: editForm.customer_id || null,
-        status: editForm.status,
         notes: editForm.notes || null,
       }).eq('id', viewSale.id);
-      if (error) { show(error.message, 'error'); return; }
+      if (error) {
+        if (paymentChanged) {
+          show(isAr
+            ? 'تم تغيير طريقة الدفع بالفعل، لكن تعذر حفظ العميل والملاحظات. أعد فتح الفاتورة للتحقق.'
+            : 'Payment method changed, but customer/notes could not be saved. Reopen the invoice to verify.', 'error');
+          setViewSale(null);
+          reloadSales();
+        } else {
+          show(error.message, 'error');
+        }
+        return;
+      }
     }
 
     await logAudit('update', 'sales', viewSale.id, paymentChanged ? { payment_method: editForm.payment_method } : undefined);
@@ -702,13 +716,19 @@ export function SalesPage() {
         <>
           <input
             data-testid="sales-search"
-            aria-label={isAr ? 'بحث في الفواتير المحمّلة' : 'Search loaded invoices'}
+            aria-label={searchAllInvoices ? (isAr ? 'بحث في كل أرقام الفواتير المسموح بها' : 'Search all authorized invoice numbers') : (isAr ? 'بحث في الفواتير المحمّلة' : 'Search loaded invoices')}
             type="search"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
-            placeholder={isAr ? 'بحث في الفواتير...' : 'Search invoices...'}
+            placeholder={searchAllInvoices ? (isAr ? 'رقم الفاتورة في كل السجلات...' : 'Invoice number across all records...') : (isAr ? 'بحث في الفواتير المحمّلة...' : 'Search loaded invoices...')}
             className="h-9 w-32 min-w-0 rounded-lg border border-ui-border bg-ui-surface px-3 text-xs text-ui-text outline-none focus:border-ui-primary sm:w-52"
           />
+          <label className="inline-flex items-center gap-1.5 text-xs font-medium text-ui-muted">
+            <input type="checkbox" data-testid="sales-global-invoice-search" checked={searchAllInvoices}
+              onChange={(event) => { setSearchAllInvoices(event.target.checked); setSearch(''); }}
+              className="accent-brand-600" />
+            {isAr ? 'كل أرقام الفواتير' : 'All invoice numbers'}
+          </label>
           <Button variant="outline" size="sm"
             onClick={() => setShowViewFilters((value) => !value)}
             data-testid="sales-toggle-filters"
@@ -746,12 +766,12 @@ export function SalesPage() {
         <DesignPanel testId="sales-search-panel" bodyClassName="px-3 py-2">
           <div className="flex flex-wrap items-end gap-2" data-testid="sales-expanded-filters">
             <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted" htmlFor="sales-view-date">
-              <span>{isAr ? 'تاريخ الإنشاء' : 'Creation date'}</span>
+              <span>{isAr ? 'تاريخ الإنشاء (توقيت الجهاز)' : 'Creation date (device time)'}</span>
               <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-ui-border bg-ui-surface px-3">
                 <CalendarDays className="h-4 w-4 text-ui-subtle" />
                 <input id="sales-view-date" data-testid="sales-view-date" type="date"
                   className="min-w-0 bg-transparent text-sm text-ui-text outline-none"
-                  value={displayDate} onChange={(event) => setDisplayDate(event.target.value)} />
+                  value={displayDate} onChange={(event) => { setDisplayDate(event.target.value); if (displayStatus === 'today') setDisplayStatus('all'); }} />
               </span>
             </label>
             {(displayDate || search || displayStatus !== 'all') && (
@@ -768,14 +788,14 @@ export function SalesPage() {
           <div className="flex max-w-full items-center gap-1 overflow-x-auto" role="group" aria-label={isAr ? 'عرض الفواتير حسب الحالة' : 'Invoice display filter'}>
             {([
               ['all', isAr ? 'الكل' : 'All'],
-              ['today', isAr ? 'اليوم' : 'Today'],
+              ['today', isAr ? 'اليوم (تقويمي)' : 'Today (calendar)'],
               ['completed', isAr ? 'مكتملة' : 'Completed'],
               ['returned', isAr ? 'مرتجعة' : 'Returned'],
               ['other', isAr ? 'أخرى' : 'Other'],
             ] as const).map(([key, label]) => (
               <button key={key} type="button" data-testid={`sales-view-tab-${key}`}
                 aria-pressed={displayStatus === key}
-                onClick={() => setDisplayStatus(key)}
+                onClick={() => { setDisplayStatus(key); if (key === 'today') setDisplayDate(''); }}
                 className={`shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition ${
                   displayStatus === key
                     ? 'bg-brand-600/10 text-brand-600 dark:text-brand-400'
@@ -786,7 +806,8 @@ export function SalesPage() {
             ))}
           </div>
           <span className="shrink-0 text-xs font-medium text-ui-subtle" data-testid="sales-view-count">
-            {isAr ? `المعروض: ${filtered.length} من ${items.length} محمّلة` : `Showing ${filtered.length} of ${items.length} loaded`}
+            {searchAllInvoices ? (isAr ? 'بحث شامل برقم الفاتورة فقط · ' : 'All invoice numbers only · ') : ''}
+            {isAr ? `المعروض: ${filtered.length} من ${items.length} محمّلة من النتائج المطابقة` : `Showing ${filtered.length} of ${items.length} loaded matching records`}
           </span>
         </div>
         <div className="min-w-0 px-3 py-3 sm:px-4 sales-invoices-layout">
@@ -857,11 +878,9 @@ export function SalesPage() {
                 <option value="transfer">{t('transfer')}</option>
                 <option value="credit" disabled>{t('credit')}</option>
               </Select>
-              <Select label={t('status')} value={editForm.status} disabled={!canEditSaleMetadata} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
-                <option value="completed">{isAr ? 'مكتملة' : 'Completed'}</option>
-                <option value="pending">{isAr ? 'قيد الانتظار' : 'Pending'}</option>
-                <option value="returned">{isAr ? 'مرتجعة' : 'Returned'}</option>
-              </Select>
+              <div className="text-sm text-ui-muted">
+                {isAr ? 'حالة الفاتورة تُعدّل فقط عبر إجراءات الدفع والمرتجع المعتمدة.' : 'Invoice status is managed by the authorized payment and refund workflows.'}
+              </div>
               <div />
             </div>
             <Textarea label={t('notes')} value={editForm.notes} disabled={!canEditSaleMetadata} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} rows={2} />

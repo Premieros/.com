@@ -12,6 +12,7 @@ export const qr = {
   handleCall(p: { p_id: string; p_status: string }) { return rpc('qr_handle_call', p); },
   routing(p: { p_branch: string }) { return rpc<{ tables: import('@/features/qr/service').QrTable[]; can_review: boolean }>('qr_routing', p); },
   settings(p: { p_branch: string }) { return rpc<import('@/features/qr/service').QrSettings>('qr_settings', p); },
+  saveSettingsWithRecovery(p: { p_branch: string; p_enabled: boolean; p_appearance: import('@/features/qr/service').QrAppearance; p_roles: string[]; p_checkin: boolean; p_recovery: boolean }) { return rpc('qr_save_customer_settings_with_recovery', p); },
   saveSettings(p: { p_branch: string; p_enabled: boolean; p_appearance: import('@/features/qr/service').QrAppearance; p_roles: string[]; p_checkin: boolean }) { return rpc('qr_save_customer_settings', p); },
   review(p: { p_id: string; p_accept: boolean; p_table: string | null }) { return rpc<{ status: string; order_id: string | null }>('qr_review', p); },
   saveOrder(p: { p_revision: number; p_payload: object }) { return rpc<import('@/lib/types').RpcResult>('qr_save_order', p); },

@@ -3,6 +3,7 @@ import { supabase } from '@/api';
 import { useAuth } from '@/context/AuthContext';
 import { isAuthSessionError } from '@/lib/authSessionError';
 import { userFacingErrorMessage } from '@/lib/userFacingError';
+import { createdAtIdCursor } from './createdAtIdCursor';
 
 // Unified, reusable paginated-rows hook (audit M7). Every list/table page that
 // previously issued an unbounded `.select('*')` (or a silent `.limit(N)`)
@@ -16,6 +17,8 @@ export interface PaginatedQueryOptions {
   select?: string;
   /** Server-side ordering applied to the data query. */
   order?: { column: string; ascending?: boolean };
+  /** Opt-in keyset pagination for immutable non-null created_at and UUID id, descending. */
+  createdAtIdKeyset?: boolean;
   /** Equality filter on branch_id (skipped when null/undefined). */
   branch_id?: string | null;
   /** Multi-branch filter. When provided, it takes precedence over branch_id. */
@@ -26,6 +29,10 @@ export interface PaginatedQueryOptions {
   filters?: { column: string; value: unknown }[];
   /** Optional server-side text search over one or more plain columns. */
   search?: { term: string; columns: string[] };
+  /** Values excluded from a column, scoped by the same branch and pagination. */
+  exclude?: { column: string; values: string[] };
+  /** Exclusive upper bound for a timestamp or other ordered column. */
+  maxExclusive?: { column: string; value: string };
   /** Optional lower-bound filter, used by centralized historical-data access. */
   min?: { column: string; value: string };
   /** Rows exposed per page. The hook fetches one extra row to detect hasMore. Default 50. */
@@ -91,9 +98,10 @@ function safeSearchTerm(value: string): string {
 
 export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRowsResult<T> {
   const { user } = useAuth();
-  const { table, select = '*', order, branch_id, branch_ids, or, filters, search, min, pageSize = 50, enabled = true } = opts;
+  const { table, select = '*', order, createdAtIdKeyset = false, branch_id, branch_ids, or, filters, exclude, maxExclusive, search, min, pageSize = 50, enabled = true } = opts;
   const branchIdsKey = JSON.stringify([...(branch_ids || [])].sort());
   const filterKey = JSON.stringify(filters ?? []);
+  const excludeKey = JSON.stringify(exclude ?? null);
   const searchKey = JSON.stringify({ term: search?.term ?? '', columns: search?.columns ?? [] });
   const orderKey = order?.column ?? '';
   const orderAsc = order?.ascending !== false;
@@ -106,16 +114,20 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
       select,
       orderKey,
       orderAsc,
+      createdAtIdKeyset,
       branch_id: branch_id ?? null,
       branch_ids: branchIdsKey,
       or: or ?? null,
       filterKey,
+      excludeKey,
+      maxColumn: maxExclusive?.column ?? null,
+      maxValue: maxExclusive?.value ?? null,
       searchKey,
       minColumn: min?.column ?? null,
       minValue: min?.value ?? null,
       pageSize,
     }),
-    [userId, table, select, orderKey, orderAsc, branch_id, branchIdsKey, or, filterKey, searchKey, min?.column, min?.value, pageSize],
+    [userId, table, select, orderKey, orderAsc, createdAtIdKeyset, branch_id, branchIdsKey, or, filterKey, excludeKey, maxExclusive?.column, maxExclusive?.value, searchKey, min?.column, min?.value, pageSize],
   );
 
   const initialCache = readSessionCache<T>(queryKey);
@@ -156,6 +168,8 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
       else if (branch_id) bq = bq.eq('branch_id', branch_id);
       if (or) bq = bq.or(or);
       for (const f of filters ?? []) bq = bq.eq(f.column, f.value);
+      if (exclude?.column && exclude.values.length) bq = bq.not(exclude.column, 'in', `(${exclude.values.join(',')})`);
+      if (maxExclusive?.column && maxExclusive.value) bq = bq.lt(maxExclusive.column, maxExclusive.value);
       if (min?.column && min.value) bq = bq.gte(min.column, min.value);
       const term = safeSearchTerm(search?.term ?? '');
       const columns = (search?.columns ?? []).filter((column) => /^[a-zA-Z0-9_]+$/.test(column));
@@ -166,11 +180,11 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
       return bq;
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by stable serialized option values
-    [branch_id, branchIdsKey, or, filterKey, searchKey, min?.column, min?.value]
+    [branch_id, branchIdsKey, or, filterKey, excludeKey, maxExclusive?.column, maxExclusive?.value, searchKey, min?.column, min?.value]
   );
 
   const buildDataQuery = useCallback(
-    (from: number, to: number): FilterBuilder => {
+    (from: number, to: number, after?: T): FilterBuilder => {
       // `table` and `select` are intentionally dynamic in this generic hook.
       // Narrow the Supabase overload to the filter-builder shape once here so
       // TypeScript does not recursively instantiate schema-string error types.
@@ -178,11 +192,14 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
         select: (columns: string) => FilterBuilder;
       };
       let q = applyFilters(source.select(select));
-      if (order) q = q.order(order.column, { ascending: orderAsc });
+      if (createdAtIdKeyset) {
+        q = q.order('created_at', { ascending: false }).order('id', { ascending: false });
+        if (after !== undefined) q = q.or(createdAtIdCursor(after));
+      } else if (order) q = q.order(order.column, { ascending: orderAsc });
       return q.range(from, to);
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed by stable orderKey/orderAsc; `order` identity changes each render
-    [table, select, applyFilters, orderKey, orderAsc]
+    [table, select, applyFilters, orderKey, orderAsc, createdAtIdKeyset]
   );
 
   // Synchronize display scope before paint. This prevents a branch/filter change
@@ -275,7 +292,9 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
     setLoadingMore(true);
     setError(null);
     try {
-      const { data, error: err } = await buildDataQuery(rows.length, rows.length + pageSize);
+      const { data, error: err } = createdAtIdKeyset
+        ? await buildDataQuery(0, pageSize, rows[rows.length - 1])
+        : await buildDataQuery(rows.length, rows.length + pageSize);
       if (g !== gen.current) return;
       if (err) {
         setError(userFacingErrorMessage(err));
@@ -302,7 +321,7 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
         setLoadingMore(false);
       }
     }
-  }, [buildDataQuery, enabled, pageSize, queryKey, rows.length, loading, hasMore]);
+  }, [buildDataQuery, enabled, pageSize, queryKey, rows, loading, hasMore, createdAtIdKeyset]);
 
   const fetchAll = useCallback(async (): Promise<T[]> => {
     if (!enabled) return [];
@@ -319,7 +338,9 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
     const all: T[] = [];
     let offset = 0;
     while (true) {
-      const { data, error: err } = await buildDataQuery(offset, offset + batchSize - 1);
+      const { data, error: err } = createdAtIdKeyset
+        ? await buildDataQuery(0, batchSize - 1, all[all.length - 1])
+        : await buildDataQuery(offset, offset + batchSize - 1);
       checkScope();
       if (err) throw err;
       const batch = (data as T[]) || [];
@@ -328,7 +349,7 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
       offset += batch.length;
     }
     return all;
-  }, [buildDataQuery, enabled, pageSize, queryKey]);
+  }, [buildDataQuery, enabled, pageSize, queryKey, createdAtIdKeyset]);
 
   useLayoutEffect(() => () => {
     scope.current = { queryKey: '', enabled: false };

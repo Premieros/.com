@@ -1,14 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/api';
+import type { ItemPayload } from '../../utils/cart';
 
 export function CashierDiscountApprovalCard({
   subtotal,
+  branchId,
+  orderId,
+  cart,
   currentType,
   onApproved,
   ar,
   canDirectDiscount,
 }: {
   subtotal: number;
+  branchId?: string;
+  orderId?: string | null;
+  cart?: ItemPayload[];
   currentType: 'amount' | 'percent';
   onApproved: (type: 'amount' | 'percent', amount: number) => void;
   ar: boolean;
@@ -20,6 +27,19 @@ export function CashierDiscountApprovalCard({
   const [requestId, setRequestId] = useState<string | null>(null);
   const [status, setStatus] = useState<'idle' | 'pending' | 'approved' | 'rejected'>('idle');
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const approvedRequest = useRef<string | null>(null);
+  const activeRequest = useRef<string | null>(null);
+  const requesting = useRef(false);
+  const submittedRequest = useRef<{ type: 'amount' | 'percent'; value: number } | null>(null);
+  const submittedSubtotal = useRef<number | null>(null);
+  const submittedScope = useRef('');
+  const currentScope = useRef('');
+  currentScope.current = JSON.stringify([branchId ?? null, orderId ?? null, cart ?? null]);
+  const subtotalRef = useRef(subtotal);
+  subtotalRef.current = subtotal;
+  const onApprovedRef = useRef(onApproved);
+  onApprovedRef.current = onApproved;
 
   useEffect(() => setType(currentType), [currentType]);
 
@@ -27,60 +47,98 @@ export function CashierDiscountApprovalCard({
   useEffect(() => {
     if (!requestId) return;
 
+    let active = true;
+    let terminal = false;
+    let reading = false;
+    const isCurrent = () => active && activeRequest.current === requestId && !terminal;
+    const acceptStatus = (next: { status?: string; expires_at?: string }) => {
+      if (!isCurrent()) return;
+      if (next.status === 'approved') {
+        const submitted = submittedRequest.current;
+        if (!submitted || approvedRequest.current === requestId) return;
+        approvedRequest.current = requestId;
+        terminal = true;
+        if (submittedSubtotal.current !== subtotalRef.current || submittedScope.current !== currentScope.current) {
+          setStatus('rejected');
+          setError(ar ? 'تغير إجمالي الطلب. أرسل طلب موافقة جديدًا.' : 'Order subtotal changed. Request a new approval.');
+          return;
+        }
+        setStatus('approved');
+        onApprovedRef.current(submitted.type, submitted.value);
+      } else if (next.status === 'rejected' || next.status === 'expired' || next.status === 'consumed' ||
+        (next.status === 'pending' && next.expires_at && Date.parse(next.expires_at) <= Date.now())) {
+        terminal = true;
+        setStatus('rejected');
+      }
+    };
+    const reconcile = async () => {
+      if (!isCurrent() || reading || document.visibilityState !== 'visible') return;
+      reading = true;
+      try {
+        const { data, error: failure } = await supabase.from('approval_requests')
+          .select('status,expires_at').eq('id', requestId).maybeSingle();
+        if (!isCurrent()) return;
+        if (failure || !data) {
+          setError(ar ? 'تعذر التحقق من الموافقة؛ ستتم إعادة المحاولة.' : 'Unable to verify approval; retrying.');
+        } else {
+          setError('');
+          acceptStatus(data);
+        }
+      } catch {
+        if (isCurrent()) setError(ar ? 'تعذر الاتصال للتحقق من الموافقة.' : 'Unable to connect to verify approval.');
+      } finally {
+        reading = false;
+      }
+    };
     const channel = supabase
       .channel(`discount-approval-${requestId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'approval_requests',
-          filter: `id=eq.${requestId}`,
-        },
-        (payload) => {
-          const next = payload.new as {
-            status?: string;
-            payload?: Record<string, unknown>;
-          };
-
-          if (next.status === 'approved') {
-            setStatus('approved');
-            onApproved(type, type === 'percent' ? Math.min(amount, 100) : Math.min(amount, Math.max(subtotal, 0)));
-          } else if (next.status === 'rejected' || next.status === 'expired') {
-            setStatus('rejected');
-          }
-        },
-      )
-      .subscribe();
-
+      .on('postgres_changes', {
+        event: 'UPDATE', schema: 'public', table: 'approval_requests',
+        filter: `id=eq.${requestId}`,
+      }, payload => acceptStatus(payload.new as { status?: string; expires_at?: string }))
+      .subscribe(state => { if (state === 'SUBSCRIBED') void reconcile(); });
+    void reconcile();
+    const timer = window.setInterval(() => { void reconcile(); }, 10_000);
+    const onVisible = () => { if (document.visibilityState === 'visible') void reconcile(); };
+    document.addEventListener('visibilitychange', onVisible);
     return () => {
+      active = false;
+      window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisible);
       void supabase.removeChannel(channel);
     };
-  }, [requestId, type, amount, subtotal, onApproved]);
+  }, [requestId]);
 
   if (canDirectDiscount) return null;
 
   const request = async () => {
-    if (amount <= 0 || reason.trim().length < 3) return;
+    if (busy || status === 'pending' || amount <= 0 || reason.trim().length < 3) return;
+    if (requesting.current) return;
 
     const normalizedInput = type === 'percent'
       ? Math.min(amount, 100)
       : Math.min(amount, Math.max(subtotal, 0));
-    const monetaryDiscount = type === 'percent'
+    const monetaryDiscount = Math.round((type === 'percent'
       ? (Math.max(subtotal, 0) * normalizedInput) / 100
-      : normalizedInput;
+      : normalizedInput) * 100) / 100;
     if (monetaryDiscount <= 0) return;
 
+    const requestScope = currentScope.current;
+    requesting.current = true;
+    activeRequest.current = null;
     setBusy(true);
+    setError('');
 
     try {
-      const { data } = await supabase.rpc('request_manager_approval', {
+      const { data, error: failure } = await supabase.rpc('request_manager_approval', {
         p_action_type: 'discount',
-        p_entity_type: 'sale',
-        p_entity_id: null,
+        p_entity_type: orderId ? 'order' : 'sale',
+        p_entity_id: orderId ?? null,
         p_payload: {
+          ...(branchId ? { branch_id: branchId } : {}),
           discount_amount: monetaryDiscount,
-          discount_type: type,
+          discount_type: 'amount',
+          ...(cart ? { cart } : {}),
           requested_value: normalizedInput,
           subtotal,
         },
@@ -92,11 +150,23 @@ export function CashierDiscountApprovalCard({
         request_id?: string;
       } | null;
 
+      if (failure) { setError(failure.message); return; }
       if (res?.success && res.request_id) {
+        // The approved action must match exactly what was submitted for review.
+        submittedRequest.current = { type: 'amount', value: monetaryDiscount };
+        submittedScope.current = requestScope;
+        submittedSubtotal.current = subtotal;
+        approvedRequest.current = null;
+        activeRequest.current = res.request_id;
         setRequestId(res.request_id);
         setStatus('pending');
+      } else {
+        setError(ar ? 'تعذر إرسال طلب الموافقة.' : 'Could not request approval.');
       }
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : (ar ? 'تعذر إرسال الطلب.' : 'Request failed.'));
     } finally {
+      requesting.current = false;
       setBusy(false);
     }
   };
@@ -111,6 +181,7 @@ export function CashierDiscountApprovalCard({
         <select
           value={type}
           onChange={(e) => setType(e.target.value as 'amount' | 'percent')}
+          disabled={busy || status === 'pending'}
           className="rounded-xl border border-ui-border bg-ui-surface-raised px-3 py-2 text-sm"
         >
           <option value="amount">{ar ? 'قيمة' : 'Amount'}</option>
@@ -122,6 +193,7 @@ export function CashierDiscountApprovalCard({
           min={0}
           value={amount || ''}
           onChange={(e) => setAmount(Math.max(0, Number(e.target.value) || 0))}
+          disabled={busy || status === 'pending'}
           className="rounded-xl border border-ui-border bg-ui-surface-raised px-3 py-2 text-sm"
           placeholder={ar ? 'قيمة الخصم' : 'Discount'}
         />
@@ -130,10 +202,12 @@ export function CashierDiscountApprovalCard({
       <input
         value={reason}
         onChange={(e) => setReason(e.target.value)}
+        disabled={busy || status === 'pending'}
         className="mt-2 w-full rounded-xl border border-ui-border bg-ui-surface-raised px-3 py-2 text-sm"
         placeholder={ar ? 'سبب الخصم (إجباري)' : 'Reason (required)'}
       />
 
+      {error && <p role="alert" className="mt-2 text-xs text-ui-danger">{error}</p>}
       <button
         type="button"
         onClick={() => void request()}

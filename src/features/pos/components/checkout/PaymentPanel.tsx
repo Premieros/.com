@@ -19,6 +19,7 @@ import {
 import { orderTypeLabel } from '../../utils/format';
 import { parseCarNotes, parseDeliveryNotes } from '../../utils/orderLabels';
 import { CashierDiscountApprovalCard } from './CashierDiscountApprovalCard';
+import { cartToItems } from '../../utils/cart';
 
 interface PaymentPanelProps {
   branchId: string;
@@ -29,6 +30,7 @@ interface PaymentPanelProps {
   orderType: OrderType;
   activeTable: DiningTable | null;
   activeOrderNumber: string | null;
+  activeOrderId?: string | null;
   guestCount: number | null;
   onGuestCountChange: (n: number | null) => void;
   customerId: string;
@@ -368,6 +370,9 @@ export function PaymentPanel(p: PaymentPanelProps) {
 
           {p.canEditOrder !== false && <CashierDiscountApprovalCard
             subtotal={p.subtotal}
+            branchId={p.branchId}
+            orderId={p.activeOrderId}
+            cart={cartToItems(p.cart)}
             currentType={p.discountType}
             ar={isAr}
             canDirectDiscount={p.canDirectDiscount === true}
