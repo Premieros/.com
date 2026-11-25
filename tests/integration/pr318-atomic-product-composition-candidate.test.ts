@@ -116,6 +116,17 @@ const disposable = Boolean(url && ['localhost','127.0.0.1','[::1]'].includes(new
       await db.query("select set_config('app.user_id',$1,true),set_config('app.jwt',$2,true)",[editor,JSON.stringify({sub:editor,role:'authenticated'})]);
       await db.query('SET LOCAL ROLE authenticated');
       expect((await db.query("select public.can_permission('products.edit') permitted,public.is_pos_admin() admin")).rows[0]).toEqual({permitted:true,admin:false});
+      // Read access is intentionally separate from edit permission. RLS must
+      // reject an editor who cannot see the product, even in their own branch.
+      await db.query('SAVEPOINT no_product_view');
+      expect((await db.query("select public.can_permission('products.view') allowed")).rows[0].allowed).toBe(false);
+      await expect(db.query(legacyEdit,[pid,branch,latestVersion,links,{name:'No read access'},null,sameRaw,links,'[]','[]'])).rejects.toThrow('PRODUCT_NOT_FOUND');
+      await db.query('ROLLBACK TO SAVEPOINT no_product_view');
+      await db.query('RESET ROLE');
+      await db.query("update public.roles set permissions=$2::jsonb where role=$1",[editorRole,JSON.stringify(['products.view','products.edit','recipes.manage'])]);
+      await db.query('SET LOCAL ROLE authenticated');
+      expect((await db.query("select public.can_permission('products.view') allowed,public.is_pos_admin() admin,public.user_may_access_branch($1) branch_access",[branch])).rows[0]).toEqual({allowed:true,admin:false,branch_access:true});
+      expect((await db.query('select id from public.products where id=$1',[pid])).rowCount).toBe(1);
       expect((await db.query(legacyEdit,[pid,branch,latestVersion,links,{name:'CI Delegated Edit'},null,sameRaw,links,'[]','[]'])).rows[0].result.success).toBe(true);
       await db.query('RESET ROLE');
       expect((await db.query('select version from public.recipes where product_id=$1 and is_active',[pid])).rows[0].version).toBe(latestVersion);
