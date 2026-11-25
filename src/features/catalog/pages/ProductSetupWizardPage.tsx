@@ -237,28 +237,15 @@ export function ProductSetupWizardPage() {
         p_wholesale_price: Number(form.wholesale_price) || 0,
         p_is_active: form.is_active,
         p_product_type: derivedProductType,
+        p_business_attributes: businessAttributes,
         p_unit_links: supportsComponentGroups && manufacturedComponents.length > 0
           ? manufacturedComponents.map((row) => ({ unit_id: row.unit_id, quantity: Number(row.quantity) }))
           : null,
       };
       const directItems = supportsRawComposition ? rawComponents.map(row => ({ raw_material_id: row.raw_material_id, quantity: Number(row.quantity), wastage_percent: Number(row.wastage_percent ?? 0) })) : [];
-      // The deployed raw-create RPC saves product and raw recipe atomically;
-      // mixed groups still need the separately verified link operation.
-      const { data, error: productError } = directItems.length > 0
-        ? await api.catalog.createProductWithRawComponents({ p_product: createInput, p_items: directItems })
-        : await api.catalog.createProduct(createInput);
-      if (productError || !data || data.success === false) throw productError || new Error(data?.error || 'error');
-      createdProductId = data.product_id ?? null;
-      if (!createdProductId) throw new Error(data?.error || 'error');
-
-      if (Object.keys(businessAttributes).length > 0) {
-        const { data: updated, error: attributesError } = await supabase.from('products').update({ business_attributes: businessAttributes }).eq('id', createdProductId).eq('branch_id', branchId).select('id').maybeSingle();
-        if (attributesError || !updated?.id) throw attributesError || new Error('PRODUCT_ATTRIBUTES_NOT_SAVED');
-      }
-
-      if (directItems.length > 0 && createInput.p_unit_links?.length) {
-        await api.catalog.setProductUnitLinks(createdProductId, createInput.p_unit_links);
-      }
+      const { data, error: productError } = await api.catalog.createProductOperational({ p_product: createInput, p_items: directItems });
+      if (productError || !data?.success || !data.product_id) throw productError || new Error(data?.error || 'PRODUCT_CREATE_FAILED');
+      createdProductId = data.product_id;
       if (directItems.length > 0) {
         const persisted = await api.catalog.getProductDirectRawComponents(createdProductId, branchId);
         if (persisted.items.length !== directItems.length || directItems.some(row => !persisted.items.some(item => item.raw_material_id === row.raw_material_id && Math.abs(Number(item.quantity) - row.quantity) < 0.000001 && Math.abs(Number(item.wastage_percent ?? 0) - row.wastage_percent) < 0.000001))) throw new Error('PRODUCT_RAW_COMPONENTS_NOT_SAVED');

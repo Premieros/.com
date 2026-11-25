@@ -170,6 +170,9 @@ export function ProductsPage() {
   const saveLock = useRef(false);
   const openingProduct = useRef(false);
   const initialRawCount = useRef(0);
+  const initialRecipeVersion = useRef<number | null>(null);
+  const initialLinks = useRef<{ unit_id: string; quantity: number }[]>([]);
+  const initialLegacyCount = useRef(0);
   const canManageRecipes = can('recipes.manage');
 
   useEffect(() => {
@@ -209,6 +212,9 @@ export function ProductsPage() {
     if (!can('products.create') || openingProduct.current || saveLock.current) return;
     setEditing(null);
     initialRawCount.current = 0;
+    initialRecipeVersion.current = null;
+    initialLinks.current = [];
+    initialLegacyCount.current = 0;
     setRawMaterialOptions([]);
     setRawMaterialWaste(0);
     setComponentSel('');
@@ -252,6 +258,8 @@ export function ProductsPage() {
     ]);
     if (u.error || comps.error) { show((u.error || comps.error)?.message || t('error'), 'error'); return; }
     setUnits((u.data as ProductUnit[]) || [{ id: '', product_id: p.id, unit_name: 'piece', unit_name_en: 'piece', conversion_factor: 1, sale_price: p.sale_price, cost_price: p.cost_price, barcode: p.barcode || '', is_base: true, created_at: '' }]);
+    initialLegacyCount.current = (comps.data || []).length;
+    initialRecipeVersion.current = null;
     setProductComponents(((comps.data as { component_product_id: string; quantity: number }[] | null) || []).map((c) => ({ component_product_id: c.component_product_id, quantity: Number(c.quantity) || 1 })));
     const effectiveProductBranch = p.branch_id || branchFilter || '';
     setLiveCompositionCost(null);
@@ -302,6 +310,7 @@ export function ProductsPage() {
         setRawMaterialOptions(options);
         const names = new Map(options.map((row) => [row.id, row.name]));
         currentYield = Number(composition.yield_quantity) || 1;
+        initialRecipeVersion.current = composition.recipe_version ?? null;
         recipeRows = composition.items.map((row) => ({
           raw_material_id: row.raw_material_id,
           quantity: Number(row.quantity) || 0,
@@ -338,6 +347,7 @@ export function ProductsPage() {
     setRawMaterialSel('');
     setRawMaterialQty(1);
     setRawMaterialWaste(0);
+    initialLinks.current = displayInventoryLinks.map(({unit_id,quantity}) => ({unit_id,quantity})).sort((a,b) => a.unit_id < b.unit_id ? -1 : a.unit_id > b.unit_id ? 1 : 0);
     setLinkedInventoryUnits(displayInventoryLinks);
     setLinkedUnitSel('');
     setLinkedUnitQty(1);
@@ -392,7 +402,13 @@ export function ProductsPage() {
     const payload = { ...form, product_type: productType, category_id: form.category_id || null, branch_id: effectiveBranch, business_attributes: businessAttributes };
     const unitPayload = units.filter(u => u.unit_name).map((u) => ({ unit_name: u.unit_name, unit_name_en: u.unit_name_en || u.unit_name, conversion_factor: u.conversion_factor, sale_price: u.sale_price, cost_price: u.cost_price, barcode: u.barcode || null, is_base: u.is_base }));
     let pid: string;
-    if (editing) {
+    const atomicEdit = Boolean(editing && supportsRawComposition && supportsComponentGroups && canManageRecipes && initialLegacyCount.current === 0 && productComponents.length === 0);
+    if (editing && atomicEdit) {
+      const { data, error } = await api.catalog.editProductOperational({ p_product_id: editing.id, p_branch_id: effectiveBranch, p_expected_version: initialRecipeVersion.current, p_expected_links: initialLinks.current, p_product: payload, p_units: unitPayload.length > 0 ? unitPayload : null, p_items: rawRows.map(({raw_material_id,quantity,wastage_percent}) => ({raw_material_id,quantity,wastage_percent})), p_links: unitRows.map(({unit_id,quantity}) => ({unit_id,quantity})) });
+      if (error || !data?.success || data.product_id !== editing.id) { show(error?.message || data?.detail || data?.error || 'PRODUCT_NOT_SAVED', 'error'); return; }
+      pid = editing.id;
+      await logAudit('update', 'products', pid, { name: form.name });
+    } else if (editing) {
       const { data: updated, error } = await supabase.from('products').update(payload).eq('id', editing.id).eq('branch_id', effectiveBranch).select('id').maybeSingle();
       if (error || !updated?.id) { show(error?.message || (lang === 'ar' ? 'لم يتم حفظ المنتج؛ تحقق من الصلاحية والفرع.' : 'Product was not saved; check permissions and branch.'), 'error'); return; }
       pid = editing.id;
@@ -417,12 +433,13 @@ export function ProductsPage() {
         p_max_stock: payload.max_stock,
         p_reorder_point: payload.reorder_point,
         p_product_type: payload.product_type,
+        p_business_attributes: businessAttributes,
         p_is_active: payload.is_active,
         p_units: unitPayload.length > 0 ? unitPayload : null,
         p_unit_links: supportsComponentGroups && unitRows.length > 0 ? unitRows.map(({ unit_id, quantity }) => ({ unit_id, quantity })) : null,
       };
-      const { data, error } = rawRows.length > 0
-        ? await api.catalog.createProductWithRawComponents({
+      const { data, error } = productComponents.length === 0
+        ? await api.catalog.createProductOperational({
           p_product: createInput,
           p_items: rawRows.map(({ raw_material_id, quantity, wastage_percent }) =>
             ({ raw_material_id, quantity, wastage_percent })),
@@ -437,8 +454,8 @@ export function ProductsPage() {
         ? unitRows.map(({ unit_id, quantity }) => ({ unit_id, quantity }))
         : [];
       try {
-        if (supportsComponentGroups && (editing || (rawRows.length > 0 && desiredLinks.length > 0))) await api.catalog.setProductUnitLinks(pid, desiredLinks);
-        if (editing && supportsRawComposition && canManageRecipes && (rawRows.length > 0 || initialRawCount.current > 0)) {
+        if (supportsComponentGroups && editing && !atomicEdit) await api.catalog.setProductUnitLinks(pid, desiredLinks);
+        if (editing && !atomicEdit && supportsRawComposition && canManageRecipes && (rawRows.length > 0 || initialRawCount.current > 0)) {
           await api.catalog.saveProductDirectRawComponents({
             product_id: pid,
             branch_id: effectiveBranch,
@@ -481,7 +498,7 @@ export function ProductsPage() {
     }
 
     const usesOperationalComposition = rawRows.length > 0 || unitRows.length > 0;
-    if (supportsComposition && !usesOperationalComposition) {
+    if (supportsComposition && !usesOperationalComposition && !atomicEdit && (initialLegacyCount.current > 0 || productComponents.length > 0)) {
       const { error: compDelError } = await supabase.from('product_components').delete().eq('product_id', pid);
       if (compDelError) { show(compDelError.message, 'error'); return; }
       if (productType === 'manufactured' && productComponents.length > 0) {

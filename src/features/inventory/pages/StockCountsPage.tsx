@@ -261,7 +261,7 @@ export function StockCountsPage() {
   const removeEditLine = (idx: number) => setEditLines(editLines.filter((_, i) => i !== idx));
 
   const saveEdit = async () => {
-    if (!editTarget || mutationLock.current || !can('inventory.count.create') || editTarget.status !== 'draft') return;
+    if (!editTarget || mutationLock.current || !can('inventory.count.create') || editTarget.status !== 'draft' || (editTarget.items || []).some(it => it.raw_material_id)) return;
     const selected = editLines.filter(line => line.product_id);
     if (new Set(selected.map(line => line.product_id)).size !== selected.length || selected.some(line => !editProducts.some(product => product.id === line.product_id))) { show(isAr ? 'تحقق من الأصناف وعدم تكرارها.' : 'Check products and duplicate lines.', 'error'); return; }
     let parsed;
@@ -270,22 +270,15 @@ export function StockCountsPage() {
     mutationLock.current = true;
     setMutationBusy(true);
     try {
-      const original = new Map((editTarget.items || []).filter(it => it.product_id).map(it => [it.product_id as string, it]));
-      for (const line of parsed) {
-        const before = original.get(line.product_id);
-        if (before) {
-          if ((before.counted_quantity == null ? null : Number(before.counted_quantity)) !== line.qty || (before.reason || '') !== line.reason) {
-            requireSuccessfulMutation(await api.inventory.updateStockCountItem({ p_stock_count_id: editTarget.id, p_product_id: line.product_id, p_counted_quantity: line.qty, p_reason: line.reason || null }));
-          }
-        } else {
-          requireSuccessfulMutation(await api.inventory.addStockCountItem({ p_stock_count_id: editTarget.id, p_product_id: line.product_id, p_counted_quantity: line.qty, p_reason: line.reason || null }));
-        }
-      }
-      const kept = new Set(selected.map(line => line.product_id));
-      for (const it of editTarget.items || []) if (it.product_id && !kept.has(it.product_id)) requireSuccessfulMutation(await api.inventory.removeStockCountItem({ p_stock_count_id: editTarget.id, p_product_id: it.product_id }));
+      const original = (editTarget.items || []).filter(it => it.product_id).map(it => ({ product_id: it.product_id as string, counted_quantity: Number(it.counted_quantity), reason: it.reason ?? null })).sort((a,b) => a.product_id < b.product_id ? -1 : a.product_id > b.product_id ? 1 : 0);
+      requireSuccessfulMutation(await api.inventory.editStockCountDraft({
+        p_count_id: editTarget.id,
+        p_expected: original,
+        p_items: parsed.map(line => ({ product_id: line.product_id, counted_quantity: line.qty, reason: line.reason || null })),
+      }));
       show(t('countSaved'), 'success');
     } catch (error) {
-      show((isAr ? 'لم يكتمل حفظ الجرد؛ أعد فتح الجلسة للتحقق من البنود المحفوظة: ' : 'Count save incomplete; reopen to inspect saved lines: ') + (error instanceof Error ? error.message : String(error)), 'error');
+      show((isAr ? 'تعذر تأكيد حفظ الجرد؛ أعد فتح الجلسة للتحقق: ' : 'Count save unconfirmed; reopen to verify: ') + (error instanceof Error ? error.message : String(error)), 'error');
     } finally {
       setEditTarget(null);
       reloadCounts();

@@ -1,11 +1,10 @@
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const dbUrl = process.env.SUPABASE_DB_URL;
 const disposable = Boolean(dbUrl && /(?:localhost|127\.0\.0\.1|\[::1\])/.test(new URL(dbUrl).hostname));
-(disposable ? describe : describe.skip)('PR 318 candidate: semi-finished projection', () => {
+(disposable ? describe : describe.skip)('PR 318 canonical semi-finished projection', () => {
   const db = new Client({ connectionString: dbUrl });
   beforeAll(async () => { await db.connect(); });
   afterAll(async () => { await db.end(); });
@@ -24,14 +23,8 @@ const disposable = Boolean(dbUrl && /(?:localhost|127\.0\.0\.1|\[::1\])/.test(ne
       await db.query('insert into public.inventory_unit_batches(unit_id,branch_id,warehouse_id,batch_number,quantity,unit_cost) values($1,$2,$3,$4,2,1)', [unlinked,branch,wh,'CI-P-' + tag]);
       await db.query("insert into public.inventory_unit_entries(unit_id,branch_id,warehouse_id,quantity,unit_cost,entry_type) values($1,$2,$3,-0.5,0,'sale'),($4,$2,$3,1.5,1,'production')", [linked,branch,wh,unlinked]);
       await db.query('insert into public.inventory_unit_stock_debts(unit_id,branch_id,warehouse_id,oversold_batch_id,debt_quantity) values($1,$2,$3,$4,0.5),($5,$2,$3,null,0.5)', [linked,branch,wh,batch,unlinked]);
-      // Compile the candidate SELECT in a session-local view: no permanent
-      // DDL, no production migration and no changes to historical views.
-      const sql = readFileSync('scripts/db/candidates/pr_318_semi_finished_balance_projection_NOT_FOR_PRODUCTION.sql', 'utf8')
-        .replace('create or replace view private.canonical_inventory_balances', 'create temp view pr318_candidate_balance')
-        .split('revoke all on table private.canonical_inventory_balances')[0];
-      await db.query(sql);
       const get = async (unitId: string) => (await db.query(
-        "select v.quantity::float8 qty,v.open_debt_quantity::float8 debt,v.movement_delta::float8 delta,v.reconciliation_status status from pr318_candidate_balance v join private.item_legacy_links l on l.item_id=v.item_id where l.source_table='inventory_units' and l.source_id=$1 and v.inventory_kind='SEMI_FINISHED' and v.branch_id=$2 and v.warehouse_id=$3",
+        "select v.quantity::float8 qty,v.open_debt_quantity::float8 debt,v.movement_delta::float8 delta,v.reconciliation_status status from private.canonical_inventory_balances v join private.item_legacy_links l on l.item_id=v.item_id where l.source_table='inventory_units' and l.source_id=$1 and v.inventory_kind='SEMI_FINISHED' and v.branch_id=$2 and v.warehouse_id=$3",
         [unitId,branch,wh],
       )).rows[0];
       expect(await get(linked)).toEqual({qty:-0.5,debt:0.5,delta:0,status:'MATCH'});

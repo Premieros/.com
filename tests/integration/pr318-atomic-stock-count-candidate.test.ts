@@ -1,10 +1,9 @@
 import { randomUUID } from 'node:crypto';
-import { readFileSync } from 'node:fs';
 import { Client } from 'pg';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 const url=process.env.SUPABASE_DB_URL;
 const disposable=Boolean(url && ['localhost','127.0.0.1','[::1]'].includes(new URL(url).hostname));
-(disposable ? describe : describe.skip)('PR318 atomic legacy stock count edit candidate',()=>{
+(disposable ? describe : describe.skip)('PR318 canonical atomic legacy stock count edit',()=>{
   const db=new Client({connectionString:url});
   beforeAll(async()=>{await db.connect()});
   afterAll(async()=>{await db.end()});
@@ -25,26 +24,22 @@ const disposable=Boolean(url && ['localhost','127.0.0.1','[::1]'].includes(new U
       await db.query("insert into public.products(id,name,sku,branch_id,product_type,cost_price,sale_price) values($1,'CI Count first',$2,$3,'ready',1,2),($4,'CI Count second',$5,$3,'ready',1,2)",[pid,'CI-F-'+tag,branch,second,'CI-S-'+tag]);
       await db.query("insert into public.stock_counts(id,branch_id,warehouse_id,status) values($1,$2,$3,'draft')",[count,branch,wh]);
       await db.query("insert into public.stock_count_items(stock_count_id,product_id,system_quantity,counted_quantity,unit_cost) values($1,$2,2,2,1)",[count,pid]);
-      const candidate=readFileSync('scripts/db/candidates/pr_318_atomic_stock_count_edit_NOT_FOR_PRODUCTION.sql','utf8');
-      expect(candidate.match(/\$count_lock\$/g)).toHaveLength(2);
-      expect(candidate).not.toMatch(/AS \$\n|END; \$;/);
-      await db.query(candidate);
-      const call='select public.pr318_edit_stock_count_candidate($1,$2,$3) result';
-      const acl=(await db.query("select has_table_privilege('authenticated','public.stock_counts','UPDATE') count_write,has_table_privilege('authenticated','public.stock_count_items','UPDATE') item_write,has_function_privilege('anon','private.pr318_lock_stock_count_draft(uuid)','EXECUTE') anon_lock,has_function_privilege('anon','public.pr318_edit_stock_count_candidate(uuid,jsonb,jsonb)','EXECUTE') anon_edit")).rows[0];
+      const call='select public.edit_stock_count_draft($1,$2,$3) result';
+      const acl=(await db.query("select has_table_privilege('authenticated','public.stock_counts','UPDATE') count_write,has_table_privilege('authenticated','public.stock_count_items','UPDATE') item_write,has_function_privilege('anon','private.lock_stock_count_draft_for_edit(uuid)','EXECUTE') anon_lock,has_function_privilege('anon','public.edit_stock_count_draft(uuid,jsonb,jsonb)','EXECUTE') anon_edit")).rows[0];
       expect(acl).toEqual({count_write:false,item_write:false,anon_lock:false,anon_edit:false});
       // A fabricated or inactive identity must not gain the privileged lock.
       await db.query('SAVEPOINT denied_lock');
       const unknown=randomUUID();
       await db.query("select set_config('app.user_id',$1,true),set_config('app.jwt',$2,true)",[unknown,JSON.stringify({sub:unknown,role:'authenticated'})]);
       await db.query('SET LOCAL ROLE authenticated');
-      await expect(db.query('select private.pr318_lock_stock_count_draft($1)',[count])).rejects.toThrow('COUNT_EDIT_DENIED');
+      await expect(db.query('select private.lock_stock_count_draft_for_edit($1)',[count])).rejects.toThrow('COUNT_EDIT_DENIED');
       await db.query('ROLLBACK TO SAVEPOINT denied_lock');
       await db.query('RESET ROLE');
       // The helper checks the draft state under the lock, not merely before it.
       await db.query('SAVEPOINT closed_count');
       await db.query("update public.stock_counts set status='submitted' where id=$1",[count]);
       await db.query('SET LOCAL ROLE authenticated');
-      await expect(db.query('select private.pr318_lock_stock_count_draft($1)',[count])).rejects.toThrow('COUNT_NOT_DRAFT');
+      await expect(db.query('select private.lock_stock_count_draft_for_edit($1)',[count])).rejects.toThrow('COUNT_NOT_DRAFT');
       await db.query('ROLLBACK TO SAVEPOINT closed_count');
       await db.query('RESET ROLE');
       // A real non-admin with count-create permission still cannot lock another branch.
@@ -60,7 +55,7 @@ const disposable=Boolean(url && ['localhost','127.0.0.1','[::1]'].includes(new U
       await db.query("select set_config('app.user_id',$1,true),set_config('app.jwt',$2,true)",[outsideUser,JSON.stringify({sub:outsideUser,role:'authenticated'})]);
       await db.query('SET LOCAL ROLE authenticated');
       expect((await db.query("select public.can_permission('inventory.count.create') allowed")).rows[0].allowed).toBe(true);
-      await expect(db.query('select private.pr318_lock_stock_count_draft($1)',[count])).rejects.toThrow('COUNT_EDIT_DENIED');
+      await expect(db.query('select private.lock_stock_count_draft_for_edit($1)',[count])).rejects.toThrow('COUNT_EDIT_DENIED');
       await db.query('ROLLBACK TO SAVEPOINT outside_scope');
       await db.query('RESET ROLE');
       const snapshot=JSON.stringify([{product_id:pid,counted_quantity:2,reason:null}]);

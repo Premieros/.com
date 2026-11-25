@@ -36,12 +36,14 @@ export type CreateProductInput = {
   p_is_active?: boolean;
   p_units?: { unit_name: string; unit_name_en?: string; conversion_factor?: number; sale_price?: number; cost_price?: number; barcode?: string | null; is_base?: boolean }[] | null;
   p_unit_links?: { unit_id: string; quantity: number }[] | null;
+  p_business_attributes?: Record<string, unknown>;
 };
 
 export type CreateProductResult = { success?: boolean; error?: string; product_id?: string; branch_id?: string | null };
 export type DirectRawComponentInput = { raw_material_id: string; quantity: number; wastage_percent?: number };
 export type ProductDirectRawComposition = {
   recipe_id: string | null;
+  recipe_version?: number | null;
   yield_quantity: number;
   items: DirectRawComponentInput[];
 };
@@ -142,6 +144,8 @@ export type KitchenCompletedHistoryResult = {
 };
 
 export const catalog = {
+  createProductOperational(p: { p_product: CreateProductInput; p_items: DirectRawComponentInput[] }): ApiResult<CreateProductResult> { return rpc('create_product_operational', p); },
+  editProductOperational(p: { p_product_id: string; p_branch_id: string; p_expected_version: number | null; p_expected_links: { unit_id: string; quantity: number }[]; p_product: object; p_units: unknown; p_items: DirectRawComponentInput[]; p_links: { unit_id: string; quantity: number }[] }): ApiResult<{ success?: boolean; error?: string; detail?: string; product_id?: string }> { return rpc('edit_product_operational_composition', p); },
   replaceProductUnits(p: { p_product_id: string; p_units: unknown }): ApiResult<{ success?: boolean; error?: string; detail?: string }> { return rpc('replace_product_units', p); },
   createRawMaterial(p: CreateRawMaterialInput): ApiResult<CreateRawMaterialResult> { return rpc('create_raw_material', p); },
   createProduct(p: CreateProductInput): ApiResult<CreateProductResult> { return rpc('create_product', p); },
@@ -223,7 +227,7 @@ export const catalog = {
   async getProductDirectRawComponents(product_id: string, branch_id: string): Promise<ProductDirectRawComposition> {
     const { data: recipe, error: recipeError } = await supabase
       .from('recipes')
-      .select('id,yield_quantity')
+      .select('id,yield_quantity,version')
       .eq('product_id', product_id)
       .eq('branch_id', branch_id)
       .eq('is_active', true)
@@ -232,7 +236,7 @@ export const catalog = {
       .limit(1)
       .maybeSingle();
     if (recipeError) throw recipeError;
-    if (!recipe?.id) return { recipe_id: null, yield_quantity: 1, items: [] };
+    if (!recipe?.id) return { recipe_id: null, recipe_version: null, yield_quantity: 1, items: [] };
 
     const { data: items, error: itemsError } = await supabase
       .from('recipe_items')
@@ -242,6 +246,7 @@ export const catalog = {
     if (itemsError) throw itemsError;
     return {
       recipe_id: recipe.id,
+      recipe_version: Number(recipe.version),
       yield_quantity: Number(recipe.yield_quantity) || 1,
       items: ((items || []) as DirectRawComponentInput[]).map((row) => ({
         raw_material_id: row.raw_material_id,
