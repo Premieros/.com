@@ -9,7 +9,7 @@ const disposable = Boolean(url && ['localhost','127.0.0.1','[::1]'].includes(new
   const db = new Client({ connectionString: url });
   beforeAll(async () => { await db.connect(); });
   afterAll(async () => { await db.end(); });
-  it('saves mixed composition in one transaction and rolls back a late recipe insert failure', async () => {
+  it('creates and edits mixed composition with rollback and stale-snapshot rejection', async () => {
     const org=randomUUID(), branch=randomUUID(), other=randomUUID(), user=randomUUID(), measure=randomUUID(), raw=randomUUID(), group=randomUUID(), foreignGroup=randomUUID();
     const tag=randomUUID().slice(0,8), email='atomic-'+tag+'@ci.invalid';
     await db.query('BEGIN');
@@ -46,6 +46,27 @@ const disposable = Boolean(url && ['localhost','127.0.0.1','[::1]'].includes(new
         expect((await db.query('select id from public.products where sku=$1',[sku])).rowCount).toBe(0);
       }
       expect((await db.query("select has_function_privilege('anon','public.pr318_create_product_composition_candidate(jsonb,jsonb)','execute') allowed")).rows[0].allowed).toBe(false);
+      await db.query(readFileSync('scripts/db/candidates/pr_318_atomic_product_edit_NOT_FOR_PRODUCTION.sql','utf8'));
+      const editCall='select public.pr318_edit_product_composition_candidate($1,$2,$3,$4,$5,$6,$7) result';
+      const ver=(await db.query('select version from public.recipes where product_id=$1',[pid])).rows[0].version;
+      const originalLinks=JSON.stringify([{unit_id:group,quantity:0.5}]);
+      const links=JSON.stringify([{unit_id:group,quantity:0.75}]);
+      await db.query('SAVEPOINT bad_edit');
+      await db.query('SET LOCAL ROLE authenticated');
+      await expect(db.query(editCall,[pid,branch,ver,originalLinks,'Must roll back',JSON.stringify([{raw_material_id:raw,quantity:1e20}]),links])).rejects.toThrow();
+      await db.query('ROLLBACK TO SAVEPOINT bad_edit');
+      await db.query('RESET ROLE');
+      expect((await db.query('select p.name,l.quantity::float8 qty,i.quantity::float8 raw_qty from public.products p join public.product_unit_links l on l.product_id=p.id join public.recipes r on r.product_id=p.id join public.recipe_items i on i.recipe_id=r.id where p.id=$1',[pid])).rows[0]).toEqual({name:'CI Mixed',qty:0.5,raw_qty:2});
+      await db.query('SET LOCAL ROLE authenticated');
+      expect((await db.query(editCall,[pid,branch,ver,originalLinks,'CI Edited',JSON.stringify([{raw_material_id:raw,quantity:3,wastage_percent:2}]),links])).rows[0].result.success).toBe(true);
+      await db.query('RESET ROLE');
+      expect((await db.query('select p.name,l.quantity::float8 group_qty,i.quantity::float8 raw_qty from public.products p join public.product_unit_links l on l.product_id=p.id join public.recipes r on r.product_id=p.id join public.recipe_items i on i.recipe_id=r.id where p.id=$1',[pid])).rows[0]).toEqual({name:'CI Edited',group_qty:.75,raw_qty:3});
+      await db.query('SAVEPOINT stale_edit');
+      await db.query('SET LOCAL ROLE authenticated');
+      await expect(db.query(editCall,[pid,branch,ver,originalLinks,'Stale',JSON.stringify(items),links])).rejects.toThrow('COMPOSITION_REFRESH_REQUIRED');
+      await db.query('ROLLBACK TO SAVEPOINT stale_edit');
+      await db.query('RESET ROLE');
+      expect((await db.query("select has_function_privilege('anon','public.pr318_edit_product_composition_candidate(uuid,uuid,integer,jsonb,text,jsonb,jsonb)','execute') allowed")).rows[0].allowed).toBe(false);
     } finally { await db.query('ROLLBACK'); }
   });
 });
