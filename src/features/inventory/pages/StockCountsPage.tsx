@@ -24,7 +24,8 @@ import { usePaginatedRows } from '@/hooks/usePaginatedRows';
 import type { StockCount, StockCountItem, Branch, Warehouse, Product, RawMaterial } from '@/lib/types';
 
 interface EditLine {
-  product_id: string;
+  item_kind: 'raw_material' | 'product';
+  item_id: string;
   counted_quantity: string;
   reason: string;
 }
@@ -90,6 +91,7 @@ export function StockCountsPage() {
   const visibleBranches = branches.filter((b) => branchScope.selectedBranchSet.has(b.id));
   const formRawMaterials = form.branch_id ? rawMaterials.filter((r) => r.branch_id === form.branch_id) : [];
   const editProducts = editTarget ? products.filter((p) => p.branch_id === editTarget.branch_id) : [];
+  const editRawMaterials = editTarget ? rawMaterials.filter((r) => r.branch_id === editTarget.branch_id) : [];
 
   async function loadMeta() {
     const [br, wh, pr, rm] = await Promise.all([
@@ -254,27 +256,27 @@ export function StockCountsPage() {
 
   const openEdit = (count: StockCount) => {
     setEditTarget(count);
-    setEditLines((count.items || []).map((it) => ({ product_id: it.product_id || '', counted_quantity: it.counted_quantity == null ? '' : String(it.counted_quantity), reason: it.reason || '' })));
+    setEditLines((count.items || []).map((it) => ({ item_kind: it.raw_material_id ? 'raw_material' : 'product', item_id: it.raw_material_id || it.product_id || '', counted_quantity: it.counted_quantity == null ? '' : String(it.counted_quantity), reason: it.reason || '' })));
   };
-  const addEditLine = () => setEditLines([...editLines, { product_id: '', counted_quantity: '', reason: '' }]);
-  const updateEditLine = (idx: number, field: keyof EditLine, value: string) => setEditLines(editLines.map((l, i) => i === idx ? { ...l, [field]: value } : l));
-  const removeEditLine = (idx: number) => setEditLines(editLines.filter((_, i) => i !== idx));
+  const addEditLine = () => setEditLines(prev => [...prev, { item_kind: 'raw_material', item_id: '', counted_quantity: '', reason: '' }]);
+  const updateEditLine = (idx: number, patch: Partial<EditLine>) => setEditLines(prev => prev.map((l, i) => i === idx ? { ...l, ...patch } : l));
+  const removeEditLine = (idx: number) => setEditLines(prev => prev.filter((_, i) => i !== idx));
 
   const saveEdit = async () => {
-    if (!editTarget || mutationLock.current || !can('inventory.count.create') || editTarget.status !== 'draft' || (editTarget.items || []).some(it => it.raw_material_id)) return;
-    const selected = editLines.filter(line => line.product_id);
-    if (new Set(selected.map(line => line.product_id)).size !== selected.length || selected.some(line => !editProducts.some(product => product.id === line.product_id))) { show(isAr ? 'تحقق من الأصناف وعدم تكرارها.' : 'Check products and duplicate lines.', 'error'); return; }
+    if (!editTarget || mutationLock.current || !can('inventory.count.create') || editTarget.status !== 'draft') return;
+    const selected = editLines.filter(line => line.item_id);
+    if (selected.length !== editLines.length || new Set(selected.map(line => `${line.item_kind}:${line.item_id}`)).size !== selected.length || selected.some(line => !(line.item_kind === 'raw_material' ? editRawMaterials : editProducts).some(item => item.id === line.item_id))) { show(isAr ? 'تحقق من اختيار كل بند والفرع وعدم التكرار.' : 'Check every item selection, branch and duplicates.', 'error'); return; }
     let parsed;
     try { parsed = selected.map(line => ({ ...line, qty: requireCountedQuantity(line.counted_quantity) })); }
     catch { show(isAr ? 'أدخل كمية جرد فعلية صحيحة لكل بند محدد؛ الصفر مقبول.' : 'Enter an explicit valid counted quantity for every selected item; zero is allowed.', 'error'); return; }
     mutationLock.current = true;
     setMutationBusy(true);
     try {
-      const original = (editTarget.items || []).filter(it => it.product_id).map(it => ({ product_id: it.product_id as string, counted_quantity: Number(it.counted_quantity), reason: it.reason ?? null })).sort((a,b) => a.product_id < b.product_id ? -1 : a.product_id > b.product_id ? 1 : 0);
-      requireSuccessfulMutation(await api.inventory.editStockCountDraft({
+      const original = (editTarget.items || []).map(it => ({ item_kind: (it.raw_material_id ? 'raw_material' : 'product') as EditLine['item_kind'], item_id: (it.raw_material_id || it.product_id) as string, counted_quantity: Number(it.counted_quantity), reason: it.reason ?? null })).sort((a,b) => a.item_kind < b.item_kind ? -1 : a.item_kind > b.item_kind ? 1 : a.item_id < b.item_id ? -1 : a.item_id > b.item_id ? 1 : 0);
+      requireSuccessfulMutation(await api.inventory.editStockCountDraftItems({
         p_count_id: editTarget.id,
         p_expected: original,
-        p_items: parsed.map(line => ({ product_id: line.product_id, counted_quantity: line.qty, reason: line.reason || null })),
+        p_items: parsed.map(line => ({ item_kind: line.item_kind, item_id: line.item_id, counted_quantity: line.qty, reason: line.reason || null })),
       }));
       show(t('countSaved'), 'success');
     } catch (error) {
@@ -324,10 +326,9 @@ export function StockCountsPage() {
     { key: 'items_count', header: t('countItems'), render: (c) => c.items?.length || 0 },
     { key: 'status', header: t('status'), render: (c) => statusPill(c.status) },
     { key: 'actions', header: t('actions'), render: (c) => {
-      const hasRaw = (c.items || []).some((i) => !!i.raw_material_id);
       return <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
         <button onClick={() => setViewTarget(c)} className="p-1.5 rounded-md hover:bg-ui-page-alt text-ui-subtle" title={t('viewCountItems')}><Eye className="w-4 h-4" /></button>
-        {can('inventory.count.create') && c.status === 'draft' && <>{!hasRaw && <button onClick={() => openEdit(c)} className="p-1.5 rounded-md hover:bg-ui-info-soft text-ui-info" title={t('addCountItem')}><Plus className="w-4 h-4" /></button>}<button onClick={() => setConfirmTarget({ count: c, action: 'submit' })} className="p-1.5 rounded-md hover:bg-ui-success-soft text-ui-success" title={t('submitCount')}><Send className="w-4 h-4" /></button></>}
+        {can('inventory.count.create') && c.status === 'draft' && <><button onClick={() => openEdit(c)} className="p-1.5 rounded-md hover:bg-ui-info-soft text-ui-info" title={t('addCountItem')}><Plus className="w-4 h-4" /></button><button onClick={() => setConfirmTarget({ count: c, action: 'submit' })} className="p-1.5 rounded-md hover:bg-ui-success-soft text-ui-success" title={t('submitCount')}><Send className="w-4 h-4" /></button></>}
         {can('inventory.count.approve') && c.status === 'submitted' && <button onClick={() => setConfirmTarget({ count: c, action: 'approve' })} className="p-1.5 rounded-md hover:bg-ui-success-soft text-ui-success" title={t('approveCount')}><CheckCircle2 className="w-4 h-4" /></button>}
         {can('inventory.count.reject') && c.status === 'submitted' && <button onClick={() => { setConfirmTarget({ count: c, action: 'reject' }); setRejectReason(''); }} className="p-1.5 rounded-md hover:bg-ui-danger-soft text-ui-danger" title={t('rejectCount')}><XCircle className="w-4 h-4" /></button>}
         {can('inventory.count.apply') && c.status === 'approved' && <button onClick={() => setConfirmTarget({ count: c, action: 'apply' })} className="p-1.5 rounded-md hover:bg-purple-50 text-purple-500" title={t('applyCount')}><CheckCheck className="w-4 h-4" /></button>}
@@ -386,7 +387,7 @@ export function StockCountsPage() {
       </div></Modal>
 
       <Modal open={!!viewTarget} onClose={() => setViewTarget(null)} title={t('countItems') + (viewTarget?.count_number ? ` - ${viewTarget.count_number}` : '')} size="lg">{viewTarget && <div className="space-y-3"><div className="flex items-center justify-between rounded-lg bg-ui-page-alt px-4 py-3"><span className="text-sm text-ui-muted">{isAr ? 'إجمالي قيمة الجرد' : 'Total Count Value'}</span><span className="text-lg font-bold text-ui-text">{formatNumber(viewTotalValue, 2)}</span></div><DataTable columns={itemColumns} data={viewTarget.items || []} emptyMessage={t('noData')} /></div>}</Modal>
-      <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title={t('editCountItem')} size="lg">{editTarget && <div className="space-y-4"><div className="flex items-center justify-between"><p className="text-sm font-medium text-ui-muted">{t('countItems')}</p><Button variant="outline" size="sm" onClick={addEditLine}><Plus className="w-4 h-4" /> {t('addCountItem')}</Button></div><div className="space-y-2">{editLines.map((l, idx) => <div key={idx} className="grid grid-cols-12 gap-2 items-end"><div className="col-span-6"><Select label={idx === 0 ? t('product') : undefined} value={l.product_id} onChange={(e) => updateEditLine(idx, 'product_id', e.target.value)}><option value="">{t('product')}</option>{editProducts.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}</Select></div><div className="col-span-3"><Input label={idx === 0 ? t('countedQuantity') : undefined} type="number" step="0.0001" value={l.counted_quantity} onChange={(e) => updateEditLine(idx, 'counted_quantity', e.target.value)} placeholder="0" /></div><div className="col-span-2"><Input label={idx === 0 ? t('reason') : undefined} value={l.reason} onChange={(e) => updateEditLine(idx, 'reason', e.target.value)} placeholder={isAr ? 'سبب' : 'Reason'} /></div><div className="col-span-1 flex justify-end"><button onClick={() => removeEditLine(idx)} className="p-2 rounded-md hover:bg-ui-danger-soft text-ui-danger"><Trash2 className="w-4 h-4" /></button></div></div>)}</div><div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setEditTarget(null)}>{t('cancel')}</Button><Button onClick={saveEdit} disabled={mutationBusy}>{t('save')}</Button></div></div>}</Modal>
+      <Modal open={!!editTarget} onClose={() => setEditTarget(null)} title={t('editCountItem')} size="lg">{editTarget && <div className="space-y-4"><div className="flex items-center justify-between"><p className="text-sm font-medium text-ui-muted">{t('countItems')}</p><Button variant="outline" size="sm" onClick={addEditLine}><Plus className="w-4 h-4" /> {t('addCountItem')}</Button></div><div className="space-y-2">{editLines.map((l, idx) => <div key={idx} className="grid grid-cols-12 gap-2 items-end"><div className="col-span-6"><Select label={idx === 0 ? (isAr ? 'الصنف / الخامة' : 'Product / material') : undefined} value={l.item_id ? l.item_kind + ':' + l.item_id : ''} onChange={e => { const [kind,id] = e.target.value.split(':'); updateEditLine(idx, { item_kind: kind === 'product' ? 'product' : 'raw_material', item_id: id || '' }); }}><option value="">{isAr ? 'اختر بنداً' : 'Choose item'}</option><optgroup label={isAr ? 'الخامات' : 'Raw materials'}>{editRawMaterials.map(r => <option key={r.id} value={'raw_material:' + r.id}>{r.name}</option>)}</optgroup><optgroup label={isAr ? 'المنتجات' : 'Products'}>{editProducts.map(p => <option key={p.id} value={'product:' + p.id}>{p.name}</option>)}</optgroup></Select></div><div className="col-span-3"><Input label={idx === 0 ? t('countedQuantity') : undefined} type="number" step="0.0001" value={l.counted_quantity} onChange={(e) => updateEditLine(idx, { counted_quantity: e.target.value })} placeholder="0" /></div><div className="col-span-2"><Input label={idx === 0 ? t('reason') : undefined} value={l.reason} onChange={(e) => updateEditLine(idx, { reason: e.target.value })} placeholder={isAr ? 'سبب' : 'Reason'} /></div><div className="col-span-1 flex justify-end"><button onClick={() => removeEditLine(idx)} className="p-2 rounded-md hover:bg-ui-danger-soft text-ui-danger"><Trash2 className="w-4 h-4" /></button></div></div>)}</div><div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setEditTarget(null)}>{t('cancel')}</Button><Button onClick={saveEdit} disabled={mutationBusy}>{t('save')}</Button></div></div>}</Modal>
       <ConfirmDialog open={!!confirmTarget && confirmTarget.action !== 'reject'} onClose={() => setConfirmTarget(null)} onConfirm={() => confirmTarget && runWorkflow(confirmTarget.action)} title={confirmTarget?.action ? t(confirmTarget.action === 'submit' ? 'submitCount' : confirmTarget.action === 'approve' ? 'approveCount' : 'applyCount') : ''} message={confirmTarget?.action ? (confirmTarget.action === 'submit' ? t('submitCountConfirm') : confirmTarget.action === 'approve' ? t('approveCountConfirm') : t('applyCountConfirm')) : ''} confirmLabel={t('save')} cancelLabel={t('cancel')} />
       <Modal open={!!confirmTarget && confirmTarget.action === 'reject'} onClose={() => setConfirmTarget(null)} title={t('rejectCount')} size="sm"><div className="space-y-4"><p className="text-sm text-ui-subtle">{t('rejectCountConfirm')}</p><Input label={t('reason')} value={rejectReason} onChange={(e) => setRejectReason(e.target.value)} placeholder={isAr ? 'سبب الرفض' : 'Rejection reason'} /><div className="flex justify-end gap-2"><Button variant="secondary" onClick={() => setConfirmTarget(null)}>{t('cancel')}</Button><Button variant="danger" onClick={() => runWorkflow('reject')} disabled={mutationBusy}>{t('rejectCount')}</Button></div></div></Modal>
     </DesignSurface>

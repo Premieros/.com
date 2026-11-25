@@ -242,6 +242,77 @@ REVOKE ALL ON FUNCTION public.edit_stock_count_draft(uuid,jsonb,jsonb) FROM PUBL
 GRANT EXECUTE ON FUNCTION public.edit_stock_count_draft(uuid,jsonb,jsonb) TO authenticated;
 
 
+
+-- Atomic edit for raw-material, product and mixed draft counts.
+-- No direct client table grants: the private function may write only scoped draft lines.
+CREATE FUNCTION private.edit_stock_count_draft_items_internal(p_count_id uuid,p_expected jsonb,p_items jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $count_items$
+DECLARE v_count public.stock_counts%ROWTYPE; v_snapshot jsonb; v_line record; v_result jsonb; v_qty numeric; v_cost numeric;
+BEGIN
+  IF auth.uid() IS NULL OR public.can_permission('inventory.count.create') IS NOT TRUE THEN RAISE EXCEPTION 'COUNT_EDIT_DENIED'; END IF;
+  PERFORM private.lock_stock_count_draft_for_edit(p_count_id);
+  SELECT * INTO v_count FROM public.stock_counts WHERE id=p_count_id AND public.user_may_access_branch(branch_id) IS TRUE;
+  IF NOT FOUND OR v_count.status IS DISTINCT FROM 'draft' THEN RAISE EXCEPTION 'COUNT_EDIT_DENIED'; END IF;
+  IF jsonb_typeof(p_expected) IS DISTINCT FROM 'array' OR jsonb_typeof(p_items) IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'INVALID_COUNT_LINES'; END IF;
+  SELECT coalesce(jsonb_agg(jsonb_build_object('item_kind',CASE WHEN raw_material_id IS NOT NULL THEN 'raw_material' ELSE 'product' END,
+    'item_id',coalesce(raw_material_id,product_id),'counted_quantity',counted_quantity,'reason',reason)
+    ORDER BY CASE WHEN raw_material_id IS NOT NULL THEN 'raw_material' ELSE 'product' END,coalesce(raw_material_id,product_id)),'[]'::jsonb)
+    INTO v_snapshot FROM public.stock_count_items WHERE stock_count_id=p_count_id;
+  IF v_snapshot IS DISTINCT FROM p_expected THEN RAISE EXCEPTION 'COUNT_REFRESH_REQUIRED'; END IF;
+  IF EXISTS (SELECT 1 FROM jsonb_to_recordset(p_items) i(item_kind text,item_id uuid,counted_quantity numeric,reason text)
+      WHERE i.item_kind IS NULL OR i.item_kind NOT IN ('raw_material','product') OR i.item_id IS NULL
+      OR i.counted_quantity IS NULL OR i.counted_quantity<0 OR i.counted_quantity::text IN ('NaN','Infinity','-Infinity')
+      OR (i.item_kind='raw_material' AND NOT EXISTS(SELECT 1 FROM public.raw_materials r WHERE r.id=i.item_id AND r.branch_id=v_count.branch_id AND r.is_active))
+      OR (i.item_kind='product' AND NOT EXISTS(SELECT 1 FROM public.products p WHERE p.id=i.item_id AND p.branch_id=v_count.branch_id)))
+    OR (SELECT count(DISTINCT (i.item_kind,i.item_id)) FROM jsonb_to_recordset(p_items) i(item_kind text,item_id uuid))<>jsonb_array_length(p_items)
+  THEN RAISE EXCEPTION 'INVALID_COUNT_LINES'; END IF;
+  FOR v_line IN SELECT * FROM jsonb_to_recordset(p_items) i(item_kind text,item_id uuid,counted_quantity numeric,reason text) LOOP
+    IF v_line.item_kind='raw_material' THEN
+      UPDATE public.stock_count_items SET counted_quantity=v_line.counted_quantity,reason=v_line.reason
+       WHERE stock_count_id=p_count_id AND raw_material_id=v_line.item_id;
+      IF NOT FOUND THEN
+        SELECT quantity,avg_cost INTO v_qty,v_cost FROM public.raw_material_warehouse_inventory
+          WHERE raw_material_id=v_line.item_id AND branch_id=v_count.branch_id AND warehouse_id=v_count.warehouse_id;
+        INSERT INTO public.stock_count_items(stock_count_id,product_id,raw_material_id,system_quantity,counted_quantity,unit_cost,reason)
+          VALUES(p_count_id,NULL,v_line.item_id,coalesce(v_qty,0),v_line.counted_quantity,coalesce(v_cost,0),v_line.reason);
+      END IF;
+    ELSE
+      IF EXISTS (SELECT 1 FROM public.stock_count_items WHERE stock_count_id=p_count_id AND product_id=v_line.item_id) THEN
+        v_result:=public.update_stock_count_item(p_count_id,v_line.item_id,v_line.counted_quantity,v_line.reason);
+      ELSE
+        v_result:=public.add_stock_count_item(p_count_id,v_line.item_id,v_line.counted_quantity,v_line.reason);
+      END IF;
+      IF (v_result->>'success')::boolean IS NOT TRUE THEN RAISE EXCEPTION 'COUNT_LINE_SAVE_FAILED: %',v_result; END IF;
+    END IF;
+  END LOOP;
+  FOR v_line IN SELECT s.raw_material_id,s.product_id FROM public.stock_count_items s
+    WHERE s.stock_count_id=p_count_id AND NOT EXISTS(SELECT 1 FROM jsonb_to_recordset(p_items) i(item_kind text,item_id uuid)
+      WHERE (i.item_kind='raw_material' AND i.item_id=s.raw_material_id) OR (i.item_kind='product' AND i.item_id=s.product_id)) LOOP
+    IF v_line.raw_material_id IS NOT NULL THEN
+      DELETE FROM public.stock_count_items WHERE stock_count_id=p_count_id AND raw_material_id=v_line.raw_material_id;
+    ELSE
+      v_result:=public.remove_stock_count_item(p_count_id,v_line.product_id);
+      IF (v_result->>'success')::boolean IS NOT TRUE THEN RAISE EXCEPTION 'COUNT_LINE_REMOVE_FAILED: %',v_result; END IF;
+    END IF;
+  END LOOP;
+  IF (SELECT count(*) FROM public.stock_count_items WHERE stock_count_id=p_count_id)<>jsonb_array_length(p_items)
+    OR EXISTS(SELECT 1 FROM jsonb_to_recordset(p_items) i(item_kind text,item_id uuid,counted_quantity numeric,reason text)
+      WHERE NOT EXISTS(SELECT 1 FROM public.stock_count_items s WHERE s.stock_count_id=p_count_id
+        AND ((i.item_kind='raw_material' AND s.raw_material_id=i.item_id) OR (i.item_kind='product' AND s.product_id=i.item_id))
+        AND s.counted_quantity=round(i.counted_quantity,4) AND s.reason IS NOT DISTINCT FROM i.reason))
+  THEN RAISE EXCEPTION 'COUNT_LINES_NOT_SAVED'; END IF;
+  RETURN jsonb_build_object('success',true,'items_count',jsonb_array_length(p_items));
+END; $count_items$;
+REVOKE ALL ON FUNCTION private.edit_stock_count_draft_items_internal(uuid,jsonb,jsonb) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION private.edit_stock_count_draft_items_internal(uuid,jsonb,jsonb) TO authenticated;
+
+CREATE FUNCTION public.edit_stock_count_draft_items(p_count_id uuid,p_expected jsonb,p_items jsonb)
+RETURNS jsonb LANGUAGE sql SECURITY INVOKER SET search_path='' AS $count_api$
+  SELECT private.edit_stock_count_draft_items_internal(p_count_id,p_expected,p_items);
+$count_api$;
+REVOKE ALL ON FUNCTION public.edit_stock_count_draft_items(uuid,jsonb,jsonb) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION public.edit_stock_count_draft_items(uuid,jsonb,jsonb) TO authenticated;
+
 -- Canonical reconciliation: do not deduct a debt already represented in its linked negative batch.
 -- Preserve raw-material projection and debt diagnostics. Subtract only debt not already represented by its linked negative batch.
 create or replace view private.canonical_inventory_balances

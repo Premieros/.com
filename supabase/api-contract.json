@@ -372,6 +372,14 @@
       ]
     },
     {
+      "name": "edit_stock_count_draft_items",
+      "params": [
+        "count_id",
+        "expected",
+        "items"
+      ]
+    },
+    {
       "name": "enqueue_cloud_open_order_print",
       "params": [
         "idempotency_key",
