@@ -142,7 +142,7 @@ export type KitchenCompletedHistoryResult = {
 };
 
 export const catalog = {
-  replaceProductUnits(p: { p_product_id: string; p_units: unknown }): ApiResult<null> { return rpc('replace_product_units', p); },
+  replaceProductUnits(p: { p_product_id: string; p_units: unknown }): ApiResult<{ success?: boolean; error?: string; detail?: string }> { return rpc('replace_product_units', p); },
   createRawMaterial(p: CreateRawMaterialInput): ApiResult<CreateRawMaterialResult> { return rpc('create_raw_material', p); },
   createProduct(p: CreateProductInput): ApiResult<CreateProductResult> { return rpc('create_product', p); },
   createProductWithRawComponents(p: { p_product: CreateProductInput; p_items: DirectRawComponentInput[] }): ApiResult<CreateProductResult> {
@@ -260,7 +260,7 @@ export const catalog = {
     const normalized = p.items.map((row) => ({
       raw_material_id: row.raw_material_id,
       quantity: Number(row.quantity),
-      wastage_percent: Number(row.wastage_percent || 0),
+      wastage_percent: Number(row.wastage_percent ?? 0),
     }));
     if (normalized.some((row) => !row.raw_material_id || !Number.isFinite(row.quantity) || row.quantity <= 0 || !Number.isFinite(row.wastage_percent) || row.wastage_percent < 0)) {
       throw new Error('INVALID_DIRECT_RAW_COMPONENT');

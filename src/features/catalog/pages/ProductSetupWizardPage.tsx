@@ -3,6 +3,7 @@ import { Check, ChevronLeft, ChevronRight, PackagePlus, Plus, Trash2 } from 'luc
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/api';
 import * as api from '@/api';
+import type { CreateProductInput } from '@/api/domains/catalog';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
 import { DesignSurface, DesignPageHeader, DesignPanel } from '@/components/design';
@@ -224,7 +225,7 @@ export function ProductSetupWizardPage() {
     let createdProductId: string | null = null;
     try {
       const derivedProductType: 'ready' | 'manufactured' = supportsComposition && (rawComponents.length > 0 || manufacturedComponents.length > 0) ? 'manufactured' : 'ready';
-      const { data, error: productError } = await api.catalog.createProduct({
+      const createInput: CreateProductInput = {
         p_name: form.name.trim(),
         p_name_en: form.name_en.trim() || null,
         p_barcode: form.barcode || null,
@@ -239,28 +240,28 @@ export function ProductSetupWizardPage() {
         p_unit_links: supportsComponentGroups && manufacturedComponents.length > 0
           ? manufacturedComponents.map((row) => ({ unit_id: row.unit_id, quantity: Number(row.quantity) }))
           : null,
-      });
+      };
+      const directItems = supportsRawComposition ? rawComponents.map(row => ({ raw_material_id: row.raw_material_id, quantity: Number(row.quantity), wastage_percent: Number(row.wastage_percent ?? 0) })) : [];
+      // The deployed raw-create RPC saves product and raw recipe atomically;
+      // mixed groups still need the separately verified link operation.
+      const { data, error: productError } = directItems.length > 0
+        ? await api.catalog.createProductWithRawComponents({ p_product: createInput, p_items: directItems })
+        : await api.catalog.createProduct(createInput);
       if (productError || !data || data.success === false) throw productError || new Error(data?.error || 'error');
       createdProductId = data.product_id ?? null;
       if (!createdProductId) throw new Error(data?.error || 'error');
 
-      const { error: attributesError } = await supabase
-        .from('products')
-        .update({ business_attributes: businessAttributes })
-        .eq('id', createdProductId);
-      if (attributesError) throw attributesError;
+      if (Object.keys(businessAttributes).length > 0) {
+        const { data: updated, error: attributesError } = await supabase.from('products').update({ business_attributes: businessAttributes }).eq('id', createdProductId).eq('branch_id', branchId).select('id').maybeSingle();
+        if (attributesError || !updated?.id) throw attributesError || new Error('PRODUCT_ATTRIBUTES_NOT_SAVED');
+      }
 
-      if (supportsRawComposition && rawComponents.length > 0) {
-        await api.catalog.saveProductDirectRawComponents({
-          product_id: createdProductId,
-          branch_id: branchId,
-          product_name: form.name.trim(),
-          items: rawComponents.map((row) => ({
-            raw_material_id: row.raw_material_id,
-            quantity: Number(row.quantity),
-            wastage_percent: Number(row.wastage_percent) || 0,
-          })),
-        });
+      if (directItems.length > 0 && createInput.p_unit_links?.length) {
+        await api.catalog.setProductUnitLinks(createdProductId, createInput.p_unit_links);
+      }
+      if (directItems.length > 0) {
+        const persisted = await api.catalog.getProductDirectRawComponents(createdProductId, branchId);
+        if (persisted.items.length !== directItems.length || directItems.some(row => !persisted.items.some(item => item.raw_material_id === row.raw_material_id && Math.abs(Number(item.quantity) - row.quantity) < 0.000001 && Math.abs(Number(item.wastage_percent ?? 0) - row.wastage_percent) < 0.000001))) throw new Error('PRODUCT_RAW_COMPONENTS_NOT_SAVED');
       }
 
       await invalidatePosCatalogCache();
@@ -272,9 +273,12 @@ export function ProductSetupWizardPage() {
       }
     } catch (error) {
       if (createdProductId) {
-        await supabase.from('products').delete().eq('id', createdProductId);
+        // Never delete a committed product or retry creation on a partial follow-up failure.
+        show(isAr ? 'تم إنشاء المنتج، لكن لم تكتمل إحدى خطوات الحفظ. افتحه من قائمة المنتجات للمراجعة.' : 'Product created, but a follow-up save was incomplete. Reopen from the product list to review.', 'error');
+        navigate('/products');
+      } else {
+        show(error instanceof Error ? error.message : String(error), 'error');
       }
-      show(error instanceof Error ? error.message : String(error), 'error');
     } finally {
       saveLock.current = false;
       setSaving(false);

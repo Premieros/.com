@@ -353,7 +353,7 @@ export function ProductsPage() {
 
   const saveProduct = async () => {
     if (editing ? !can('products.edit') : !can('products.create')) return;
-    if (!form.name) { show(t('required') + ': ' + t('name'), 'error'); return; }
+    if (!form.name.trim()) { show(t('required') + ': ' + t('name'), 'error'); return; }
     const effectiveBranch = form.branch_id || branchFilter || '';
     if (!effectiveBranch) { show(lang === 'ar' ? 'اختر الفرع أولاً' : 'Select a branch first', 'error'); return; }
     if (editing && editing.branch_id && editing.branch_id !== effectiveBranch) { show(lang === 'ar' ? 'لا يمكن نقل المنتج بين الفروع من محرر المكونات.' : 'Cannot move a product between branches in the component editor.', 'error'); return; }
@@ -388,16 +388,16 @@ export function ProductsPage() {
     setForm(current => ({ ...current, product_type: productType }));
     if (supportsComponentGroups && unitRows.some((row) => row.quantity <= 0 || !manufacturedInventoryUnits.some((unit) => unit.id === row.unit_id && unit.branch_id === effectiveBranch))) { show(lang === 'ar' ? 'تحقق من مجموعات المكونات وكمياتها للفرع الحالي' : 'Check component groups and quantities for the current branch', 'error'); return; }
     if (supportsRawComposition && rawRows.some((row) => row.quantity <= 0 || row.wastage_percent < 0 || !rawMaterialOptions.some((material) => material.id === row.raw_material_id && material.branch_id === effectiveBranch))) { show(lang === 'ar' ? 'تحقق من الخامات المباشرة وكمياتها للفرع الحالي' : 'Check direct raw materials and quantities for the current branch', 'error'); return; }
-    if (supportsRawComposition && editing && rawRows.length > 0 && !can('recipes.manage')) { show(lang === 'ar' ? 'لا تملك صلاحية إدارة الخامات المباشرة للمنتج.' : 'You do not have permission to manage direct product raw materials.', 'error'); return; }
+    if (supportsRawComposition && rawRows.length > 0 && !can('recipes.manage')) { show(lang === 'ar' ? 'لا تملك صلاحية إدارة الخامات المباشرة للمنتج.' : 'You do not have permission to manage direct product raw materials.', 'error'); return; }
     const payload = { ...form, product_type: productType, category_id: form.category_id || null, branch_id: effectiveBranch, business_attributes: businessAttributes };
     const unitPayload = units.filter(u => u.unit_name).map((u) => ({ unit_name: u.unit_name, unit_name_en: u.unit_name_en || u.unit_name, conversion_factor: u.conversion_factor, sale_price: u.sale_price, cost_price: u.cost_price, barcode: u.barcode || null, is_base: u.is_base }));
     let pid: string;
     if (editing) {
-      const { error } = await supabase.from('products').update(payload).eq('id', editing.id);
-      if (error) { show(error.message, 'error'); return; }
+      const { data: updated, error } = await supabase.from('products').update(payload).eq('id', editing.id).eq('branch_id', effectiveBranch).select('id').maybeSingle();
+      if (error || !updated?.id) { show(error?.message || (lang === 'ar' ? 'لم يتم حفظ المنتج؛ تحقق من الصلاحية والفرع.' : 'Product was not saved; check permissions and branch.'), 'error'); return; }
       pid = editing.id;
-      const { error: unitError } = await api.catalog.replaceProductUnits({ p_product_id: editing.id, p_units: unitPayload });
-      if (unitError) { show(unitError.message, 'error'); return; }
+      const { data: unitResult, error: unitError } = await api.catalog.replaceProductUnits({ p_product_id: editing.id, p_units: unitPayload });
+      if (unitError || !unitResult?.success) { show(unitError?.message || unitResult?.detail || unitResult?.error || 'PRODUCT_UNITS_NOT_SAVED', 'error'); return; }
       await logAudit('update', 'products', editing.id, { name: form.name });
     } else {
       const createInput: CreateProductInput = {

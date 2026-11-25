@@ -22,7 +22,7 @@ import {
   type DetectedPrinter,
   type PrinterRouteConfig,
 } from '../../services/localPrintAgent';
-import { filterPrintQueueJobs, printQueueDiagnostics, printQueueJobSummary, scopeVisiblePrintQueueJobs, type PrintQueueFilter } from '../../services/printQueueDiagnostics';
+import { filterPrintQueueJobs, printQueueDiagnostics, printQueueJobSummary, scopeVisiblePrintQueueJobs, isStalePrintJob, type PrintQueueFilter } from '../../services/printQueueDiagnostics';
 import {
   getCloudPrintAgentBranchId,
   isCloudPrintAgentEnabled,
@@ -215,8 +215,9 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
   ), [queueJobs, queueJobsBranchId, selectedBranchId, canManagePrinters]);
 
   const queueCounts = useMemo(() => {
-    const counts = { pending: 0, active: 0, submitted: 0, failed: 0 };
+    const counts = { pending: 0, active: 0, submitted: 0, failed: 0, stale: 0 };
     for (const job of scopedQueueJobs) {
+      if (isStalePrintJob(job)) counts.stale += 1;
       if (job.status === 'pending') counts.pending += 1;
       else if (job.status === 'claimed' || job.status === 'printing') counts.active += 1;
       else if (job.status === 'submitted') counts.submitted += 1;
@@ -437,9 +438,11 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
           ))}
         </div>
 
+        {queueCounts.stale > 0 && <div className="mt-3 rounded-xl border border-ui-warning/30 bg-ui-warning-soft p-3 text-xs text-ui-warning" role="status">{isAr ? 'توجد تذاكر طباعة نشطة منذ أكثر من 10 دقائق. تحقق من اتصال وكيل الطباعة والطابعة قبل اتخاذ إجراء؛ لا تعِد إرسال الطلب تلقائيًا.' : 'Active print jobs older than ten minutes. Check the print agent and printer before taking action; do not resend automatically.'}</div>}
         <div className="mt-3 flex flex-wrap gap-2">
+          <button type="button" onClick={() => setQueueFilter('stale')} className={`rounded-full border px-3 py-1 text-xs font-bold ${queueFilter === 'stale' ? 'border-brand-500 bg-brand-500/10' : 'border-ui-border text-ui-muted'}`}>{isAr ? 'متأخرة' : 'Stale'} ({queueCounts.stale})</button>
           <button type="button" onClick={() => setQueueFilter('all')} className={`rounded-full border px-3 py-1 text-xs font-bold ${queueFilter === 'all' ? 'border-brand-500 bg-brand-500/10 text-brand-700' : 'border-ui-border text-ui-muted'}`}>
-            {isAr ? 'الكل' : 'All'} ({queueJobs.length})
+            {isAr ? 'الكل' : 'All'} ({scopedQueueJobs.length})
           </button>
         </div>
 
@@ -451,7 +454,7 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
               data-testid="print-queue-search"
               className="h-9 rounded-lg border border-ui-border bg-ui-page px-3 text-sm text-ui-text" />
           </label>
-          <span className="text-xs text-ui-muted">{isAr ? `المعروض: ${visibleQueueJobs.length} من ${queueJobs.length} تذكرة محملة` : `Showing ${visibleQueueJobs.length} of ${queueJobs.length} loaded jobs`}</span>
+          <span className="text-xs text-ui-muted">{isAr ? `المعروض: ${visibleQueueJobs.length} من ${scopedQueueJobs.length} تذكرة محملة` : `Showing ${visibleQueueJobs.length} of ${scopedQueueJobs.length} loaded jobs`}</span>
         </div>
 
         {queueError ? (
