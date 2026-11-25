@@ -13,7 +13,7 @@ describe('BUNKER live-order handoff safeguards', () => {
     const { rows } = await db.query<{ can_activate: boolean }>(
       'select qr_private.bunker_live_menu_ready() as can_activate',
     );
-    // Disposable test DB has no BUNKER staff, stock, or approved costs.
+    // Disposable test DB has no BUNKER staff or active menu.
     expect(rows[0]?.can_activate).toBe(false);
   });
 
@@ -36,14 +36,16 @@ describe('BUNKER live-order handoff safeguards', () => {
     expect(rows).toEqual([{ enabled: true }]);
   });
 
-  it('requires cost, authorized staff, a warehouse and kitchen routing', async () => {
+  it('requires authorized staff, menu, warehouse and kitchen routing but not artificial cost or opening stock', async () => {
     const { rows } = await db.query<{ def: string }>(
-      `select pg_get_functiondef('qr_private.bunker_live_menu_ready()'::regprocedure) as def`,
+      `select pg_get_functiondef('qr_private.branch_live_menu_ready(uuid)'::regprocedure) as def`,
     );
     const definition = rows[0]?.def ?? '';
     for (const table of ['auth.users', 'organization_members', 'warehouses', 'kitchen_stations', 'menu_products']) {
       expect(definition).toContain(table);
     }
-    expect(definition).toContain('cost_price');
+    expect(definition).not.toContain('cost_price');
+    expect(definition).not.toContain('inventory_batches');
+    expect(definition).not.toContain('recipe_items');
   });
 });

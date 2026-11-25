@@ -58,7 +58,7 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
       if (error) throw error;
       setMessage('تم حفظ إعدادات طلبات العملاء لهذا الفرع فقط.');
       void loadReadiness();
-    } catch (failure) { const message = failure instanceof Error ? failure.message : String(failure); setMessage((message.includes('BUNKER_LIVE_NOT_READY') || message.includes('QR_DEMO_PRODUCTS_NOT_APPROVED')) ? 'لا يمكن تفعيل طلبات BUNKER قبل إكمال التكاليف والمخزون أو الوصفات وصلاحيات الموظفين والمخزن والطاولات وربط المطبخ. راجع بطاقة الجاهزية أعلاه.' : qrError(failure)); } finally { setBusy(false); }
+    } catch (failure) { const message = failure instanceof Error ? failure.message : String(failure); setMessage((message.includes('BUNKER_LIVE_NOT_READY') || message.includes('QR_DEMO_PRODUCTS_NOT_APPROVED')) ? 'لم تكتمل شروط تشغيل الطلبات: راجع اعتماد المنيو وربط المطبخ والمخزن والصلاحيات. التكلفة الصفرية والخامة غير المعرفة مسبقًا لا تمنع البيع وفق سياسة الخامة التلقائية.' : qrError(failure)); } finally { setBusy(false); }
   }
   const roles = rolesList.filter(r => r.is_active && r.role !== 'super_admin' && (!r.branch_id || r.branch_id === branchId) && r.permissions.includes('pos.order.edit'));
   return <section dir="rtl" className="space-y-5 rounded-2xl border border-ui-border bg-ui-surface p-5">
@@ -67,13 +67,13 @@ export function CustomerOrderSettings({ branchId }: { branchId: string }) {
     {!settings ? <p>جارٍ تحميل إعدادات الفرع…</p> : <>
       {readiness?.bunker && <div data-testid="bunker-handoff-readiness" className="space-y-3 rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-ui-text">
         <h3 className="font-bold">جاهزية التشغيل الفعلي لفرع BUNKER</h3>
-        <p>{readiness.ready ? 'المتطلبات الفنية مكتملة، لكن يلزم اعتماد الإدارة وتجربة الطلب والمطبخ والدفع قبل التفعيل.' : 'الطلبات الحقيقية مغلقة لحين استكمال المتطلبات أدناه. معاينة المنيو والسلة التجريبية تعمل بدون تسجيل مبيعات.'}</p>
+        <p>{readiness.ready ? 'المتطلبات الفنية مكتملة، لكن يلزم اعتماد الإدارة وتجربة الطلب والمطبخ والدفع قبل التفعيل.' : 'الطلبات الحقيقية لم تُفعَّل بعد. راجع الربط التشغيلي والصلاحيات؛ التكلفة الصفرية أو غياب الخامة ليسا مانعَين للبيع. المعاينة تظل بدون تسجيل مبيعات.'}</p>
         <div className="grid gap-2 sm:grid-cols-2">
           {([
             ['المنتجات المنشورة',readiness.real_products ?? 0,(readiness.real_products ?? 0)>0 && (readiness.demo_products ?? 0)===0],
-            ['منتجات بدون تكلفة مسجلة',readiness.products_missing_cost ?? 0,(readiness.products_missing_cost ?? 0)===0],
+            ['أصناف تكلفتها صفر (تنبيه محاسبي لا يمنع البيع)',readiness.products_missing_cost ?? 0,true],
             ['ربط مطبخ غير مكتمل',readiness.products_missing_kitchen_route ?? 0,(readiness.products_missing_kitchen_route ?? 0)===0],
-            ['أصناف بلا رصيد مخزني أو وصفة',readiness.products_missing_stock_or_recipe ?? 0,(readiness.products_missing_stock_or_recipe ?? 0)===0],
+            ['أصناف بلا وصفة جاهزة (خامة تلقائية وقت البيع)',readiness.products_missing_stock_or_recipe ?? 0,true],
             ['مخازن نشطة',readiness.active_warehouses ?? 0,(readiness.active_warehouses ?? 0)>0],
             ['موظفون موثّقون ومصرح لهم',readiness.authorized_staff ?? 0,(readiness.authorized_staff ?? 0)>0],
             ['الطاولات النشطة',readiness.active_tables ?? 0,(readiness.active_tables ?? 0)>0],
