@@ -30,7 +30,15 @@ const disposable = Boolean(url && ['localhost','127.0.0.1','[::1]'].includes(new
       const {rows}=await db.query(call,[base,JSON.stringify(items)]);
       expect(rows[0].result.success).toBe(true);
       const pid=rows[0].result.product_id;
+      const ready=(await db.query(call,[{...base,p_name:'CI Ready',p_sku:'CI-READY-'+tag,p_unit_links:[],p_business_attributes:{}},'[]'])).rows[0].result;
+      const groupOnly=(await db.query(call,[{...base,p_name:'CI Group Only',p_sku:'CI-GROUP-'+tag,p_business_attributes:{}},'[]'])).rows[0].result;
+      expect(ready.success).toBe(true);
+      expect(groupOnly.success).toBe(true);
       await db.query('RESET ROLE');
+      expect((await db.query('select product_type from public.products where id=$1',[ready.product_id])).rows[0].product_type).toBe('ready');
+      expect((await db.query('select product_type from public.products where id=$1',[groupOnly.product_id])).rows[0].product_type).toBe('manufactured');
+      expect((await db.query('select count(*)::int n from public.recipes where product_id=any($1::uuid[])',[[ready.product_id,groupOnly.product_id]])).rows[0].n).toBe(0);
+      expect((await db.query('select quantity::float8 qty from public.product_unit_links where product_id=$1',[groupOnly.product_id])).rows[0].qty).toBe(.5);
       expect((await db.query("select p.business_attributes attrs, r.yield_quantity::float8 yield, i.quantity::float8 raw_qty, l.quantity::float8 group_qty from public.products p join public.recipes r on r.product_id=p.id join public.recipe_items i on i.recipe_id=r.id join public.product_unit_links l on l.product_id=p.id where p.id=$1",[pid])).rows).toEqual([{attrs:{ci_marker:'atomic'},yield:1,raw_qty:2,group_qty:0.5}]);
       for(const [sku, product, ingredientRows, error] of [
         ['CI-BAD-G-'+tag,{...base,p_unit_links:[{unit_id:foreignGroup,quantity:1}]},items,'INVALID_MANUFACTURED_COMPONENT'],
@@ -57,7 +65,7 @@ const disposable = Boolean(url && ['localhost','127.0.0.1','[::1]'].includes(new
       await db.query('SET LOCAL ROLE authenticated');
       expect((await db.query(editCall,[pid,branch,ver,originalLinks,{name:'CI Edited',business_attributes:{ci_marker:'atomic'},sale_price:12},null,JSON.stringify([{raw_material_id:raw,quantity:3,wastage_percent:2}]),links])).rows[0].result.success).toBe(true);
       await db.query('RESET ROLE');
-      expect((await db.query('select p.name,l.quantity::float8 group_qty,i.quantity::float8 raw_qty from public.products p join public.product_unit_links l on l.product_id=p.id join public.recipes r on r.product_id=p.id join public.recipe_items i on i.recipe_id=r.id where p.id=$1',[pid])).rows[0]).toEqual({name:'CI Edited',group_qty:.75,raw_qty:3});
+      expect((await db.query('select p.name,p.sale_price::float8 sale_price,l.quantity::float8 group_qty,i.quantity::float8 raw_qty from public.products p join public.product_unit_links l on l.product_id=p.id join public.recipes r on r.product_id=p.id join public.recipe_items i on i.recipe_id=r.id where p.id=$1',[pid])).rows[0]).toEqual({name:'CI Edited',sale_price:12,group_qty:.75,raw_qty:3});
       await db.query('SAVEPOINT stale_edit');
       await db.query('SET LOCAL ROLE authenticated');
       await expect(db.query(editCall,[pid,branch,ver,originalLinks,{name:'Stale'},null,JSON.stringify(items),links])).rejects.toThrow('COMPOSITION_REFRESH_REQUIRED');

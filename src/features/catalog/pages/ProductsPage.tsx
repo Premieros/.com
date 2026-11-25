@@ -433,14 +433,13 @@ export function ProductsPage() {
         p_max_stock: payload.max_stock,
         p_reorder_point: payload.reorder_point,
         p_product_type: payload.product_type,
-        p_business_attributes: businessAttributes,
         p_is_active: payload.is_active,
         p_units: unitPayload.length > 0 ? unitPayload : null,
         p_unit_links: supportsComponentGroups && unitRows.length > 0 ? unitRows.map(({ unit_id, quantity }) => ({ unit_id, quantity })) : null,
       };
       const { data, error } = productComponents.length === 0
         ? await api.catalog.createProductOperational({
-          p_product: createInput,
+          p_product: { ...createInput, p_business_attributes: businessAttributes },
           p_items: rawRows.map(({ raw_material_id, quantity, wastage_percent }) =>
             ({ raw_material_id, quantity, wastage_percent })),
         })

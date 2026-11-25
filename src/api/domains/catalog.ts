@@ -36,8 +36,9 @@ export type CreateProductInput = {
   p_is_active?: boolean;
   p_units?: { unit_name: string; unit_name_en?: string; conversion_factor?: number; sale_price?: number; cost_price?: number; barcode?: string | null; is_base?: boolean }[] | null;
   p_unit_links?: { unit_id: string; quantity: number }[] | null;
-  p_business_attributes?: Record<string, unknown>;
 };
+
+export type OperationalCreateProductInput = CreateProductInput & { p_business_attributes?: Record<string, unknown> };
 
 export type CreateProductResult = { success?: boolean; error?: string; product_id?: string; branch_id?: string | null };
 export type DirectRawComponentInput = { raw_material_id: string; quantity: number; wastage_percent?: number };
@@ -144,7 +145,7 @@ export type KitchenCompletedHistoryResult = {
 };
 
 export const catalog = {
-  createProductOperational(p: { p_product: CreateProductInput; p_items: DirectRawComponentInput[] }): ApiResult<CreateProductResult> { return rpc('create_product_operational', p); },
+  createProductOperational(p: { p_product: OperationalCreateProductInput; p_items: DirectRawComponentInput[] }): ApiResult<CreateProductResult> { return rpc('create_product_operational', p); },
   editProductOperational(p: { p_product_id: string; p_branch_id: string; p_expected_version: number | null; p_expected_links: { unit_id: string; quantity: number }[]; p_product: object; p_units: unknown; p_items: DirectRawComponentInput[]; p_links: { unit_id: string; quantity: number }[] }): ApiResult<{ success?: boolean; error?: string; detail?: string; product_id?: string }> { return rpc('edit_product_operational_composition', p); },
   replaceProductUnits(p: { p_product_id: string; p_units: unknown }): ApiResult<{ success?: boolean; error?: string; detail?: string }> { return rpc('replace_product_units', p); },
   createRawMaterial(p: CreateRawMaterialInput): ApiResult<CreateRawMaterialResult> { return rpc('create_raw_material', p); },

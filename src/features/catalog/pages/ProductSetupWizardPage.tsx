@@ -237,13 +237,12 @@ export function ProductSetupWizardPage() {
         p_wholesale_price: Number(form.wholesale_price) || 0,
         p_is_active: form.is_active,
         p_product_type: derivedProductType,
-        p_business_attributes: businessAttributes,
         p_unit_links: supportsComponentGroups && manufacturedComponents.length > 0
           ? manufacturedComponents.map((row) => ({ unit_id: row.unit_id, quantity: Number(row.quantity) }))
           : null,
       };
       const directItems = supportsRawComposition ? rawComponents.map(row => ({ raw_material_id: row.raw_material_id, quantity: Number(row.quantity), wastage_percent: Number(row.wastage_percent ?? 0) })) : [];
-      const { data, error: productError } = await api.catalog.createProductOperational({ p_product: createInput, p_items: directItems });
+      const { data, error: productError } = await api.catalog.createProductOperational({ p_product: { ...createInput, p_business_attributes: businessAttributes }, p_items: directItems });
       if (productError || !data?.success || !data.product_id) throw productError || new Error(data?.error || 'PRODUCT_CREATE_FAILED');
       createdProductId = data.product_id;
       if (directItems.length > 0) {
