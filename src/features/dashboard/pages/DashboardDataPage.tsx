@@ -1,5 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { Link, useSearchParams } from 'react-router-dom';
 import {
   AlertTriangle, ArrowDown, ArrowUp, ArrowUpRight, BarChart3, CreditCard,
   RefreshCw, Wallet, ReceiptText,
@@ -12,7 +12,7 @@ import { useBranchFilter } from '@/lib/useBranchFilter';
 import { useBranchScope } from '@/lib/branchScope';
 import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
-import { useCan } from '@/lib/permissions';
+import { useCan, type Permission } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { formatFinancialCurrency, formatNumber, formatPercent } from '@/lib/format';
 import {
@@ -24,9 +24,16 @@ import { loadDashboardPaymentAggregates } from '../services/dashboardPayments';
 import { loadDashboardSalesSnapshot, type DashboardSalesSnapshot } from '../services/dashboardSnapshot';
 import { DashboardStandbyBar } from '../components/DashboardStandbyBar';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
+import { DashboardBreakdown } from '../components/DashboardBreakdown';
+import { Modal } from '@/components/Modal';
+import { businessDateISO } from '@/lib/businessTime';
+import { REPORT_REGISTRY } from '@/features/reporting/reportRegistry';
+import type { ReportType } from '@/features/reporting/reportFilters';
+import { businessReportAllowed } from '@/core/organizations/businessRuntime';
 import { APP_ROUTES } from '@/core/navigation/routes';
 
 type Range = 'today' | 'week' | 'month' | 'year';
+type AnalysisMetric = 'sales' | 'orders' | 'payments';
 type RelatedName = { name?: string | null; name_en?: string | null; low_stock_threshold?: number | null };
 type Sale = {
   id: string;
@@ -176,8 +183,8 @@ function Empty({ ar }: { ar: boolean }) {
   return <div className="flex min-h-[120px] items-center justify-center text-sm text-ui-subtle">{ar ? 'لا توجد بيانات فعلية للفترة المحددة' : 'No actual data for the selected period'}</div>;
 }
 
-function Metric({ testId, icon: Icon, title, value, display, previous, href, ar, detail }: {
-  testId: string; icon: typeof Wallet; title: string; value: number; display: string; previous: number; href?: string; ar: boolean; detail?: ReactNode;
+function Metric({ testId, icon: Icon, title, value, display, previous, href, ar, detail, selected, onSelect }: {
+  testId: string; icon: typeof Wallet; title: string; value: number; display: string; previous: number; href?: string; ar: boolean; detail?: ReactNode; selected?: boolean; onSelect?: () => void;
 }) {
   const change = previous > 0 ? ((value - previous) / previous) * 100 : null;
   const positive = (change ?? 0) >= 0;
@@ -188,6 +195,12 @@ function Metric({ testId, icon: Icon, title, value, display, previous, href, ar,
     <div className="mt-2 flex items-center gap-2 text-xs">{change === null ? <span className="text-ui-subtle">—</span> : <span className={`inline-flex items-center gap-0.5 font-bold ${positive ? 'text-ui-success' : 'text-ui-danger'}`}>{positive ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}{formatPercent(Math.abs(change), 1)}</span>}<span className="text-ui-subtle">{ar ? 'مقارنة بالفترة السابقة' : 'vs previous period'}</span></div>
   </>;
   const className = `ui-accent-card ui-accent-primary rounded-3xl border border-ui-border bg-ui-surface p-5 shadow-ui ${href ? 'group transition hover:-translate-y-0.5 hover:shadow-ui-lg' : ''}`;
+  if (onSelect) return (
+    <button type="button" data-testid={testId} aria-pressed={selected} onClick={onSelect}
+      className={`${className} text-start transition-colors hover:border-ui-primary focus-visible:outline-2 focus-visible:outline-ui-ring ${selected ? 'ring-2 ring-ui-primary' : ''}`}>
+      {content}
+    </button>
+  );
   if (!href) return <div data-testid={testId} className={className}>{content}</div>;
   return <Link data-testid={testId} to={href} className={className}>{content}</Link>;
 }
@@ -198,7 +211,10 @@ export function DashboardDataPage() {
   const history = useHistoryAccess();
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
-  const readBranchIds = branchScope.selectedBranchIds.length ? branchScope.selectedBranchIds : (branchFilter ? [branchFilter] : []);
+  const readBranchIds = useMemo(
+    () => branchScope.selectedBranchIds.length ? branchScope.selectedBranchIds : (branchFilter ? [branchFilter] : []),
+    [branchScope.selectedBranchIds, branchFilter],
+  );
   const { effectiveSettings } = useSettings();
   const { branches } = useBranches();
   const { organizationId, runtime, canAccessModule, canAccessPath } = useOrganizationModules();
@@ -220,7 +236,23 @@ export function DashboardDataPage() {
   const canViewAudit = can('audit.view') && canAccessModule('audit_logs');
   const canViewSettings = can('settings.manage');
   const canViewTreasury = can('accounts.view') && canAccessModule('accounting');
-  const [range, setRange] = useState<Range>(() => history.unlimited ? 'month' : 'week');
+  const [params, setParams] = useSearchParams();
+  const requestedRange = params.get('range');
+  const range = (Object.keys(rangeLabels) as Range[]).find((key) => key === requestedRange)
+    ?? (history.unlimited ? 'month' : 'week');
+  const requestedMetric = params.get('metric');
+  const metric: AnalysisMetric = requestedMetric === 'orders' || requestedMetric === 'payments' ? requestedMetric : 'sales';
+  const compare = params.get('compare') === '1';
+  const groupByWeek = range === 'month' && params.get('group') === 'week';
+  const [expanded, setExpanded] = useState(false);
+  const requestId = useRef(0);
+  const lastSalesScope = useRef<string>();
+  const updateView = (key: string, value: string) => {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next);
+  };
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -242,15 +274,20 @@ export function DashboardDataPage() {
   const money = useCallback((value: number) => formatFinancialCurrency(value, settings?.currency || 'EGP', lang), [settings?.currency, lang]);
 
   const load = useCallback(async () => {
-    setRefreshing(true);
-    setError(null);
-    if (!canViewSales) {
+    const id = ++requestId.current;
+    const scope = `${branchScope.scopeKey}:${range}`;
+    if (!canViewSales || lastSalesScope.current !== scope) {
       setSnapshot(null);
       setSales([]);
       setPreviousSales([]);
       setPaymentAggregates([]);
       setPreviousPaymentAggregates([]);
       setItems([]);
+    }
+    setRefreshing(true);
+    setError(null);
+    if (!canViewSales) {
+      lastSalesScope.current = undefined;
       setLoading(false);
       setRefreshing(false);
       return;
@@ -270,6 +307,7 @@ export function DashboardDataPage() {
         timezone: 'Africa/Cairo',
       });
     } catch {
+      if (requestId.current !== id) return;
       // Keep the last successful dashboard instead of turning a slow/failed
       // snapshot into a burst of raw sales, sale-items and payment queries.
       setError(ar ? 'تعذر تحديث ملخص المبيعات. أعد المحاولة.' : 'Sales summary could not refresh. Please retry.');
@@ -278,7 +316,9 @@ export function DashboardDataPage() {
       return;
     }
 
+    if (requestId.current !== id) return;
     if (boundedSnapshot) {
+      lastSalesScope.current = scope;
       setSnapshot(boundedSnapshot);
       setSales([]);
       setPreviousSales([]);
@@ -301,6 +341,7 @@ export function DashboardDataPage() {
     }
 
     const [currentResult, previousResult] = await Promise.all([currentQuery, previousQuery]);
+    if (requestId.current !== id) return;
     const currentRows = currentResult.error ? [] : ((currentResult.data || []) as unknown as Sale[]);
     const previousRows = previousResult.error ? [] : ((previousResult.data || []) as unknown as Sale[]);
     setSales(currentRows);
@@ -332,6 +373,7 @@ export function DashboardDataPage() {
     }
 
     const [paymentResults, itemResult] = await Promise.all([paymentPromise, itemPromise]);
+    if (requestId.current !== id) return;
     const currentPaymentResult = paymentResults[0];
     const previousPaymentResult = paymentResults[1];
     setPaymentAggregates(currentPaymentResult.status === 'fulfilled' ? currentPaymentResult.value : []);
@@ -340,14 +382,20 @@ export function DashboardDataPage() {
       setError(ar ? 'تعذر تحميل تفاصيل طرق الدفع. أعد المحاولة.' : 'Payment-method details could not be loaded. Please retry.');
     }
     setItems(itemResult.error ? [] : ((itemResult.data || []) as unknown as SaleItem[]));
+    if (!currentResult.error) lastSalesScope.current = scope;
 
     setLoading(false);
     setRefreshing(false);
-  }, [ar, branchFilter, branchScope.scopeKey, range, canViewSales]);
-
-  useEffect(() => { void load(); }, [load]);
+  }, [ar, branchFilter, branchScope.scopeKey, range, canViewSales, readBranchIds]);
 
   useEffect(() => {
+    setLoading(true);
+    void load();
+    return () => { requestId.current += 1; };
+  }, [load]);
+
+  useEffect(() => {
+    let cancelled = false;
     void (async () => {
       const now = new Date();
       let rawMasterQuery = canViewInventory ? supabase.from('raw_materials').select('id,branch_id,name,min_stock,is_active').eq('is_active', true) : null;
@@ -366,6 +414,7 @@ export function DashboardDataPage() {
         unitMasterQuery ?? Promise.resolve({ data: [], error: null }),
         unitBatchQuery ?? Promise.resolve({ data: [], error: null }),
       ]);
+      if (cancelled) return;
       const stockQueryFailed = !canViewInventory || Boolean(rawMastersResult.error || rawBalancesResult.error || unitMastersResult.error || unitBatchesResult.error);
       const alerts = stockQueryFailed ? [] : buildStockAlerts(
         (rawMastersResult.data || []) as RawStockMaster[],
@@ -383,12 +432,14 @@ export function DashboardDataPage() {
       const statements = canViewFinancial
         ? await Promise.all(targetBranches.map((branch) => reporting.getIncomeStatement({ p_branch_id: branch.id, p_from_date: from, p_to_date: to })))
         : [];
+      if (cancelled) return;
       const validStatements = statements.filter((result) => !result.error && result.data);
       const expenses = canViewFinancial && targetBranches.length && validStatements.length === targetBranches.length ? validStatements.reduce((sum, result) => sum + Number(result.data?.expenses || 0), 0) : null;
       const profit = canViewFinancial && targetBranches.length && validStatements.length === targetBranches.length ? validStatements.reduce((sum, result) => sum + Number(result.data?.net_income || 0), 0) : null;
       setQuickStats({ expenses, profit, lowStockCount });
     })();
-  }, [branchFilter, branchScope.scopeKey, branches, settings?.low_stock_threshold, canViewInventory, canViewFinancial]);
+    return () => { cancelled = true; };
+  }, [readBranchIds, branches, settings?.low_stock_threshold, canViewInventory, canViewFinancial]);
 
   useEffect(() => {
     let cancelled = false;
@@ -457,7 +508,7 @@ export function DashboardDataPage() {
     return () => { cancelled = true; };
   }, [
     branchFilter, branchScope.scopeKey, range,
-    canViewPos, canViewPurchases, canViewExpenses, canViewBusinessRecords, organizationId,
+    canViewPos, canViewPurchases, canViewExpenses, canViewBusinessRecords, organizationId, readBranchIds,
   ]);
 
   const current = useMemo(() => {
@@ -482,7 +533,13 @@ export function DashboardDataPage() {
       discounts: previousSales.reduce((sum, sale) => sum + Number(sale.discount_amount || 0), 0),
     };
   }, [previousSales, previousPaymentAggregates, snapshot]);
-  const paymentRows = useMemo(() => paymentAggregates.slice(0, 5), [paymentAggregates]);
+  const paymentRows = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const { method, total } of paymentAggregates) {
+      totals.set(method, (totals.get(method) ?? 0) + total);
+    }
+    return [...totals].sort((a, b) => b[1] - a[1]);
+  }, [paymentAggregates]);
   const orderRows = useMemo(() => {
     if (snapshot) return snapshot.orderTypes.map((row) => [row.key, row.count] as [string, number]);
     const map = new Map<string, number>();
@@ -547,13 +604,62 @@ export function DashboardDataPage() {
     });
   }, [ar, previousSales, range, sales, snapshot]);
 
+  const displayedChart = useMemo(() => {
+    if (!groupByWeek) return chart;
+    const points: Point[] = [];
+    for (let start = 0; start < chart.length; start += 7) {
+      const week = chart.slice(start, start + 7);
+      points.push({
+        label: `${week[0].label} – ${week[week.length - 1].label}`,
+        sales: week.reduce((total, point) => total + point.sales, 0),
+        previous: week.reduce((total, point) => total + point.previous, 0),
+      });
+    }
+    return points;
+  }, [chart, groupByWeek]);
+
   const quick = (value: number | null, formatter: (value: number) => string) => value === null ? '—' : formatter(value);
   const recent = snapshot ? snapshot.recentSales : sales.slice(0, 5);
+
+  const period = periodWindow(range);
+  const dates = history.clampRange(businessDateISO(period.start), businessDateISO(period.end));
+  const canCompare = history.unlimited;
+  const reportLink = (type: ReportType) => {
+    const report = REPORT_REGISTRY.find((entry) => entry.key === type);
+    if (!canViewReports || !canAccessPath(APP_ROUTES.reportView) || !report
+      || !report.permissions.every((permission) => can(permission as Permission))
+      || !businessReportAllowed(runtime, type, report.category)) return undefined;
+    return `${APP_ROUTES.reportView}?${new URLSearchParams({ type, from: dates.from, to: dates.to }).toString()}`;
+  };
+  const analysis = {
+    sales: { title: ar ? 'حركة صافي المبيعات' : 'Net sales performance', href: reportLink('sales') },
+    orders: { title: ar ? 'الطلبات حسب النوع' : 'Orders by type', href: reportLink('detailed_invoices') },
+    payments: { title: ar ? 'صافي المدفوعات حسب الطريقة' : 'Net payments by method', href: reportLink('sales_by_payment') },
+  }[metric];
+  const orderBreakdown = orderRows.map(([key, value]) => ({ key, label: orderLabels[key]?.[ar ? 0 : 1] || key, value }));
+  const paymentBreakdown = paymentRows.map(([key, value]) => ({ key, label: paymentLabels[key]?.[ar ? 0 : 1] || key, value }));
+  const renderAnalysis = (large: boolean) => metric === 'sales' ? (
+    <div className={`min-w-0 text-ui-primary ${large ? 'h-[min(55vh,24rem)]' : 'h-72'}`} dir="ltr">
+      {current.orders > 0 || (compare && canCompare && previous.orders > 0) ? (
+        <Suspense fallback={<div className="flex h-full items-center justify-center"><RefreshCw className="h-5 w-5 animate-spin" /></div>}>
+          <DashboardSalesChart data={displayedChart} formatValue={money} compare={compare && canCompare}
+            labels={{ current: ar ? 'الفترة الحالية' : 'Current period', previous: ar ? 'الفترة السابقة' : 'Previous period' }} />
+        </Suspense>
+      ) : <Empty ar={ar} />}
+    </div>
+  ) : (
+    <div className="mt-4">
+      {(metric === 'orders' ? orderBreakdown.length : paymentBreakdown.length) ? (
+        <DashboardBreakdown rows={metric === 'orders' ? orderBreakdown : paymentBreakdown}
+          formatValue={metric === 'orders' ? (value) => formatNumber(value, 0) : money} />
+      ) : <Empty ar={ar} />}
+    </div>
+  );
 
   return <div dir={ar ? 'rtl' : 'ltr'} className="min-h-[calc(100vh-64px)] w-full min-w-0 bg-ui-page py-3 sm:py-4" data-testid="dashboard-surface"><div className="w-full min-w-0 space-y-5">
     <DashboardStandbyBar canCreateSale={canCreateSale} />
 
-    <section className="rounded-[32px] bg-gradient-to-br from-[#24114f] via-[#4b20a9] to-[#6d35df] p-6 text-white shadow-ui-lg"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex items-center gap-2 text-white/80"><BarChart3 className="h-4 w-4" /><span className="text-xs font-bold uppercase tracking-[0.18em]">Premier Control</span></div><h2 className="mt-2 text-3xl font-black">{ar ? `لوحة ${runtime.title.ar}` : `${runtime.title.en} Dashboard`}</h2><p className="mt-1 text-sm text-white/70">{ar ? runtime.description.ar : runtime.description.en}</p></div><div className="flex flex-wrap gap-2">{(Object.keys(rangeLabels) as Range[]).map((item) => <button key={item} onClick={() => setRange(item)} className={`rounded-xl px-4 py-2 text-sm font-bold ${range === item ? 'bg-white text-ui-primary' : 'bg-white/10 text-white'}`}>{rangeLabels[item][ar ? 0 : 1]}</button>)}<button onClick={() => void load()} className="rounded-xl bg-white/10 p-2" aria-label={ar ? 'تحديث' : 'Refresh'}><RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /></button></div></div></section>
+    <section className="rounded-[32px] bg-gradient-to-br from-[#24114f] via-[#4b20a9] to-[#6d35df] p-6 text-white shadow-ui-lg"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex items-center gap-2 text-white/80"><BarChart3 className="h-4 w-4" /><span className="text-xs font-bold uppercase tracking-[0.18em]">Premier Control</span></div><h2 className="mt-2 text-3xl font-black">{ar ? `لوحة ${runtime.title.ar}` : `${runtime.title.en} Dashboard`}</h2><p className="mt-1 text-sm text-white/70">{ar ? runtime.description.ar : runtime.description.en}</p></div><div className="flex flex-wrap gap-2">{(Object.keys(rangeLabels) as Range[]).map((item) => <button key={item} type="button" aria-pressed={range === item} onClick={() => updateView('range', item)} className={`rounded-xl px-4 py-2 text-sm font-bold ${range === item ? 'bg-white text-ui-primary' : 'bg-white/10 text-white'}`}>{rangeLabels[item][ar ? 0 : 1]}</button>)}<button onClick={() => void load()} className="rounded-xl bg-white/10 p-2" aria-label={ar ? 'تحديث' : 'Refresh'}><RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /></button></div></div></section>
 
     <section data-testid="business-runtime-quick-actions" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {runtime.dashboard.quickActions
@@ -585,19 +691,52 @@ export function DashboardDataPage() {
     {loading ? <div className="flex h-64 items-center justify-center rounded-3xl border border-ui-border bg-ui-surface"><RefreshCw className="h-7 w-7 animate-spin text-ui-primary" /></div> : <>
       <section data-testid="dashboard-permission-kpis" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {canViewPos && <Metric testId="kpi-open-order-value" icon={Wallet} title={ar ? 'قيمة الطلبات المفتوحة' : 'Open order value'} value={ops.openOrderValue} display={money(ops.openOrderValue)} previous={0} href={canViewFloorPlan ? '/floor-plan' : undefined} ar={ar} />}
-        {canViewSales && <Metric testId="kpi-orders" icon={ReceiptText} title={ar ? 'إجمالي الطلبات' : 'Total orders'} value={current.orders} display={formatNumber(current.orders, 0)} previous={previous.orders} href={canViewReports ? '/reports?reportType=detailed_invoices' : undefined} ar={ar} />}
-        {canViewSales && <Metric testId="kpi-average-order" icon={Calculator} title={ar ? 'متوسط قيمة الطلب' : 'Average order'} value={current.orders ? current.sales / current.orders : 0} display={money(current.orders ? current.sales / current.orders : 0)} previous={previous.orders ? previous.sales / previous.orders : 0} href={canViewReports ? '/reports?reportType=sales' : undefined} ar={ar} />}
-        {canViewSales && <Metric testId="kpi-net-payments" icon={CreditCard} title={ar ? 'صافي المدفوعات' : 'Net payments'} value={current.payments} display={money(current.payments)} previous={previous.payments} href={canViewReports ? '/reports?reportType=sales_by_payment' : undefined} ar={ar} />}
-        {canViewSales && <Metric testId="kpi-discounts" icon={Calculator} title={ar ? 'الخصومات' : 'Discounts'} value={current.discounts} display={money(current.discounts)} previous={previous.discounts} href={canViewReports ? '/reports?reportType=sales' : undefined} ar={ar} />}
-        {canViewSales && <Metric testId="kpi-returns" icon={ReceiptText} title={ar ? 'المرتجعات' : 'Returns'} value={current.returns} display={money(current.returns)} previous={previous.returns} href={canViewReports ? '/reports?reportType=returns' : undefined} ar={ar} />}
+        {canViewSales && <Metric testId="kpi-net-sales" icon={BarChart3} title={ar ? 'صافي المبيعات' : 'Net sales'} value={current.sales} display={money(current.sales)} previous={canCompare ? previous.sales : 0} selected={metric === 'sales'} onSelect={() => updateView('metric', '')} ar={ar} />}
+        {canViewSales && <Metric testId="kpi-orders" icon={ReceiptText} title={ar ? 'إجمالي الطلبات' : 'Total orders'} value={current.orders} display={formatNumber(current.orders, 0)} previous={canCompare ? previous.orders : 0} selected={metric === 'orders'} onSelect={() => updateView('metric', 'orders')} ar={ar} />}
+        {canViewSales && <Metric testId="kpi-average-order" icon={Calculator} title={ar ? 'متوسط قيمة الطلب' : 'Average order'} value={current.orders ? current.sales / current.orders : 0} display={money(current.orders ? current.sales / current.orders : 0)} previous={canCompare && previous.orders ? previous.sales / previous.orders : 0} href={reportLink('sales')} ar={ar} />}
+        {canViewSales && <Metric testId="kpi-net-payments" icon={CreditCard} title={ar ? 'صافي المدفوعات' : 'Net payments'} value={current.payments} display={money(current.payments)} previous={canCompare ? previous.payments : 0} selected={metric === 'payments'} onSelect={() => updateView('metric', 'payments')} ar={ar} />}
+        {canViewSales && <Metric testId="kpi-discounts" icon={Calculator} title={ar ? 'الخصومات' : 'Discounts'} value={current.discounts} display={money(current.discounts)} previous={canCompare ? previous.discounts : 0} href={reportLink('sales')} ar={ar} />}
+        {canViewSales && <Metric testId="kpi-returns" icon={ReceiptText} title={ar ? 'المرتجعات' : 'Returns'} value={current.returns} display={money(current.returns)} previous={canCompare ? previous.returns : 0} href={reportLink('returns')} ar={ar} />}
         {canViewPurchases && <Metric testId="kpi-purchases" icon={ShoppingCart} title={ar ? 'المشتريات' : 'Purchases'} value={ops.purchases} display={money(ops.purchases)} previous={0} href="/purchases" ar={ar} />}
         {canViewExpenses && <Metric testId="kpi-expenses" icon={Wallet} title={ar ? 'المصروفات' : 'Expenses'} value={ops.expenses} display={money(ops.expenses)} previous={0} href="/expenses" ar={ar} />}
         {canViewBusinessRecords && <Metric testId="kpi-business-records" icon={ReceiptText} title={runtime.navigation.menuLabels['business-records']?.[ar ? 'ar' : 'en'] || (ar ? 'سجلات النشاط' : 'Business records')} value={ops.businessRecords} display={formatNumber(ops.businessRecords, 0)} previous={0} href={APP_ROUTES.businessRecords} ar={ar} />}
       </section>
 
-      {canViewReports && canViewSales && <section className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]"><Card><h2 className="text-lg font-black text-ui-text">{ar ? 'حركة صافي المبيعات' : 'Net sales performance'}</h2><div className="mt-4 h-72">{current.orders > 0 ? <Suspense fallback={<div className="flex h-full items-center justify-center"><RefreshCw className="h-5 w-5 animate-spin text-ui-primary" /></div>}><DashboardSalesChart data={chart} formatValue={money} /></Suspense> : <Empty ar={ar} />}</div></Card>
-      <div className="grid gap-5"><Card><h2 className="font-black text-ui-text">{ar ? 'أنواع الطلبات' : 'Order types'}</h2><div className="mt-3 space-y-3">{orderRows.length ? orderRows.map(([key, count]) => <div key={key} className="flex justify-between text-sm"><span className="text-ui-muted">{orderLabels[key]?.[ar ? 0 : 1] || key}</span><b className="text-ui-text">{formatNumber(count, 0)}</b></div>) : <Empty ar={ar} />}</div></Card>
-      <Card><h2 className="font-black text-ui-text">{ar ? 'طرق الدفع' : 'Payment methods'}</h2><div className="mt-3 space-y-3">{paymentRows.length ? paymentRows.map((row) => <div key={`${row.branchId}-${row.method}`} className="flex justify-between gap-3 text-sm"><span className="text-ui-muted">{paymentLabels[row.method]?.[ar ? 0 : 1] || row.method}</span><b className="text-ui-text">{money(row.total)}</b></div>) : <Empty ar={ar} />}</div></Card></div></section>}
+      {canViewSales && (
+        <Card>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h2 aria-live="polite" className="text-lg font-black text-ui-text">{analysis.title}</h2>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+              {metric === 'sales' && range === 'month' && (
+                <div role="group" aria-label={ar ? 'تجميع الرسم' : 'Chart grouping'} className="flex rounded-lg border border-ui-border">
+                  <button type="button" aria-pressed={!groupByWeek} onClick={() => updateView('group', '')}
+                    className="rounded-lg px-3 py-2 aria-pressed:bg-ui-primary-soft">
+                    {ar ? 'يومي' : 'Daily'}
+                  </button>
+                  <button type="button" aria-pressed={groupByWeek} onClick={() => updateView('group', 'week')}
+                    className="rounded-lg px-3 py-2 aria-pressed:bg-ui-primary-soft">
+                    {ar ? 'أسبوعي' : 'Weekly'}
+                  </button>
+                </div>
+              )}
+              {metric === 'sales' && canCompare && (
+                <button type="button" aria-pressed={compare} onClick={() => updateView('compare', compare ? '' : '1')}
+                  className="rounded-lg border border-ui-border px-3 py-2 aria-pressed:border-ui-primary aria-pressed:bg-ui-primary-soft">
+                  {ar ? 'مقارنة بالفترة السابقة' : 'Compare previous period'}
+                </button>
+              )}
+              <button type="button" onClick={() => setExpanded(true)} className="rounded-lg border border-ui-border px-3 py-2">
+                {ar ? 'توسيع العرض' : 'Expand view'}
+              </button>
+              {analysis.href && <Link to={analysis.href} className="rounded-lg px-3 py-2 text-ui-primary">{ar ? 'فتح التقرير' : 'Open report'}</Link>}
+            </div>
+          </div>
+          <div aria-hidden={expanded}>{renderAnalysis(false)}</div>
+          <Modal manageFocus open={expanded} onClose={() => setExpanded(false)} title={analysis.title} size="xl">
+            {expanded && renderAnalysis(true)}
+          </Modal>
+        </Card>
+      )}
 
       {canViewSales && <section className="grid gap-5 xl:grid-cols-3">{can('branches.manage') && <Card><h2 className="mb-3 font-black text-ui-text">{ar ? 'الفروع حسب صافي المبيعات' : 'Branches by net sales'}</h2>{branchRows.length ? branchRows.map(([name, row]) => <div key={name} className="mb-3 flex justify-between gap-3 text-sm"><span className="font-semibold text-ui-text">{name}</span><span className="text-ui-muted">{formatNumber(row.orders, 0)} · {money(row.sales)}</span></div>) : <Empty ar={ar} />}</Card>}
       <Card><h2 className="mb-3 font-black text-ui-text">{ar ? 'أكثر الأصناف مبيعًا' : 'Top selling items'}</h2>{productRows.length ? productRows.map(([name, qty]) => <div key={name} className="mb-3 flex justify-between gap-3 text-sm"><span className="font-semibold text-ui-text">{name}</span><span className="text-ui-muted">{formatNumber(qty, 2)}</span></div>) : <Empty ar={ar} />}</Card>

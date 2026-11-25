@@ -31,6 +31,8 @@ import {
   type ReceiptData,
 } from '@/features/pos/utils/printing';
 
+const SALE_ORDER_TYPES = ['dine_in', 'takeaway', 'delivery', 'drive_thru', 'quick'] as const;
+
 interface SaleRow {
   id: string;
   invoice_number: string;
@@ -71,6 +73,8 @@ export function SalesPage() {
   const debouncedInvoiceSearch = useDebouncedValue(searchAllInvoices ? search : '', 250);
   const [displayStatus, setDisplayStatus] = useState<'all' | 'today' | 'completed' | 'returned' | 'other'>('all');
   const [displayDate, setDisplayDate] = useState('');
+  const [displayOrderType, setDisplayOrderType] = useState('');
+  const [filterDraft, setFilterDraft] = useState({ date: '', orderType: '' });
   const now = new Date();
   const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
     String(now.getDate()).padStart(2, '0')].join('-');
@@ -84,6 +88,7 @@ export function SalesPage() {
     createdAtIdKeyset: true,
     filters: [
       { column: 'is_archived', value: false },
+      ...(displayOrderType ? [{ column: 'order_type', value: displayOrderType }] : []),
       ...(['completed', 'returned'].includes(displayStatus) ? [{ column: 'status', value: displayStatus }] : []),
     ],
     exclude: displayStatus === 'other' ? { column: 'status', values: ['completed', 'returned'] } : undefined,
@@ -730,13 +735,16 @@ export function SalesPage() {
             {isAr ? 'كل أرقام الفواتير' : 'All invoice numbers'}
           </label>
           <Button variant="outline" size="sm"
-            onClick={() => setShowViewFilters((value) => !value)}
+            onClick={() => {
+              setFilterDraft({ date: displayDate, orderType: displayOrderType });
+              setShowViewFilters(true);
+            }}
             data-testid="sales-toggle-filters"
+            aria-haspopup="dialog"
             aria-expanded={showViewFilters}
           >
             <Filter className="h-4 w-4" />
             {isAr ? 'تصفية' : 'Filters'}
-            {displayDate ? ' •' : ''}
           </Button>
           <Button variant="outline" size="sm" onClick={() => void reloadSales()} data-testid="sales-view-refresh">
             <RefreshCw className="h-4 w-4" /> <span className="hidden sm:inline">{isAr ? 'تحديث' : 'Refresh'}</span>
@@ -762,25 +770,49 @@ export function SalesPage() {
                 : null}
         </div>
       )}
+      {(displayDate || displayOrderType) && (
+        <div className="flex flex-wrap items-center gap-2 text-xs text-ui-muted" data-testid="sales-applied-filters">
+          {displayDate && <span dir="ltr" className="rounded-lg bg-ui-page-alt px-3 py-1.5">{displayDate}</span>}
+          {displayOrderType && <span className="rounded-lg bg-ui-page-alt px-3 py-1.5">{orderTypeLabelForSale(displayOrderType)}</span>}
+        </div>
+      )}
       {showViewFilters && (
-        <DesignPanel testId="sales-search-panel" bodyClassName="px-3 py-2">
-          <div className="flex flex-wrap items-end gap-2" data-testid="sales-expanded-filters">
-            <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted" htmlFor="sales-view-date">
-              <span>{isAr ? 'تاريخ الإنشاء (توقيت الجهاز)' : 'Creation date (device time)'}</span>
-              <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-ui-border bg-ui-surface px-3">
-                <CalendarDays className="h-4 w-4 text-ui-subtle" />
-                <input id="sales-view-date" data-testid="sales-view-date" type="date"
-                  className="min-w-0 bg-transparent text-sm text-ui-text outline-none"
-                  value={displayDate} onChange={(event) => { setDisplayDate(event.target.value); if (displayStatus === 'today') setDisplayStatus('all'); }} />
-              </span>
-            </label>
-            {(displayDate || search || displayStatus !== 'all') && (
-              <Button variant="outline" size="sm" onClick={() => { setDisplayDate(''); setSearch(''); setDisplayStatus('all'); }}>
+        <Modal manageFocus open={showViewFilters} title={isAr ? 'فلاتر الفواتير' : 'Invoice filters'}
+          onClose={() => setShowViewFilters(false)}>
+          <form data-testid="sales-expanded-filters" className="space-y-4" onSubmit={(event) => {
+            event.preventDefault();
+            setDisplayDate(filterDraft.date);
+            setDisplayOrderType(filterDraft.orderType);
+            if (filterDraft.date && displayStatus === 'today') setDisplayStatus('all');
+            setShowViewFilters(false);
+          }}>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted" htmlFor="sales-view-date">
+                <span>{isAr ? 'تاريخ الإنشاء (توقيت الجهاز)' : 'Creation date (device time)'}</span>
+                <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-ui-border bg-ui-surface px-3">
+                  <CalendarDays className="h-4 w-4 text-ui-subtle" />
+                  <input id="sales-view-date" data-testid="sales-view-date" type="date"
+                    className="min-w-0 bg-transparent text-sm text-ui-text"
+                    value={filterDraft.date} onChange={(event) => setFilterDraft({ ...filterDraft, date: event.target.value })} />
+                </span>
+              </label>
+              <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted">
+                {isAr ? 'نوع الطلب' : 'Order type'}
+                <select value={filterDraft.orderType} onChange={(event) => setFilterDraft({ ...filterDraft, orderType: event.target.value })}
+                  className="h-9 rounded-lg border border-ui-border bg-ui-surface px-3 text-sm text-ui-text">
+                  <option value="">{isAr ? 'كل الأنواع' : 'All types'}</option>
+                  {SALE_ORDER_TYPES.map((type) => <option value={type} key={type}>{orderTypeLabelForSale(type)}</option>)}
+                </select>
+              </label>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button type="button" variant="outline" size="sm" onClick={() => setFilterDraft({ date: '', orderType: '' })}>
                 {isAr ? 'مسح التصفية' : 'Clear filters'}
               </Button>
-            )}
-          </div>
-        </DesignPanel>
+              <Button type="submit" size="sm">{isAr ? 'تطبيق' : 'Apply'}</Button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       <DesignPanel testId="sales-table-panel" bodyClassName="p-0">

@@ -2,12 +2,13 @@ import { readBranchBatches } from '../readBranchBatches';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { Download, TrendingUp, ShoppingCart, Receipt, Package, BarChart3, CreditCard, Users, List, Layers, AlertTriangle, FileDown, Printer, UserCheck, RotateCcw, Trash2 } from 'lucide-react';
+import { Download, TrendingUp, ShoppingCart, Receipt, Package, BarChart3, CreditCard, Users, List, Layers, AlertTriangle, FileDown, Printer, UserCheck, RotateCcw, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { costing, reporting, supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useTableViewport } from '@/components/useTableViewport';
 import { PageHeader, Card } from '@/components/PageHeader';
 import { Button } from '@/components/Button';
+import { Modal } from '@/components/Modal';
 import { formatFinancialCurrency, formatDate, formatPercent, todayISO } from '@/lib/format';
 import { reportDateRangeUtc } from '@/lib/businessTime';
 import { exportToExcelAdvanced } from '@/lib/excel';
@@ -110,6 +111,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   const [filters, setFilters] = useState<ReportFilters>({});
   const [filtersDirty, setFiltersDirty] = useState(false);
   const [detailFiltersOpen, setDetailFiltersOpen] = useState(false);
+  const filtersBeforeEditing = useRef<{ from: string; to: string; period: PeriodKey; filters: ReportFilters; dirty: boolean } | null>(null);
   const [queryVersion, setQueryVersion] = useState(0);
   const [options, setOptions] = useState<{
     warehouses: { id: string; name: string }[];
@@ -210,11 +212,33 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     handleReportTypeSelect(config.reportType);
     restoreVisibleColumns(config.reportType, config.visibleColumns);
     setFilters(config.filters || {});
+    filtersBeforeEditing.current = null;
+    setDetailFiltersOpen(false);
     setFiltersDirty(false);
     setQueryVersion((version) => version + 1);
   };
 
+  const closeDetailFilters = () => {
+    const saved = filtersBeforeEditing.current;
+    if (saved) {
+      setFrom(saved.from);
+      setTo(saved.to);
+      setPeriod(saved.period);
+      setFilters(saved.filters);
+      setFiltersDirty(saved.dirty);
+    }
+    filtersBeforeEditing.current = null;
+    setDetailFiltersOpen(false);
+  };
+
+  const openDetailFilters = () => {
+    filtersBeforeEditing.current = { from, to, period, filters, dirty: filtersDirty };
+    setDetailFiltersOpen(true);
+  };
+
   const runReport = () => {
+    filtersBeforeEditing.current = null;
+    setDetailFiltersOpen(false);
     setFiltersDirty(false);
     setQueryVersion((version) => version + 1);
   };
@@ -276,7 +300,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     })();
 
     return () => { cancelled = true; };
-  }, [reportType, branchScope.scopeKey]);
+  }, [reportType, branchScope.scopeKey, reportBranchIds]);
 
   useEffect(() => {
     if (reportType !== 'expenses' || reportBranchIds.length === 0) return;
@@ -284,14 +308,14 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
       const unique = await loadExpenseCategoryOptions(reportBranchIds);
       setOptions((prev) => ({ ...prev, expenseCategories: unique }));
     })();
-  }, [reportType, branchScope.scopeKey]);
+  }, [reportType, branchScope.scopeKey, reportBranchIds]);
 
   useEffect(() => {
     void loadReport();
     // Date/filter edits are intentionally applied only when the user presses
     // "Run report". This avoids repeated report queries while configuring filters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportType, branchScope.scopeKey, branches, history.unlimited, queryVersion]);
+  }, [reportType, branchScope.scopeKey, branches, history.unlimited, queryVersion, reportBranchIds]);
 
   async function loadReport() {
     setLoading(true);
@@ -1382,6 +1406,61 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     return () => onActionsReady(null);
   }, [onActionsReady, loading, reportError, canExportHeader, canPrintHeader]);
 
+  const filterPanel = (
+    <div data-testid="detail-filters-popup" className="space-y-2">
+      <CustomReportBar
+        savedReports={savedReports}
+        currentReportType={reportType}
+        currentVisibleColumns={visibleColumns}
+        currentFilters={filters}
+        onSelect={handleRestoreCustomReport}
+        onSave={handleSaveCustomReport}
+        onDelete={deleteReport}
+        lang={lang}
+      />
+
+      <ReportFilterBar
+        reportType={reportType}
+        filters={filters}
+        onFilterChange={(dim, value) => {
+          setFilters((prev) => ({ ...prev, [dim]: value }));
+          setFiltersDirty(true);
+        }}
+        showDate={showDate}
+        period={period}
+        onPeriodChange={(key) => applyPeriod(key as PeriodKey)}
+        from={from}
+        to={to}
+        onFromChange={(value) => { setFrom(value); setPeriod('custom'); setFiltersDirty(true); }}
+        onToChange={(value) => { setTo(value); setPeriod('custom'); setFiltersDirty(true); }}
+        showBranchFilter={false}
+        branches={branches}
+        branchFilterValue={branchFilter || ''}
+        onBranchFilterChange={() => undefined}
+        filterOptions={filterOptions}
+        filterLabel={filterLabel}
+        allLabel={allLabel}
+        filterDimensions={REPORT_FILTER_DIMS[reportType]}
+        total={summary.total}
+        count={summary.count}
+        currency={currency}
+        lang={lang}
+        totalLabel={summaryPresentation.totalLabel}
+        countLabel={summaryPresentation.countLabel}
+        totalIsQuantity={summaryPresentation.totalIsQuantity}
+        summaryNote={summaryPresentation.note}
+        financialTypes={canFinancial ? financialTypes : []}
+        canFinancial={canFinancial}
+        onFinancialSelect={(key) => navigate(`/financial-reports?view=${key}&from=${from}&to=${to}`)}
+        reportTypes={standalone ? reportTypes.filter((item) => item.key === reportType) : reportTypes}
+        onReportTypeChange={standalone ? undefined : handleReportTypeSelect}
+        onRunReport={runReport}
+        loading={loading}
+        pendingChanges={filtersDirty}
+      />
+    </div>
+  );
+
   return (
     <div>
       <PageHeader title={t('reports')} actions={
@@ -1437,71 +1516,35 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         </div>
       )}
 
-      <div className="relative mb-3"> 
-      {standalone && <div className="flex items-center justify-between gap-2">
-        <span className="text-xs text-ui-muted">{lang === 'ar' ? 'النتائج الكاملة متاحة أدناه. غيّر الفلاتر الإضافية عند الحاجة.' : 'Complete results appear below. Adjust additional filters if needed.'}</span>
-        <button type="button" data-testid="toggle-detail-filters"
-          aria-expanded={detailFiltersOpen} onClick={() => setDetailFiltersOpen((open) => !open)}
-          className="rounded-lg border border-ui-border bg-ui-surface px-3 py-2 text-xs font-bold text-ui-text">
-          {lang === 'ar' ? 'الفلاتر والتخصيص' : 'Filters & customization'}
-        </button>
-      </div>}
-      {(!standalone || detailFiltersOpen) && (
-        <div data-testid="detail-filters-popup" className={standalone ? 'absolute end-0 top-full z-30 mt-2 max-h-[70vh] w-[min(90vw,680px)] overflow-y-auto rounded-xl border border-ui-border bg-ui-surface p-3 shadow-xl' : ''}>
-      <CustomReportBar
-        savedReports={savedReports}
-        currentReportType={reportType}
-        currentVisibleColumns={visibleColumns}
-        currentFilters={filters}
-        onSelect={handleRestoreCustomReport}
-        onSave={handleSaveCustomReport}
-        onDelete={deleteReport}
-        lang={lang}
-      />
-
-      <ReportFilterBar
-        reportType={reportType}
-        filters={filters}
-        onFilterChange={(dim, value) => {
-          setFilters((prev) => ({ ...prev, [dim]: value }));
-          setFiltersDirty(true);
-        }}
-        showDate={showDate}
-        period={period}
-        onPeriodChange={(key) => applyPeriod(key as PeriodKey)}
-        from={from}
-        to={to}
-        onFromChange={(value) => { setFrom(value); setPeriod('custom'); setFiltersDirty(true); }}
-        onToChange={(value) => { setTo(value); setPeriod('custom'); setFiltersDirty(true); }}
-        showBranchFilter={false}
-        branches={branches}
-        branchFilterValue={branchFilter || ''}
-        onBranchFilterChange={() => undefined}
-        filterOptions={filterOptions}
-        filterLabel={filterLabel}
-        allLabel={allLabel}
-        filterDimensions={REPORT_FILTER_DIMS[reportType]}
-        total={summary.total}
-        count={summary.count}
-        currency={currency}
-        lang={lang}
-        totalLabel={summaryPresentation.totalLabel}
-        countLabel={summaryPresentation.countLabel}
-        totalIsQuantity={summaryPresentation.totalIsQuantity}
-        summaryNote={summaryPresentation.note}
-        financialTypes={canFinancial ? financialTypes : []}
-        canFinancial={canFinancial}
-        onFinancialSelect={(key) => navigate(`/financial-reports?view=${key}&from=${from}&to=${to}`)}
-        reportTypes={standalone ? reportTypes.filter((item) => item.key === reportType) : reportTypes}
-        onReportTypeChange={standalone ? undefined : handleReportTypeSelect}
-        onRunReport={runReport}
-        loading={loading}
-        pendingChanges={filtersDirty}
-      />
-
+      {standalone && (
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          <button type="button" data-testid="toggle-detail-filters"
+            aria-haspopup="dialog" aria-expanded={detailFiltersOpen} onClick={openDetailFilters}
+            className="inline-flex items-center gap-2 rounded-lg border border-ui-border bg-ui-surface px-3 py-2 text-xs font-bold text-ui-text">
+            <SlidersHorizontal className="h-4 w-4" />
+            {lang === 'ar' ? 'الفلاتر والتخصيص' : 'Filters & customization'}
+          </button>
+          {showDate && <span dir="ltr" className="rounded-lg bg-ui-page-alt px-3 py-1.5 text-xs text-ui-muted">
+            {filtersBeforeEditing.current?.from ?? from} — {filtersBeforeEditing.current?.to ?? to}
+          </span>}
+          {REPORT_FILTER_DIMS[reportType].map((dim) => {
+            const value = (filtersBeforeEditing.current?.filters ?? filters)[dim];
+            if (!value) return null;
+            const label = filterOptions(dim).find((option) => option.value === value)?.label ?? value;
+            return (
+              <span key={dim} className="rounded-lg bg-ui-page-alt px-3 py-1.5 text-xs text-ui-muted">
+                {filterLabel(dim)} · {label}
+              </span>
+            );
+          })}
         </div>
       )}
-      </div>
+      {standalone ? (
+        <Modal manageFocus open={detailFiltersOpen} onClose={closeDetailFilters}
+          title={lang === 'ar' ? 'فلاتر التقرير' : 'Report filters'} size="xl">
+          {filterPanel}
+        </Modal>
+      ) : filterPanel}
 
       {/* Reuse the existing report loader's series; never compute a second
           financial truth from a partial table/page or unrelated SQL. */}

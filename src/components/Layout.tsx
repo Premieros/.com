@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useState } from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity, AlertTriangle, ArrowDown, ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUp, BarChart3, BadgeDollarSign, Boxes, BookOpenText, Building2, Calculator, ChefHat,
   ChevronDown, ClipboardCheck, FileSpreadsheet, FileText, FlaskConical,
@@ -17,6 +17,7 @@ import { useActiveOrderCount } from '../features/pos/hooks/useActiveOrderCount';
 import { Logo } from './Logo';
 import { ApprovalInbox } from './ApprovalInbox';
 import { APP_ROUTES } from '@/core/navigation/routes';
+import { workspaceSectionForPath } from '@/core/navigation/workspaceSections';
 import { prefetchAppRoute } from '@/core/navigation/prefetch';
 import { MENU_GROUPS, MENU_ITEMS, SIDEBAR_SECTION_ORDER, sidebarSectionForItem, type MenuIcon, type SidebarSection } from '@/core/navigation/menu.config';
 import { CommandPalette, CommandPaletteTrigger } from './CommandPalette';
@@ -25,7 +26,7 @@ import { PageUtilityControls } from './PageUtilityControls';
 import { ReturnContextBanner } from '@/core/guard/ReturnContextBanner';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
 import { businessGroupLabel, businessMenuLabel } from '@/core/organizations/businessRuntime';
-import { moduleForRoute } from '@/core/modules/module.config';
+import { moduleForPath, moduleForRoute } from '@/core/modules/module.config';
 import { useBranchScope } from '@/lib/branchScope';
 
 const ICONS: Record<MenuIcon, ReactNode> = {
@@ -166,12 +167,21 @@ function AccountLayout({ children }: { children: ReactNode }) {
     return acc;
   }, {}), [visibleItems]);
 
+  const workspace = workspaceSectionForPath(location.pathname);
+  const sectionLinks = workspace?.section.links.filter((link) => {
+    const menuItem = MENU_ITEMS.find((item) => item.route === link.route);
+    if (menuItem) return visibleItems.includes(menuItem);
+    return !!link.permission && can(link.permission) &&
+      canAccessModule(moduleForPath(link.route)) && canAccessPath(link.route);
+  }) ?? [];
+
   const activeMenuGroup = useMemo<SidebarSection | null>(() => {
-    const activeItem = visibleItems.find((item) =>
-      location.pathname === item.route || location.pathname.startsWith(`${item.route}/`),
-    );
+    const activeItem = visibleItems.find((item) => item.route === workspace?.section.anchor)
+      ?? visibleItems.find((item) =>
+        location.pathname === item.route || location.pathname.startsWith(`${item.route}/`),
+      );
     return activeItem ? sidebarSectionForItem(activeItem) : null;
-  }, [location.pathname, visibleItems]);
+  }, [location.pathname, visibleItems, workspace?.section.anchor]);
 
   const sidebarSectionLabel = (group: SidebarSection) => {
     if (group === 'delivery') return ar ? 'التوصيل' : 'Delivery';
@@ -232,8 +242,8 @@ function AccountLayout({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div dir={ar ? 'rtl' : 'ltr'} className="premier-backoffice min-h-screen bg-ui-page text-ui-text overflow-x-hidden" data-testid="app-shell">
-      <header data-testid="app-header" className={`fixed top-0 start-0 end-0 z-[60] flex h-[68px] min-w-0 items-center justify-between gap-2 border-b border-ui-border bg-ui-surface px-4 shadow-none transition-all duration-200 sm:px-6 ${desktopSidebarHidden ? 'lg:start-0' : 'lg:start-[272px]'}`}>
+    <div dir={ar ? 'rtl' : 'ltr'} className="premier-backoffice min-h-screen bg-ui-page text-ui-text overflow-x-clip" data-testid="app-shell">
+      <header data-testid="app-header" className={`fixed top-0 start-0 end-0 z-[60] flex h-[68px] min-w-0 items-center justify-between gap-2 border-b border-ui-border bg-ui-surface px-4 shadow-none transition-all duration-200 sm:px-6 ${desktopSidebarHidden ? 'lg:start-[64px]' : 'lg:start-[272px]'}`}>
         <div className="flex shrink-0 items-center gap-1 sm:gap-2" data-testid="app-header-navigation">
           <button data-testid="sidebar-open" type="button" onClick={() => setMobileOpen(true)} className="rounded-lg p-2 text-ui-muted hover:bg-ui-page-alt lg:hidden" aria-label={ar ? 'فتح القائمة' : 'Open sidebar'}>
             <Menu className="h-5 w-5" />
@@ -244,8 +254,8 @@ function AccountLayout({ children }: { children: ReactNode }) {
               type="button"
               onClick={() => setDesktopSidebarHidden(false)}
               className="hidden h-9 w-9 items-center justify-center rounded-xl border border-ui-border bg-ui-surface text-ui-muted shadow-ui-xs transition hover:bg-ui-page-alt hover:text-ui-text lg:inline-flex"
-              aria-label={ar ? 'إظهار القائمة الجانبية' : 'Show sidebar'}
-              title={ar ? 'إظهار القائمة الجانبية' : 'Show sidebar'}
+              aria-label={ar ? 'توسيع القائمة الجانبية' : 'Expand sidebar'}
+              title={ar ? 'توسيع القائمة الجانبية' : 'Expand sidebar'}
             >
               <Menu className="h-4.5 w-4.5" />
             </button>
@@ -339,7 +349,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <aside data-testid="app-sidebar" className={`fixed top-0 bottom-0 start-0 z-50 w-[272px] border-e border-ui-border bg-[#F5F5F9] text-[#191a20] shadow-none dark:bg-ui-surface transition-transform duration-200 ease-[var(--ui-ease)] ${mobileOpen ? 'translate-x-0' : ar ? 'translate-x-full' : '-translate-x-full'} ${desktopSidebarHidden ? (ar ? 'lg:translate-x-full' : 'lg:-translate-x-full') : 'lg:translate-x-0'}`}>
+      <aside data-testid="app-sidebar" className={`fixed top-0 bottom-0 start-0 z-50 w-[272px] border-e border-ui-border bg-[#F5F5F9] text-[#191a20] shadow-none dark:bg-ui-surface transition-transform duration-200 ease-[var(--ui-ease)] ${mobileOpen ? 'translate-x-0' : ar ? 'translate-x-full' : '-translate-x-full'} ${desktopSidebarHidden ? 'lg:hidden' : 'lg:translate-x-0'}`}>
         <div className="flex h-[68px] items-center justify-between px-5">
           <Logo variant="horizontal" size={28} tone="mono" showTagline={false} className="text-ui-primary" />
           <button data-testid="sidebar-close" type="button" onClick={() => setMobileOpen(false)} className="rounded-lg p-2 text-ui-muted hover:bg-ui-page-alt lg:hidden" aria-label={ar ? 'إغلاق القائمة' : 'Close sidebar'}><X className="h-5 w-5" /></button>
@@ -348,8 +358,8 @@ function AccountLayout({ children }: { children: ReactNode }) {
             type="button"
             onClick={() => setDesktopSidebarHidden(true)}
             className="hidden h-8 w-8 items-center justify-center rounded-lg text-ui-muted transition hover:bg-ui-page-alt hover:text-ui-text lg:inline-flex"
-            aria-label={ar ? 'إخفاء القائمة الجانبية' : 'Hide sidebar'}
-            title={ar ? 'إخفاء القائمة الجانبية' : 'Hide sidebar'}
+            aria-label={ar ? 'تصغير القائمة الجانبية' : 'Collapse sidebar'}
+            title={ar ? 'تصغير القائمة الجانبية' : 'Collapse sidebar'}
           >
             <X className="h-4 w-4" />
           </button>
@@ -553,9 +563,51 @@ function AccountLayout({ children }: { children: ReactNode }) {
         </nav>
       </aside>
 
+      {desktopSidebarHidden && (
+        <nav aria-label={ar ? 'الأقسام الرئيسية' : 'Main sections'} data-testid="app-sidebar-rail"
+          className="fixed inset-y-0 start-0 z-50 hidden w-16 flex-col gap-1 overflow-y-auto border-e border-ui-border bg-ui-surface p-2 lg:flex">
+          <div className="mb-2 grid h-[52px] shrink-0 place-items-center">
+            <Logo variant="mark" size={28} tone="mono" showTagline={false} className="text-ui-primary" />
+          </div>
+          {visibleSections.flatMap((section) => {
+            const entries = new Map<string, (typeof visibleItems)[number]>();
+            for (const item of grouped[section] ?? []) {
+              const anchor = workspaceSectionForPath(item.route)?.section.anchor ?? item.route;
+              if (!entries.has(anchor) || item.route === anchor) entries.set(anchor, item);
+            }
+            return [...entries].map(([anchor, item]) => {
+              const label = businessMenuLabel(runtime, item.id, lang, item.label?.[lang] ?? t(item.labelKey));
+              const active = workspace ? workspace.section.anchor === anchor : location.pathname === item.route;
+              return (
+                <Link key={item.id} to={item.route} aria-label={label} title={label}
+                  aria-current={active ? 'page' : undefined}
+                  onPointerEnter={() => prefetchAppRoute(item.route)} onFocus={() => prefetchAppRoute(item.route)}
+                  className={`grid min-h-11 shrink-0 place-items-center rounded-lg transition-colors focus-visible:outline-2 focus-visible:outline-ui-ring ${active ? 'bg-ui-primary-soft text-ui-primary' : 'text-ui-muted hover:bg-ui-page-alt'}`}>
+                  {ICONS[item.icon]}
+                </Link>
+              );
+            });
+          })}
+        </nav>
+      )}
+
       {mobileOpen && <button data-testid="mobile-sidebar-backdrop" type="button" className="fixed inset-0 z-40 bg-ui-text/20 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} aria-label={ar ? 'إغلاق' : 'Close'} />}
 
-      <div data-testid="app-content-shell" className={`min-h-screen pt-[68px] transition-all duration-200 ${desktopSidebarHidden ? 'lg:ms-0' : 'lg:ms-[272px]'}`}>
+      <div data-testid="app-content-shell" className={`min-h-screen pt-[68px] transition-all duration-200 ${desktopSidebarHidden ? 'lg:ms-[64px]' : 'lg:ms-[272px]'}`}>
+        {sectionLinks.length > 1 && workspace && (
+          <nav aria-label={ar ? 'صفحات القسم' : 'Pages in this section'}
+            data-testid="workspace-section-navigation"
+            className="sticky top-[68px] z-[35] flex min-w-0 gap-1 overflow-x-auto border-b border-ui-border bg-ui-surface px-3 sm:px-5 lg:px-6">
+            {sectionLinks.map((link) => (
+              <Link key={link.route} to={link.route}
+                aria-current={workspace.route === link.route ? 'page' : undefined}
+                onPointerEnter={() => prefetchAppRoute(link.route)} onFocus={() => prefetchAppRoute(link.route)}
+                className={`flex min-h-10 shrink-0 items-center border-b-2 px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-ui-ring ${workspace.route === link.route ? 'border-ui-primary text-ui-primary' : 'border-transparent text-ui-muted hover:text-ui-text'}`}>
+                {link.label[ar ? 0 : 1]}
+              </Link>
+            ))}
+          </nav>
+        )}
         <ReturnContextBanner />
         {branchScope.isAggregate && (
           <div data-testid="aggregate-branch-action-banner" className="border-b border-ui-warning/30 bg-ui-warning/10 px-4 py-2.5 sm:px-6 lg:px-7">
@@ -604,7 +656,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
 
       <footer
         data-testid="app-bottom-footer"
-        className={`fixed bottom-0 start-0 end-0 z-[55] border-t border-ui-border bg-ui-surface/95 shadow-[0_-8px_28px_rgba(0,0,0,0.08)] backdrop-blur-xl transition-all duration-200 print:hidden ${desktopSidebarHidden ? 'lg:start-0' : 'lg:start-[272px]'} ${mobileOpen ? 'hidden lg:block' : ''}`}
+        className={`fixed bottom-0 start-0 end-0 z-[55] border-t border-ui-border bg-ui-surface/95 shadow-[0_-8px_28px_rgba(0,0,0,0.08)] backdrop-blur-xl transition-all duration-200 print:hidden ${desktopSidebarHidden ? 'lg:start-[64px]' : 'lg:start-[272px]'} ${mobileOpen ? 'hidden lg:block' : ''}`}
       >
         <div data-testid="app-bottom-toolbar" className="flex h-12 items-center border-b border-ui-border px-3 sm:h-14 sm:px-5 md:border-b-0">
           <PageUtilityControls />
