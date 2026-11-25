@@ -1,11 +1,31 @@
 -- Disposable candidate only; legacy product-only draft stock counts.
+-- Row-level locks require UPDATE privilege, which is deliberately revoked from clients.
+-- Keep the privileged operation in a non-exposed schema, lock only an authorized draft,
+-- never change data or return protected rows, and retain the existing client table ACLs.
+CREATE FUNCTION private.pr318_lock_stock_count_draft(p_count_id uuid)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $
+DECLARE v_branch uuid; v_status text;
+BEGIN
+  IF auth.uid() IS NULL OR public.can_permission('inventory.count.create') IS NOT TRUE THEN
+    RAISE EXCEPTION 'COUNT_EDIT_DENIED';
+  END IF;
+  SELECT c.branch_id,c.status INTO v_branch,v_status
+    FROM public.stock_counts c WHERE c.id=p_count_id
+      AND public.user_may_access_branch(c.branch_id) IS TRUE FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'COUNT_EDIT_DENIED'; END IF;
+  IF v_status IS DISTINCT FROM 'draft' THEN RAISE EXCEPTION 'COUNT_NOT_DRAFT'; END IF;
+END; $;
+REVOKE ALL ON FUNCTION private.pr318_lock_stock_count_draft(uuid) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION private.pr318_lock_stock_count_draft(uuid) TO authenticated;
+
 CREATE FUNCTION public.pr318_edit_stock_count_candidate(p_count_id uuid,p_expected jsonb,p_items jsonb)
 RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
 DECLARE v_count public.stock_counts%ROWTYPE; v_snapshot jsonb; v_item record; v_result jsonb;
 BEGIN
-  IF auth.uid() IS NULL OR NOT (public.is_pos_admin() OR public.can_permission('inventory.count.create')) THEN RAISE EXCEPTION 'COUNT_EDIT_DENIED'; END IF;
-  SELECT * INTO v_count FROM public.stock_counts WHERE id=p_count_id FOR UPDATE;
-  IF NOT FOUND OR NOT public.user_may_access_branch(v_count.branch_id) THEN RAISE EXCEPTION 'COUNT_EDIT_DENIED'; END IF;
+  IF auth.uid() IS NULL OR public.can_permission('inventory.count.create') IS NOT TRUE THEN RAISE EXCEPTION 'COUNT_EDIT_DENIED'; END IF;
+  PERFORM private.pr318_lock_stock_count_draft(p_count_id);
+  SELECT * INTO v_count FROM public.stock_counts WHERE id=p_count_id;
+  IF NOT FOUND OR public.user_may_access_branch(v_count.branch_id) IS NOT TRUE THEN RAISE EXCEPTION 'COUNT_EDIT_DENIED'; END IF;
   IF v_count.status<>'draft' THEN RAISE EXCEPTION 'COUNT_NOT_DRAFT'; END IF;
   IF EXISTS(SELECT 1 FROM public.stock_count_items WHERE stock_count_id=p_count_id AND raw_material_id IS NOT NULL) THEN RAISE EXCEPTION 'RAW_COUNT_NOT_SUPPORTED'; END IF;
   IF jsonb_typeof(p_items) IS DISTINCT FROM 'array' OR jsonb_typeof(p_expected) IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'INVALID_COUNT_LINES'; END IF;
