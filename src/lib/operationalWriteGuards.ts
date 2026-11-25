@@ -11,3 +11,8 @@ export function parseNonnegativeQuantity(value: string): number | null {
   if (!Number.isFinite(quantity) || quantity < 0) throw new Error('INVALID_QUANTITY');
   return quantity;
 }
+
+/** Ignore stale async lookups without overwriting the latest draft edits. */
+export function applyTransferCost<T extends { lookupToken?: number; unit_cost: number; costError?: boolean }>(rows: T[], token: number, cost: number, costError = false): T[] {
+  return rows.map(row => row.lookupToken === token ? { ...row, unit_cost: cost, lookupToken: undefined, costError } : row);
+}
