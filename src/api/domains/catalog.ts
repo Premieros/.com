@@ -262,7 +262,7 @@ export const catalog = {
       quantity: Number(row.quantity),
       wastage_percent: Number(row.wastage_percent || 0),
     }));
-    if (normalized.some((row) => !row.raw_material_id || !Number.isFinite(row.quantity) || row.quantity <= 0 || row.wastage_percent < 0)) {
+    if (normalized.some((row) => !row.raw_material_id || !Number.isFinite(row.quantity) || row.quantity <= 0 || !Number.isFinite(row.wastage_percent) || row.wastage_percent < 0)) {
       throw new Error('INVALID_DIRECT_RAW_COMPONENT');
     }
     if (new Set(normalized.map((row) => row.raw_material_id)).size !== normalized.length) {
@@ -330,23 +330,21 @@ export const catalog = {
   },
 
   async setProductUnitLinks(product_id: string, links: { unit_id: string; quantity: number }[]) {
+    if (!product_id || links.some(row => !row.unit_id || !Number.isFinite(row.quantity) || row.quantity <= 0) || new Set(links.map(row => row.unit_id)).size !== links.length) throw new Error('INVALID_PRODUCT_UNIT_LINKS');
     const { data: existingLinks, error: existingLinksError } = await supabase
       .from('product_unit_links')
-      .select('unit_id')
+      .select('unit_id,quantity')
       .eq('product_id', product_id);
     if (existingLinksError) throw existingLinksError;
 
-    const existingIds = new Set(((existingLinks || []) as { unit_id: string }[]).map((row) => row.unit_id));
+    const existingRows = (existingLinks || []) as { unit_id: string; quantity: number }[];
+    const existingIds = new Set(existingRows.map(row => row.unit_id));
     const desiredIds = new Set(links.map((row) => row.unit_id));
     const removedIds = [...existingIds].filter((unitId) => !desiredIds.has(unitId));
 
-    if (removedIds.length > 0) {
-      const { error } = await supabase.from('product_unit_links').delete().eq('product_id', product_id).in('unit_id', removedIds);
-      if (error) throw error;
-    }
-
     for (const row of links) {
       if (existingIds.has(row.unit_id)) {
+        if (Number(existingRows.find(existing => existing.unit_id === row.unit_id)?.quantity) === row.quantity) continue;
         const { error } = await supabase
           .from('product_unit_links')
           .update({ quantity: row.quantity })
@@ -358,6 +356,13 @@ export const catalog = {
         if (error) throw error;
       }
     }
+    if (removedIds.length > 0) {
+      const { error } = await supabase.from('product_unit_links').delete().eq('product_id', product_id).in('unit_id', removedIds);
+      if (error) throw error;
+    }
+    const { data: saved, error: readError } = await supabase.from('product_unit_links').select('unit_id,quantity').eq('product_id', product_id);
+    if (readError) throw readError;
+    if ((saved || []).length !== links.length || links.some(row => !(saved || []).some(item => item.unit_id === row.unit_id && Math.abs(Number(item.quantity) - row.quantity) < 0.000001))) throw new Error('PRODUCT_UNIT_LINKS_NOT_SAVED');
   },
 
   // ─── Production ───────────────────────────────────────────

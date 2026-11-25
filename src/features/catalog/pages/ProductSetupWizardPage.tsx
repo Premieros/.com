@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { Check, ChevronLeft, ChevronRight, PackagePlus, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/api';
@@ -52,6 +52,7 @@ export function ProductSetupWizardPage() {
 
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
+  const saveLock = useRef(false);
   const [loadingComponents, setLoadingComponents] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [manufacturedItems, setManufacturedItems] = useState<InventoryUnit[]>([]);
@@ -170,13 +171,13 @@ export function ProductSetupWizardPage() {
   };
   const removeRawComponent = (index: number) => setRawComponents((prev) => prev.filter((_, i) => i !== index));
 
-  const validateStep = () => {
-    if (step === 1 && (!form.name.trim() || !branchId)) {
+  const validateStep = (validationStep = step) => {
+    if (validationStep === 1 && (!form.name.trim() || !branchId)) {
       show(isAr ? 'أكمل اسم المنتج والفرع' : 'Complete the product name and branch', 'error');
       return false;
     }
-    if (step === 2 && supportsComponentGroups) {
-      if (manufacturedComponents.some((row) => !row.unit_id || row.quantity <= 0)) {
+    if (validationStep === 2 && supportsComponentGroups) {
+      if (manufacturedComponents.some((row) => !row.unit_id || !Number.isFinite(row.quantity) || row.quantity <= 0)) {
         show(isAr ? 'اختر مجموعة المكونات وحدد كمية صحيحة' : 'Select each component group and enter a valid quantity', 'error');
         return false;
       }
@@ -189,8 +190,8 @@ export function ProductSetupWizardPage() {
         return false;
       }
     }
-    if (step === 3 && supportsRawComposition) {
-      if (rawComponents.some((row) => !row.raw_material_id || row.quantity <= 0 || row.wastage_percent < 0)) {
+    if (validationStep === 3 && supportsRawComposition) {
+      if (rawComponents.some((row) => !row.raw_material_id || !Number.isFinite(row.quantity) || row.quantity <= 0 || !Number.isFinite(row.wastage_percent) || row.wastage_percent < 0)) {
         show(isAr ? 'اختر الخامة وحدد كمية صحيحة' : 'Select each raw material and enter a valid quantity', 'error');
         return false;
       }
@@ -211,13 +212,14 @@ export function ProductSetupWizardPage() {
   };
 
   const save = async () => {
-    if (!can('products.create') || saving || !branchId) return;
-    if (!validateStep()) return;
+    if (!can('products.create') || saveLock.current || loadingComponents || !branchId) return;
+    if (!wizardSteps.every(({ step: validationStep }) => validateStep(validationStep))) return;
     if (supportsRawComposition && rawComponents.length > 0 && !can('recipes.manage')) {
       show(isAr ? 'لا تملك صلاحية إدارة الخامات المباشرة للمنتج.' : 'You do not have permission to manage direct product raw materials.', 'error');
       return;
     }
 
+    saveLock.current = true;
     setSaving(true);
     let createdProductId: string | null = null;
     try {
@@ -274,6 +276,7 @@ export function ProductSetupWizardPage() {
       }
       show(error instanceof Error ? error.message : String(error), 'error');
     } finally {
+      saveLock.current = false;
       setSaving(false);
     }
   };
