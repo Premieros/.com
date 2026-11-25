@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { describe, expect, it, vi } from 'vitest';
+import { ReportsShowcase } from '@/features/reporting/components/ReportsShowcase';
 import { DashboardDataPage } from '@/features/dashboard/pages/DashboardDataPage';
 
 const { loadSnapshot } = vi.hoisted(() => ({
@@ -28,7 +29,7 @@ vi.mock('@/lib/permissions', () => ({
 }));
 vi.mock('@/lib/useBranchFilter', () => ({ useBranchFilter: () => 'branch-1' }));
 vi.mock('@/lib/branchScope', () => {
-  const scopedBranches = { selectedBranchIds: ['branch-1'], scopeKey: 'branch-1' };
+  const scopedBranches = { selectedBranchIds: ['branch-1'], organizationBranches: [], scopeKey: 'branch-1' };
   return { useBranchScope: () => scopedBranches };
 });
 vi.mock('@/hooks/useBranches', () => {
@@ -91,5 +92,26 @@ describe('dashboard workspace controls', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /^Month$/ }));
     await waitFor(() => expect(loadSnapshot).toHaveBeenCalledTimes(2));
+  });
+});
+
+describe('reports overview interactions', () => {
+  it('keeps invoice counts and payment amounts distinct while switching analyses locally', async () => {
+    loadSnapshot.mockClear();
+    render(<ReportsShowcase isAr={false} allowedReportTypes={new Set(['sales', 'sales_by_payment', 'detailed_invoices'])}
+      onSelectReport={vi.fn()} from="2026-11-19" to="2026-11-25" hasAuthorizedBranches verifiedIncome={null} />);
+
+    expect(await screen.findByText('Cash')).toBeVisible();
+    expect(screen.getByText('Takeaway')).toBeVisible();
+
+    fireEvent.click(screen.getByTestId('overview-kpi-orders'));
+    expect(screen.getByTestId('overview-kpi-orders')).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Takeaway')).toBeVisible();
+    expect(screen.queryByText('Cash')).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Net payments by method' }));
+    expect(screen.getByText('Cash')).toBeVisible();
+    expect(screen.queryByText('Takeaway')).toBeNull();
+    expect(loadSnapshot).toHaveBeenCalledTimes(1);
   });
 });

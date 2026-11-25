@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { BarChart3, CalendarDays, Check, Layers3, RefreshCw, Store, Trophy, TrendingUp } from 'lucide-react';
 import {
-  Area, AreaChart, Bar, BarChart, CartesianGrid, Cell, Pie, PieChart,
+  Area, AreaChart, Bar, BarChart, CartesianGrid, Legend,
   ResponsiveContainer, Tooltip, XAxis, YAxis,
 } from 'recharts';
 import { loadDashboardSalesSnapshot, type DashboardSalesSnapshot } from '@/features/dashboard/services/dashboardSnapshot';
@@ -10,24 +10,26 @@ import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { formatFinancialCurrency } from '@/lib/format';
 import { canonicalReportCurrency, sharedReportCurrency } from '../reportCurrency';
-import { reportDateRangeUtc } from '@/lib/businessTime';
+import { DashboardBreakdown } from '@/features/dashboard/components/DashboardBreakdown';
+import { comparisonPeriod } from '../reportComparison';
+import { addIsoDays, reportDateRangeUtc } from '@/lib/businessTime';
 import type { ReportType } from '../reportFilters';
 import type { IncomeKpiVerified } from './ReportsExecutiveKpis';
 
 type Panel = {
-  id: 'payment' | 'time' | 'branches' | 'products';
+  id: 'payment' | 'orders' | 'time' | 'branches' | 'products';
   report: ReportType;
   ar: string;
   en: string;
   icon: typeof BarChart3;
 };
 const PANELS: Panel[] = [
-  { id: 'payment', report: 'sales_by_payment', ar: 'توزيع المبيعات حسب طرق الدفع', en: 'Sales by payment method', icon: Layers3 },
+  { id: 'payment', report: 'sales_by_payment', ar: 'صافي المدفوعات حسب الطريقة', en: 'Net payments by method', icon: Layers3 },
+  { id: 'orders', report: 'detailed_invoices', ar: 'الطلبات حسب النوع', en: 'Orders by type', icon: Layers3 },
   { id: 'time', report: 'sales', ar: 'المبيعات حسب الفترة', en: 'Sales over time', icon: TrendingUp },
   { id: 'branches', report: 'sales', ar: 'المبيعات حسب الفروع', en: 'Sales by branch', icon: Store },
   { id: 'products', report: 'sales_by_product', ar: 'الأصناف الأكثر مبيعًا (بالكمية)', en: 'Top products (units)', icon: Trophy },
 ];
-const PIE_COLORS = ['#7c3aed', '#3b82f6', '#10b981', '#f59e0b', '#ec4899', '#6366f1'];
 type Loaded = { snapshot: DashboardSalesSnapshot; scopeKey: string; from: string; to: string };
 
 export function ReportsShowcase({
@@ -47,10 +49,15 @@ export function ReportsShowcase({
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [focusedPanel, setFocusedPanel] = useState<Panel['id'] | null>(null);
+  const [compare, setCompare] = useState(false);
   const generation = useRef(0);
   // Report readers may see report aggregates; the invoker-security RPC still enforces table RLS.
   const canReadSnapshot = can('dashboard.view') || can('reports.view');
   const panels = PANELS.filter((panel) => allowedReportTypes.has(panel.report));
+  const activePanel = panels.find((panel) => panel.id === focusedPanel);
+  const displayedPanels = activePanel ? [activePanel] : panels;
+  const showComparison = compare && can('history.unlimited');
   const branchIds = branchScope.selectedBranchIds;
   const currencyCodes = branchIds.map((id) => effectiveSettings(id)?.currency);
   const commonCurrency = sharedReportCurrency(currencyCodes);
@@ -77,18 +84,16 @@ export function ReportsShowcase({
     setError(null);
     try {
       const { startIso, endExclusiveIso } = reportDateRangeUtc(from, to);
-      const duration = Date.parse(endExclusiveIso) - Date.parse(startIso);
-      if (!Number.isFinite(duration) || duration <= 0) throw new Error('INVALID_PERIOD');
-      // The existing RPC uses <= end; supply the final millisecond of the selected day.
+      const prior = comparisonPeriod({ from, to }, 'previous');
+      const previous = reportDateRangeUtc(prior.from, prior.to);
       const currentToInclusive = new Date(Date.parse(endExclusiveIso) - 1).toISOString();
-      const previousTo = new Date(Date.parse(startIso) - 1).toISOString();
-      const previousFrom = new Date(Date.parse(startIso) - duration).toISOString();
+      const previousTo = new Date(Date.parse(previous.endExclusiveIso) - 1).toISOString();
       const snapshot = await loadDashboardSalesSnapshot({
         branchId: branchIds.length === 1 ? branchIds[0] : null,
         branchIds: [...branchIds],
         currentFrom: startIso,
         currentTo: currentToInclusive,
-        previousFrom,
+        previousFrom: previous.startIso,
         previousTo,
         granularity: 'day',
         timezone: 'Africa/Cairo',
@@ -123,12 +128,38 @@ export function ReportsShowcase({
     drive_thru: { ar: 'طلبات السيارات', en: 'Drive through' },
     online: { ar: 'الطلبات الإلكترونية', en: 'Online' },
   };
-  const payments = (current?.orderTypes || []).map((item) => ({
-    name: (channelNames[item.key] || { ar: item.key, en: item.key })[isAr ? 'ar' : 'en'],
-    value: item.count,
-  })).filter((item) => item.value > 0);
-  const channelCount = payments.reduce((total, item) => total + item.value, 0);
-  const series = (current?.currentSeries || []).map((item) => ({ name: item.bucket.slice(0, 10), value: item.sales }));
+  const orderTypes = (current?.orderTypes || []).map(({ key, count }) => ({
+    key,
+    label: (channelNames[key] || { ar: key, en: key })[isAr ? 'ar' : 'en'],
+    value: count,
+  }));
+  const paymentTotals = new Map<string, number>();
+  for (const { method, total } of current?.paymentMethods ?? []) {
+    paymentTotals.set(method, (paymentTotals.get(method) ?? 0) + total);
+  }
+  const paymentLabels: Record<string, readonly [string, string]> = {
+    cash: ['نقدي', 'Cash'], card: ['بطاقة', 'Card'], visa: ['فيزا / ماستركارد', 'Visa / Mastercard'],
+    bank: ['تحويل بنكي', 'Bank transfer'], transfer: ['تحويل', 'Transfer'], instapay: ['إنستاباي', 'InstaPay'],
+    wallet: ['محفظة إلكترونية', 'Wallet'], split: ['مختلط غير موزع', 'Unallocated split'],
+    credit: ['آجل', 'Credit'], other: ['أخرى', 'Other'],
+  };
+  const payments = [...paymentTotals].sort((a, b) => b[1] - a[1]).map(([key, value]) => ({
+    key, value, label: paymentLabels[key]?.[isAr ? 0 : 1] ?? key,
+  }));
+  const series = new Map<string, { name: string; value: number; previous: number }>();
+  for (const item of current?.currentSeries ?? []) {
+    const name = item.bucket.slice(0, 10);
+    series.set(name, { name, value: item.sales, previous: 0 });
+  }
+  if (showComparison && current) {
+    const prior = comparisonPeriod({ from, to }, 'previous');
+    const days = Math.round((Date.parse(from) - Date.parse(prior.from)) / 86400000);
+    for (const item of current.previousSeries) {
+      const name = addIsoDays(item.bucket.slice(0, 10), days);
+      const row = series.get(name) ?? { name, value: 0, previous: 0 };
+      series.set(name, { ...row, previous: item.sales });
+    }
+  }
   const branches = (current?.branches || []).map((item) => {
     const branch = branchScope.organizationBranches.find((entry) => entry.id === item.branchId);
     return {
@@ -159,32 +190,21 @@ export function ReportsShowcase({
         </div>
       ) : <p className="py-12 text-center text-xs text-ui-muted">{isAr ? 'لم تُسجّل مبيعات أصناف في هذه الفترة. جرّب توسيع الفترة أو اختيار فرع آخر.' : 'No product sales were recorded in this period. Try a longer period or another branch.'}</p>;
     }
-    if (id !== 'payment' && !commonCurrency) return (
+    if (id === 'orders') {
+      return orderTypes.length ? <div className="p-2"><DashboardBreakdown rows={orderTypes}
+        formatValue={(value) => value.toLocaleString(isAr ? 'ar-EG' : 'en-US')} /></div>
+        : <p className="py-12 text-center text-xs text-ui-muted">{isAr ? 'لا توجد طلبات في هذه الفترة' : 'No orders in this period'}</p>;
+    }
+    if (!commonCurrency) return (
       <p className="py-12 text-center text-xs text-ui-muted">
-        {isAr ? 'الفروع المختارة لا تستخدم عملة واحدة معروفة. اختر فرعًا واحدًا أو راجع عملة كل فرع في الإعدادات قبل مقارنة المبالغ.' : 'The selected branches do not have one known currency. Choose a single branch or review branch currency settings before comparing amounts.'}
+        {isAr ? 'الفروع المختارة لا تستخدم عملة واحدة معروفة.' : 'The selected branches do not have one known currency.'}
       </p>
     );
-    if (id === 'payment' && payments.length) return (
-      <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] items-center gap-2" data-testid="reports-payment-donut">
-        <div className="h-48 min-w-0" dir="ltr">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie data={payments} dataKey="value" nameKey="name" innerRadius="46%" outerRadius="77%" paddingAngle={2}>
-                {payments.map((item, index) => <Cell key={item.name} fill={PIE_COLORS[index % PIE_COLORS.length]} />)}
-              </Pie>
-              <Tooltip formatter={(value: number) => Number(value).toLocaleString(isAr ? 'ar-EG' : 'en-US')} />
-            </PieChart>
-          </ResponsiveContainer>
-        </div>
-        <div className="min-w-0 space-y-2">
-          {payments.map((item, index) => <div key={item.name} className="flex items-center justify-between gap-1 text-[11px]">
-            <span className="flex min-w-0 items-center gap-1 text-ui-text"><span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: PIE_COLORS[index % PIE_COLORS.length] }} /><span className="truncate">{item.name}</span></span>
-            <strong className="shrink-0 tabular-nums text-ui-text">{channelCount ? (item.value / channelCount * 100).toFixed(1) : '0'}%</strong>
-          </div>)}
-        </div>
-      </div>
-    );
-    const data = id === 'time' ? series : id === 'branches' ? branches : [];
+    if (id === 'payment') {
+      return payments.length ? <div className="p-2"><DashboardBreakdown rows={payments} formatValue={money} /></div>
+        : <p className="py-12 text-center text-xs text-ui-muted">{isAr ? 'لا توجد مدفوعات في هذه الفترة' : 'No payments in this period'}</p>;
+    }
+    const data = id === 'time' ? [...series.values()].sort((a, b) => a.name.localeCompare(b.name)) : branches;
     return data.length ? (
       <div className="h-48 w-full" dir="ltr" data-testid={id === 'time' ? 'reports-daily-sales-chart' : 'reports-branch-sales-chart'}>
         <ResponsiveContainer width="100%" height="100%">
@@ -194,7 +214,11 @@ export function ReportsShowcase({
               <XAxis dataKey="name" tick={{ fontSize: 9 }} />
               <YAxis tick={{ fontSize: 9 }} width={45} />
               <Tooltip formatter={(value: number) => money(Number(value))} />
-              <Area type="monotone" dataKey="value" stroke="#7c3aed" fill="#a78bfa" fillOpacity={0.18} strokeWidth={2} />
+              {showComparison && <Legend />}
+              <Area type="monotone" dataKey="value" name={isAr ? 'الفترة الحالية' : 'Current period'}
+                stroke="#7c3aed" fill="#a78bfa" fillOpacity={0.18} strokeWidth={2} isAnimationActive={false} />
+              {showComparison && <Area type="monotone" dataKey="previous" name={isAr ? 'الفترة السابقة' : 'Previous period'}
+                stroke="rgb(var(--ui-muted))" strokeDasharray="5 4" fill="none" isAnimationActive={false} />}
             </AreaChart>
           ) : (
             <BarChart data={data} margin={{ top: 8, right: 8, left: 0, bottom: 12 }}>
@@ -202,7 +226,7 @@ export function ReportsShowcase({
               <XAxis dataKey="name" tick={{ fontSize: 9 }} />
               <YAxis tick={{ fontSize: 9 }} width={45} />
               <Tooltip formatter={(value: number) => money(Number(value))} />
-              <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+              <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} isAnimationActive={false} />
             </BarChart>
           )}
         </ResponsiveContainer>
@@ -220,7 +244,7 @@ export function ReportsShowcase({
   const summaryCards = [
     { id: 'average', ar: 'متوسط قيمة الطلب', en: 'Average order', value: current && commonCurrency ? money(current.current.orders > 0 ? current.current.sales / current.current.orders : 0) : null, tone: 'from-rose-50 to-pink-100/60 dark:from-rose-950/30 dark:to-ui-surface' },
     { id: 'orders', ar: 'عدد الطلبات', en: 'Orders', value: current ? current.current.orders.toLocaleString(isAr ? 'ar-EG' : 'en-US') : null, tone: 'from-blue-50 to-blue-100/70 dark:from-blue-950/30 dark:to-ui-surface' },
-    { id: 'sales', ar: 'إجمالي المبيعات', en: 'Total sales', value: current && commonCurrency ? money(current.current.sales) : null, tone: 'from-emerald-50 to-green-100/70 dark:from-emerald-950/30 dark:to-ui-surface' },
+    { id: 'sales', ar: 'صافي المبيعات', en: 'Net sales', value: current && commonCurrency ? money(current.current.sales) : null, tone: 'from-emerald-50 to-green-100/70 dark:from-emerald-950/30 dark:to-ui-surface' },
     { id: 'cogs', ar: 'تكلفة المواد (COGS)', en: 'Cost of goods sold', value: comparableIncome ? money(comparableIncome.cogs) : null, tone: 'from-sky-50 to-blue-100/60 dark:from-sky-950/30 dark:to-ui-surface' },
     { id: 'margin', ar: 'معدل الربح الصافي', en: 'Net profit margin', value: margin === null ? null : `${margin.toFixed(1)}%`, tone: 'from-amber-50 to-orange-100/70 dark:from-amber-950/30 dark:to-ui-surface' },
     { id: 'net', ar: 'الربح الصافي', en: 'Net profit', value: comparableIncome ? money(comparableIncome.net_income) : null, tone: 'from-violet-50 to-purple-100/70 dark:from-violet-950/30 dark:to-ui-surface' },
@@ -231,12 +255,24 @@ export function ReportsShowcase({
       <div className="rounded-xl border border-[#d9ddec] bg-white p-3 shadow-sm dark:border-ui-border dark:bg-ui-surface" data-testid="reports-performance-summary">
         <h2 className="mb-3 flex items-center gap-2 text-base font-black text-ui-text"><BarChart3 className="h-5 w-5 text-violet-600" />{isAr ? 'ملخص الأداء' : 'Performance summary'}</h2>
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-6">
-          {summaryCards.map((card) => (
-            <div key={card.id} className={`min-w-0 rounded-xl bg-gradient-to-br p-3 ${card.tone}`} data-testid={`overview-kpi-${card.id}`}>
-              <p className="text-xs font-bold text-ui-text">{isAr ? card.ar : card.en}</p>
-              <p className="mt-2 break-words text-lg font-black tabular-nums text-ui-text">{card.value ?? (loading ? (isAr ? 'جارٍ التحميل' : 'Loading') : (isAr ? 'غير متاح' : 'Unavailable'))}</p>
-            </div>
-          ))}
+          {summaryCards.map((card) => {
+            const target = card.id === 'orders' ? 'orders' : card.id === 'sales' ? 'time' : null;
+            const available = target && panels.some((panel) => panel.id === target);
+            const content = <>
+              <span className="block text-xs font-bold text-ui-text">{isAr ? card.ar : card.en}</span>
+              <span className="mt-2 block break-words text-lg font-black tabular-nums text-ui-text">
+                {card.value ?? (loading ? (isAr ? 'جارٍ التحميل' : 'Loading') : (isAr ? 'غير متاح' : 'Unavailable'))}
+              </span>
+            </>;
+            const classes = `min-w-0 rounded-xl bg-gradient-to-br p-3 ${card.tone}`;
+            return available ? (
+              <button type="button" key={card.id} className={`${classes} text-start hover:ring-1 hover:ring-ui-primary focus-visible:ring-2 focus-visible:ring-ui-ring aria-pressed:ring-2 aria-pressed:ring-ui-primary`}
+                data-testid={`overview-kpi-${card.id}`} aria-pressed={activePanel?.id === target}
+                onClick={() => setFocusedPanel(activePanel?.id === target ? null : target)}>
+                {content}
+              </button>
+            ) : <div key={card.id} className={classes} data-testid={`overview-kpi-${card.id}`}>{content}</div>;
+          })}
         </div>
         {!comparableIncome && <p className="mt-2 text-xs text-ui-muted">{accountingNotice}</p>}
       </div>
@@ -259,8 +295,20 @@ export function ReportsShowcase({
         {isAr ? 'لا تملك صلاحية عرض ملخص المبيعات. اطلب من مدير النظام منحك صلاحية التقارير أو لوحة المبيعات للفروع المطلوبة.' : 'You do not have permission to view the sales overview. Ask your administrator for reporting or sales dashboard access to the needed branches.'}
       </p>}
       {error && <p role="alert" className="rounded-lg border border-ui-danger/30 bg-ui-danger-soft p-3 text-xs text-ui-danger">{error}</p>}
-      <div className="grid gap-3 md:grid-cols-2">
-        {panels.map((panel) => {
+      <div role="group" aria-label={isAr ? 'اختيار التحليل' : 'Choose analysis'} className="flex flex-wrap gap-2">
+        <button type="button" aria-pressed={!activePanel} onClick={() => setFocusedPanel(null)}
+          className="rounded-lg border border-ui-border px-3 py-2 text-xs font-bold aria-pressed:bg-ui-primary-soft">
+          {isAr ? 'كل التحليلات' : 'All analyses'}
+        </button>
+        {panels.map((panel) => (
+          <button type="button" key={panel.id} aria-pressed={activePanel?.id === panel.id} onClick={() => setFocusedPanel(panel.id)}
+            className="rounded-lg border border-ui-border px-3 py-2 text-xs font-bold aria-pressed:bg-ui-primary-soft">
+            {isAr ? panel.ar : panel.en}
+          </button>
+        ))}
+      </div>
+      <div className={`grid gap-3 ${activePanel ? '' : 'md:grid-cols-2'}`}>
+        {displayedPanels.map((panel) => {
           const Icon = panel.icon;
           return (
             <div key={panel.id} data-testid={`report-shortcut-${panel.id}`}
@@ -270,6 +318,12 @@ export function ReportsShowcase({
                   <Icon className="h-5 w-5 shrink-0 text-ui-primary" />
                   {isAr ? panel.ar : panel.en}
                 </h3>
+                {panel.id === 'time' && can('history.unlimited') && (
+                  <button type="button" aria-pressed={showComparison} onClick={() => setCompare((value) => !value)}
+                    className="ms-auto rounded-lg border border-ui-border px-3 py-2 text-xs font-bold aria-pressed:bg-ui-primary-soft">
+                    {isAr ? 'مقارنة بالفترة السابقة' : 'Compare previous period'}
+                  </button>
+                )}
                 <button type="button" aria-label={isAr ? 'تحديد نوع التقرير من هذه اللوحة' : 'Select this report type'}
                   onClick={() => onSelectReport(panel.report)}
                   className="shrink-0 rounded-lg p-2 text-ui-primary hover:bg-ui-primary-soft">
@@ -287,8 +341,8 @@ export function ReportsShowcase({
         })}
       </div>
       <p className="text-xs text-ui-muted">
-        {isAr ? 'المخططات من نفس خدمة لقطة المبيعات المعتمدة في لوحة Premier. القنوات تعرض أعداد الطلبات، وأفضل الأصناف تعرض الكميات؛ ولا تُعرض إجماليات مجمعة لعملات مختلفة.'
-          : 'Charts reuse the Premier dashboard sales snapshot. Channels reflect order counts and top products reflect units; different currencies are never combined.'}
+        {isAr ? 'المخططات من نفس خدمة لقطة المبيعات المعتمدة في لوحة Premier. أنواع الطلبات تعرض العدد، وطرق الدفع تعرض صافي المبالغ، وأفضل الأصناف تعرض الكميات؛ ولا تُعرض إجماليات مجمعة لعملات مختلفة.'
+          : 'Charts reuse the Premier dashboard sales snapshot. Order types reflect counts, payments show net amounts, and top products reflect units; different currencies are never combined.'}
       </p>
     </section>
   );
