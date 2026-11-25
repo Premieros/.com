@@ -1,0 +1,31 @@
+{
+  "captured_on": "2026-11-10",
+  "project_ref": "hvqlkapynjfjikqithvd",
+  "main_commit": "4542021dc1dc3ce20ccc20328b548e995c223c0a",
+  "canonical_files": 602,
+  "custom_ledger_rows": 452,
+  "supabase_ledger_rows": 727,
+  "registered_filenames_verified": 452,
+  "registered_checksums_verified": 452,
+  "remaining_files": 150,
+  "categories": {
+    "byte_exact": 56,
+    "outer_whitespace_only": 20,
+    "outer_comments_only": 36,
+    "sql_ast_equal": 3,
+    "unresolved": 35
+  },
+  "unambiguous_byte_exact": 55,
+  "production_sql_snapshots_verified": 146,
+  "parser": "pglast 7.22",
+  "parser_postgresql_version": "17.7",
+  "production_writes": false,
+  "kds_probe": {
+    "signature": "complete_stale_kitchen_orders(uuid)",
+    "anon_execute": false,
+    "authenticated_execute": true,
+    "service_role_execute": true,
+    "expected_baseline_marker": true,
+    "expected_permission_marker": true
+  }
+}

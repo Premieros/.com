@@ -1,0 +1,15 @@
+--- canonical/20261023043004_stage_non_fifo_idempotent_movement_contract.sql
++++ history/20261023043004.sql
+@@ -1,6 +1,3 @@
+--- Historical migration already recorded in Premier production Supabase history.
+--- Recovered verbatim SQL body to allow disposable CI databases to replay full schema.
+--- DO NOT run manually against production; applied there as migration 20261023043004.
+ CREATE TABLE IF NOT EXISTS private.raw_warehouse_movements_v2 (
+  operation_id uuid PRIMARY KEY,
+  branch_id uuid NOT NULL,
+@@ -71,4 +68,4 @@
+ REVOKE ALL ON FUNCTION private.apply_raw_warehouse_delta_v2(uuid,uuid,uuid,uuid,numeric,boolean)
+  FROM PUBLIC,anon,authenticated;
+ GRANT EXECUTE ON FUNCTION private.apply_raw_warehouse_delta_v2(uuid,uuid,uuid,uuid,numeric,boolean)
+- TO service_role;
++ TO service_role;

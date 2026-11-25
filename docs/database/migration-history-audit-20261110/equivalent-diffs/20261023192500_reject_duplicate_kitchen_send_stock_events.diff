@@ -1,0 +1,8 @@
+--- canonical/20261023192500_reject_duplicate_kitchen_send_stock_events.sql
++++ history/20261023130618.sql
+@@ -1,5 +1,3 @@
+--- Lock and reject duplicate kitchen-send event inventory deductions before any stock mutations.
+--- Keeps historical FIFO mutation path until full atomic cutover is ready.
+ CREATE OR REPLACE FUNCTION public._deduct_kitchen_raw_components(p_product_id uuid, p_branch_id uuid, p_warehouse_id uuid, p_quantity numeric, p_modifier_option_ids jsonb, p_event_id uuid, p_reference_number text, p_created_by uuid)
+  RETURNS jsonb
+  LANGUAGE plpgsql

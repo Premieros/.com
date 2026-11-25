@@ -1,0 +1,46 @@
+--- canonical/20261009080923_phase2a_canonical_item_compatibility.sql
++++ history/20261009080923.sql
+@@ -1,3 +1,4 @@
++
+ create schema if not exists private;
+ 
+ create table if not exists public.items (
+@@ -132,8 +133,10 @@
+ from public.products p
+ join public.branches b on b.id=p.branch_id
+ where not exists (
+-  select 1 from private.item_legacy_links l
+-  where l.source_table='products' and l.source_id=p.id
++  select 1
++  from private.item_legacy_links l
++  where l.source_table='products'
++    and l.source_id=p.id
+ );
+ 
+ insert into pg_temp.canonical_item_stage
+@@ -159,8 +162,10 @@
+ from public.raw_materials r
+ join public.branches b on b.id=r.branch_id
+ where not exists (
+-  select 1 from private.item_legacy_links l
+-  where l.source_table='raw_materials' and l.source_id=r.id
++  select 1
++  from private.item_legacy_links l
++  where l.source_table='raw_materials'
++    and l.source_id=r.id
+ );
+ 
+ insert into pg_temp.canonical_item_stage
+@@ -186,8 +191,10 @@
+ from public.inventory_units u
+ join public.branches b on b.id=u.branch_id
+ where not exists (
+-  select 1 from private.item_legacy_links l
+-  where l.source_table='inventory_units' and l.source_id=u.id
++  select 1
++  from private.item_legacy_links l
++  where l.source_table='inventory_units'
++    and l.source_id=u.id
+ );
+ 
+ insert into public.items(

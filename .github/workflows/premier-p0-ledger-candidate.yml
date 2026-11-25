@@ -1,0 +1,39 @@
+name: P0 ledger candidate safety
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - scripts/db/candidates/reconcile-premier-p0-ledger*
+      - scripts/db/candidates/premier-p0-ledger-batch.mjs
+      - scripts/db/candidates/premier_p0_ledger_metadata_ACK_ONLY_NOT_A_MIGRATION.sql
+      - docs/database/production-p0-20261110/**
+      - supabase/migrations/20261109140000_premier_stock_count_atomic_failures.sql
+      - supabase/migrations/20261109180000_premier_stock_valuation_rpc_branch_auth.sql
+      - supabase/migrations/20261109183000_premier_refund_core_atomic_failure.sql
+      - .github/workflows/premier-p0-ledger-candidate.yml
+permissions:
+  contents: read
+jobs:
+  candidate-safety:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Test metadata-only reconciliation on disposable localhost PostgreSQL
+        env:
+          P0_LEDGER_TEST_DB_URL: postgresql://postgres:postgres@localhost:5432/postgres
+        run: node --test scripts/db/candidates/reconcile-premier-p0-ledger.test.mjs

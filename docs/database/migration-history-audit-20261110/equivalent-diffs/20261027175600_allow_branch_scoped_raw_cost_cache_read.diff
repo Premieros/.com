@@ -1,0 +1,8 @@
+--- canonical/20261027175600_allow_branch_scoped_raw_cost_cache_read.sql
++++ history/20261027180005.sql
+@@ -1,4 +1,4 @@
+ GRANT SELECT ON public.raw_material_current_costs TO authenticated;
+ CREATE POLICY raw_current_costs_authorized_branch_read
+ ON public.raw_material_current_costs FOR SELECT TO authenticated
+-USING (public.user_may_access_branch(branch_id));
++USING (public.user_may_access_branch(branch_id));

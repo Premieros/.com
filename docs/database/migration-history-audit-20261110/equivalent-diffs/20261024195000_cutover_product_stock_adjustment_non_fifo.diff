@@ -1,0 +1,7 @@
+--- canonical/20261024195000_cutover_product_stock_adjustment_non_fifo.sql
++++ history/20261024174313.sql
+@@ -77,4 +77,3 @@
+   END;
+ END;
+ $function$
+-;

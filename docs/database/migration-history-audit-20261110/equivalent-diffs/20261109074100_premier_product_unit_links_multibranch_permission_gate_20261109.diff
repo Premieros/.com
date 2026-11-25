@@ -1,0 +1,15 @@
+--- canonical/20261109074100_premier_product_unit_links_multibranch_permission_gate_20261109.sql
++++ history/20261109074100.sql
+@@ -1,6 +1,3 @@
+--- MIRRORED VERBATIM from already-applied Premier production migration history.
+--- Version: 20261109074100; name: premier_product_unit_links_multibranch_permission_gate_20261109
+--- DO NOT manually rerun on production. A fresh database replays sequentially.
+ BEGIN; SET LOCAL lock_timeout='2s'; SET LOCAL statement_timeout='15s';
+ DO $guard$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE schemaname='public' AND tablename='product_unit_links' AND policyname='pul_branch_read') THEN RAISE EXCEPTION 'PRODUCT_UNIT_LINKS_BASELINE_DRIFT'; END IF;
+@@ -14,4 +11,4 @@
+ CREATE POLICY premier_product_unit_links_multibranch_read
+  ON public.product_unit_links AS PERMISSIVE FOR SELECT TO authenticated
+  USING (EXISTS (SELECT 1 FROM public.products p WHERE p.id=product_unit_links.product_id AND public.user_may_access_branch(p.branch_id)));
+-COMMIT;
++COMMIT;

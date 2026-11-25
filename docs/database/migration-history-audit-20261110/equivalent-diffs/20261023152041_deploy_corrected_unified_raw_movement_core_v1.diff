@@ -1,0 +1,13 @@
+--- canonical/20261023152041_deploy_corrected_unified_raw_movement_core_v1.sql
++++ history/20261023152041.sql
+@@ -1,5 +1,3 @@
+--- Already-applied Premier production SQL restored verbatim for disposable CI replay.
+--- Production migration 20261023152041; DO NOT manually reapply to production.
+ -- Correct real movement schema, signed ledger valuation, and replay parameter conflict.
+ -- ============================================================================
+ -- Migration: 20261023223000_unified_non_fifo_inventory_engine.sql
+@@ -184,4 +182,3 @@
+ 
+ REVOKE ALL ON FUNCTION private.apply_unified_raw_movement_v1(uuid,uuid,uuid,uuid,numeric,text,text,uuid,text,uuid,boolean,timestamptz) FROM PUBLIC, anon, authenticated;
+ GRANT EXECUTE ON FUNCTION private.apply_unified_raw_movement_v1(uuid,uuid,uuid,uuid,numeric,text,text,uuid,text,uuid,boolean,timestamptz) TO service_role;
+-

@@ -1,0 +1,15 @@
+--- canonical/20261109073754_premier_sales_purchases_counts_warehouse_keys_stage3_20261109.sql
++++ history/20261109073754.sql
+@@ -1,6 +1,3 @@
+--- MIRRORED VERBATIM from already-applied Premier production migration history.
+--- Version: 20261109073754; name: premier_sales_purchases_counts_warehouse_keys_stage3_20261109
+--- DO NOT manually rerun on production. A fresh database replays sequentially.
+ BEGIN; SET LOCAL lock_timeout='2s'; SET LOCAL statement_timeout='18s';
+ DO $guard$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname IN ('premier_purchases_warehouse_branch_fk','premier_sales_warehouse_branch_fk','premier_stock_counts_warehouse_branch_fk')) THEN RAISE EXCEPTION 'STAGE3_CONSTRAINT_PRESENT'; END IF;
+@@ -17,4 +14,4 @@
+ ALTER TABLE public.stock_counts ADD CONSTRAINT premier_stock_counts_warehouse_branch_fk
+  FOREIGN KEY (warehouse_id,branch_id) REFERENCES public.warehouses(id,branch_id)
+  ON DELETE RESTRICT NOT VALID;
+-COMMIT;
++COMMIT;

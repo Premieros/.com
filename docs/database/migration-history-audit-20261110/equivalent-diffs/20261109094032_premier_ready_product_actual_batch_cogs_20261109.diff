@@ -1,0 +1,13 @@
+--- canonical/20261109094032_premier_ready_product_actual_batch_cogs_20261109.sql
++++ history/20261109094032.sql
+@@ -1,5 +1,3 @@
+--- Applied in Premier production as tracked Supabase migration 20261109094032.
+--- SQL body below recovered from supabase_migrations.schema_migrations, do not manually rerun.
+ -- FINANCIAL COSTING CANDIDATE: do not apply to production without full DB tests.
+ -- Use the consumed batch unit cost for sale COGS and ledger; fallback to
+ -- catalog cost only for legacy batches where batch unit_cost=0.
+@@ -196,4 +194,3 @@
+   ) THEN RAISE EXCEPTION 'PREMIER_BATCH_COST_POSTCHECK_FAILED'; END IF;
+ END $result_guard$;
+ COMMIT;
+-

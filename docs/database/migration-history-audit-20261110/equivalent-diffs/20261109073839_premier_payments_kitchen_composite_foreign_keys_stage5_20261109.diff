@@ -1,0 +1,15 @@
+--- canonical/20261109073839_premier_payments_kitchen_composite_foreign_keys_stage5_20261109.sql
++++ history/20261109073839.sql
+@@ -1,6 +1,3 @@
+--- MIRRORED VERBATIM from already-applied Premier production migration history.
+--- Version: 20261109073839; name: premier_payments_kitchen_composite_foreign_keys_stage5_20261109
+--- DO NOT manually rerun on production. A fresh database replays sequentially.
+ BEGIN; SET LOCAL lock_timeout='2s'; SET LOCAL statement_timeout='20s';
+ DO $guard$ BEGIN
+  IF EXISTS (SELECT 1 FROM pg_constraint WHERE conname IN ('premier_sale_payments_sale_branch_fk','premier_kitchen_send_order_branch_fk','premier_kitchen_send_item_order_fk')) THEN RAISE EXCEPTION 'SALE_KITCHEN_FK_ALREADY_PRESENT'; END IF;
+@@ -17,4 +14,4 @@
+ ALTER TABLE public.order_kitchen_sends ADD CONSTRAINT premier_kitchen_send_item_order_fk
+  FOREIGN KEY (order_item_id,order_id) REFERENCES public.order_items(id,order_id)
+  ON DELETE CASCADE NOT VALID;
+-COMMIT;
++COMMIT;
