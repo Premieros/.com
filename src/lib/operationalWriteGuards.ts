@@ -16,3 +16,10 @@ export function parseNonnegativeQuantity(value: string): number | null {
 export function applyTransferCost<T extends { lookupToken?: number; unit_cost: number; costError?: boolean }>(rows: T[], token: number, cost: number, costError = false): T[] {
   return rows.map(row => row.lookupToken === token ? { ...row, unit_cost: cost, lookupToken: undefined, costError } : row);
 }
+
+/** An explicitly selected physical count must have a measured quantity; blank is not system stock. */
+export function requireCountedQuantity(value: string): number {
+  const result = parseNonnegativeQuantity(value);
+  if (result === null) throw new Error('COUNTED_QUANTITY_REQUIRED');
+  return result;
+}

@@ -16,7 +16,7 @@ import { Modal } from '@/components/Modal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { formatNumber, formatDateTime } from '@/lib/format';
 import { logAudit } from '@/lib/audit';
-import { requireSuccessfulMutation, parseNonnegativeQuantity } from '@/lib/operationalWriteGuards';
+import { requireSuccessfulMutation, requireCountedQuantity } from '@/lib/operationalWriteGuards';
 import { exportToExcelAdvanced, importFromExcel } from '@/lib/excel';
 import { loadStockCountExcelSnapshot } from '../services/stockCountExcelSnapshot';
 import { buildStockCountExcelRows, parseStockCountExcelRows, stockCountExcelColumns } from '../utils/stockCountExcel';
@@ -235,9 +235,9 @@ export function StockCountsPage() {
     try { items = selected.map((l) => ({
       product_id: null,
       raw_material_id: l.item_id,
-      counted_quantity: parseNonnegativeQuantity(l.counted_quantity),
+      counted_quantity: requireCountedQuantity(l.counted_quantity),
       reason: l.reason || null,
-    })); } catch { show(isAr ? 'كمية الجرد غير صالحة.' : 'Invalid counted quantity.', 'error'); return; }
+    })); } catch { show(isAr ? 'أدخل كمية جرد فعلية صحيحة لكل بند محدد؛ الصفر مقبول.' : 'Enter an explicit valid counted quantity for every selected item; zero is allowed.', 'error'); return; }
     mutationLock.current = true;
     setMutationBusy(true);
     try {
@@ -265,8 +265,8 @@ export function StockCountsPage() {
     const selected = editLines.filter(line => line.product_id);
     if (new Set(selected.map(line => line.product_id)).size !== selected.length || selected.some(line => !editProducts.some(product => product.id === line.product_id))) { show(isAr ? 'تحقق من الأصناف وعدم تكرارها.' : 'Check products and duplicate lines.', 'error'); return; }
     let parsed;
-    try { parsed = selected.map(line => ({ ...line, qty: parseNonnegativeQuantity(line.counted_quantity) })); }
-    catch { show(isAr ? 'كمية الجرد غير صالحة.' : 'Invalid counted quantity.', 'error'); return; }
+    try { parsed = selected.map(line => ({ ...line, qty: requireCountedQuantity(line.counted_quantity) })); }
+    catch { show(isAr ? 'أدخل كمية جرد فعلية صحيحة لكل بند محدد؛ الصفر مقبول.' : 'Enter an explicit valid counted quantity for every selected item; zero is allowed.', 'error'); return; }
     mutationLock.current = true;
     setMutationBusy(true);
     try {

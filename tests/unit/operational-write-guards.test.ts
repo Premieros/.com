@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { requireSuccessfulMutation, parseNonnegativeQuantity, applyTransferCost } from '@/lib/operationalWriteGuards';
+import { requireSuccessfulMutation, parseNonnegativeQuantity, applyTransferCost, requireCountedQuantity } from '@/lib/operationalWriteGuards';
 describe('operational write guards', () => {
   it('rejects transport and business failures', () => {
     expect(() => requireSuccessfulMutation({ data: { success: false, error: 'DENIED' } })).toThrow('DENIED');
@@ -23,4 +23,11 @@ describe('transfer cost request ordering', () => {
     expect(applyTransferCost([], 2, 14)).toEqual([]);
     expect(applyTransferCost(rows, 2, 0, true)[0]).toMatchObject({ costError: true });
   });
+});
+
+it('requires explicit physical counts without replacing a blank with system stock', () => {
+  expect(() => requireCountedQuantity('')).toThrow('COUNTED_QUANTITY_REQUIRED');
+  expect(() => requireCountedQuantity('  ')).toThrow('COUNTED_QUANTITY_REQUIRED');
+  expect(requireCountedQuantity('0')).toBe(0);
+  expect(requireCountedQuantity('1.25')).toBe(1.25);
 });
