@@ -18,6 +18,7 @@ DECLARE
   v_product_id uuid;
   v_attributes jsonb := coalesce(nullif(p_product->'p_business_attributes','null'::jsonb),'{}'::jsonb);
   v_links jsonb := coalesce(nullif(p_product->'p_unit_links','null'::jsonb),'[]'::jsonb);
+  v_legacy jsonb := coalesce(nullif(p_product->'p_legacy_components','null'::jsonb),'[]'::jsonb);
   v_branch_id uuid := (p_product->>'p_branch_id')::uuid;
 BEGIN
   IF auth.uid() IS NULL OR v_branch_id IS NULL OR NOT public.user_may_access_branch(v_branch_id) THEN
@@ -49,6 +50,9 @@ BEGIN
     RAISE EXCEPTION 'INVALID_DIRECT_RAW_COMPONENT';
   END IF;
 
+  IF jsonb_typeof(v_legacy) IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'INVALID_LEGACY_COMPONENTS'; END IF;
+  IF jsonb_array_length(v_legacy)>0 AND jsonb_array_length(p_items)+jsonb_array_length(v_links)>0 THEN RAISE EXCEPTION 'MIXED_LEGACY_COMPOSITION'; END IF;
+  IF EXISTS (SELECT 1 FROM jsonb_to_recordset(v_legacy) i(component_product_id uuid,quantity numeric) LEFT JOIN public.products p ON p.id=i.component_product_id AND p.branch_id=v_branch_id AND p.is_active WHERE p.id IS NULL OR i.quantity IS NULL OR i.quantity<=0 OR i.quantity::text IN ('NaN','Infinity','-Infinity')) OR (SELECT count(DISTINCT i.component_product_id) FROM jsonb_to_recordset(v_legacy) i(component_product_id uuid))<>jsonb_array_length(v_legacy) THEN RAISE EXCEPTION 'INVALID_LEGACY_COMPONENTS'; END IF;
   v_result := public.create_product(
     p_name => p_product->>'p_name',
     p_branch_id => v_branch_id,
@@ -65,7 +69,7 @@ BEGIN
     p_min_stock => coalesce((p_product->>'p_min_stock')::numeric,0),
     p_max_stock => coalesce((p_product->>'p_max_stock')::numeric,0),
     p_reorder_point => coalesce((p_product->>'p_reorder_point')::numeric,0),
-    p_product_type => CASE WHEN jsonb_array_length(p_items)+jsonb_array_length(v_links)>0 THEN 'manufactured' ELSE 'ready' END,
+    p_product_type => CASE WHEN jsonb_array_length(p_items)+jsonb_array_length(v_links)+jsonb_array_length(v_legacy)>0 THEN 'manufactured' ELSE 'ready' END,
     p_is_active => coalesce((p_product->>'p_is_active')::boolean,true),
     p_units => nullif(p_product->'p_units','null'::jsonb),
     p_unit_links => v_links
@@ -80,6 +84,10 @@ BEGIN
     IF NOT FOUND THEN RAISE EXCEPTION 'PRODUCT_ATTRIBUTES_NOT_SAVED'; END IF;
   END IF;
 
+  IF jsonb_array_length(v_legacy)>0 THEN
+    INSERT INTO public.product_components(product_id,component_product_id,quantity) SELECT v_product_id,i.component_product_id,i.quantity FROM jsonb_to_recordset(v_legacy) i(component_product_id uuid,quantity numeric);
+    IF (SELECT count(*) FROM public.product_components WHERE product_id=v_product_id)<>jsonb_array_length(v_legacy) THEN RAISE EXCEPTION 'LEGACY_COMPONENTS_NOT_SAVED'; END IF;
+  END IF;
   IF jsonb_array_length(p_items)>0 THEN
   INSERT INTO public.recipes(product_id,branch_id,name,yield_quantity,is_active)
   VALUES ((v_result->>'product_id')::uuid,v_branch_id,(p_product->>'p_name') || ' Components',1,true)
@@ -98,20 +106,55 @@ REVOKE ALL ON FUNCTION public.create_product_operational(jsonb,jsonb) FROM PUBLI
 GRANT EXECUTE ON FUNCTION public.create_product_operational(jsonb,jsonb) TO authenticated;
 
 
--- Atomic edit of product metadata, sale units and operational composition; legacy BOM excluded.
+-- Controlled deletion of legacy BOM rows; public direct deletion remains denied by RLS.
+CREATE FUNCTION private.replace_legacy_product_components(p_product_id uuid,p_branch_id uuid,p_expected jsonb,p_components jsonb)
+RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $legacy_bom$
+DECLARE v_current jsonb;
+BEGIN
+  IF auth.uid() IS NULL OR public.can_permission('products.edit') IS NOT TRUE
+    OR public.user_may_access_branch(p_branch_id) IS NOT TRUE THEN RAISE EXCEPTION 'LEGACY_EDIT_DENIED'; END IF;
+  IF jsonb_typeof(p_expected) IS DISTINCT FROM 'array' OR jsonb_typeof(p_components) IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'INVALID_LEGACY_COMPONENTS'; END IF;
+  -- Serialize graph edits in this branch through the controlled path.
+  PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('legacy-bom:'||p_branch_id::text,0));
+  PERFORM 1 FROM public.products WHERE id=p_product_id AND branch_id=p_branch_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'PRODUCT_NOT_FOUND'; END IF;
+  SELECT coalesce(jsonb_agg(jsonb_build_object('component_product_id',component_product_id,'quantity',quantity) ORDER BY component_product_id),'[]'::jsonb)
+    INTO v_current FROM public.product_components WHERE product_id=p_product_id;
+  IF v_current IS DISTINCT FROM p_expected THEN RAISE EXCEPTION 'COMPOSITION_REFRESH_REQUIRED'; END IF;
+  IF EXISTS (SELECT 1 FROM jsonb_to_recordset(p_components) i(component_product_id uuid,quantity numeric)
+    LEFT JOIN public.products p ON p.id=i.component_product_id AND p.branch_id=p_branch_id AND p.is_active
+    WHERE p.id IS NULL OR p.id=p_product_id OR i.quantity IS NULL OR i.quantity<=0 OR i.quantity::text IN ('NaN','Infinity','-Infinity'))
+    OR (SELECT count(DISTINCT i.component_product_id) FROM jsonb_to_recordset(p_components) i(component_product_id uuid))<>jsonb_array_length(p_components)
+  THEN RAISE EXCEPTION 'INVALID_LEGACY_COMPONENTS'; END IF;
+  IF jsonb_array_length(p_components)>0 AND (EXISTS(SELECT 1 FROM public.recipes WHERE product_id=p_product_id AND is_active)
+     OR EXISTS(SELECT 1 FROM public.product_unit_links WHERE product_id=p_product_id)) THEN RAISE EXCEPTION 'MIXED_LEGACY_COMPOSITION'; END IF;
+  IF EXISTS(WITH RECURSIVE reachable(id) AS (
+      SELECT i.component_product_id FROM jsonb_to_recordset(p_components) i(component_product_id uuid)
+      UNION SELECT c.component_product_id FROM public.product_components c JOIN reachable r ON r.id=c.product_id
+    ) SELECT 1 FROM reachable WHERE id=p_product_id) THEN RAISE EXCEPTION 'LEGACY_COMPONENT_CYCLE'; END IF;
+  DELETE FROM public.product_components WHERE product_id=p_product_id;
+  INSERT INTO public.product_components(product_id,component_product_id,quantity)
+    SELECT p_product_id,i.component_product_id,i.quantity FROM jsonb_to_recordset(p_components) i(component_product_id uuid,quantity numeric);
+  IF (SELECT count(*) FROM public.product_components WHERE product_id=p_product_id)<>jsonb_array_length(p_components)
+  THEN RAISE EXCEPTION 'LEGACY_COMPONENTS_NOT_SAVED'; END IF;
+  UPDATE public.products SET product_type=CASE WHEN jsonb_array_length(p_components)>0 OR EXISTS(SELECT 1 FROM public.recipes WHERE product_id=p_product_id AND is_active) OR EXISTS(SELECT 1 FROM public.product_unit_links WHERE product_id=p_product_id) THEN 'manufactured' ELSE 'ready' END WHERE id=p_product_id AND branch_id=p_branch_id;
+END; $legacy_bom$;
+REVOKE ALL ON FUNCTION private.replace_legacy_product_components(uuid,uuid,jsonb,jsonb) FROM PUBLIC,anon,authenticated;
+GRANT EXECUTE ON FUNCTION private.replace_legacy_product_components(uuid,uuid,jsonb,jsonb) TO authenticated;
+
+-- Atomic edit of metadata, units and all supported component kinds.
 CREATE FUNCTION public.edit_product_operational_composition(
   p_product_id uuid,p_branch_id uuid,p_expected_version integer,p_expected_links jsonb,
-  p_product jsonb,p_units jsonb,p_items jsonb,p_links jsonb
+  p_product jsonb,p_units jsonb,p_items jsonb,p_links jsonb,p_expected_legacy jsonb DEFAULT NULL,p_legacy jsonb DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
-DECLARE v_product public.products%ROWTYPE; v_next public.products%ROWTYPE; v_recipe public.recipes%ROWTYPE; v_result jsonb; v_recipe_id uuid; v_snapshot jsonb;
+DECLARE v_product public.products%ROWTYPE; v_next public.products%ROWTYPE; v_recipe public.recipes%ROWTYPE; v_result jsonb; v_recipe_id uuid; v_snapshot jsonb; v_legacy_count integer; v_raw_count integer; v_link_count integer;
 BEGIN
-  IF auth.uid() IS NULL OR NOT public.can_permission('products.edit') OR NOT public.can_permission('recipes.manage')
-     OR NOT public.user_may_access_branch(p_branch_id) THEN RAISE EXCEPTION 'COMPOSITION_EDIT_DENIED'; END IF;
+  IF auth.uid() IS NULL OR public.can_permission('products.edit') IS NOT TRUE
+     OR public.user_may_access_branch(p_branch_id) IS NOT TRUE OR (p_items IS NOT NULL AND public.can_permission('recipes.manage') IS NOT TRUE) THEN RAISE EXCEPTION 'COMPOSITION_EDIT_DENIED'; END IF;
+  IF p_legacy IS NOT NULL THEN PERFORM pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended('legacy-bom:'||p_branch_id::text,0)); END IF;
   SELECT * INTO v_product FROM public.products WHERE id=p_product_id AND branch_id=p_branch_id FOR UPDATE;
   IF NOT FOUND THEN RAISE EXCEPTION 'PRODUCT_NOT_FOUND'; END IF;
-  IF EXISTS (SELECT 1 FROM public.product_components WHERE product_id=p_product_id) THEN RAISE EXCEPTION 'LEGACY_COMPOSITION_REQUIRES_REVIEW'; END IF;
-  IF jsonb_typeof(p_product) IS DISTINCT FROM 'object' OR jsonb_typeof(p_items) IS DISTINCT FROM 'array' OR jsonb_typeof(p_links) IS DISTINCT FROM 'array'
-    OR jsonb_typeof(p_expected_links) IS DISTINCT FROM 'array' THEN RAISE EXCEPTION 'INVALID_COMPOSITION'; END IF;
+  IF jsonb_typeof(p_product) IS DISTINCT FROM 'object' OR (p_items IS NOT NULL AND jsonb_typeof(p_items) IS DISTINCT FROM 'array') OR (p_links IS NOT NULL AND (jsonb_typeof(p_links) IS DISTINCT FROM 'array' OR jsonb_typeof(p_expected_links) IS DISTINCT FROM 'array')) OR (p_legacy IS NOT NULL AND (jsonb_typeof(p_legacy) IS DISTINCT FROM 'array' OR jsonb_typeof(p_expected_legacy) IS DISTINCT FROM 'array')) THEN RAISE EXCEPTION 'INVALID_COMPOSITION'; END IF;
   IF EXISTS (
     SELECT 1 FROM jsonb_to_recordset(p_items) i(raw_material_id uuid,quantity numeric,wastage_percent numeric)
     LEFT JOIN public.raw_materials r ON r.id=i.raw_material_id AND r.branch_id=p_branch_id AND r.is_active AND r.unit_id IS NOT NULL
@@ -125,11 +168,17 @@ BEGIN
     WHERE u.id IS NULL OR i.quantity IS NULL OR i.quantity<=0 OR i.quantity::text IN ('NaN','Infinity','-Infinity')
   ) OR (SELECT count(DISTINCT i.unit_id) FROM jsonb_to_recordset(p_links) i(unit_id uuid))<>jsonb_array_length(p_links)
   THEN RAISE EXCEPTION 'INVALID_MANUFACTURED_COMPONENT'; END IF;
-  IF (SELECT count(*) FROM public.recipes WHERE product_id=p_product_id AND branch_id=p_branch_id AND is_active)>1 THEN RAISE EXCEPTION 'MULTIPLE_ACTIVE_RECIPES'; END IF;
-  SELECT * INTO v_recipe FROM public.recipes WHERE product_id=p_product_id AND branch_id=p_branch_id AND is_active FOR UPDATE;
+  IF p_items IS NOT NULL THEN
+    IF (SELECT count(*) FROM public.recipes WHERE product_id=p_product_id AND branch_id=p_branch_id AND is_active)>1 THEN RAISE EXCEPTION 'MULTIPLE_ACTIVE_RECIPES'; END IF;
+    SELECT * INTO v_recipe FROM public.recipes WHERE product_id=p_product_id AND branch_id=p_branch_id AND is_active FOR UPDATE;
+  END IF;
   SELECT coalesce(jsonb_agg(jsonb_build_object('unit_id',unit_id,'quantity',quantity) ORDER BY unit_id),'[]'::jsonb) INTO v_snapshot
     FROM public.product_unit_links WHERE product_id=p_product_id;
-  IF v_recipe.version IS DISTINCT FROM p_expected_version OR v_snapshot IS DISTINCT FROM p_expected_links THEN RAISE EXCEPTION 'COMPOSITION_REFRESH_REQUIRED'; END IF;
+  IF (p_items IS NOT NULL AND v_recipe.version IS DISTINCT FROM p_expected_version) OR (p_links IS NOT NULL AND v_snapshot IS DISTINCT FROM p_expected_links) THEN RAISE EXCEPTION 'COMPOSITION_REFRESH_REQUIRED'; END IF;
+  v_raw_count:=coalesce(jsonb_array_length(p_items),(SELECT count(*)::int FROM public.recipes WHERE product_id=p_product_id AND is_active));
+  v_link_count:=coalesce(jsonb_array_length(p_links),jsonb_array_length(v_snapshot));
+  v_legacy_count:=coalesce(jsonb_array_length(p_legacy),(SELECT count(*)::int FROM public.product_components WHERE product_id=p_product_id));
+  IF v_legacy_count>0 AND v_raw_count+v_link_count>0 THEN RAISE EXCEPTION 'MIXED_LEGACY_COMPOSITION'; END IF;
   v_next:=jsonb_populate_record(v_product,p_product);
   IF nullif(trim(v_next.name),'') IS NULL OR v_next.branch_id IS DISTINCT FROM p_branch_id
     OR v_next.cost_price<0 OR v_next.sale_price<0 OR v_next.wholesale_price<0
@@ -143,13 +192,14 @@ BEGIN
     cost_price=v_next.cost_price,sale_price=v_next.sale_price,wholesale_price=v_next.wholesale_price,
     is_active=v_next.is_active,low_stock_threshold=v_next.low_stock_threshold,min_stock=v_next.min_stock,
     max_stock=v_next.max_stock,reorder_point=v_next.reorder_point,business_attributes=v_next.business_attributes,
-    product_type=CASE WHEN jsonb_array_length(p_items)+jsonb_array_length(p_links)>0 THEN 'manufactured' ELSE 'ready' END
+    product_type=CASE WHEN v_raw_count+v_link_count+v_legacy_count>0 THEN 'manufactured' ELSE 'ready' END
     WHERE id=p_product_id AND branch_id=p_branch_id;
   IF NOT FOUND THEN RAISE EXCEPTION 'PRODUCT_NOT_SAVED'; END IF;
   IF p_units IS NOT NULL THEN
     v_result:=public.replace_product_units(p_product_id,p_units);
     IF (v_result->>'success')::boolean IS NOT TRUE THEN RAISE EXCEPTION 'PRODUCT_UNITS_NOT_SAVED: %',v_result; END IF;
   END IF;
+  IF p_links IS NOT NULL THEN
   DELETE FROM public.product_unit_links WHERE product_id=p_product_id;
   INSERT INTO public.product_unit_links(product_id,unit_id,quantity)
     SELECT p_product_id,i.unit_id,i.quantity FROM jsonb_to_recordset(p_links) i(unit_id uuid,quantity numeric);
@@ -157,6 +207,8 @@ BEGIN
     OR EXISTS (SELECT 1 FROM jsonb_to_recordset(p_links) i(unit_id uuid,quantity numeric) WHERE NOT EXISTS
       (SELECT 1 FROM public.product_unit_links l WHERE l.product_id=p_product_id AND l.unit_id=i.unit_id AND l.quantity=round(i.quantity,4)))
   THEN RAISE EXCEPTION 'GROUP_LINKS_NOT_SAVED'; END IF;
+  END IF;
+  IF p_items IS NOT NULL THEN
   IF jsonb_array_length(p_items)=0 THEN
     IF v_recipe.id IS NOT NULL THEN
       v_result:=public.delete_recipe_controlled(v_recipe.id);
@@ -175,10 +227,12 @@ BEGIN
     OR EXISTS (SELECT 1 FROM jsonb_to_recordset(p_items) i(raw_material_id uuid,quantity numeric,wastage_percent numeric) WHERE NOT EXISTS
        (SELECT 1 FROM public.recipe_items r WHERE r.recipe_id=v_recipe_id AND r.raw_material_id=i.raw_material_id AND r.quantity=round(i.quantity,4) AND r.wastage_percent=round(coalesce(i.wastage_percent,0),2))))
   THEN RAISE EXCEPTION 'RAW_COMPONENTS_NOT_SAVED'; END IF;
+  END IF;
+  IF p_legacy IS NOT NULL THEN PERFORM private.replace_legacy_product_components(p_product_id,p_branch_id,p_expected_legacy,p_legacy); END IF;
   RETURN jsonb_build_object('success',true,'product_id',p_product_id,'recipe_id',v_recipe_id);
 END; $$;
-REVOKE ALL ON FUNCTION public.edit_product_operational_composition(uuid,uuid,integer,jsonb,jsonb,jsonb,jsonb,jsonb) FROM PUBLIC,anon;
-GRANT EXECUTE ON FUNCTION public.edit_product_operational_composition(uuid,uuid,integer,jsonb,jsonb,jsonb,jsonb,jsonb) TO authenticated;
+REVOKE ALL ON FUNCTION public.edit_product_operational_composition(uuid,uuid,integer,jsonb,jsonb,jsonb,jsonb,jsonb,jsonb,jsonb) FROM PUBLIC,anon;
+GRANT EXECUTE ON FUNCTION public.edit_product_operational_composition(uuid,uuid,integer,jsonb,jsonb,jsonb,jsonb,jsonb,jsonb,jsonb) TO authenticated;
 
 
 -- Atomic legacy product-only draft stock count edit.

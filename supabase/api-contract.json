@@ -338,9 +338,11 @@
       "name": "edit_product_operational_composition",
       "params": [
         "branch_id",
+        "expected_legacy",
         "expected_links",
         "expected_version",
         "items",
+        "legacy",
         "links",
         "product",
         "product_id",

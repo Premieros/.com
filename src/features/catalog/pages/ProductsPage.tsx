@@ -33,7 +33,7 @@ import type { Product, Category, ProductUnit, ProductComponentInput } from '@/li
 import { APP_ROUTES } from '@/core/navigation/routes';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
 
-import { includePendingComponent, assertSavedComponentRows, positiveRecipeYield, validComponentRows } from '@/features/catalog/productCompositionDraft';
+import { includePendingComponent, positiveRecipeYield, validComponentRows } from '@/features/catalog/productCompositionDraft';
 
 const UNIT_NAMES = ['piece', 'carton', 'box', 'pack', 'kg', 'liter', 'meter', 'gram'];
 
@@ -169,10 +169,9 @@ export function ProductsPage() {
   const [saving, setSaving] = useState(false);
   const saveLock = useRef(false);
   const openingProduct = useRef(false);
-  const initialRawCount = useRef(0);
   const initialRecipeVersion = useRef<number | null>(null);
   const initialLinks = useRef<{ unit_id: string; quantity: number }[]>([]);
-  const initialLegacyCount = useRef(0);
+  const initialLegacy = useRef<ProductComponentInput[]>([]);
   const canManageRecipes = can('recipes.manage');
 
   useEffect(() => {
@@ -211,10 +210,9 @@ export function ProductsPage() {
   const openAdd = () => {
     if (!can('products.create') || openingProduct.current || saveLock.current) return;
     setEditing(null);
-    initialRawCount.current = 0;
     initialRecipeVersion.current = null;
     initialLinks.current = [];
-    initialLegacyCount.current = 0;
+    initialLegacy.current = [];
     setRawMaterialOptions([]);
     setRawMaterialWaste(0);
     setComponentSel('');
@@ -258,7 +256,7 @@ export function ProductsPage() {
     ]);
     if (u.error || comps.error) { show((u.error || comps.error)?.message || t('error'), 'error'); return; }
     setUnits((u.data as ProductUnit[]) || [{ id: '', product_id: p.id, unit_name: 'piece', unit_name_en: 'piece', conversion_factor: 1, sale_price: p.sale_price, cost_price: p.cost_price, barcode: p.barcode || '', is_base: true, created_at: '' }]);
-    initialLegacyCount.current = (comps.data || []).length;
+    initialLegacy.current = ((comps.data || []) as ProductComponentInput[]).map(c => ({ component_product_id: c.component_product_id, quantity: Number(c.quantity) })).sort((a,b) => a.component_product_id < b.component_product_id ? -1 : a.component_product_id > b.component_product_id ? 1 : 0);
     initialRecipeVersion.current = null;
     setProductComponents(((comps.data as { component_product_id: string; quantity: number }[] | null) || []).map((c) => ({ component_product_id: c.component_product_id, quantity: Number(c.quantity) || 1 })));
     const effectiveProductBranch = p.branch_id || branchFilter || '';
@@ -342,7 +340,6 @@ export function ProductsPage() {
     }
     await stockComponentsPromise;
     setRecipeYield(currentYield);
-    initialRawCount.current = recipeRows.length;
     setRecipeIngredients(recipeRows);
     setRawMaterialSel('');
     setRawMaterialQty(1);
@@ -369,11 +366,16 @@ export function ProductsPage() {
     if (editing && editing.branch_id && editing.branch_id !== effectiveBranch) { show(lang === 'ar' ? 'لا يمكن نقل المنتج بين الفروع من محرر المكونات.' : 'Cannot move a product between branches in the component editor.', 'error'); return; }
     let rawRows = recipeIngredients;
     let unitRows = linkedInventoryUnits;
+    let legacyRows = productComponents;
     try {
       if (rawMaterialSel) {
         const material = rawMaterialOptions.find(row => row.id === rawMaterialSel && row.branch_id === effectiveBranch);
         if (!supportsRawComposition || !canManageRecipes || !material || !Number.isFinite(rawMaterialWaste) || rawMaterialWaste < 0) throw new Error('INVALID_DIRECT_RAW_COMPONENT');
         rawRows = includePendingComponent(rawRows, rawMaterialSel, rawMaterialQty, row => row.raw_material_id, (id, quantity) => ({ raw_material_id: id, quantity: quantity * positiveRecipeYield(recipeYield), wastage_percent: rawMaterialWaste, raw_material: { name: material.name } }));
+      }
+      if (componentSel) {
+        if (!supportsComposition || componentSel === editing?.id || !availableToAdd.some(row => row.product_id === componentSel)) throw new Error('INVALID_LEGACY_COMPONENT');
+        legacyRows = includePendingComponent(legacyRows, componentSel, componentQty, row => row.component_product_id, (id, quantity) => ({component_product_id:id,quantity}));
       }
       if (linkedUnitSel) {
         const unit = manufacturedInventoryUnits.find(row => row.id === linkedUnitSel && row.branch_id === effectiveBranch);
@@ -384,36 +386,36 @@ export function ProductsPage() {
       show(lang === 'ar' ? 'تحقق من اختيار المكون والكمية والفرع قبل الحفظ.' : 'Check the selected component, quantity and branch before saving.', 'error');
       return;
     }
-    if (!validComponentRows(rawRows, row => row.raw_material_id) || !validComponentRows(unitRows, row => row.unit_id) || rawRows.some(row => !Number.isFinite(row.wastage_percent) || row.wastage_percent < 0)) { show(lang === 'ar' ? 'تحقق من كميات المكونات وعدم تكرارها.' : 'Check component quantities and duplicates.', 'error'); return; }
-    const hasComponents = rawRows.length > 0 || unitRows.length > 0 || productComponents.length > 0;
+    if (!validComponentRows(rawRows, row => row.raw_material_id) || !validComponentRows(unitRows, row => row.unit_id) || !validComponentRows(legacyRows, row => row.component_product_id) || rawRows.some(row => !Number.isFinite(row.wastage_percent) || row.wastage_percent < 0)) { show(lang === 'ar' ? 'تحقق من كميات المكونات وعدم تكرارها.' : 'Check component quantities and duplicates.', 'error'); return; }
+    const hasComponents = rawRows.length > 0 || unitRows.length > 0 || legacyRows.length > 0;
     const productType = hasComponents ? 'manufactured' as const : form.product_type;
     if (supportsComposition && productType === 'manufactured' && !hasComponents) { show(t('manufacturedRequiresComponents'), 'error'); return; }
-    if (productComponents.length > 0 && (rawRows.length > 0 || unitRows.length > 0)) {
+    if (legacyRows.length > 0 && (rawRows.length > 0 || unitRows.length > 0)) {
       show(lang === 'ar' ? 'راجع مكونات المنتجات المخزنية القديمة قبل خلطها بالخامات والمصنّعات.' : 'Review legacy stock-product components before mixing them with raw materials and manufactured groups.', 'error'); return;
     }
     setRecipeIngredients(rawRows);
     setLinkedInventoryUnits(unitRows);
+    setProductComponents(legacyRows);
+    setComponentSel('');
     setRawMaterialSel('');
     setLinkedUnitSel('');
     setForm(current => ({ ...current, product_type: productType }));
     if (supportsComponentGroups && unitRows.some((row) => row.quantity <= 0 || !manufacturedInventoryUnits.some((unit) => unit.id === row.unit_id && unit.branch_id === effectiveBranch))) { show(lang === 'ar' ? 'تحقق من مجموعات المكونات وكمياتها للفرع الحالي' : 'Check component groups and quantities for the current branch', 'error'); return; }
-    if (supportsRawComposition && rawRows.some((row) => row.quantity <= 0 || row.wastage_percent < 0 || !rawMaterialOptions.some((material) => material.id === row.raw_material_id && material.branch_id === effectiveBranch))) { show(lang === 'ar' ? 'تحقق من الخامات المباشرة وكمياتها للفرع الحالي' : 'Check direct raw materials and quantities for the current branch', 'error'); return; }
-    if (supportsRawComposition && rawRows.length > 0 && !can('recipes.manage')) { show(lang === 'ar' ? 'لا تملك صلاحية إدارة الخامات المباشرة للمنتج.' : 'You do not have permission to manage direct product raw materials.', 'error'); return; }
+    if (supportsRawComposition && canManageRecipes && rawRows.some((row) => row.quantity <= 0 || row.wastage_percent < 0 || !rawMaterialOptions.some((material) => material.id === row.raw_material_id && material.branch_id === effectiveBranch))) { show(lang === 'ar' ? 'تحقق من الخامات المباشرة وكمياتها للفرع الحالي' : 'Check direct raw materials and quantities for the current branch', 'error'); return; }
+    if (!editing && supportsRawComposition && rawRows.length > 0 && !can('recipes.manage')) { show(lang === 'ar' ? 'لا تملك صلاحية إدارة الخامات المباشرة للمنتج.' : 'You do not have permission to manage direct product raw materials.', 'error'); return; }
     const payload = { ...form, product_type: productType, category_id: form.category_id || null, branch_id: effectiveBranch, business_attributes: businessAttributes };
     const unitPayload = units.filter(u => u.unit_name).map((u) => ({ unit_name: u.unit_name, unit_name_en: u.unit_name_en || u.unit_name, conversion_factor: u.conversion_factor, sale_price: u.sale_price, cost_price: u.cost_price, barcode: u.barcode || null, is_base: u.is_base }));
-    let pid: string;
-    const atomicEdit = Boolean(editing && supportsRawComposition && supportsComponentGroups && canManageRecipes && initialLegacyCount.current === 0 && productComponents.length === 0);
-    if (editing && atomicEdit) {
-      const { data, error } = await api.catalog.editProductOperational({ p_product_id: editing.id, p_branch_id: effectiveBranch, p_expected_version: initialRecipeVersion.current, p_expected_links: initialLinks.current, p_product: payload, p_units: unitPayload.length > 0 ? unitPayload : null, p_items: rawRows.map(({raw_material_id,quantity,wastage_percent}) => ({raw_material_id,quantity,wastage_percent})), p_links: unitRows.map(({unit_id,quantity}) => ({unit_id,quantity})) });
+    if (editing) {
+      const { data, error } = await api.catalog.editProductOperational({
+        p_product_id: editing.id, p_branch_id: effectiveBranch,
+        p_expected_version: initialRecipeVersion.current, p_expected_links: initialLinks.current,
+        p_product: payload, p_units: unitPayload.length > 0 ? unitPayload : null,
+        p_items: supportsRawComposition && canManageRecipes ? rawRows.map(({raw_material_id,quantity,wastage_percent}) => ({raw_material_id,quantity,wastage_percent})) : null,
+        p_links: supportsComponentGroups ? unitRows.map(({unit_id,quantity}) => ({unit_id,quantity})) : null,
+        p_expected_legacy: supportsComposition ? initialLegacy.current : null,
+        p_legacy: supportsComposition ? legacyRows : null,
+      });
       if (error || !data?.success || data.product_id !== editing.id) { show(error?.message || data?.detail || data?.error || 'PRODUCT_NOT_SAVED', 'error'); return; }
-      pid = editing.id;
-      await logAudit('update', 'products', pid, { name: form.name });
-    } else if (editing) {
-      const { data: updated, error } = await supabase.from('products').update(payload).eq('id', editing.id).eq('branch_id', effectiveBranch).select('id').maybeSingle();
-      if (error || !updated?.id) { show(error?.message || (lang === 'ar' ? 'لم يتم حفظ المنتج؛ تحقق من الصلاحية والفرع.' : 'Product was not saved; check permissions and branch.'), 'error'); return; }
-      pid = editing.id;
-      const { data: unitResult, error: unitError } = await api.catalog.replaceProductUnits({ p_product_id: editing.id, p_units: unitPayload });
-      if (unitError || !unitResult?.success) { show(unitError?.message || unitResult?.detail || unitResult?.error || 'PRODUCT_UNITS_NOT_SAVED', 'error'); return; }
       await logAudit('update', 'products', editing.id, { name: form.name });
     } else {
       const createInput: CreateProductInput = {
@@ -437,73 +439,11 @@ export function ProductsPage() {
         p_units: unitPayload.length > 0 ? unitPayload : null,
         p_unit_links: supportsComponentGroups && unitRows.length > 0 ? unitRows.map(({ unit_id, quantity }) => ({ unit_id, quantity })) : null,
       };
-      const { data, error } = productComponents.length === 0
-        ? await api.catalog.createProductOperational({
-          p_product: { ...createInput, p_business_attributes: businessAttributes },
-          p_items: rawRows.map(({ raw_material_id, quantity, wastage_percent }) =>
-            ({ raw_material_id, quantity, wastage_percent })),
-        })
-        : await api.catalog.createProduct(createInput);
-      if (error || !data?.product_id || data.success === false) { show(error?.message || data?.error || 'error', 'error'); return; }
-      pid = data.product_id;
-    }
-
-    if (supportsComposition) {
-      const desiredLinks = supportsComponentGroups && productType === 'manufactured'
-        ? unitRows.map(({ unit_id, quantity }) => ({ unit_id, quantity }))
-        : [];
-      try {
-        if (supportsComponentGroups && editing && !atomicEdit) await api.catalog.setProductUnitLinks(pid, desiredLinks);
-        if (editing && !atomicEdit && supportsRawComposition && canManageRecipes && (rawRows.length > 0 || initialRawCount.current > 0)) {
-          await api.catalog.saveProductDirectRawComponents({
-            product_id: pid,
-            branch_id: effectiveBranch,
-            product_name: form.name.trim(),
-            items: productType === 'manufactured'
-              ? rawRows.map((row) => ({
-                  raw_material_id: row.raw_material_id,
-                  quantity: Number(row.quantity),
-                  wastage_percent: Number(row.wastage_percent) || 0,
-                }))
-              : [],
-          });
-        } else if (editing && supportsRawComposition && productType === 'ready' && rawRows.length > 0) {
-          throw new Error(lang === 'ar'
-            ? 'لا يمكن تحويل المنتج إلى بدون مكونات قبل إزالة خاماته المباشرة بصلاحية مناسبة.'
-            : 'Direct raw materials must be removed with the proper permission before changing this product to no-components.');
-        }
-        if (supportsComponentGroups) {
-          const { data, error } = await supabase.from('product_unit_links').select('unit_id,quantity').eq('product_id', pid);
-          if (error) throw error;
-          assertSavedComponentRows(desiredLinks, data || [], row => row.unit_id);
-        }
-        if (supportsRawComposition && canManageRecipes) {
-          const saved = await api.catalog.getProductDirectRawComponents(pid, effectiveBranch);
-          assertSavedComponentRows(rawRows, saved.items, row => row.raw_material_id);
-          if (rawRows.some(row => !saved.items.some(item => item.raw_material_id === row.raw_material_id && Math.abs(Number(item.wastage_percent || 0) - Number(row.wastage_percent)) < 0.000001))) throw new Error('COMPONENT_WASTE_NOT_SAVED');
-        }
-      } catch (compositionError) {
-        if (!editing) {
-          setQuickModalOpen(false);
-          setIngredientsModalOpen(false);
-          setModalOpen(false);
-          reloadProducts();
-          show(lang === 'ar' ? 'تم إنشاء المنتج، لكن لم يكتمل حفظ المكونات. افتح المنتج من القائمة لإعادة المحاولة.' : 'Product created, but component saving was incomplete. Reopen it from the list to retry.', 'error');
-        } else {
-          show(compositionError instanceof Error ? compositionError.message : String(compositionError), 'error');
-        }
-        return;
-      }
-    }
-
-    const usesOperationalComposition = rawRows.length > 0 || unitRows.length > 0;
-    if (supportsComposition && !usesOperationalComposition && !atomicEdit && (initialLegacyCount.current > 0 || productComponents.length > 0)) {
-      const { error: compDelError } = await supabase.from('product_components').delete().eq('product_id', pid);
-      if (compDelError) { show(compDelError.message, 'error'); return; }
-      if (productType === 'manufactured' && productComponents.length > 0) {
-        const { error: compInsError } = await supabase.from('product_components').insert(productComponents.map((c) => ({ product_id: pid, component_product_id: c.component_product_id, quantity: c.quantity })));
-        if (compInsError) { show(compInsError.message, 'error'); return; }
-      }
+      const { data, error } = await api.catalog.createProductOperational({
+        p_product: { ...createInput, p_business_attributes: businessAttributes, p_legacy_components: legacyRows },
+        p_items: rawRows.map(({ raw_material_id, quantity, wastage_percent }) => ({ raw_material_id, quantity, wastage_percent })),
+      });
+      if (error || !data?.success || !data.product_id) { show(error?.message || data?.error || 'PRODUCT_CREATE_FAILED', 'error'); return; }
     }
     show(t('saveSuccess'), 'success');
     setModalOpen(false);
@@ -526,9 +466,9 @@ export function ProductsPage() {
     }
   };
 
-  const addComponentRow = () => { if (!componentSel) { show(t('required'), 'error'); return; } setProductComponents([...productComponents, { component_product_id: componentSel, quantity: componentQty > 0 ? componentQty : 1 }]); setComponentSel(''); setComponentQty(1); };
-  const updateComponentQty = (i: number, qty: number) => setProductComponents(productComponents.map((c, idx) => idx === i ? { ...c, quantity: qty > 0 ? qty : 1 } : c));
-  const removeComponentRow = (i: number) => setProductComponents(productComponents.filter((_, idx) => idx !== i));
+  const addComponentRow = () => { if (!componentSel || !Number.isFinite(componentQty) || componentQty <= 0 || !availableToAdd.some(row => row.product_id === componentSel)) { show(t('required'), 'error'); return; } setProductComponents(prev => [...prev, { component_product_id: componentSel, quantity: componentQty }]); setForm(prev => ({ ...prev, product_type: 'manufactured' })); setComponentSel(''); setComponentQty(1); };
+  const updateComponentQty = (i: number, qty: number) => setProductComponents(productComponents.map((c, idx) => idx === i ? { ...c, quantity: qty } : c));
+  const removeComponentRow = (i: number) => { const next = productComponents.filter((_, idx) => idx !== i); setProductComponents(next); if (!next.length && !recipeIngredients.length && !linkedInventoryUnits.length) setForm(prev => ({ ...prev, product_type: 'ready' })); };
   const addDirectRawIngredient = () => {
     if (!rawMaterialSel || !can('recipes.manage')) return;
     const material = rawMaterialOptions.find((row) => row.id === rawMaterialSel);
