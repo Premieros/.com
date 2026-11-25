@@ -103,6 +103,28 @@ const disposable = Boolean(url && ['localhost','127.0.0.1','[::1]'].includes(new
       expect((await db.query('select count(*)::int n from public.product_components where product_id=$1',[legacy.product_id])).rows[0].n).toBe(0);
       expect((await db.query('select p.name,l.quantity::float8 group_qty,i.quantity::float8 raw_qty from public.products p join public.product_unit_links l on l.product_id=p.id join public.recipes r on r.product_id=p.id join public.recipe_items i on i.recipe_id=r.id where p.id=$1',[pid])).rows[0]).toEqual({name:'CI Metadata Only',group_qty:.75,raw_qty:3});
       expect((await db.query("select has_function_privilege('anon','private.replace_legacy_product_components(uuid,uuid,jsonb,jsonb)','execute') allowed")).rows[0].allowed).toBe(false);
+      // A product editor is not a group administrator. Unchanged groups must not
+      // require DELETE/INSERT permission, and a changed group must be rejected.
+      const editor=randomUUID(),editorRole='ci_editor_'+tag,editorEmail='editor-'+tag+'@ci.invalid';
+      await db.query("insert into public.roles(role,name_ar,name_en,permissions,scope,is_active) values($1,'CI Editor','CI Editor',$2::jsonb,'global',true)",[editorRole,JSON.stringify(['products.edit','recipes.manage'])]);
+      await db.query('insert into auth.users(id,email,created_at,updated_at) values($1,$2,now(),now())',[editor,editorEmail]);
+      await db.query("select set_config('app.register_branch','on',true)");
+      await db.query("insert into public.users(id,email,full_name,role,branch_id,is_active) values($1,$2,'CI Editor',$3,$4,true)",[editor,editorEmail,editorRole,branch]);
+      await db.query("select set_config('app.register_branch','off',true)");
+      const latestVersion=(await db.query('select version from public.recipes where product_id=$1 and is_active',[pid])).rows[0].version;
+      const sameRaw=JSON.stringify([{raw_material_id:raw,quantity:3,wastage_percent:2}]);
+      await db.query("select set_config('app.user_id',$1,true),set_config('app.jwt',$2,true)",[editor,JSON.stringify({sub:editor,role:'authenticated'})]);
+      await db.query('SET LOCAL ROLE authenticated');
+      expect((await db.query("select public.can_permission('products.edit') permitted,public.is_pos_admin() admin")).rows[0]).toEqual({permitted:true,admin:false});
+      expect((await db.query(legacyEdit,[pid,branch,latestVersion,links,{name:'CI Delegated Edit'},null,sameRaw,links,'[]','[]'])).rows[0].result.success).toBe(true);
+      await db.query('RESET ROLE');
+      expect((await db.query('select version from public.recipes where product_id=$1 and is_active',[pid])).rows[0].version).toBe(latestVersion);
+      await db.query('SAVEPOINT denied_group_edit');
+      await db.query('SET LOCAL ROLE authenticated');
+      await expect(db.query(legacyEdit,[pid,branch,latestVersion,links,{name:'Do not save'},null,sameRaw,originalLinks,'[]','[]'])).rejects.toThrow('GROUP_LINK_EDIT_DENIED');
+      await db.query('ROLLBACK TO SAVEPOINT denied_group_edit');
+      await db.query('RESET ROLE');
+      expect((await db.query('select p.name,l.quantity::float8 qty from public.products p join public.product_unit_links l on l.product_id=p.id where p.id=$1',[pid])).rows[0]).toEqual({name:'CI Delegated Edit',qty:.75});
     } finally { await db.query('ROLLBACK'); }
   });
 });

@@ -1,6 +1,6 @@
 -- PR #318: atomic catalog and stock count operations; corrected inventory projection.
 -- No historical inventory movements or data adjustments. Functions use invoker rights;
--- private row-lock helper alone has elevated rights with explicit authorization.
+-- private scoped helpers have elevated rights only after explicit authorization.
 
 -- Atomic product creation with operational composition.
 -- Existing invoker/RLS contract; create_product owns its existing permission checks.
@@ -109,7 +109,7 @@ GRANT EXECUTE ON FUNCTION public.create_product_operational(jsonb,jsonb) TO auth
 -- Controlled deletion of legacy BOM rows; public direct deletion remains denied by RLS.
 CREATE FUNCTION private.replace_legacy_product_components(p_product_id uuid,p_branch_id uuid,p_expected jsonb,p_components jsonb)
 RETURNS void LANGUAGE plpgsql SECURITY DEFINER SET search_path='' AS $legacy_bom$
-DECLARE v_current jsonb;
+DECLARE v_current jsonb; v_desired jsonb;
 BEGIN
   IF auth.uid() IS NULL OR public.can_permission('products.edit') IS NOT TRUE
     OR public.user_may_access_branch(p_branch_id) IS NOT TRUE THEN RAISE EXCEPTION 'LEGACY_EDIT_DENIED'; END IF;
@@ -121,6 +121,8 @@ BEGIN
   SELECT coalesce(jsonb_agg(jsonb_build_object('component_product_id',component_product_id,'quantity',quantity) ORDER BY component_product_id),'[]'::jsonb)
     INTO v_current FROM public.product_components WHERE product_id=p_product_id;
   IF v_current IS DISTINCT FROM p_expected THEN RAISE EXCEPTION 'COMPOSITION_REFRESH_REQUIRED'; END IF;
+  SELECT coalesce(jsonb_agg(jsonb_build_object('component_product_id',i.component_product_id,'quantity',i.quantity) ORDER BY i.component_product_id),'[]'::jsonb) INTO v_desired FROM jsonb_to_recordset(p_components) i(component_product_id uuid,quantity numeric);
+  IF v_current=v_desired THEN RETURN; END IF;
   IF EXISTS (SELECT 1 FROM jsonb_to_recordset(p_components) i(component_product_id uuid,quantity numeric)
     LEFT JOIN public.products p ON p.id=i.component_product_id AND p.branch_id=p_branch_id AND p.is_active
     WHERE p.id IS NULL OR p.id=p_product_id OR i.quantity IS NULL OR i.quantity<=0 OR i.quantity::text IN ('NaN','Infinity','-Infinity'))
@@ -147,7 +149,7 @@ CREATE FUNCTION public.edit_product_operational_composition(
   p_product_id uuid,p_branch_id uuid,p_expected_version integer,p_expected_links jsonb,
   p_product jsonb,p_units jsonb,p_items jsonb,p_links jsonb,p_expected_legacy jsonb DEFAULT NULL,p_legacy jsonb DEFAULT NULL
 ) RETURNS jsonb LANGUAGE plpgsql SECURITY INVOKER SET search_path='' AS $$
-DECLARE v_product public.products%ROWTYPE; v_next public.products%ROWTYPE; v_recipe public.recipes%ROWTYPE; v_result jsonb; v_recipe_id uuid; v_snapshot jsonb; v_legacy_count integer; v_raw_count integer; v_link_count integer;
+DECLARE v_product public.products%ROWTYPE; v_next public.products%ROWTYPE; v_recipe public.recipes%ROWTYPE; v_result jsonb; v_recipe_id uuid; v_snapshot jsonb; v_legacy_count integer; v_raw_count integer; v_link_count integer; v_desired_links jsonb; v_current_raw jsonb; v_desired_raw jsonb;
 BEGIN
   IF auth.uid() IS NULL OR public.can_permission('products.edit') IS NOT TRUE
      OR public.user_may_access_branch(p_branch_id) IS NOT TRUE OR (p_items IS NOT NULL AND public.can_permission('recipes.manage') IS NOT TRUE) THEN RAISE EXCEPTION 'COMPOSITION_EDIT_DENIED'; END IF;
@@ -175,6 +177,14 @@ BEGIN
   SELECT coalesce(jsonb_agg(jsonb_build_object('unit_id',unit_id,'quantity',quantity) ORDER BY unit_id),'[]'::jsonb) INTO v_snapshot
     FROM public.product_unit_links WHERE product_id=p_product_id;
   IF (p_items IS NOT NULL AND v_recipe.version IS DISTINCT FROM p_expected_version) OR (p_links IS NOT NULL AND v_snapshot IS DISTINCT FROM p_expected_links) THEN RAISE EXCEPTION 'COMPOSITION_REFRESH_REQUIRED'; END IF;
+  IF p_links IS NOT NULL THEN
+    SELECT coalesce(jsonb_agg(jsonb_build_object('unit_id',i.unit_id,'quantity',i.quantity) ORDER BY i.unit_id),'[]'::jsonb) INTO v_desired_links FROM jsonb_to_recordset(p_links) i(unit_id uuid,quantity numeric);
+    IF v_desired_links IS DISTINCT FROM v_snapshot AND public.is_pos_admin() IS NOT TRUE THEN RAISE EXCEPTION 'GROUP_LINK_EDIT_DENIED'; END IF;
+  END IF;
+  IF p_items IS NOT NULL THEN
+    SELECT coalesce(jsonb_agg(jsonb_build_object('raw_material_id',i.raw_material_id,'quantity',i.quantity,'wastage_percent',coalesce(i.wastage_percent,0)) ORDER BY i.raw_material_id),'[]'::jsonb) INTO v_desired_raw FROM jsonb_to_recordset(p_items) i(raw_material_id uuid,quantity numeric,wastage_percent numeric);
+    SELECT coalesce(jsonb_agg(jsonb_build_object('raw_material_id',raw_material_id,'quantity',quantity,'wastage_percent',coalesce(wastage_percent,0)) ORDER BY raw_material_id),'[]'::jsonb) INTO v_current_raw FROM public.recipe_items WHERE recipe_id=v_recipe.id;
+  END IF;
   v_raw_count:=coalesce(jsonb_array_length(p_items),(SELECT count(*)::int FROM public.recipes WHERE product_id=p_product_id AND is_active));
   v_link_count:=coalesce(jsonb_array_length(p_links),jsonb_array_length(v_snapshot));
   v_legacy_count:=coalesce(jsonb_array_length(p_legacy),(SELECT count(*)::int FROM public.product_components WHERE product_id=p_product_id));
@@ -199,7 +209,7 @@ BEGIN
     v_result:=public.replace_product_units(p_product_id,p_units);
     IF (v_result->>'success')::boolean IS NOT TRUE THEN RAISE EXCEPTION 'PRODUCT_UNITS_NOT_SAVED: %',v_result; END IF;
   END IF;
-  IF p_links IS NOT NULL THEN
+  IF p_links IS NOT NULL AND v_desired_links IS DISTINCT FROM v_snapshot THEN
   DELETE FROM public.product_unit_links WHERE product_id=p_product_id;
   INSERT INTO public.product_unit_links(product_id,unit_id,quantity)
     SELECT p_product_id,i.unit_id,i.quantity FROM jsonb_to_recordset(p_links) i(unit_id uuid,quantity numeric);
@@ -208,7 +218,7 @@ BEGIN
       (SELECT 1 FROM public.product_unit_links l WHERE l.product_id=p_product_id AND l.unit_id=i.unit_id AND l.quantity=round(i.quantity,4)))
   THEN RAISE EXCEPTION 'GROUP_LINKS_NOT_SAVED'; END IF;
   END IF;
-  IF p_items IS NOT NULL THEN
+  IF p_items IS NOT NULL AND (v_desired_raw IS DISTINCT FROM v_current_raw OR (v_recipe.id IS NOT NULL AND jsonb_array_length(p_items)=0)) THEN
   IF jsonb_array_length(p_items)=0 THEN
     IF v_recipe.id IS NOT NULL THEN
       v_result:=public.delete_recipe_controlled(v_recipe.id);
