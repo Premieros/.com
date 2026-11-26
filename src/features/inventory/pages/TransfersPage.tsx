@@ -93,6 +93,10 @@ export function TransfersPage() {
   }, [location.state]);
 
   const sourceWarehouses = useMemo(() => warehouses.filter((w) => w.branch_id === form.source_branch_id), [warehouses, form.source_branch_id]);
+  const sourceBranch = branches.find((branch) => branch.id === form.source_branch_id);
+  const destinationBranches = sourceBranch ? branches.filter((branch) =>
+    branch.id === sourceBranch.id || (sourceBranch.organization_id && branch.organization_id === sourceBranch.organization_id),
+  ) : [];
   const destinationWarehouses = useMemo(() => warehouses.filter((w) => w.branch_id === form.destination_branch_id), [warehouses, form.destination_branch_id]);
   const sourceRawMaterials = useMemo(() => rawMaterials.filter((r) => r.branch_id === form.source_branch_id), [rawMaterials, form.source_branch_id]);
 
@@ -115,21 +119,16 @@ export function TransfersPage() {
     const allowed = guardTransfer({ warehousesCount: warehouses.length, formData: { form, lines } });
     if (!allowed) return;
     const sourceBranchId = branchFilter || branches[0]?.id || '';
-    const destinationBranchId = branches.find((b) => b.id !== sourceBranchId)?.id || sourceBranchId;
     const from = warehouses.find((w) => w.branch_id === sourceBranchId)?.id || '';
-    const to = warehouses.find((w) => w.branch_id === destinationBranchId)?.id || '';
-    setForm({ source_branch_id: sourceBranchId, destination_branch_id: destinationBranchId, from_warehouse_id: from, to_warehouse_id: to, reason: '', notes: '' });
+    setForm({ source_branch_id: sourceBranchId, destination_branch_id: '', from_warehouse_id: from, to_warehouse_id: '', reason: '', notes: '' });
     const item = rawMaterials.find((raw) => raw.id === suggestedItem && raw.branch_id === sourceBranchId);
-    const destinationMatches = item ? rawMaterials.filter((raw) => raw.branch_id === destinationBranchId
-      && raw.unit_id === item.unit_id && normalizeRawName(raw.name) === normalizeRawName(item.name)) : [];
-    const destinationItem = destinationBranchId === sourceBranchId ? item : destinationMatches.length === 1 ? destinationMatches[0] : undefined;
-    setLines([{ ...EMPTY_LINE, item_id: item?.id || '', destination_item_id: destinationItem?.id || '' }]);
+    setLines([{ ...EMPTY_LINE, item_id: item?.id || '' }]);
     setModalOpen(true);
   };
 
   const setSourceBranch = (branchId: string) => {
     const firstWarehouse = warehouses.find((w) => w.branch_id === branchId)?.id || '';
-    setForm((prev) => ({ ...prev, source_branch_id: branchId, from_warehouse_id: firstWarehouse }));
+    setForm((prev) => ({ ...prev, source_branch_id: branchId, from_warehouse_id: firstWarehouse, destination_branch_id: '', to_warehouse_id: '' }));
     setLines([{ ...EMPTY_LINE }]);
   };
   const resolveDestinationRawId = (sourceRawId: string, destinationBranchId: string): string => {
@@ -182,7 +181,7 @@ export function TransfersPage() {
     if (mutationLock.current || !can('inventory.transfer.create')) return;
     const allowed = guardTransfer({ warehousesCount: warehouses.length, formData: { form, lines } });
     if (!allowed) return;
-    if (!form.source_branch_id || !form.destination_branch_id) { show(lang === 'ar' ? 'اختر فرع المصدر وفرع الوجهة' : 'Select source and destination branches', 'error'); return; }
+    if (!sourceBranch || !destinationBranches.some((branch) => branch.id === form.destination_branch_id)) { show(lang === 'ar' ? 'اختر فرع المصدر وفرع الوجهة' : 'Select source and destination branches', 'error'); return; }
     if (!form.from_warehouse_id || !form.to_warehouse_id || form.from_warehouse_id === form.to_warehouse_id) { show(t('required') + ': ' + t('fromWarehouse'), 'error'); return; }
     const validLines = lines.filter(l => l.item_id);
     if (validLines.some(l => l.lookupToken !== undefined || l.costError || !Number.isFinite(l.quantity) || l.quantity <= 0 || !Number.isFinite(l.unit_cost) || l.unit_cost < 0 || !sourceRawMaterials.some(material => material.id === l.item_id) || l.destination_item_id !== resolveDestinationRawId(l.item_id, form.destination_branch_id)) || new Set(validLines.map(l => l.item_id)).size !== validLines.length || !sourceWarehouses.some(w => w.id === form.from_warehouse_id) || !destinationWarehouses.some(w => w.id === form.to_warehouse_id)) { show(lang === 'ar' ? 'تحقق من المخازن والكميات والتكلفة وعدم تكرار الخامات واكتمال التحميل.' : 'Check warehouses, quantities, costs, duplicates and pending lookups.', 'error'); return; }
@@ -275,7 +274,7 @@ export function TransfersPage() {
         <div className="space-y-5">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Select label={lang === 'ar' ? 'فرع المصدر' : 'Source branch'} value={form.source_branch_id} onChange={(e) => setSourceBranch(e.target.value)} disabled={!!branchFilter}><option value="">{t('branch')}</option>{branches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}</Select>
-            <Select label={lang === 'ar' ? 'فرع الوجهة' : 'Destination branch'} value={form.destination_branch_id} onChange={(e) => setDestinationBranch(e.target.value)}><option value="">{t('branch')}</option>{branches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}</Select>
+            <Select label={lang === 'ar' ? 'فرع الوجهة' : 'Destination branch'} value={form.destination_branch_id} onChange={(e) => setDestinationBranch(e.target.value)}><option value="">{t('branch')}</option>{destinationBranches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}</Select>
             <Select label={t('fromWarehouse')} value={form.from_warehouse_id} onChange={(e) => { setForm({ ...form, from_warehouse_id: e.target.value }); setLines([{ ...EMPTY_LINE }]); }}><option value="">{t('fromWarehouse')}</option>{sourceWarehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</Select>
             <Select label={t('toWarehouse')} value={form.to_warehouse_id} onChange={(e) => setForm({ ...form, to_warehouse_id: e.target.value })}><option value="">{t('toWarehouse')}</option>{destinationWarehouses.map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}</Select>
             <Input label={t('reason')} value={form.reason} onChange={(e) => setForm({ ...form, reason: e.target.value })} />

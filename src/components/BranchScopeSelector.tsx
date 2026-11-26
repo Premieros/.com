@@ -203,20 +203,19 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
                 {branches.map((branch) => {
               const selected = scope.selectedBranchSet.has(branch.id);
               return (
+                <div key={branch.id} className="flex items-center gap-1">
+                  <input type="checkbox" className="ms-2 h-4 w-4 shrink-0" checked={selected}
+                    aria-label={ar ? `إدراج ${branch.name} في العرض المجمّع` : `Include ${branch.name} in combined view`}
+                    onChange={() => scope.toggleBranch(branch.id)} />
                 <button
-                  key={branch.id}
                   type="button"
                   data-testid={`branch-scope-option-${branch.id}`}
-                  onClick={() => scope.toggleBranch(branch.id)}
-                  className="flex w-full items-center gap-3 rounded-lg px-2.5 py-1.5 text-start text-xs text-ui-text transition hover:bg-ui-page-alt"
+                  onClick={() => { scope.selectOnlyBranch(branch.id); setOpen(false); }}
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2.5 py-1.5 text-start text-xs text-ui-text transition hover:bg-ui-page-alt"
                 >
-                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
-                    selected ? 'border-ui-primary bg-ui-primary text-ui-primary-fg' : 'border-ui-border'
-                  }`}>
-                    {selected && <Check className="h-3.5 w-3.5" />}
-                  </span>
                   <span className="truncate font-bold">{lang === 'ar' ? branch.name : branch.name_en || branch.name}</span>
                 </button>
+                </div>
               );
                 })}
               </div>

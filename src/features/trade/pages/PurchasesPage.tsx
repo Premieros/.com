@@ -141,27 +141,29 @@ export function PurchasesPage() {
   const subtotal = useMemo(() => lineItems.reduce((s, i) => s + i.quantity * i.unit_cost, 0), [lineItems]);
 
   const openAdd = () => {
-    const allowed = guardPurchase({
-      warehousesCount: warehouses.length,
-      suppliersCount: suppliers.length,
-      productsCount: products.length,
-      rawMaterialsCount: rawMaterials.length,
-      formData: { form, lineItems },
-    });
-    if (!allowed) return;
-
-    setEditingPurchase(null);
     const targetBranchId = branchFilter || user?.branch_id || branches[0]?.id || '';
     const targetSupplier = suppliers.find((supplier) => supplier.branch_id === targetBranchId);
     const targetWarehouse = warehouses.find((warehouse) => warehouse.branch_id === targetBranchId);
-    setForm({
+    const draft = {
       supplier_id: targetSupplier?.id || '',
       warehouse_id: targetWarehouse?.id || '',
       branch_id: targetBranchId,
       payment_method: 'cash',
       notes: '',
+    } satisfies typeof form;
+    const draftLines = [{ ...EMPTY_LINE }];
+    const allowed = guardPurchase({
+      warehousesCount: warehouses.length,
+      suppliersCount: suppliers.length,
+      productsCount: products.length,
+      rawMaterialsCount: rawMaterials.length,
+      formData: { form: draft, lineItems: draftLines },
     });
-    setLineItems([{ ...EMPTY_LINE }]);
+    if (!allowed) return;
+
+    setEditingPurchase(null);
+    setForm(draft);
+    setLineItems(draftLines);
     setModalOpen(true);
   };
 

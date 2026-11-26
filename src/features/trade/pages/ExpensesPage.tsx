@@ -123,6 +123,7 @@ export function ExpensesPage() {
       return;
     }
     let cancelled = false;
+    setActiveShiftId(null);
     void Promise.all([
       supabase.from('chart_of_accounts').select('id,code,name,name_en').eq('branch_id', effectiveBranchId).eq('account_type', 'expense').eq('is_active', true).order('code'),
       supabase.from('treasury_accounts').select('id,account_name,account_type').eq('branch_id', effectiveBranchId).eq('is_active', true).order('account_type'),
@@ -433,9 +434,12 @@ export function ExpensesPage() {
           {editingExpense && (
             <Textarea label={isAr ? 'سبب التعديل' : 'Edit reason'} value={editReason} onChange={(e) => setEditReason(e.target.value)} rows={2} required />
           )}
+          {!activeShiftId && <p role="status" className="rounded-lg border border-ui-warning/30 bg-ui-warning-soft p-3 text-sm text-ui-text">
+            {isAr ? 'افتح وردية في الفرع المحدد قبل حفظ المصروف.' : 'Open a shift in the selected branch before saving the expense.'}
+          </p>}
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => { setModalOpen(false); setEditingExpense(null); }}>{t('cancel')}</Button>
-            <Button onClick={save}>{t('save')}</Button>
+            <Button onClick={save} disabled={!activeShiftId || !effectiveBranchId}>{t('save')}</Button>
           </div>
         </div>
       </Modal>
