@@ -18,7 +18,7 @@ export function bunkerInlineEditor():Plugin {
   name:'bunker-inline-editor',
   apply:'build',
   configResolved(config){projectRoot=config.root;outputDirectory=path.resolve(config.root,config.build.outDir);},
-  closeBundle(){
+  writeBundle(){
    const htmlPath=path.join(outputDirectory,'bunker/index.html');
    const html=readFileSync(htmlPath,'utf8');
    const css=readFileSync(path.join(projectRoot,'public/bunker/inline-editor.css'),'utf8');

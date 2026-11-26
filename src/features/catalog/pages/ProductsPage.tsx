@@ -78,7 +78,7 @@ export function ProductsPage() {
     select: '*',
     order: { column: 'created_at', ascending: false },
     branch_id: branchFilter,
-    enabled: !record.id || Boolean(branchFilter),
+    enabled: can('products.view') && (!record.id || Boolean(branchFilter)),
     search: { term: record.id ? '' : debouncedSearch, columns: ['name', 'name_en', 'barcode', 'sku'] },
     pageSize: 100,
   });
@@ -661,13 +661,21 @@ export function ProductsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams]);
 
+  const productToolItems = useMemo(() => ([
+    { route: APP_ROUTES.pricing, ar: 'التسعير', en: 'Pricing', allowed: can('products.view') },
+    { route: APP_ROUTES.productModifiers, ar: 'مجموعات الإضافات', en: 'Modifier groups', allowed: can('products.modifiers.manage') },
+    { route: APP_ROUTES.productModifierOptions, ar: 'خيارات الإضافات', en: 'Modifier options', allowed: can('products.modifiers.manage') },
+    { route: APP_ROUTES.categories, ar: 'التصنيفات', en: 'Categories', allowed: can('categories.view') },
+    { route: APP_ROUTES.inventoryUnits, ar: 'مجموعات المكونات', en: 'Component groups', allowed: can('raw_materials.view') },
+  ] as const).filter((item) => item.allowed && canAccessPath(item.route)), [can, canAccessPath]);
+
   return (
     <DesignSurface testId="products-page">
       {record.id && <RecordFocus onClear={record.clear} />}
       <DesignPageHeader
         title={itemLabel}
         subtitle={lang === 'ar' ? 'إدارة الأصناف والأسعار والتصنيفات والمكونات' : 'Manage finished goods, pricing, categories and compositions'}
-        actions={<>{can('products.import') && <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} data-testid="products-import" />}{can('products.import') && <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} data-testid="products-import-button"><Upload className="w-4 h-4" /> {t('importExcel')}</Button>}{can('products.export') && <Button variant="outline" size="sm" onClick={handleExport} data-testid="products-export"><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}<Button variant="outline" size="sm" onClick={() => setCatalogToolsOpen(true)} data-testid="products-tools"><SlidersHorizontal className="w-4 h-4" /> {lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'}</Button>{can('products.create') && <Button size="sm" onClick={openAdd} data-testid="products-add"><Plus className="w-4 h-4" /> {t('add')}</Button>}</>}
+        actions={<>{can('products.import') && <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} data-testid="products-import" />}{can('products.import') && <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} data-testid="products-import-button"><Upload className="w-4 h-4" /> {t('importExcel')}</Button>}{can('products.export') && <Button variant="outline" size="sm" onClick={handleExport} data-testid="products-export"><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}{productToolItems.length > 0 && <Button variant="outline" size="sm" onClick={() => setCatalogToolsOpen(true)} data-testid="products-tools"><SlidersHorizontal className="w-4 h-4" /> {lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'}</Button>}{can('products.create') && <Button size="sm" onClick={openAdd} data-testid="products-add"><Plus className="w-4 h-4" /> {t('add')}</Button>}</>}
       />
       <section className="premier-refresh-stagger grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
@@ -1002,9 +1010,9 @@ export function ProductsPage() {
           <div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setModalOpen(false)}>{t('cancel')}</Button><Button onClick={save} disabled={saving}>{t('save')}</Button></div>
         </div>
       </Modal>
-      <Modal open={catalogToolsOpen} onClose={() => setCatalogToolsOpen(false)} title={lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'} size="sm"><div className="grid gap-2">{[{ route: APP_ROUTES.pricing, ar: 'التسعير', en: 'Pricing' }, { route: APP_ROUTES.productModifiers, ar: 'مجموعات الإضافات', en: 'Modifier groups' }, { route: APP_ROUTES.productModifierOptions, ar: 'خيارات الإضافات', en: 'Modifier options' }, { route: APP_ROUTES.categories, ar: 'التصنيفات', en: 'Categories' }, { route: APP_ROUTES.inventoryUnits, ar: 'مجموعات المكونات', en: 'Component groups' }].filter((item) => canAccessPath(item.route)).map((item) => <button key={item.route} type="button" onClick={() => { setCatalogToolsOpen(false); navigate(item.route); }} className="flex min-h-11 items-center justify-between rounded-xl border border-ui-border bg-ui-surface px-4 text-sm font-bold text-ui-text transition hover:bg-ui-page-alt"><span>{lang === 'ar' ? item.ar : item.en}</span><span className="text-ui-subtle">›</span></button>)}</div></Modal>
-      <Modal open={!!barcodeModal} onClose={() => setBarcodeModal(null)} title={t('barcode')} size="sm">{barcodeModal && <div className="flex flex-col items-center gap-4"><p className="font-medium text-ui-text">{barcodeModal.name}</p><canvas ref={barcodeCanvasRef} className="rounded-lg bg-ui-surface p-2" /><Button variant="outline" onClick={() => window.print()}><BarcodeIcon className="w-4 h-4" /> {t('print')}</Button></div>}</Modal>
-      <Modal open={!!qrModal} onClose={() => setQrModal(null)} title={t('generateQR')} size="sm">{qrDataUrl && <div className="flex flex-col items-center gap-4"><img src={qrDataUrl} alt="QR Code" className="w-48 h-48 rounded-lg" /><Button variant="outline" onClick={() => window.print()}><QrCode className="w-4 h-4" /> {t('print')}</Button></div>}</Modal>
+      <Modal open={catalogToolsOpen} onClose={() => setCatalogToolsOpen(false)} title={lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'} size="sm"><div className="grid gap-2">{productToolItems.map((item) => <button key={item.route} type="button" onClick={() => { setCatalogToolsOpen(false); navigate(item.route); }} className="flex min-h-11 items-center justify-between rounded-xl border border-ui-border bg-ui-surface px-4 text-sm font-bold text-ui-text transition hover:bg-ui-page-alt"><span>{lang === 'ar' ? item.ar : item.en}</span><span className="text-ui-subtle">›</span></button>)}</div></Modal>
+      <Modal open={!!barcodeModal} onClose={() => setBarcodeModal(null)} title={t('barcode')} size="sm">{barcodeModal && <div className="flex flex-col items-center gap-4"><p className="font-medium text-ui-text">{barcodeModal.name}</p><canvas ref={barcodeCanvasRef} className="rounded-lg bg-ui-surface p-2" />{can('products.print') && <Button variant="outline" onClick={() => window.print()}><BarcodeIcon className="w-4 h-4" /> {t('print')}</Button>}</div>}</Modal>
+      <Modal open={!!qrModal} onClose={() => setQrModal(null)} title={t('generateQR')} size="sm">{qrDataUrl && <div className="flex flex-col items-center gap-4"><img src={qrDataUrl} alt="QR Code" className="w-48 h-48 rounded-lg" />{can('products.print') && <Button variant="outline" onClick={() => window.print()}><QrCode className="w-4 h-4" /> {t('print')}</Button>}</div>}</Modal>
       <ProductImageAdjustModal
         open={imageAdjustOpen}
         src={form.image_url}

@@ -255,10 +255,29 @@ export function DashboardDataPage() {
   const canViewExpenses = can('expenses.view') && canAccessModule('expenses') && dashboardSections.has('expenses');
   const canViewKds = can('pos.kds_view') && canAccessPath(APP_ROUTES.kitchenDisplay);
   const canViewFinancial = can('reports.financial') && canAccessModule('accounting') && dashboardSections.has('finance');
-  const canViewBusinessRecords = dashboardSections.has('business_records') && runtime.recordTypes.length > 0;
-  const canViewAudit = can('audit.view') && canAccessModule('audit_logs');
-  const canViewSettings = can('settings.manage');
-  const canViewTreasury = can('accounts.view') && canAccessModule('accounting');
+  const canViewBusinessRecords = can('customers.view') && dashboardSections.has('business_records') && runtime.recordTypes.length > 0;
+  const canViewAudit = can('audit.view') && canAccessModule('audit_logs') && canAccessPath(APP_ROUTES.auditLog);
+  const canViewSettings = can('settings.manage') && canAccessPath(APP_ROUTES.settings);
+  const canViewTreasury = can('accounts.view') && canAccessModule('accounting') && canAccessPath(APP_ROUTES.treasury);
+  const quickActionPermitted = (route: string): boolean => {
+    if (route === APP_ROUTES.pos) return can('pos.view');
+    if (route === APP_ROUTES.floorPlan) return canViewFloorPlan;
+    if (route === APP_ROUTES.kitchenDisplay) return canViewKds;
+    if (route === APP_ROUTES.purchases) return canViewPurchases;
+    if (route === APP_ROUTES.products) return can('products.view');
+    if (route === APP_ROUTES.customers) return can('customers.view');
+    if (route === APP_ROUTES.accounts) return can('accounts.view') && canAccessModule('accounting');
+    if (route === APP_ROUTES.sales) return can('sales.view');
+    if (route === APP_ROUTES.inventory) return can('inventory.view');
+    return true;
+  };
+  const visibleQuickActions = runtime.dashboard.quickActions.filter((action) =>
+    (!action.module || canAccessModule(action.module))
+    && (!action.capability || runtime.capabilities.has(action.capability))
+    && canAccessPath(action.route)
+    && quickActionPermitted(action.route),
+  );
+  const quickRoutes = new Set(visibleQuickActions.map((action) => action.route));
   const [params, setParams] = useSearchParams();
   const requestedRange = params.get('range');
   const range = (Object.keys(rangeLabels) as Range[]).find((key) => key === requestedRange)
@@ -697,9 +716,9 @@ export function DashboardDataPage() {
         {(runtime.description.ar || runtime.description.en) && (
           <p className="mt-1.5 text-sm text-ui-muted">{ar ? runtime.description.ar : runtime.description.en}</p>
         )}
-        {(canCreateSale || canViewSales) && (
+        {((canCreateSale && !quickRoutes.has(APP_ROUTES.pos)) || (can('sales.view') && canAccessPath(APP_ROUTES.sales) && !quickRoutes.has(APP_ROUTES.sales))) && (
           <div className="mt-3.5 flex flex-wrap items-center gap-2">
-            {canCreateSale && (
+            {canCreateSale && !quickRoutes.has(APP_ROUTES.pos) && (
               <Link
                 to={APP_ROUTES.pos}
                 className="inline-flex items-center gap-1.5 rounded-full bg-ui-primary px-4 py-2 text-xs font-semibold text-ui-primary-fg shadow-ui-sm transition hover:bg-ui-primary-hover"
@@ -708,7 +727,7 @@ export function DashboardDataPage() {
                 <span>{ar ? 'طلب جديد' : 'New order'}</span>
               </Link>
             )}
-            {canViewSales && (
+            {can('sales.view') && canAccessPath(APP_ROUTES.sales) && !quickRoutes.has(APP_ROUTES.sales) && (
               <Link
                 to={APP_ROUTES.sales}
                 className="inline-flex items-center gap-1.5 rounded-full border border-ui-border bg-ui-surface px-4 py-2 text-xs font-semibold text-ui-text shadow-ui-sm transition hover:border-ui-border-strong hover:bg-ui-page-alt"
@@ -745,14 +764,9 @@ export function DashboardDataPage() {
       </div>
     </section>
 
-    <section data-testid="business-runtime-quick-actions" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      {runtime.dashboard.quickActions
-        .filter((action) =>
-          (!action.module || canAccessModule(action.module))
-          && (!action.capability || runtime.capabilities.has(action.capability))
-          && canAccessPath(action.route),
-        )
-        .map((action) => (
+    {visibleQuickActions.length > 0 && (
+      <section data-testid="business-runtime-quick-actions" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {visibleQuickActions.map((action) => (
           <Link
             key={action.id}
             to={action.route}
@@ -762,11 +776,12 @@ export function DashboardDataPage() {
             <span className="grid h-7 w-7 place-items-center rounded-full bg-ui-primary-soft text-xs font-bold text-ui-primary">→</span>
           </Link>
         ))}
-    </section>
+      </section>
+    )}
 
     {error && <div className="rounded-[20px] border border-ui-danger/30 bg-ui-danger-soft p-4 text-sm font-bold text-ui-danger">{error}</div>}
 
-    {(canViewSales || canViewFinancial || canViewInventory) && <Card><div className="mb-4"><h2 className="text-lg font-bold text-ui-text">{ar ? `ملخص ${rangeLabels[range][0]}` : `${rangeLabels[range][1]} summary`}</h2><p className="text-xs text-ui-subtle">{ar ? 'المبيعات صافية بعد المرتجعات، والربح من قائمة الدخل المحاسبية' : 'Sales are net of refunds; profit comes from the accounting income statement'}</p></div><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+    {(canViewFinancial || canViewInventory) && <Card><div className="mb-4"><h2 className="text-lg font-bold text-ui-text">{ar ? `ملخص ${rangeLabels[range][0]}` : `${rangeLabels[range][1]} summary`}</h2><p className="text-xs text-ui-subtle">{ar ? 'المبيعات صافية بعد المرتجعات، والربح من قائمة الدخل المحاسبية' : 'Sales are net of refunds; profit comes from the accounting income statement'}</p></div><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
       {canViewFinancial && <div className="min-w-0 rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="truncate text-xs font-medium text-ui-muted">{ar ? 'المصروفات المحاسبية' : 'Accounting expenses'}</p><p className="mt-2 truncate text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.expenses, money)}</p></div>}
       {canViewFinancial && <div className="min-w-0 rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="truncate text-xs font-medium text-ui-muted">{ar ? 'صافي الربح المحاسبي' : 'Accounting net profit'}</p><p className="mt-2 truncate text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.profit, money)}</p></div>}
       {canViewInventory && <div className="min-w-0 rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="truncate text-xs font-medium text-ui-muted">{ar ? 'تنبيهات المخزون' : 'Low stock alerts'}</p><p className="mt-2 truncate text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.lowStockCount, (value) => formatNumber(value, 0))}</p></div>}
@@ -901,12 +916,12 @@ export function DashboardDataPage() {
       <Card><h2 className="mb-3 font-black text-ui-text">{ar ? 'أكثر الأصناف مبيعًا' : 'Top selling items'}</h2>{productRows.length ? productRows.map(([name, qty]) => <div key={name} className="mb-3 flex justify-between gap-3 text-sm"><span className="font-semibold text-ui-text">{name}</span><span className="text-ui-muted">{formatNumber(qty, 2)}</span></div>) : <Empty ar={ar} />}</Card>
       <Card><h2 className="mb-3 font-black text-ui-text">{ar ? 'أحدث الطلبات' : 'Recent orders'}</h2>{recent.length ? recent.map((sale) => <div key={sale.id} className="mb-3 flex justify-between gap-3 text-sm"><span className="font-semibold text-ui-text">{sale.invoice_number || '—'}</span><span className="text-ui-muted">{money(netSaleAmount(sale))}</span></div>) : <Empty ar={ar} />}</Card></section>}
 
-      {(canViewKds || canViewTreasury || canViewAudit || canViewSettings) && (
+      {((canViewKds && !quickRoutes.has(APP_ROUTES.kitchenDisplay)) || (canViewTreasury && !quickRoutes.has(APP_ROUTES.treasury)) || (canViewAudit && !quickRoutes.has(APP_ROUTES.auditLog)) || (canViewSettings && !quickRoutes.has(APP_ROUTES.settings))) && (
         <section data-testid="dashboard-permission-shortcuts" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {canViewKds && <Link to="/kitchen-display" className="ui-accent-card ui-accent-system rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><ChefHat className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'شاشة المطبخ' : 'Kitchen display'}</Link>}
-          {canViewTreasury && <Link to="/treasury" className="ui-accent-card ui-accent-finance rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><Landmark className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'الخزينة' : 'Treasury'}</Link>}
-          {canViewAudit && <Link to="/audit-log" className="ui-accent-card ui-accent-neutral rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><HistoryIcon className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'سجل العمليات' : 'Audit log'}</Link>}
-          {canViewSettings && <Link to="/settings" className="ui-accent-card ui-accent-system rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><Settings className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'الإعدادات' : 'Settings'}</Link>}
+          {canViewKds && !quickRoutes.has(APP_ROUTES.kitchenDisplay) && <Link to={APP_ROUTES.kitchenDisplay} className="ui-accent-card ui-accent-system rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><ChefHat className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'شاشة المطبخ' : 'Kitchen display'}</Link>}
+          {canViewTreasury && !quickRoutes.has(APP_ROUTES.treasury) && <Link to={APP_ROUTES.treasury} className="ui-accent-card ui-accent-finance rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><Landmark className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'الخزينة' : 'Treasury'}</Link>}
+          {canViewAudit && !quickRoutes.has(APP_ROUTES.auditLog) && <Link to={APP_ROUTES.auditLog} className="ui-accent-card ui-accent-neutral rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><HistoryIcon className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'سجل العمليات' : 'Audit log'}</Link>}
+          {canViewSettings && !quickRoutes.has(APP_ROUTES.settings) && <Link to={APP_ROUTES.settings} className="ui-accent-card ui-accent-system rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><Settings className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'الإعدادات' : 'Settings'}</Link>}
         </section>
       )}
 

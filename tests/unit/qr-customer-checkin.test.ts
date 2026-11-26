@@ -60,6 +60,7 @@ describe('Phone check-in and private table visits on PostgreSQL', () => {
     await db.exec(sqlFile('supabase/migrations/20261122190000_change_customer_cart_fulfillment.sql'));
     await db.exec('CREATE TABLE qr_private.branch_qr_links (branch_id uuid, token_hash text)');
     await db.exec(sqlFile('supabase/migrations/20261122200000_parallel_customer_orders.sql'));
+    await db.exec(sqlFile('supabase/migrations/20261126120000_qr_public_catalog.sql'));
   }, 30_000);
   beforeEach(async () => {
     await db.exec('RESET ROLE');
@@ -71,6 +72,15 @@ describe('Phone check-in and private table visits on PostgreSQL', () => {
   });
   afterAll(async () => { await db?.close(); });
 
+
+  it('exposes only the published catalog before check-in', async () => {
+    await anon();
+    const catalog = await scalar<Record<string, unknown>>('select public.qr_public_catalog($1) result', [token]);
+    expect(catalog.products).toEqual([expect.objectContaining({ id: product, price: 25 })]);
+    for (const key of ['tables', 'table_id', 'table_name']) expect(catalog).not.toHaveProperty(key);
+    await expect(scalar('select public.qr_menu($1) result', [token])).rejects.toThrow('QR_CHECKIN_REQUIRED');
+    await expect(scalar('select public.qr_public_catalog($1) result', ['0'.repeat(64)])).rejects.toThrow('QR_LINK_INVALID');
+  });
 
   type Result = { id: string; recovery_code: string; order_id: string; status: string };
   type View = { bills: import('../../src/features/qr/service').GuestBill[]; requests: import('../../src/features/qr/service').GuestRequest[]; calls: import('../../src/features/qr/service').ServiceCall[]; visit: { closed: boolean } };

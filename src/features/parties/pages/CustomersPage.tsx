@@ -101,6 +101,7 @@ export function CustomersPage() {
     select: '*',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
+    enabled: can('customers.view'),
     pageSize: 100,
   });
   const [supportOpen, setSupportOpen] = useState(false);
@@ -126,10 +127,11 @@ export function CustomersPage() {
   const [form, setForm] = useState({ name: '', name_en: '', phone: '', email: '', address: '', tax_number: '', balance: 0, notes: '', branch_id: '' });
   const [businessAttributes, setBusinessAttributes] = useState<Record<string, unknown>>({});
 
+  const canViewCustomers = can('customers.view');
   useEffect(() => {
     let cancelled = false;
     const loadOpenBalances = async () => {
-      if (!branchScope.selectedBranchIds.length) {
+      if (!canViewCustomers || !branchScope.selectedBranchIds.length) {
         if (!cancelled) setOpenBalances({});
         return;
       }
@@ -144,7 +146,7 @@ export function CustomersPage() {
     };
     void loadOpenBalances();
     return () => { cancelled = true; };
-  }, [branchScope.selectedBranchIds]);
+  }, [canViewCustomers, branchScope.selectedBranchIds]);
 
   useEffect(() => {
     let active = true;
@@ -713,32 +715,36 @@ export function CustomersPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
-                  <p className="text-xs text-ui-muted">{ar ? 'إجمالي المشتريات' : 'Lifetime spend'}</p>
-                  <p className="mt-1 text-xl font-bold text-ui-text tabular-nums">
-                    {formatCurrency(
-                      customerSales.reduce((sum, s) => sum + Math.max(0, Number(s.total || 0) - Number(s.refunded_amount || 0)), 0),
-                      currency,
-                      lang,
-                    )}
-                  </p>
-                </div>
-                <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
                   <p className="text-xs text-ui-muted">{ar ? 'الرصيد المستحق' : 'Open balance'}</p>
                   <p className={`mt-1 text-xl font-bold tabular-nums ${balanceFor(selectedCustomer) > 0 ? 'text-ui-danger' : 'text-ui-text'}`}>
                     {formatCurrency(balanceFor(selectedCustomer), currency, lang)}
                   </p>
                 </div>
                 <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
-                  <p className="text-xs text-ui-muted">{ar ? 'عدد الفواتير' : 'Orders'}</p>
-                  <p className="mt-1 text-lg font-bold text-ui-text tabular-nums">{formatNumber(customerSales.length, 0)}</p>
-                </div>
-                <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
                   <p className="text-xs text-ui-muted">{ar ? 'الرقم الضريبي' : 'Tax number'}</p>
                   <p className="mt-1 truncate text-base font-bold text-ui-text tabular-nums">{selectedCustomer.tax_number || '—'}</p>
                 </div>
+                {can('sales.view') && (
+                  <>
+                    <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
+                      <p className="text-xs text-ui-muted">{ar ? 'إجمالي المشتريات' : 'Lifetime spend'}</p>
+                      <p className="mt-1 text-xl font-bold text-ui-text tabular-nums">
+                        {formatCurrency(
+                          customerSales.reduce((sum, s) => sum + Math.max(0, Number(s.total || 0) - Number(s.refunded_amount || 0)), 0),
+                          currency,
+                          lang,
+                        )}
+                      </p>
+                    </div>
+                    <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
+                      <p className="text-xs text-ui-muted">{ar ? 'عدد الفواتير' : 'Orders'}</p>
+                      <p className="mt-1 text-lg font-bold text-ui-text tabular-nums">{formatNumber(customerSales.length, 0)}</p>
+                    </div>
+                  </>
+                )}
               </div>
 
-              {(() => {
+              {can('sales.view') && (() => {
                 const now = new Date();
                 const buckets = Array.from({ length: 6 }, (_, idx) => {
                   const d = new Date(now.getFullYear(), now.getMonth() - (5 - idx), 1);
@@ -780,7 +786,7 @@ export function CustomersPage() {
                 );
               })()}
 
-              {customerSales.length > 0 && (
+              {can('sales.view') && customerSales.length > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-bold text-ui-text">{ar ? 'أحدث الفواتير' : 'Recent orders'}</p>
                   {customerSales.slice(0, 5).map((sale) => (

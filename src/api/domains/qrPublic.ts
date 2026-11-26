@@ -20,6 +20,7 @@ export const qrPublic = {
   guestCall(p: { p_token: string; p_session: string; p_key: string; p_table: string | null; p_kind: string; p_note: string }) { return rpc('qr_guest_call', p); },
   rating(p: { p_token: string; p_session: string }) { return rpc('qr_guest_rating', p); },
   rate(p: { p_token: string; p_session: string; p_overall: number; p_food: number; p_service: number; p_note: string }) { return rpc('qr_guest_rate', p); },
+  catalog(p: { p_token: string }) { return rpc('qr_public_catalog', p); },
   menu(p: { p_token: string }) { return rpc('qr_menu', p); },
   submit(p: { p_token: string; p_key: string; p_items: QrItem[]; p_table: string; p_session: string }) { return rpc('qr_place', p); },
   submitLegacy(p: { p_token: string; p_key: string; p_items: QrItem[]; p_table: string }) { return rpc('qr_submit_selected', p); },
