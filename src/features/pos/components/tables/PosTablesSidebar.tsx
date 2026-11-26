@@ -8,7 +8,7 @@ import { useCan } from '@/lib/permissions';
 import * as api from '@/api';
 import type { DiningArea, DiningTable, Order, OrderItem, RpcResult } from '@/lib/types';
 import type { OrderKitchenSend } from '../../types';
-import { TableCard } from './TableCard';
+import { TableCard, TABLE_TILE_STATES } from './TableCard';
 
 type TableFilter = 'all' | 'available' | 'occupied';
 
@@ -90,39 +90,41 @@ export function PosTablesSidebar(props: PosTablesSidebarProps) {
   );
 
   useEffect(() => {
-    if (orderedAreas.length === 0) {
-      setSelectedAreaId('');
-      return;
-    }
-    setSelectedAreaId((current) => (
-      current && orderedAreas.some((area) => area.id === current)
-        ? current
-        : (orderedAreas.find((area) => area.is_default)?.id || orderedAreas[0].id)
-    ));
-  }, [orderedAreas]);
+    if (selectedAreaId && !orderedAreas.some((area) => area.id === selectedAreaId)) setSelectedAreaId('');
+  }, [orderedAreas, selectedAreaId]);
+
+  const isOccupied = (table: DiningTable) =>
+    Boolean(ordersByTable[table.id]?.length) || table.status === 'occupied';
+  const isAvailable = (table: DiningTable) => !isOccupied(table) && table.status === 'vacant';
 
   const areaTables = useMemo(
     () => selectedAreaId ? tables.filter((table) => table.area_id === selectedAreaId) : tables,
     [tables, selectedAreaId],
   );
 
-  const occupiedCount = useMemo(
-    () => areaTables.filter((table) => (ordersByTable[table.id] || []).length > 0 || table.status === 'occupied').length,
-    [areaTables, ordersByTable],
-  );
-  const availableCount = Math.max(0, areaTables.length - occupiedCount);
+  const occupiedCount = areaTables.filter(isOccupied).length;
+  const availableCount = areaTables.filter(isAvailable).length;
+  const query = searchQuery.trim().toLowerCase();
+  const matchesFilters = (table: DiningTable) => {
+    if (filter === 'available' && !isAvailable(table)) return false;
+    if (filter === 'occupied' && !isOccupied(table)) return false;
+    return !query || table.name.toLowerCase().includes(query)
+      || (ordersByTable[table.id] ?? []).some((order) => order.order_number?.toLowerCase().includes(query));
+  };
 
-  const filteredTables = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
-    return areaTables.filter((table) => {
-      const orders = ordersByTable[table.id] || [];
-      const occupied = orders.length > 0 || table.status === 'occupied';
-      if (filter === 'available' && occupied) return false;
-      if (filter === 'occupied' && !occupied) return false;
-      if (!q) return true;
-      return table.name.toLowerCase().includes(q) || orders.some((order) => order.order_number?.toLowerCase().includes(q));
-    });
-  }, [areaTables, ordersByTable, searchQuery, filter]);
+  const groups = orderedAreas.map((area) => ({
+    id: area.id, name: area.name, tables: tables.filter((table) => table.area_id === area.id),
+  }));
+  const knownAreas = new Set(orderedAreas.map((area) => area.id));
+  const unassigned = tables.filter((table) => !table.area_id || !knownAreas.has(table.area_id));
+  if (unassigned.length) groups.push({
+    id: '', name: orderedAreas.length ? (isAr ? 'طاولات بلا منطقة' : 'Unassigned tables') : (isAr ? 'الطاولات' : 'Tables'),
+    tables: unassigned,
+  });
+  const visibleGroups = groups.filter((group) => !selectedAreaId || group.id === selectedAreaId)
+    .map((group) => ({ ...group, visible: group.tables.filter(matchesFilters)
+      .sort((a, b) => a.name.localeCompare(b.name, lang, { numeric: true })) }))
+    .filter((group) => group.visible.length);
 
   const defaultArea = useMemo(() => orderedAreas.find((area) => area.is_default) || null, [orderedAreas]);
   const defaultAreaCount = useMemo(
@@ -273,6 +275,10 @@ export function PosTablesSidebar(props: PosTablesSidebarProps) {
         {orderedAreas.length > 0 && (
           <div className="mt-3 flex items-center gap-2">
             <div data-testid="pos-table-area-tabs" className="flex min-w-0 flex-1 gap-2 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+              <button type="button" aria-pressed={!selectedAreaId} onClick={() => setSelectedAreaId('')}
+                className="min-h-9 shrink-0 rounded-lg border border-ui-border px-3 text-xs font-bold aria-pressed:bg-ui-primary-soft aria-pressed:text-ui-primary">
+                {isAr ? 'كل المناطق' : 'All areas'}
+              </button>
               {orderedAreas.map((area) => {
                 const count = tables.filter((table) => table.area_id === area.id).length;
                 const active = selectedAreaId === area.id;
@@ -281,6 +287,7 @@ export function PosTablesSidebar(props: PosTablesSidebarProps) {
                     key={area.id}
                     type="button"
                     data-testid={`pos-table-area-${area.id}`}
+                    aria-pressed={active}
                     onClick={() => setSelectedAreaId(area.id)}
                     className={`flex min-h-10 shrink-0 items-center gap-2 rounded-xl border px-4 py-2 text-xs font-black transition ${active ? 'border-ui-primary bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'border-ui-border bg-ui-page text-ui-muted hover:border-ui-primary hover:text-ui-text'}`}
                   >
@@ -290,7 +297,7 @@ export function PosTablesSidebar(props: PosTablesSidebarProps) {
                 );
               })}
             </div>
-            {canManageFloorPlan && defaultArea && selectedAreaId === defaultArea.id && (
+            {canManageFloorPlan && defaultArea && (!selectedAreaId || selectedAreaId === defaultArea.id) && (
               <button
                 type="button"
                 data-testid="pos-main-area-count-edit"
@@ -310,7 +317,7 @@ export function PosTablesSidebar(props: PosTablesSidebarProps) {
             <input value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={isAr ? 'ابحث برقم الطاولة أو الطلب...' : 'Search table or order...'} className="h-11 w-full rounded-xl border border-ui-border bg-ui-page ps-10 pe-3 text-sm font-bold text-ui-text outline-none focus:border-ui-primary" />
           </div>
 
-          <div className="grid min-w-[310px] grid-cols-3 gap-1.5" data-testid="pos-table-filters">
+          <div className="grid min-w-0 grid-cols-3 gap-1.5" data-testid="pos-table-filters">
             {filters.map((item) => (
               <button key={item.id} type="button" onClick={() => setFilter(item.id)} className={`rounded-lg border px-3 py-2.5 text-[11px] font-black transition ${filter === item.id ? 'border-ui-primary bg-ui-primary text-ui-primary-fg' : 'border-ui-border bg-ui-page text-ui-muted hover:border-ui-primary'}`}>
                 {isAr ? item.ar : item.en} <span className="ms-1 opacity-70">{item.count}</span>
@@ -320,28 +327,41 @@ export function PosTablesSidebar(props: PosTablesSidebarProps) {
         </div>
       </div>
 
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain p-4">
-        {filteredTables.length > 0 ? (
-          <div data-testid="pos-table-grid" className="grid grid-cols-[repeat(auto-fit,minmax(150px,1fr))] gap-3">
-            {filteredTables.map((table) => (
-              <TableCard
-                key={table.id}
-                table={table}
-                orders={ordersByTable[table.id] || []}
-                itemsByOrder={itemsByOrder}
-                kitchenSendsByOrder={kitchenSendsByOrder}
-                currency={currency}
-                isSelected={activeTableId === table.id}
-                onSelect={(selectedTable) => {
-                  if (onSelectOrder && (ordersByTable[selectedTable.id] || []).length > 1) {
-                    setBillSelectionTable(selectedTable);
-                  } else onSelectTable(selectedTable);
-                }}
-                onTransfer={onTransferOrder}
-              />
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-y-contain p-4">
+        <ul aria-label={isAr ? 'حالات الطاولات' : 'Table statuses'} className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-ui-muted">
+          {Object.entries(TABLE_TILE_STATES).map(([key, state]) => (
+            <li key={key} className="flex items-center gap-1.5">
+              <span aria-hidden="true" className={`h-3 w-3 rounded border ${state.tone}`} />{isAr ? state.ar : state.en}
+            </li>
+          ))}
+        </ul>
+        {visibleGroups.length > 0 ? (
+          <div data-testid="pos-table-grid" className="space-y-4">
+            {visibleGroups.map((group) => (
+              <section key={group.id} aria-label={group.name}>
+                <div className="mb-2 flex flex-wrap items-baseline justify-between gap-1">
+                  <h3 className="text-sm font-bold text-ui-text">{group.name}</h3>
+                  <span className="text-xs tabular-nums text-ui-muted">
+                    {group.tables.filter(isOccupied).length}/{group.tables.length} {isAr ? 'مشغولة' : 'occupied'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-[repeat(auto-fill,minmax(3rem,1fr))] gap-1.5 sm:grid-cols-[repeat(auto-fill,minmax(3.5rem,1fr))]">
+                  {group.visible.map((table) => (
+                    <TableCard key={table.id} table={table} orders={ordersByTable[table.id] || []}
+                      itemsByOrder={itemsByOrder} kitchenSendsByOrder={kitchenSendsByOrder}
+                      currency={currency} isSelected={activeTableId === table.id}
+                      onSelect={(selectedTable) => {
+                        if (onSelectOrder && (ordersByTable[selectedTable.id] || []).length > 1) {
+                          setBillSelectionTable(selectedTable);
+                        } else onSelectTable(selectedTable);
+                      }}
+                      onTransfer={onTransferOrder} />
+                  ))}
+                </div>
+              </section>
             ))}
           </div>
-        ) : <div className="py-16 text-center text-sm font-bold text-ui-muted">{isAr ? 'لا توجد طاولات مطابقة' : 'No matching tables'}</div>}
+        ) : <div className="py-12 text-center text-sm font-bold text-ui-muted">{isAr ? 'لا توجد طاولات مطابقة' : 'No matching tables'}</div>}
       </div>
 
       <Modal

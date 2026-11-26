@@ -1,5 +1,4 @@
-import { useMemo } from 'react';
-import { Users, Clock, ArrowRightLeft } from 'lucide-react';
+import { ArrowRightLeft } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatCurrency } from '@/lib/format';
 import type { DiningTable, Order, OrderItem } from '@/lib/types';
@@ -7,7 +6,15 @@ import type { OrderKitchenSend } from '../../types';
 import { orderOperatorName } from '../../utils/operatorName';
 import { usePosPermissions } from '../../hooks/usePosPermissions';
 
-export type TableOperationalStatus = 'vacant' | 'open' | 'sent' | 'new_additions' | 'needs_action';
+export const TABLE_TILE_STATES = {
+  vacant: { ar: 'متاحة', en: 'Available', tone: 'border-ui-border bg-ui-page-alt text-ui-text' },
+  occupied: { ar: 'مشغولة', en: 'Occupied', tone: 'border-ui-primary/50 bg-ui-primary-soft text-ui-primary' },
+  sent: { ar: 'بالمطبخ', en: 'Kitchen', tone: 'border-ui-info/50 bg-ui-info-soft text-ui-info' },
+  additions: { ar: 'إضافة جديدة', en: 'New items', tone: 'border-ui-warning/60 bg-ui-warning-soft text-ui-warning' },
+  held: { ar: 'معلقة', en: 'Held', tone: 'border-ui-danger/50 bg-ui-danger-soft text-ui-danger' },
+  reserved: { ar: 'محجوزة', en: 'Reserved', tone: 'border-dashed border-ui-info bg-ui-page text-ui-info' },
+  closed: { ar: 'مغلقة', en: 'Closed', tone: 'border-dashed border-ui-border-strong bg-ui-page text-ui-muted' },
+} as const;
 
 interface TableCardProps {
   table: DiningTable;
@@ -22,56 +29,43 @@ interface TableCardProps {
 
 export function TableCard({ table, orders, itemsByOrder, kitchenSendsByOrder, currency, isSelected, onSelect, onTransfer }: TableCardProps) {
   const { lang } = useLanguage();
-  const isAr = lang === 'ar';
+  const ar = lang === 'ar';
   const perms = usePosPermissions();
-  const activeOrder = orders[0] || null;
-  const operatorName = activeOrder ? orderOperatorName(activeOrder) : null;
-
-  const statusInfo = useMemo(() => {
-    if (!activeOrder || table.status === 'vacant') return { status: 'vacant' as TableOperationalStatus, label: isAr ? 'متاحة' : 'Available', tone: 'text-ui-success bg-ui-success-soft border-ui-success/35', cardTone: 'border-ui-success/45 bg-ui-success/10', elapsed: 0 };
-    const orderItems = itemsByOrder[activeOrder.id] || [];
-    const sends = kitchenSendsByOrder[activeOrder.id] || [];
-    const sentIds = new Set(sends.map((s) => s.order_item_id));
-    const sent = orderItems.filter((item) => sentIds.has(item.id)).length;
-    const unsent = orderItems.length - sent;
-    const elapsed = Math.max(1, Math.round((Date.now() - new Date(activeOrder.created_at).getTime()) / 60000));
-    if (activeOrder.status === 'held') return { status: 'needs_action' as TableOperationalStatus, label: isAr ? 'معلقة' : 'Held', tone: 'text-ui-danger bg-ui-danger-soft border-ui-danger/35', cardTone: 'border-ui-danger/55 bg-ui-danger/10', elapsed };
-    if (sent > 0 && unsent > 0) return { status: 'new_additions' as TableOperationalStatus, label: isAr ? 'إضافة جديدة' : 'New items', tone: 'text-ui-warning bg-ui-warning-soft border-ui-warning/35', cardTone: 'border-ui-warning/60 bg-ui-warning/10', elapsed };
-    if (sent > 0) return { status: 'sent' as TableOperationalStatus, label: isAr ? 'بالمطبخ' : 'Kitchen', tone: 'text-ui-info bg-ui-info-soft border-ui-info/35', cardTone: 'border-ui-info/55 bg-ui-info/10', elapsed };
-    return { status: 'open' as TableOperationalStatus, label: isAr ? 'مشغولة' : 'Occupied', tone: 'text-ui-warning bg-ui-warning-soft border-ui-warning/35', cardTone: 'border-ui-warning/60 bg-ui-warning/10', elapsed };
-  }, [activeOrder, table.status, itemsByOrder, kitchenSendsByOrder, isAr]);
-
-  const itemCount = orders.reduce((sum, order) => sum + (itemsByOrder[order.id] || []).reduce((n, item) => n + (Number(item.quantity) || 0), 0), 0);
-  const combinedAmount = orders.reduce((sum, order) => sum + (Number(order.total) || 0), 0);
+  const [activeOrder] = orders;
+  const operator = activeOrder ? orderOperatorName(activeOrder) : null;
+  let sent = false;
+  let unsent = false;
+  for (const order of orders) {
+    const sentIds = new Set((kitchenSendsByOrder[order.id] ?? []).map((item) => item.order_item_id));
+    for (const item of itemsByOrder[order.id] ?? []) {
+      if (sentIds.has(item.id)) sent = true;
+      else unsent = true;
+    }
+  }
+  const status = orders.some((order) => order.status === 'held') ? 'held'
+    : sent && unsent ? 'additions' : sent ? 'sent' : activeOrder ? 'occupied' : table.status;
+  const { tone, ar: statusAr, en: statusEn } = TABLE_TILE_STATES[status];
+  const statusLabel = ar ? statusAr : statusEn;
+  const total = orders.reduce((sum, order) => sum + (Number(order.total) || 0), 0);
+  const label = [table.name, statusLabel, activeOrder && `#${activeOrder.order_number}`,
+    orders.length > 1 && `${orders.length} ${ar ? 'حسابات' : 'bills'}`,
+    activeOrder && formatCurrency(total, currency, lang), operator].filter(Boolean).join(' · ');
 
   return (
-    <div onClick={() => onSelect(table)} role="button" tabIndex={0} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onSelect(table)} className={`group relative min-h-[132px] cursor-pointer select-none rounded-xl border p-3 text-start shadow-ui-sm transition ${isSelected ? 'border-ui-primary bg-ui-primary/10 ring-2 ring-ui-primary shadow-ui-md' : `${statusInfo.cardTone} hover:border-ui-primary hover:shadow-ui-md`}`}>
-      <div className="flex items-center justify-between gap-1">
-        <span className="truncate text-[15px] font-black text-ui-text">{table.name}</span>
-        <span className="flex shrink-0 items-center gap-0.5 rounded-md bg-ui-page-alt px-1.5 py-0.5 text-[10px] font-bold text-ui-muted"><Users className="h-2.5 w-2.5" />{table.capacity || 4}</span>
-      </div>
-      <div className="mt-2 flex items-center justify-between gap-1">
-        <span className={`truncate rounded-md border px-1.5 py-0.5 text-[10px] font-black ${statusInfo.tone}`}>{statusInfo.label}</span>
-        {activeOrder && <span className="truncate text-[10px] font-bold text-ui-muted">#{activeOrder.order_number}{orders.length > 1 ? ` · ${orders.length} ${isAr ? 'حسابات' : 'bills'}` : ''}</span>}
-      </div>
-      {activeOrder ? (
-        <div className="mt-2 border-t border-ui-border/70 pt-1.5">
-          <div className="flex items-center justify-between gap-1 text-[10px]">
-            <span className="font-bold text-ui-muted">{itemCount} {isAr ? 'صنف' : 'items'}</span>
-            <span className="font-black text-ui-text">{formatCurrency(combinedAmount, currency, lang)}</span>
-          </div>
-          <div className="mt-1 flex items-center gap-1 text-[10px] text-ui-muted">
-            <span className="flex shrink-0 items-center gap-1"><Clock className="h-2.5 w-2.5" />{statusInfo.elapsed} {isAr ? 'د' : 'm'}</span>
-          </div>
-          {operatorName && (
-            <div data-testid={`pos-table-operator-${table.id}`} className="mt-1 flex min-w-0 items-center gap-1 rounded-md bg-ui-page-alt px-1.5 py-1 text-[10px] font-black text-ui-text" title={operatorName}>
-              <Users className="h-2.5 w-2.5 shrink-0 text-ui-primary" />
-              <span className="truncate">{operatorName}</span>
-            </div>
-          )}
-        </div>
-      ) : <p className="mt-3 text-[10px] font-bold text-ui-muted">{isAr ? 'اضغط لفتح طلب' : 'Tap to open order'}</p>}
-      {activeOrder && perms.canTransferOrder && onTransfer && <button type="button" onClick={(e) => { e.stopPropagation(); onTransfer(activeOrder, table); }} title={isAr ? 'نقل الطلب' : 'Transfer order'} className="absolute bottom-2 end-2 flex h-7 w-7 items-center justify-center rounded-md border border-ui-border-strong bg-ui-surface-raised text-ui-text transition hover:border-ui-primary hover:text-ui-primary"><ArrowRightLeft className="h-3.5 w-3.5" /></button>}
+    <div className="group relative min-w-0">
+      <button type="button" aria-label={label} title={label} aria-pressed={isSelected} onClick={() => onSelect(table)}
+        className={`flex aspect-square w-full flex-col items-start justify-between gap-0.5 overflow-hidden rounded-xl border p-1.5 text-start transition-colors hover:border-ui-primary focus-visible:ring-2 focus-visible:ring-ui-primary ${tone} ${isSelected ? 'ring-2 ring-ui-primary' : ''}`}>
+        <span className="w-full truncate text-xs font-bold tabular-nums">{table.name}</span>
+        {operator && <span data-testid={`pos-table-operator-${table.id}`} className="w-full truncate text-[9px]">{operator}</span>}
+        {orders.length > 1 && <span className="text-[9px] font-bold tabular-nums">{orders.length} {ar ? 'حسابات' : 'bills'}</span>}
+      </button>
+      {activeOrder && perms.canTransferOrder && onTransfer && (
+        <button type="button" onClick={() => onTransfer(activeOrder, table)} title={ar ? 'نقل الطلب' : 'Transfer order'}
+          aria-label={ar ? `نقل طلب طاولة ${table.name}` : `Transfer order on ${table.name}`}
+          className="absolute bottom-1 end-1 grid h-6 w-6 place-items-center rounded-md border border-ui-border bg-ui-surface text-ui-text shadow-sm focus-visible:ring-2 focus-visible:ring-ui-primary">
+          <ArrowRightLeft className="h-3 w-3" />
+        </button>
+      )}
     </div>
   );
 }

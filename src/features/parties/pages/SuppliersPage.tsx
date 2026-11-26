@@ -1,6 +1,6 @@
 import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { useEffect, useState } from 'react';
-import { Plus, Edit2, Trash2, Trophy, FileText } from 'lucide-react';
+import { Plus, Edit2, Trash2, Trophy, FileText, Building2, Wallet, MapPin, LayoutGrid, List } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -9,7 +9,10 @@ import { DesignSurface, DesignPageHeader } from '@/components/design/DesignSurfa
 import { DesignSearch } from '@/components/design/DesignSearch';
 import { DesignPanel } from '@/components/design/DesignPanel';
 import { DesignPagination } from '@/components/design/DesignPagination';
+import { WorkspaceMeter } from '@/components/design/WorkspaceIndicators';
 import { DataTable, type Column } from '@/components/DataTable';
+import { StatCard } from '@/components/PageHeader';
+import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { Input, Select, Textarea } from '@/components/Input';
 import { Modal } from '@/components/Modal';
@@ -48,6 +51,7 @@ export function SuppliersPage() {
     pageSize: 100,
   });
   const [search, setSearch] = useState('');
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Supplier | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -62,16 +66,16 @@ export function SuppliersPage() {
   const [form, setForm] = useState({ name: '', name_en: '', phone: '', email: '', address: '', tax_number: '', balance: 0, notes: '', branch_id: '' });
   const [businessAttributes, setBusinessAttributes] = useState<Record<string, unknown>>({});
 
+  const { selectedBranchIds, scopeKey } = branchScope;
   useEffect(() => {
     let cancelled = false;
     const loadOpenBalances = async () => {
-      const branchIds = branchScope.selectedBranchIds;
-      if (!branchIds.length) {
+      if (!selectedBranchIds.length) {
         if (!cancelled) setOpenBalances({});
         return;
       }
       const results = await Promise.all(
-        branchIds.map((branchId) => api.accounting.getApAging({ p_branch_id: branchId, p_as_of: new Date().toISOString().slice(0, 10) })),
+        selectedBranchIds.map((branchId) => api.accounting.getApAging({ p_branch_id: branchId, p_as_of: new Date().toISOString().slice(0, 10) })),
       );
       const next: Record<string, number> = {};
       results.forEach(({ data }) => {
@@ -81,7 +85,7 @@ export function SuppliersPage() {
     };
     void loadOpenBalances();
     return () => { cancelled = true; };
-  }, [branchScope.scopeKey]);
+  }, [scopeKey, selectedBranchIds]);
 
   const balanceFor = (supplier: Supplier) => Number(openBalances[supplier.id] || 0);
   const filtered = items.filter((s) => record.id ? s.id === record.id : !search || s.name.toLowerCase().includes(search.toLowerCase()) || s.phone?.includes(search));
@@ -170,10 +174,17 @@ export function SuppliersPage() {
     { key: 'last_purchase_at', header: t('lastPurchaseAt'), render: (r) => (r.last_purchase_at ? formatDate(r.last_purchase_at, lang) : '-') },
   ];
 
+  const totalPayables = filtered.reduce((sum, s) => sum + Math.max(0, balanceFor(s)), 0);
+  const unpaidSuppliers = filtered.filter((s) => balanceFor(s) > 0).length;
+  const ar = lang === 'ar';
+
   return (
     <DesignSurface testId="suppliers-page">
       {record.id && <RecordFocus onClear={record.clear} />}
-      <DesignPageHeader title={supplierLabel} actions={
+      <DesignPageHeader
+        title={supplierLabel}
+        subtitle={ar ? 'إدارة الموردين والأرصدة المستحقة وكشوف الحساب' : 'Manage suppliers, open payables and account statements'}
+        actions={
         <>
           {can('purchases.evaluation') && (
             <Button variant="outline" size="sm" onClick={toggleEvaluation} data-testid="suppliers-evaluation"><Trophy className="w-4 h-4" /> {t('supplierEvaluation')}</Button>
@@ -189,10 +200,91 @@ export function SuppliersPage() {
         </DesignPanel>
       ) : (
         <>
-          <DesignPanel testId="suppliers-search-panel">
-            <DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="suppliers-search" />
+          <section className="premier-refresh-stagger grid gap-3.5 sm:grid-cols-3">
+            <StatCard title={ar ? 'إجمالي الموردين' : 'Total suppliers'} value={String(filtered.length)} icon={<Building2 className="h-4 w-4" />} color="brand" />
+            <StatCard title={ar ? 'أرصدة مستحقة للموردين' : 'Open payables'} value={formatCurrency(totalPayables, currency, lang)} icon={<Wallet className="h-4 w-4" />} color="amber" trend={unpaidSuppliers > 0 ? (ar ? `${unpaidSuppliers} مورد` : `${unpaidSuppliers} open`) : undefined} />
+            <StatCard title={ar ? 'الفروع النشطة' : 'Branches'} value={String(branches.length)} icon={<MapPin className="h-4 w-4" />} color="green" />
+          </section>
+          <DesignPanel testId="suppliers-search-panel" bodyClassName="p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="suppliers-search" className="w-full sm:w-72" />
+              <div className="inline-flex items-center gap-1 rounded-full border border-ui-border bg-ui-page-alt p-1" role="group" aria-label={ar ? 'طريقة العرض' : 'View mode'}>
+                <button type="button" onClick={() => setViewMode('cards')} aria-pressed={viewMode === 'cards'} title={ar ? 'عرض البطاقات' : 'Cards view'} className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'cards' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}>
+                  <LayoutGrid className="h-4 w-4" />
+                </button>
+                <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title={ar ? 'عرض الجدول' : 'Table view'} className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'list' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}>
+                  <List className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
           </DesignPanel>
-          <DesignPanel testId="suppliers-table-panel">
+          <DesignPanel testId="suppliers-table-panel" bodyClassName="p-4 sm:p-5">
+            {viewMode === 'cards' ? (
+              loading ? (
+                <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, idx) => <div key={idx} className="h-44 animate-pulse rounded-[20px] border border-ui-border bg-ui-page-alt" />)}
+                </div>
+              ) : filtered.length === 0 ? (
+                <div className="rounded-[20px] border border-dashed border-ui-border bg-ui-page-alt/60 py-14 text-center text-sm text-ui-muted">{t('noData')}</div>
+              ) : (
+                <div className="premier-refresh-stagger grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                  {filtered.map((s) => {
+                    const balance = balanceFor(s);
+                    const branchName = branches.find((b) => b.id === s.branch_id)?.name || '—';
+                    return (
+                      <article
+                        key={s.id}
+                        onClick={can('suppliers.manage') ? () => openEdit(s) : undefined}
+                        className={`premier-refresh-subcard group flex h-full min-w-0 flex-col justify-between overflow-hidden p-4 ${can('suppliers.manage') ? 'cursor-pointer' : ''}`}
+                      >
+                        <div>
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="flex min-w-0 items-center gap-3">
+                              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-ui-primary-soft text-sm font-bold text-ui-primary">
+                                {s.name.trim().slice(0, 2).toUpperCase()}
+                              </div>
+                              <div className="min-w-0">
+                                <h3 className="truncate text-[15px] font-semibold text-ui-text group-hover:text-ui-primary">{s.name}</h3>
+                                <p className="truncate text-xs text-ui-muted">{s.phone || s.email || '—'}</p>
+                              </div>
+                            </div>
+                            {balance > 0 && <Badge variant="warning" size="sm" className="shrink-0">{ar ? 'مستحق' : 'Open'}</Badge>}
+                          </div>
+                          <div className="mt-3 flex items-center gap-1.5 text-xs text-ui-muted">
+                            <MapPin className="h-3.5 w-3.5 shrink-0 text-ui-subtle" />
+                            <span className="truncate">{s.address || branchName}</span>
+                          </div>
+                        </div>
+                        <div className="mt-3.5">
+                          <div className="grid grid-cols-2 gap-3 border-t border-ui-border pt-3">
+                            <div className="min-w-0">
+                              <p className="truncate text-[11px] font-medium text-ui-subtle">{t('amount')}</p>
+                              <p className={`mt-0.5 truncate text-sm font-bold tabular-nums ${balance > 0 ? 'text-ui-danger' : 'text-ui-text'}`}>{formatCurrency(balance, currency, lang)}</p>
+                            </div>
+                            <div className="min-w-0">
+                              <p className="truncate text-[11px] font-medium text-ui-subtle">{t('branch')}</p>
+                              <p className="mt-0.5 truncate text-sm font-semibold text-ui-text">{branchName}</p>
+                            </div>
+                          </div>
+                          {balance > 0 && totalPayables > 0 && (
+                            <div className="mt-2.5">
+                              <WorkspaceMeter value={balance} max={totalPayables} tone="warning" height="xs" />
+                            </div>
+                          )}
+                          <div className="mt-3 flex items-center justify-end gap-1 border-t border-ui-border pt-2.5" onClick={(e) => e.stopPropagation()}>
+                            <button type="button" onClick={() => setStatementSupplier(s)} className="ui-icon-action ui-icon-action-info" title={ar ? 'كشف حساب المورد' : 'Supplier statement'} data-testid={`supplier-statement-${s.id}`}>
+                              <FileText className="h-4 w-4" />
+                            </button>
+                            {can('suppliers.manage') && <button type="button" onClick={() => openEdit(s)} className="ui-icon-action ui-icon-action-info"><Edit2 className="h-4 w-4" /></button>}
+                            {can('suppliers.manage') && <button type="button" onClick={() => setDeleteId(s.id)} className="ui-icon-action ui-icon-action-danger"><Trash2 className="h-4 w-4" /></button>}
+                          </div>
+                        </div>
+                      </article>
+                    );
+                  })}
+                </div>
+              )
+            ) : (
             <DataTable
               tableId="suppliers"
               columns={columns}
@@ -212,6 +304,7 @@ export function SuppliersPage() {
               }}
               templateFilename="suppliers-template"
             />
+            )}
             <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
           </DesignPanel>
         </>

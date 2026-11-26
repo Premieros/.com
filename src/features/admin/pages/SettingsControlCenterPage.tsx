@@ -52,7 +52,7 @@ export function SettingsControlCenterPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const { t, lang, setLang, languageLocked, lockLanguagePreference, unlockLanguagePreference } = useLanguage();
-  const { theme, setTheme, uiTheme, setUiTheme } = useTheme();
+  const { theme, setTheme, uiTheme, setUiTheme, accent, setAccent } = useTheme();
   const { settings, branchSettingsMap, saveBranchSettings } = useSettings();
   const { branches } = useBranches();
   const { show } = useToast();
@@ -871,24 +871,18 @@ export function SettingsControlCenterPage() {
                 <p className="text-xs font-bold text-ui-text mb-2">{isAr ? 'لون التمييز السريع (Premier Accents):' : 'Accent colour:'}</p>
                 <div className="mb-5 flex flex-wrap items-center gap-3">
                   {([
-                    { accent: 'copper', themeKey: 'premier-refresh-copper', color: '#a8481c', ar: 'نحاسي', en: 'Copper' },
-                    { accent: 'cobalt', themeKey: 'premier-refresh-cobalt', color: '#2747c4', ar: 'كوبالت', en: 'Cobalt' },
-                    { accent: 'ocean', themeKey: 'premier-refresh-ocean', color: '#16627a', ar: 'محيطي', en: 'Ocean' },
-                    { accent: 'pine', themeKey: 'premier-refresh-pine', color: '#17704b', ar: 'صنوبري', en: 'Pine' },
-                    { accent: 'graphite', themeKey: 'premier-refresh-graphite', color: '#2c2c33', ar: 'جرافيت', en: 'Graphite' },
+                    { accent: 'copper', color: '#a8481c', ar: 'نحاسي', en: 'Copper' },
+                    { accent: 'cobalt', color: '#2747c4', ar: 'كوبالت', en: 'Cobalt' },
+                    { accent: 'ocean', color: '#16627a', ar: 'محيطي', en: 'Ocean' },
+                    { accent: 'pine', color: '#17704b', ar: 'صنوبري', en: 'Pine' },
+                    { accent: 'graphite', color: '#2c2c33', ar: 'جرافيت', en: 'Graphite' },
                   ] as const).map((swatch) => {
-                    const currentAccent = findUiTheme(uiTheme)?.accent ?? 'copper';
-                    const isActive = currentAccent === swatch.accent;
+                    const isActive = accent === swatch.accent;
                     return (
                       <button
                         key={swatch.accent}
                         type="button"
-                        onClick={() => {
-                          const currentMode = theme;
-                          setUiTheme(swatch.themeKey);
-                          if (currentMode === 'dark') setTheme('dark');
-                          document.documentElement.setAttribute('data-accent', swatch.accent);
-                        }}
+                        onClick={() => setAccent(swatch.accent)}
                         className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
                           isActive ? 'border-ui-text bg-ui-text text-ui-surface shadow-ui-sm' : 'border-ui-border bg-ui-page-alt text-ui-text hover:border-ui-border-strong'
                         }`}
