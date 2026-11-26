@@ -59,7 +59,7 @@ BEGIN
     RETURN jsonb_build_object('success', false, 'error', 'INVALID_BUSINESS_TYPE');
   END IF;
 
-  IF v_email = '' OR v_email !~ '@' OR v_email !~ '\\.' THEN
+  IF v_email = '' OR strpos(v_email, '@') = 0 OR strpos(v_email, '.') = 0 THEN
     RETURN jsonb_build_object('success', false, 'error', 'INVALID_OWNER_EMAIL');
   END IF;
 
