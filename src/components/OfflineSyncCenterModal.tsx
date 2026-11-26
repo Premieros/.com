@@ -66,6 +66,7 @@ export function OfflineSyncCenterModal({ open, onClose }: OfflineSyncCenterModal
       onClose={onClose}
       title={isAr ? 'مركز المزامنة والعمل بدون اتصال (Offline Engine)' : 'Offline Sync Center'}
       size="lg"
+      manageFocus
     >
       <div className="space-y-5">
         {/* Status card */}
