@@ -1,6 +1,11 @@
 import type { CloudPrintQueueRow } from './cloudPrint';
 
-export type PrintQueueFilter = 'all' | 'pending' | 'active' | 'submitted' | 'failed';
+export type PrintQueueFilter = 'all' | 'pending' | 'active' | 'submitted' | 'failed' | 'stale';
+
+export function isStalePrintJob(job: CloudPrintQueueRow, now = Date.now()): boolean {
+  const createdAt = Date.parse(job.created_at);
+  return ['pending', 'claimed', 'printing'].includes(job.status) && Number.isFinite(createdAt) && now - createdAt > 10 * 60_000;
+}
 
 /** Read-only presentation only: never enqueue, reserve or replay a job here. */
 export function printQueueJobSummary(job: CloudPrintQueueRow): { order: string; table: string } {
@@ -14,10 +19,11 @@ export function filterPrintQueueJobs(
   rows: CloudPrintQueueRow[],
   status: PrintQueueFilter,
   search: string,
+  now = Date.now(),
 ): CloudPrintQueueRow[] {
   const needle = search.trim().toLocaleLowerCase();
   return rows.filter(job => {
-    const matchesStatus = status === 'all' || (status === 'active'
+    const matchesStatus = status === 'all' || (status === 'stale' ? isStalePrintJob(job, now) : status === 'active'
       ? job.status === 'claimed' || job.status === 'printing'
       : job.status === status);
     if (!matchesStatus) return false;
