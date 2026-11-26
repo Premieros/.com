@@ -13,19 +13,21 @@ describe('public QR mobile order intake', () => {
   });
   it('uses a nonpersistent anonymous client and renders the table without login', async () => {
     render(<PublicQrMenu token={token} />);
-    expect(await screen.findByText('Table A')).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { name: 'Tea' })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /فتح السلة/ }));
+    expect(screen.getByText('Table A')).toBeInTheDocument();
     expect(mocks.create.mock.calls.map(call => call[2])).toContainEqual({ auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false } });
     expect(screen.queryByText('Login')).not.toBeInTheDocument();
   });
   it('restores the private visit after reload and shows its pending request', async () => {
     const tracking = { requests: [{ id: 'own-request', status: 'pending', items: [], created_at: '2026-11-14T00:00:00Z', requested_table: 'Table A' }], bills: [], calls: [] };
     mocks.rpc.mockImplementation((name: string) => Promise.resolve({ data: name === 'qr_menu' ? menu : tracking }));
-    const view = render(<PublicQrMenu token={token} />); await screen.findByText('Table A');
+    const view = render(<PublicQrMenu token={token} />); await screen.findByRole('heading', { name: 'Tea' });
     fireEvent.click(screen.getByRole('button', { name: 'طلبي وحسابي' }));
     await screen.findByText('بانتظار اعتماد الموظف');
     const firstSecret = mocks.rpc.mock.calls.find(([name]) => name === 'qr_track')?.[1].p_session;
     expect(firstSecret).toMatch(/^[a-f0-9]{64}$/);
-    view.unmount(); render(<PublicQrMenu token={token} />); await screen.findByText('Table A');
+    view.unmount(); render(<PublicQrMenu token={token} />); await screen.findByRole('heading', { name: 'Tea' });
     fireEvent.click(screen.getByRole('button', { name: 'طلبي وحسابي' })); await screen.findByText('بانتظار اعتماد الموظف');
     expect(mocks.rpc.mock.calls.filter(([name]) => name === 'qr_track').slice(-1)[0]?.[1].p_session).toBe(firstSecret);
   });
@@ -43,7 +45,7 @@ describe('public QR mobile order intake', () => {
     expect(screen.getByRole('img', { name: 'Tea' })).toHaveClass('customer-image-large');
   });
   it('scrolls category navigation in both RTL directions without selecting another category', async () => {
-    render(<PublicQrMenu token={token} />); await screen.findByText('Table A');
+    render(<PublicQrMenu token={token} />); await screen.findByRole('heading', { name: 'Tea' });
     const categories = screen.getByLabelText('أقسام المنيو');
     Object.defineProperties(categories, { scrollWidth: { value: 900 }, clientWidth: { value: 300 } });
     categories.scrollBy = vi.fn();
@@ -57,12 +59,12 @@ describe('public QR mobile order intake', () => {
   it('prevents rapid double submission and confirms pending status', async () => {
     let resolve: (value: unknown) => void = () => undefined;
     mocks.rpc.mockImplementation((name: string) => name === 'qr_menu' ? Promise.resolve({ data: menu }) : new Promise(done => { resolve = done; }));
-    render(<PublicQrMenu token={token} />); await screen.findByText('Table A');
-    fireEvent.change(screen.getByLabelText('اختر طاولتك'), { target: { value: 't2' } });
+    render(<PublicQrMenu token={token} />); await screen.findByRole('heading', { name: 'Tea' });
     fireEvent.click(screen.getByRole('button', {name:'إضافة Tea'}));
     fireEvent.click(screen.getByRole('button', {name:'زيادة الكمية'}));
     fireEvent.click(screen.getByRole('button', {name:/أضف إلى السلة/}));
     fireEvent.click(screen.getByRole('button', {name:/فتح السلة/}));
+    fireEvent.change(screen.getByLabelText('اختر طاولتك'), { target: { value: 't2' } });
     const send = screen.getByRole('button', { name: 'إرسال الطلب للموظف' });
     fireEvent.click(send); fireEvent.click(send);
     expect(mocks.rpc.mock.calls.filter(([name]) => name === 'qr_place')).toHaveLength(1);
@@ -72,16 +74,16 @@ describe('public QR mobile order intake', () => {
   });
   it('reuses the same payload and request key after an ambiguous network failure and reload', async () => {
     mocks.rpc.mockImplementation((name: string) => Promise.resolve(name === 'qr_menu' ? { data: menu } : { error: { message: 'Network disconnected' } }));
-    const rendered = render(<PublicQrMenu token={token} />); await screen.findByText('Table A');
-    fireEvent.change(screen.getByLabelText('اختر طاولتك'), { target: { value: 't2' } });
+    const rendered = render(<PublicQrMenu token={token} />); await screen.findByRole('heading', { name: 'Tea' });
     fireEvent.click(screen.getByRole('button', {name:'إضافة Tea'}));
     fireEvent.click(screen.getByRole('button', {name:'زيادة الكمية'}));
     fireEvent.click(screen.getByRole('button', {name:/أضف إلى السلة/}));
     fireEvent.click(screen.getByRole('button', {name:/فتح السلة/}));
+    fireEvent.change(screen.getByLabelText('اختر طاولتك'), { target: { value: 't2' } });
     fireEvent.click(screen.getByRole('button', { name: 'إرسال الطلب للموظف' }));
     await screen.findByRole('alert');
     const first = mocks.rpc.mock.calls.find(([name]) => name === 'qr_place')?.[1];
-    rendered.unmount(); render(<PublicQrMenu token={token} />); await screen.findByText('Table A');
+    rendered.unmount(); render(<PublicQrMenu token={token} />); await screen.findByLabelText('كمية Tea');
     expect(screen.getByLabelText('كمية Tea')).toHaveValue(2);
     fireEvent.click(screen.getByRole('button', { name: 'إعادة إرسال نفس الطلب بأمان' }));
     await waitFor(() => expect(mocks.rpc.mock.calls.filter(([name]) => name === 'qr_place')).toHaveLength(2));

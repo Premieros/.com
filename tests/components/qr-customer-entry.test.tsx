@@ -13,21 +13,22 @@ const empty = { requests: [], bills: [], calls: [] };
 describe('customer phone entry and recovery', () => {
   beforeEach(() => {
     cleanup(); localStorage.clear(); sessionStorage.clear(); mocks.rpc.mockReset();
-    mocks.rpc.mockImplementation(async (name: string) => ({ data: name === 'qr_guest_entry' ? { enabled: true, tables: [] } : name === 'qr_guest_menu' ? menu : name === 'qr_guest_track' ? empty : name === 'qr_guest_lookup' ? { registered: false, needs_pin: false } : name === 'qr_guest_begin' ? identity : name === 'qr_guest_place_delivery' ? { id: 'request', recovery_code: '07' } : null, error: null }));
+    mocks.rpc.mockImplementation(async (name: string) => ({ data: name === 'qr_guest_entry' ? { enabled: true, tables: [] } : ['qr_guest_menu', 'qr_public_catalog'].includes(name) ? menu : name === 'qr_guest_track' ? empty : name === 'qr_guest_lookup' ? { registered: false, needs_pin: false } : name === 'qr_guest_begin' ? identity : name === 'qr_guest_place_delivery' ? { id: 'request', recovery_code: '07' } : null, error: null }));
   });
   afterEach(() => { cleanup(); vi.restoreAllMocks(); });
   it('never asks a new customer for a PIN and shows the two digits after the first submission', async () => {
     render(<GuestEntryGate token={token} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'إضافة Tea' }));
+    expect(screen.queryByLabelText('رقم الهاتف')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /أضف إلى السلة/ }));
+    fireEvent.click(screen.getByRole('button', { name: /عرض السلة.*25\.00/ }));
+    fireEvent.click(screen.getByRole('button', { name: 'اختيار طريقة استلام الطلب' }));
     fireEvent.click(await screen.findByRole('button', { name: /^توصيل/ }));
     fireEvent.change(await screen.findByLabelText('رقم الهاتف'), { target: { value: '01012345678' } });
     fireEvent.click(screen.getByRole('button', { name: 'متابعة' }));
     fireEvent.change(await screen.findByLabelText('اسمك'), { target: { value: 'عميل اختبار' } });
     fireEvent.click(screen.getByRole('button', { name: 'متابعة' }));
-    expect(await screen.findByRole('button', { name: 'الرئيسية' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.queryByRole('button', { name: 'التصنيفات' })).not.toBeInTheDocument();
-    fireEvent.click(await screen.findByRole('button', { name: 'إضافة Tea' }));
-    fireEvent.click(screen.getByRole('button', { name: /أضف إلى السلة/ }));
-    fireEvent.click(screen.getByRole('button', { name: /فتح السلة/ }));
+    expect(await screen.findByLabelText('كمية Tea')).toHaveValue(1);
     expect(screen.queryByLabelText('رمز استرجاع الطلب')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('المنطقة')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'متابعة إلى العنوان' }));
@@ -44,7 +45,7 @@ describe('customer phone entry and recovery', () => {
   it('switches delivery to pickup in the cart without dropping items or sending a table', async () => {
     mocks.rpc.mockImplementation(async (name: string) => ({
       data: name === 'qr_guest_entry' ? { enabled: true, visit: identity }
-        : name === 'qr_guest_menu' ? menu
+        : ['qr_guest_menu', 'qr_public_catalog'].includes(name) ? menu
         : name === 'qr_guest_change_fulfillment' ? { ...identity, order_type: 'pickup' }
         : name === 'qr_guest_place' ? { id: 'pickup-request' } : empty,
       error: null,
@@ -71,7 +72,7 @@ describe('customer phone entry and recovery', () => {
     mocks.rpc.mockImplementation(async (name: string, args?: { p_session?: string }) => ({
       data: name === 'qr_guest_entry' ? { enabled: true, visit: args?.p_session === originalSession
         ? original : { ...identity, id: 'pickup', order_type: 'pickup' } }
-        : name === 'qr_guest_menu' ? menu
+        : ['qr_guest_menu', 'qr_public_catalog'].includes(name) ? menu
         : name === 'qr_guest_start_next_order' ? { ...identity, id: 'pickup', order_type: 'pickup' }
         : empty,
       error: null,
@@ -104,7 +105,7 @@ describe('customer phone entry and recovery', () => {
     sessionStorage.setItem(`${sharedKey}:${second}`, JSON.stringify({ key: 'second-request', session: second, table: '', items: [{ ...item, quantity: 3 }] }));
     mocks.rpc.mockImplementation(async (name: string) => ({
       data: name === 'qr_guest_entry' ? { enabled: true, visit: identity }
-        : name === 'qr_guest_menu' ? menu : name === 'qr_guest_place' ? { id: 'first-request' } : empty,
+        : ['qr_guest_menu', 'qr_public_catalog'].includes(name) ? menu : name === 'qr_guest_place' ? { id: 'first-request' } : empty,
       error: null,
     }));
     render(<GuestEntryGate token={token} />);
@@ -120,6 +121,8 @@ describe('customer phone entry and recovery', () => {
   it('requires a code for an active phone on a new device without revealing its bill first', async () => {
     mocks.rpc.mockImplementation(async (name: string) => ({ data: name === 'qr_guest_entry' ? { enabled: true } : { registered: true, needs_pin: true, pin_set: true }, error: null }));
     render(<GuestEntryGate token={token} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'طلبي وحسابي' }));
+    fireEvent.click(screen.getByRole('button', { name: 'استرجاع طلبي' }));
     fireEvent.click(await screen.findByRole('button', { name: /^توصيل/ }));
     fireEvent.change(await screen.findByLabelText('رقم الهاتف'), { target: { value: '01012345678' } }); fireEvent.click(screen.getByRole('button', { name: 'متابعة' }));
     await screen.findByLabelText('رمز استرجاع الطلب'); expect(screen.queryByLabelText('اسمك')).not.toBeInTheDocument();
@@ -150,7 +153,7 @@ describe('customer phone entry and recovery', () => {
     view.unmount();
 
     render(<GuestEntryGate token={token} />);
-    fireEvent.click(await screen.findByRole('button', { name: 'الطلبات السابقة على هذا الجهاز' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'طلبي وحسابي' }));
     expect(screen.getByText('POS-42')).toBeInTheDocument();
     expect(screen.getByText('تم التوصيل')).toBeInTheDocument();
   });

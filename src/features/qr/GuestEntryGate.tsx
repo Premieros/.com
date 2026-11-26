@@ -40,6 +40,7 @@ export function GuestEntryGate({ token }: { token: string }) {
   const [entry, setEntry] = useState<Entry | null>(null);
   const [identity, setIdentity] = useState<GuestIdentity | null>(null);
   const history = useGuestOrderHistory(token);
+  const [checkingOut, setCheckingOut] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [step, setStep] = useState<'phone' | 'name' | 'type' | 'table' | 'pickup' | 'pin'>('type');
   const [orderType, setOrderType] = useState<GuestOrderType>('dine_in');
@@ -83,7 +84,7 @@ export function GuestEntryGate({ token }: { token: string }) {
     const { data, error: failure } = await qrPublic.resume({ p_token: token, p_session: session, p_phone: phone, p_pin: pin });
     if (failure) throw failure; if (!data?.success) throw new Error(data?.error || 'QR_PIN_INVALID'); setIdentity(data.visit);
   }
-  function restart() { setIdentity(null); setClosed(false); setStep('type'); setPhone(''); setName(''); setPhoto(''); setTable(''); setPin(''); setSession(resetVisit(token)); }
+  function restart() { setCheckingOut(false); setIdentity(null); setClosed(false); setStep('type'); setPhone(''); setName(''); setPhoto(''); setTable(''); setPin(''); setSession(resetVisit(token)); }
   function openVisit(secret: string) {
     if (secret === session) return;
     rememberVisit(token, secret);
@@ -132,10 +133,17 @@ export function GuestEntryGate({ token }: { token: string }) {
     orderSwitcher={orderSwitcher} onStartNextOrder={openNewOrder}
     onOrderSubmitted={() => { if (carriedCart.current?.session === session) carriedCart.current = null; }}
     onClosed={() => { setIdentity(null); setClosed(true); }} />;
+  if (entry?.enabled && !closed && !checkingOut) return <PublicQrMenu token={token}
+    carriedItems={carriedCart.current?.session === session ? carriedCart.current.items : undefined}
+    onGuestCheckout={items => { carriedCart.current = { session, items }; setStep('type'); setCheckingOut(true); }}
+    orderSwitcher={<><button type="button" className="customer-primary" onClick={() => { setStep('type'); setCheckingOut(true); }}>
+      {isBunker ? 'Find my order' : 'استرجاع طلبي'}
+    </button><GuestPreviousOrders token={token} english={isBunker} /></>} />;
   return <main dir={isBunker ? "ltr" : "rtl"} data-bunker-theme={isBunker ? bunkerMode : undefined} className={`customer-app customer-entry${isBunker ? " bunker-customer" : ""}`}><header><span className="customer-eyebrow">{entry?.branch_name || (isBunker ? 'BUNKER' : 'Premier')}</span><h1>{closed ? (isBunker ? 'Visit complete' : 'انتهت زيارتك') : (isBunker ? 'Welcome to BUNKER' : 'أهلًا بك')}</h1><p>{closed ? (isBunker ? 'Your visit is complete. Start a new order any time.' : 'أُغلق الدخول لهذه الزيارة. يمكنك بدء طلب جديد.') : (isBunker ? 'Your orders, all in one place.' : 'طلبك وحسابك في مكان واحد')}</p></header>
     <CustomerSupportLink token={token} />
     {error && <p role="alert" className="customer-alert">{error}</p>}
     {!entry ? <><p role="status">{isBunker ? 'Checking branch link…' : 'جارٍ التحقق من رابط الفرع…'}</p>{error && <button className="customer-primary" onClick={() => window.location.reload()}>{isBunker ? 'Try again' : 'إعادة المحاولة'}</button>}</> : closed ? <>{orderSwitcher}<ClosedOrder token={token} session={session} currency={entry.currency || ''} restart={restart} /><button className="customer-primary" onClick={restart}>{isBunker ? 'Start a new order' : 'بدء طلب جديد'}</button></> : <form onSubmit={e => { e.preventDefault(); void run(step === 'phone' ? lookup : step === 'pin' ? resume : step === 'table' ? () => begin('dine_in') : step === 'pickup' ? () => begin(step) : continueOrder); }}>
+      <button type="button" className="customer-refresh" disabled={busy} onClick={() => setCheckingOut(false)}>{isBunker ? 'Back to menu' : 'العودة للمنيو'}</button>
       {step === 'phone' && <><label>{isBunker ? 'Phone number' : 'رقم الهاتف'}<input type="tel" autoComplete="tel" inputMode="tel" required maxLength={24} value={phone} disabled={busy} onChange={e => setPhone(e.target.value)} /></label><p>{isBunker ? 'If you have an active order, you can reopen it with your recovery code.' : 'إذا كان لديك طلب نشط سنفتح طلبك بعد التحقق من رمز الاسترجاع.'}</p></>}
       {step === 'name' && <label>{isBunker ? 'Your name' : 'اسمك'}<input required autoComplete="name" minLength={2} maxLength={100} value={name} disabled={busy} onChange={e => setName(e.target.value)} /></label>}
       {step === 'pin' && <><label>{isBunker ? 'Recovery code' : 'رمز استرجاع الطلب'}<input required type="text" inputMode="numeric" autoComplete="off" minLength={2} maxLength={2} value={pin} onChange={e => setPin(normalizeRecoveryPin(e.target.value))} /></label><p>{isBunker ? 'Enter the two-digit code shown after your first order. Ask our team if you need a new one. Recovery locks after three wrong attempts.' : 'الرقمان اللذان ظهرا بعد إرسال أول طلب. إذا نسيتهما، اطلب رمزًا جديدًا من الموظف. بعد ٣ محاولات خاطئة يتوقف الاسترجاع.'}</p></>}
