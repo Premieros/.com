@@ -105,12 +105,20 @@ const disposable = Boolean(url && ['localhost','127.0.0.1','[::1]'].includes(new
       expect((await db.query("select has_function_privilege('anon','private.replace_legacy_product_components(uuid,uuid,jsonb,jsonb)','execute') allowed")).rows[0].allowed).toBe(false);
       // A product editor is not a group administrator. Unchanged groups must not
       // require DELETE/INSERT permission, and a changed group must be rejected.
+      // Create two distinct least-privilege identities before assuming either.
+      // RESET ROLE changes the SQL role, not the application's auth.uid().
       const editor=randomUUID(),editorRole='ci_editor_'+tag,editorEmail='editor-'+tag+'@ci.invalid';
-      await db.query("insert into public.roles(role,name_ar,name_en,permissions,scope,is_active) values($1,'CI Editor','CI Editor',$2::jsonb,'global',true)",[editorRole,JSON.stringify(['products.edit','recipes.manage'])]);
-      await db.query('insert into auth.users(id,email,created_at,updated_at) values($1,$2,now(),now())',[editor,editorEmail]);
-      await db.query("select set_config('app.register_branch','on',true)");
-      await db.query("insert into public.users(id,email,full_name,role,branch_id,is_active) values($1,$2,'CI Editor',$3,$4,true)",[editor,editorEmail,editorRole,branch]);
-      await db.query("select set_config('app.register_branch','off',true)");
+      const viewerEditor=randomUUID(),viewerEditorRole='ci_view_editor_'+tag,viewerEditorEmail='view-editor-'+tag+'@ci.invalid';
+      for (const fixture of [
+        {id:editor,role:editorRole,email:editorEmail,permissions:['products.edit','recipes.manage']},
+        {id:viewerEditor,role:viewerEditorRole,email:viewerEditorEmail,permissions:['products.view','products.edit','recipes.manage']},
+      ]) {
+        await db.query("insert into public.roles(role,name_ar,name_en,permissions,scope,is_active) values($1,'CI Editor','CI Editor',$2::jsonb,'global',true)",[fixture.role,JSON.stringify(fixture.permissions)]);
+        await db.query('insert into auth.users(id,email,created_at,updated_at) values($1,$2,now(),now())',[fixture.id,fixture.email]);
+        await db.query("select set_config('app.register_branch','on',true)");
+        await db.query("insert into public.users(id,email,full_name,role,branch_id,is_active) values($1,$2,'CI Editor',$3,$4,true)",[fixture.id,fixture.email,fixture.role,branch]);
+        await db.query("select set_config('app.register_branch','off',true)");
+      }
       const latestVersion=(await db.query('select version from public.recipes where product_id=$1 and is_active',[pid])).rows[0].version;
       const sameRaw=JSON.stringify([{raw_material_id:raw,quantity:3,wastage_percent:2}]);
       await db.query("select set_config('app.user_id',$1,true),set_config('app.jwt',$2,true)",[editor,JSON.stringify({sub:editor,role:'authenticated'})]);
@@ -123,7 +131,9 @@ const disposable = Boolean(url && ['localhost','127.0.0.1','[::1]'].includes(new
       await expect(db.query(legacyEdit,[pid,branch,latestVersion,links,{name:'No read access'},null,sameRaw,links,'[]','[]'])).rejects.toThrow('PRODUCT_NOT_FOUND');
       await db.query('ROLLBACK TO SAVEPOINT no_product_view');
       await db.query('RESET ROLE');
-      await db.query("update public.roles set permissions=$2::jsonb where role=$1",[editorRole,JSON.stringify(['products.view','products.edit','recipes.manage'])]);
+      // Switch only the synthetic authentication context. Do not mutate role
+      // permissions while impersonating an unprivileged application user.
+      await db.query("select set_config('app.user_id',$1,true),set_config('app.jwt',$2,true)",[viewerEditor,JSON.stringify({sub:viewerEditor,role:'authenticated'})]);
       await db.query('SET LOCAL ROLE authenticated');
       expect((await db.query("select public.can_permission('products.view') allowed,public.is_pos_admin() admin,public.user_may_access_branch($1) branch_access",[branch])).rows[0]).toEqual({allowed:true,admin:false,branch_access:true});
       expect((await db.query('select id from public.products where id=$1',[pid])).rowCount).toBe(1);
