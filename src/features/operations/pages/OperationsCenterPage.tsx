@@ -13,6 +13,7 @@ export function OperationsCenterPage() {
   const ar = lang === 'ar';
 
   const cards: CenterTileItem[] = [
+    { id: 'order-board', ar: 'لوحة متابعة الطلبات', en: 'Order Board', descriptionAr: 'متابعة الكاشير والمطبخ والتوصيل.', descriptionEn: 'Track cashier, kitchen and delivery progress.', route: APP_ROUTES.orderBoard, permission: can('floor_plan.view') && canAccessPath(APP_ROUTES.orderBoard), icon: ChefHat },
     { id: 'pos', ar: 'نقطة البيع والطلبات', en: 'POS & Orders', descriptionAr: 'فتح نقطة البيع ومتابعة الطلبات النشطة.', descriptionEn: 'Open POS and monitor active orders.', route: APP_ROUTES.pos, permission: can('pos.view') && canAccessPath(APP_ROUTES.pos), icon: ShoppingCart },
     { id: 'inventory-center', ar: 'مركز المخزون', en: 'Inventory Center', descriptionAr: 'الوصول الموحد لكل وظائف المخزون.', descriptionEn: 'Unified access to all inventory functions.', route: APP_ROUTES.inventoryCenter, permission: can('inventory.view') && canAccessPath(APP_ROUTES.inventoryCenter), icon: Boxes },
     { id: 'inventory', ar: 'المخزون', en: 'Inventory', descriptionAr: 'الرصيد الحالي وحالة الأصناف.', descriptionEn: 'Current stock and item status.', route: APP_ROUTES.inventory, permission: can('inventory.view') && canAccessPath(APP_ROUTES.inventory), icon: Boxes },

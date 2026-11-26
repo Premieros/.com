@@ -129,19 +129,24 @@ export function ReportsCenterPage() {
       .sort((a, b) => a[1].order - b[1].order);
   }, [permittedOperational, canFinancial, runtime]);
 
-  const applyOverviewDates = () => {
+  const datesAreAllowed = () => {
     const valid = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(value)
       && !Number.isNaN(Date.parse(`${value}T12:00:00Z`))
       && new Date(`${value}T12:00:00Z`).toISOString().slice(0, 10) === value;
     if (!valid(draftFrom) || !valid(draftTo) || draftFrom > draftTo) {
       setPeriodError(true);
-      return;
+      return false;
     }
     const allowed = history.clampRange(draftFrom, draftTo);
     if (allowed.from !== draftFrom || allowed.to !== draftTo) {
       setPeriodError(true);
-      return;
+      return false;
     }
+    return true;
+  };
+
+  const applyOverviewDates = () => {
+    if (!datesAreAllowed()) return;
     setPeriodError(false);
     setDateRange({ from: draftFrom, to: draftTo });
     setOverviewRun((value) => value + 1);
@@ -273,7 +278,7 @@ export function ReportsCenterPage() {
           <div className="flex flex-wrap items-center gap-2">
             <span className="max-w-52 truncate rounded-lg border border-ui-border bg-ui-surface px-3 py-2 text-xs font-semibold text-ui-text" data-testid="reports-selected-type" title={chosenLabel}>{chosenLabel}</span>
             <span className="max-w-56 truncate rounded-lg border border-ui-border bg-ui-surface px-3 py-2 text-xs text-ui-muted" data-testid="reports-applied-range">
-              {draftFrom} — {draftTo}
+              {dateRange.from} — {dateRange.to}
             </span>
             {permittedOperational.some(report => report.key === 'component_consumption' || report.key === 'raw_material_consumption' || report.key === 'top_consumed_components') && (
               <button type="button" data-testid="open-consumption-workspace"
@@ -310,6 +315,23 @@ export function ReportsCenterPage() {
           <div className="mb-3 flex items-center justify-between">
             <h2 className="text-sm font-black text-ui-text">{isAr ? 'خيارات التقرير والفترة والفرع' : 'Report options, dates and branch'}</h2>
             <button type="button" onClick={() => setFiltersOpen(false)} className="rounded-lg px-3 py-1.5 text-xs text-ui-muted hover:bg-ui-page-alt">{isAr ? 'إغلاق' : 'Close'}</button>
+          </div>
+          <div className="mb-3 flex flex-wrap gap-2" role="group" aria-label={isAr ? 'فترات سريعة' : 'Quick date ranges'}>
+            {([1, 7, 30, 90] as const).map((days) => {
+              const today = businessDateISO();
+              const start = addIsoDays(today, 1 - days);
+              const selected = draftFrom === start && draftTo === today;
+              const label = days === 1 ? (isAr ? 'اليوم' : 'Today') : (isAr ? `آخر ${days} يوم` : `Last ${days} days`);
+              return (
+                <button type="button" key={days} aria-pressed={selected} onClick={() => {
+                  setDraftFrom(start);
+                  setDraftTo(today);
+                  setPeriodError(false);
+                }} className="rounded-lg border border-ui-border px-3 py-2 text-xs font-bold aria-pressed:bg-ui-primary-soft">
+                  {label}
+                </button>
+              );
+            })}
           </div>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted sm:col-span-2">
@@ -350,8 +372,7 @@ export function ReportsCenterPage() {
             </label>
           </div>
           <button type="button" onClick={() => {
-            const allowed = history.clampRange(draftFrom, draftTo);
-            if (draftFrom > draftTo || allowed.from !== draftFrom || allowed.to !== draftTo) { setPeriodError(true); return; }
+            if (!datesAreAllowed()) return;
             setDateRange({ from: draftFrom, to: draftTo }); setOverviewRun((v) => v + 1); setPeriodError(false); setFiltersOpen(false);
           }} data-testid="apply-summary-filters"
             className="mt-3 w-full rounded-lg bg-ui-primary px-3 py-2.5 text-xs font-black text-ui-primary-fg">

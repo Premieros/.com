@@ -7,6 +7,7 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
+  manageFocus?: boolean;
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 }
 
@@ -18,7 +19,7 @@ const sizes = {
   '2xl': 'sm:max-w-6xl',
 };
 
-export function Modal({ open, isOpen, onClose, title, children, size = 'md' }: ModalProps) {
+export function Modal({ open, isOpen, onClose, title, children, size = 'md', manageFocus = false }: ModalProps) {
   const isModalOpen = open ?? isOpen ?? false;
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -35,6 +36,37 @@ export function Modal({ open, isOpen, onClose, title, children, size = 'md' }: M
     }
   }, [isModalOpen, onClose]);
 
+  useEffect(() => {
+    const panel = modalRef.current;
+    if (!isModalOpen || !manageFocus || !panel) return;
+    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    panel.focus();
+
+    const keepFocusInside = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const controls = [...panel.querySelectorAll<HTMLElement>(
+        'a[href], button, input, select, textarea, [tabindex]',
+      )].filter((element) => element.tabIndex >= 0 && !element.matches(':disabled') && element.getClientRects().length > 0);
+      const first = controls[0];
+      const last = controls[controls.length - 1];
+      if (!first || !last) {
+        event.preventDefault();
+        return;
+      }
+      const focused = document.activeElement;
+      const atBoundary = focused === panel || !panel.contains(focused) || focused === (event.shiftKey ? first : last);
+      if (atBoundary) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      }
+    };
+    document.addEventListener('keydown', keepFocusInside);
+    return () => {
+      document.removeEventListener('keydown', keepFocusInside);
+      if (trigger?.isConnected) trigger.focus();
+    };
+  }, [isModalOpen, manageFocus]);
+
   if (!isModalOpen) return null;
 
   return (
@@ -44,6 +76,7 @@ export function Modal({ open, isOpen, onClose, title, children, size = 'md' }: M
         ref={modalRef}
         data-testid="modal-panel"
         className={`relative flex h-[min(92dvh,760px)] max-h-[92dvh] w-full flex-col rounded-t-2xl liquid-glass-card shadow-2xl animate-scale-in sm:h-auto sm:max-h-[90dvh] sm:rounded-ui-xl ${sizes[size]}`}
+        tabIndex={manageFocus ? -1 : undefined}
         role="dialog"
         aria-modal="true"
         aria-label={title}

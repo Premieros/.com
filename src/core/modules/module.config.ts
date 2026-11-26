@@ -33,6 +33,7 @@ const ROUTE_MODULES: Partial<Record<AppRoute, OrganizationModuleKey>> = {
   [APP_ROUTES.delivery]: 'pos',
   [APP_ROUTES.driveThru]: 'pos',
   [APP_ROUTES.floorPlan]: 'pos',
+  [APP_ROUTES.orderBoard]: 'pos',
   [APP_ROUTES.operationsCenter]: 'pos',
 
   [APP_ROUTES.products]: 'catalog',
@@ -42,6 +43,7 @@ const ROUTE_MODULES: Partial<Record<AppRoute, OrganizationModuleKey>> = {
   [APP_ROUTES.categories]: 'catalog',
 
   [APP_ROUTES.inventoryCenter]: 'inventory',
+  [APP_ROUTES.stockHealth]: 'inventory',
   [APP_ROUTES.inventory]: 'inventory',
   [APP_ROUTES.warehouses]: 'inventory',
   [APP_ROUTES.rawMaterials]: 'inventory',

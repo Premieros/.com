@@ -24,6 +24,9 @@ const PeopleCenterPage = lazy(() => import('../features/parties/pages/PeopleCent
 const FinanceCenterPage = lazy(() => import('../features/accounting/pages/FinanceCenterPage').then(m => ({ default: m.FinanceCenterPage })));
 const AdministrationCenterPage = lazy(() => import('../features/admin/pages/AdministrationCenterPage').then(m => ({ default: m.AdministrationCenterPage })));
 const PosWorkspacePage = lazy(() => import('../features/pos/pages/PosWorkspacePage').then(m => ({ default: m.PosWorkspacePage })));
+const OrderBoardPage = lazy(() => import('../features/pos/pages/OrderBoardPage').then(m => ({ default: m.OrderBoardPage })));
+const StockHealthPage = lazy(() => import('../features/inventory/pages/StockHealthPage').then(m => ({ default: m.StockHealthPage })));
+const OrderHoursPage = lazy(() => import('../features/reporting/pages/OrderHoursPage').then(m => ({ default: m.OrderHoursPage })));
 const ActiveOrdersPage = lazy(() => import('../features/pos/pages/ActiveOrdersPage').then(m => ({ default: m.ActiveOrdersPage })));
 const ProductsPage = lazy(() => import('../features/catalog/pages/ProductsPage').then(m => ({ default: m.ProductsPage })));
 const PricingPage = lazy(() => import('../features/catalog/pages/PricingPage').then(m => ({ default: m.PricingPage })));
@@ -207,6 +210,7 @@ export function AppRoutes() {
         <Route path={`${APP_ROUTES.pos}/:orderId`} element={<ProtectedRoute permission="pos.view" fullscreen><PosWorkspacePage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.delivery} element={<ProtectedRoute permission="pos.view"><DeliveryWorkspacePage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.driveThru} element={<ProtectedRoute permission="pos.view" fullscreen><Navigate to={APP_ROUTES.pos} replace state={{ startStep: 'car' }} /></ProtectedRoute>} />
+        <Route path={APP_ROUTES.orderBoard} element={<ProtectedRoute permission="floor_plan.view"><OrderBoardPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.floorPlan} element={<ProtectedRoute permission="floor_plan.view"><ActiveOrdersPage /></ProtectedRoute>} />
         <Route path="/kitchen" element={<ProtectedRoute permission="pos.kds_view"><Navigate to={APP_ROUTES.kitchenDisplay} replace /></ProtectedRoute>} />
         <Route path="/tables" element={<ProtectedRoute permission="floor_plan.view"><Navigate to={APP_ROUTES.floorPlan} replace /></ProtectedRoute>} />
@@ -221,6 +225,7 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.wasteCenter} element={<ProtectedRoute permission="waste.view"><WasteCenterPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.kitchenDisplay} element={<ProtectedRoute permission="pos.kds_view"><KitchenDisplayPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.kitchenStations} element={<ProtectedRoute permission="settings.manage"><KitchenStationsPage /></ProtectedRoute>} />
+        <Route path={APP_ROUTES.stockHealth} element={<ProtectedRoute permission="inventory.view"><StockHealthPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.stockBalances} element={<ProtectedRoute permission="inventory.view"><StockBalancesPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.inventory} element={<ProtectedRoute permission="inventory.view"><InventoryPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.warehouses} element={<ProtectedRoute permission="warehouses.view"><WarehousesPage /></ProtectedRoute>} />
@@ -246,6 +251,7 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.expenses} element={<ProtectedRoute permission="expenses.view"><ExpensesPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.sales} element={<ProtectedRoute permission="sales.view"><SalesPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.shifts} element={<ProtectedRoute permission="shifts.view"><ShiftsPage /></ProtectedRoute>} />
+        <Route path={APP_ROUTES.orderHours} element={<ProtectedRoute permission="reports.view"><OrderHoursPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.reports} element={<ProtectedRoute permissionsAny={["reports.view", "reports.financial"]}><ReportsCenterPage /></ProtectedRoute>} />
         <Route path="/reports/view" element={<ProtectedRoute permissionsAny={["reports.view", "reports.financial"]}><ReportFullPage /></ProtectedRoute>} />
         <Route path="/reports/consumption" element={<ProtectedRoute permission="reports.view"><ConsumptionReportPage /></ProtectedRoute>} />

@@ -1,3 +1,4 @@
+import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import type { CreateProductInput } from '@/api/domains/catalog';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { Plus, Edit2, Trash2, Download, Upload, Barcode as BarcodeIcon, QrCode, Move, SlidersHorizontal } from 'lucide-react';
@@ -58,6 +59,7 @@ export function ProductsPage() {
   const { t, lang } = useLanguage();
   const { show } = useToast();
   const can = useCan();
+  const record = useRecordFocus();
   const branchFilter = useBranchFilter();
   const { runtime, canAccessPath } = useOrganizationModules();
   const supportsRawComposition = runtime.capabilities.has('raw_materials') || runtime.capabilities.has('recipes');
@@ -68,10 +70,12 @@ export function ProductsPage() {
   const debouncedSearch = useDebouncedValue(search, 250);
   const { rows: products, loading, total, hasMore, loadMore, loadingMore, refresh: reloadProducts, fetchAll: fetchAllProducts } = usePaginatedRows<Product>({
     table: 'products',
+    filters: record.id ? [{ column: 'id', value: record.id }] : undefined,
     select: '*',
     order: { column: 'created_at', ascending: false },
     branch_id: branchFilter,
-    search: { term: debouncedSearch, columns: ['name', 'name_en', 'barcode', 'sku'] },
+    enabled: !record.id || Boolean(branchFilter),
+    search: { term: record.id ? '' : debouncedSearch, columns: ['name', 'name_en', 'barcode', 'sku'] },
     pageSize: 100,
   });
   const [categories, setCategories] = useState<Category[]>([]);
@@ -620,6 +624,7 @@ export function ProductsPage() {
 
   return (
     <DesignSurface testId="products-page">
+      {record.id && <RecordFocus onClear={record.clear} />}
       <DesignPageHeader title={itemLabel} actions={<>{can('products.import') && <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} data-testid="products-import" />}{can('products.import') && <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} data-testid="products-import-button"><Upload className="w-4 h-4" /> {t('importExcel')}</Button>}{can('products.export') && <Button variant="outline" size="sm" onClick={handleExport} data-testid="products-export"><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}<Button variant="outline" size="sm" onClick={() => setCatalogToolsOpen(true)} data-testid="products-tools"><SlidersHorizontal className="w-4 h-4" /> {lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'}</Button>{can('products.create') && <Button size="sm" onClick={openAdd} data-testid="products-add"><Plus className="w-4 h-4" /> {t('add')}</Button>}</>} />
       <DesignPanel testId="products-search-panel"><DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="products-search" /></DesignPanel>
       <DesignPanel testId="products-table-panel"><DataTable columns={columns} data={filtered} loading={loading} emptyMessage={t('noData')} onRowClick={can('products.edit') ? openEdit : undefined} /><DesignPagination loaded={products.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} /></DesignPanel>

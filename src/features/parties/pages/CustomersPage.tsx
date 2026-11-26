@@ -1,3 +1,4 @@
+import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { CustomerSupportInbox } from '@/features/support/CustomerSupportInbox';
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
@@ -55,12 +56,14 @@ export function CustomersPage() {
   const { t, lang } = useLanguage();
   const { show } = useToast();
   const can = useCan();
+  const record = useRecordFocus();
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
   const { runtime } = useOrganizationModules();
   const customerLabel = runtime.terminology.customer[lang === 'ar' ? 'ar' : 'en'];
   const { rows: items, loading, total, hasMore, loadMore, loadingMore, refresh: reloadCustomers, fetchAll: fetchAllCustomers } = usePaginatedRows<Customer>({
     table: 'customers',
+    filters: record.id ? [{ column: 'id', value: record.id }] : undefined,
     select: '*',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
@@ -129,15 +132,15 @@ export function CustomersPage() {
   const balanceFor = (customer: Customer) => Number(openBalances[customer.id] || 0);
   const allRows = useMemo<CustomerViewRow[]>(() => [
     ...items,
-    ...qrGuests.filter((guest) => branchScope.selectedBranchSet.has(guest.branch_id)).map(toQrCustomerRow),
-  ], [items, qrGuests, branchScope.scopeKey]);
+    ...qrGuests.filter((guest) => !record.id && branchScope.selectedBranchSet.has(guest.branch_id)).map(toQrCustomerRow),
+  ], [items, qrGuests, branchScope.scopeKey, record.id]);
   const term = search.trim().toLowerCase();
   const matchesCustomerView = (customer: CustomerViewRow) =>
     customerView === 'all' ||
     (customerView === 'registered' && !isQrGuest(customer)) ||
     (customerView === 'qr' && isQrGuest(customer)) ||
     (customerView === 'outstanding' && !isQrGuest(customer) && balanceFor(customer) > 0);
-  const filtered = allRows.filter((c) => matchesCustomerView(c) &&
+  const filtered = allRows.filter((c) => record.id ? c.id === record.id : matchesCustomerView(c) &&
     (!term || c.name.toLowerCase().includes(term) || c.phone?.includes(term)));
   const openAdd = () => { setEditing(null); setBusinessAttributes({}); setForm({ name: '', name_en: '', phone: '', email: '', address: '', tax_number: '', balance: 0, notes: '', branch_id: branchFilter || '' }); setModalOpen(true); };
   const openEdit = (c: Customer) => { setEditing(c); setBusinessAttributes(((c as Customer & { business_attributes?: Record<string, unknown> }).business_attributes) || {}); setForm({ name: c.name, name_en: c.name_en || '', phone: c.phone || '', email: c.email || '', address: c.address || '', tax_number: c.tax_number || '', balance: c.balance, notes: c.notes || '', branch_id: c.branch_id || branchFilter || '' }); setModalOpen(true); };
@@ -212,6 +215,7 @@ export function CustomersPage() {
 
   return (
     <DesignSurface testId="customers-page">
+      {record.id && <RecordFocus onClear={record.clear} />}
       <DesignPageHeader title={customerLabel} actions={
         <>
           {can('customers.manage') && branchFilter && (
@@ -275,7 +279,7 @@ export function CustomersPage() {
             // they are not silently converted to or merged with CRM accounts.
             const combined: CustomerViewRow[] = [
               ...all,
-              ...qrGuests.filter((guest) => branchScope.selectedBranchSet.has(guest.branch_id)).map(toQrCustomerRow),
+              ...qrGuests.filter((guest) => !record.id && branchScope.selectedBranchSet.has(guest.branch_id)).map(toQrCustomerRow),
             ];
             return combined.filter((customer) => matchesCustomerView(customer) &&
               (!term || customer.name.toLowerCase().includes(term) || customer.phone?.includes(term)));
