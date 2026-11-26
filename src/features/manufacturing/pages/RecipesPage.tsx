@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import { Plus, Edit2, Trash2, ChefHat, Calculator, Package } from 'lucide-react';
 import { supabase } from '@/api';
@@ -345,7 +346,7 @@ export function RecipesPage() {
   return (
     <DesignSurface testId="recipes-page">
       <DesignPageHeader title={t('recipes')} subtitle={isAr ? 'تعريف الخامات ومجموعات المكونات المرتبطة بكل منتج' : 'Define raw materials and component groups linked to each product'} actions={can('recipes.manage') ? <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4" /> {t('addRecipe')}</Button> : undefined} />
-      <DesignPanel><DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} /></DesignPanel>
+      <WorkspaceControls><DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} /></WorkspaceControls>
       <DesignPanel>
         <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} />
         <DesignPagination loaded={recipes.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />

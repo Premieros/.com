@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Eye, Send, X, BadgeCheck, Scale, Check } from 'lucide-react';
 import { supabase } from '@/api';
@@ -252,9 +253,9 @@ export function RfqsPage() {
       <DesignPageHeader title={t('rfqs')} actions={
         can('purchases.manage') && <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4" /> {t('createRfq')}</Button>
       } />
-      <DesignPanel testId="rfqs-search-panel">
+      <WorkspaceControls><div data-testid="rfqs-search-panel">
         <DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} testId="rfqs-search" />
-      </DesignPanel>
+      </div></WorkspaceControls>
       <DesignPanel testId="rfqs-table-panel">
         <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} />
       </DesignPanel>

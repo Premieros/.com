@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { HandCoins, Phone, User, Building2 } from 'lucide-react';
 import { supabase } from '@/api';
@@ -325,11 +326,11 @@ export function PaymentsPage() {
         </div>
       )}
 
-      <DesignPanel testId="payments-search-panel">
+      <WorkspaceControls><div data-testid="payments-search-panel">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <DesignSearch value={search} onChange={setSearch} className="flex-1 w-full" label={t('search')} placeholder={t('search')} testId="payments-search" />
         </div>
-      </DesignPanel>
+      </div></WorkspaceControls>
 
       {tab === 'ar' ? (
         <>

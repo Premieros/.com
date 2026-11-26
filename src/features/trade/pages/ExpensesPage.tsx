@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 ﻿import { useEffect, useState } from 'react';
 import { Download, Pencil, Plus, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '@/api';
@@ -368,9 +369,9 @@ export function ExpensesPage() {
           )}
         </>
       } />
-      <DesignPanel testId="expenses-search-panel">
+      <WorkspaceControls><div data-testid="expenses-search-panel">
         <DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} testId="expenses-search" />
-      </DesignPanel>
+      </div></WorkspaceControls>
       <DesignPanel testId="expenses-table-panel">
         <div className="mb-3 rounded-lg border border-ui-border bg-ui-page-alt p-3 text-sm text-ui-text">
           {isAr

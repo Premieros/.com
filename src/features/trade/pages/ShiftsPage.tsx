@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useMemo, useState } from 'react';
 import { Timer, Play, Square, Printer, FileText, CalendarCheck, AlertTriangle } from 'lucide-react';
 import { supabase } from '@/api';
@@ -466,7 +467,7 @@ export function ShiftsPage() {
         </DesignPanel>
       )}
 
-      <DesignPanel testId="shifts-search-panel"><div className="flex flex-col sm:flex-row gap-3"><DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={isAr ? 'بحث بالفرع أو الكاشير...' : 'Search by branch or cashier...'} testId="shifts-search" /></div></DesignPanel>
+      <WorkspaceControls><div data-testid="shifts-search-panel"><div className="flex flex-col sm:flex-row gap-3"><DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={isAr ? 'بحث بالفرع أو الكاشير...' : 'Search by branch or cashier...'} testId="shifts-search" /></div></div></WorkspaceControls>
       <DesignPanel testId="shifts-table-panel"><DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} /><DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} /></DesignPanel>
 
       <Modal open={openModal} onClose={() => setOpenModal(false)} title={t('openShift')}>

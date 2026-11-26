@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { useMemo, useState } from 'react';
 import { AlertTriangle, Clock } from 'lucide-react';
@@ -94,7 +95,7 @@ export function InventoryBatchesPage() {
         title={isAr ? 'دفعات الخامات FIFO' : 'Raw Material FIFO Batches'}
         subtitle={isAr ? 'عرض دفعات الخامات الفعلية داخل المخازن. الإضافة تتم من الشراء والجرد والحركات التشغيلية، وليس بإنشاء رصيد منتج.' : 'View actual raw-material lots by warehouse. Lots are created by purchasing, stock count and operational movements, not finished-product stock.'}
       />
-      <DesignPanel testId="batches-search-panel">
+      <WorkspaceControls><div data-testid="batches-search-panel">
         <div className="flex flex-col gap-3 sm:flex-row">
           <DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={isAr ? 'الخامة أو رقم الدفعة أو المخزن' : 'Raw material, batch or warehouse'} testId="batches-search" />
           <Select value={filter} onChange={(event) => setFilter(event.target.value)} className="sm:w-44">
@@ -108,7 +109,7 @@ export function InventoryBatchesPage() {
             {warehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
           </Select>
         </div>
-      </DesignPanel>
+      </div></WorkspaceControls>
       <DesignPanel testId="batches-table-panel">
         <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} />
         <DesignPagination loaded={batches.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />

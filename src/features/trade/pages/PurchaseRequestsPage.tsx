@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Eye, Send, Check, X, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -194,9 +195,9 @@ export function PurchaseRequestsPage() {
       <DesignPageHeader title={t('purchaseRequests')} actions={
         can('procurement.request.create') && <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4" /> {t('createRequest')}</Button>
       } />
-      <DesignPanel testId="purchase-requests-search-panel">
+      <WorkspaceControls><div data-testid="purchase-requests-search-panel">
         <DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} testId="purchase-requests-search" />
-      </DesignPanel>
+      </div></WorkspaceControls>
       <DesignPanel testId="purchase-requests-table-panel">
         <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} onRowClick={viewRequest} />
       </DesignPanel>

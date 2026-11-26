@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, History } from 'lucide-react';
 import { supabase } from '@/api';
@@ -488,7 +489,7 @@ export function CostingCenterPage() {
             <div className="rounded-xl border border-ui-border bg-ui-surface/60 p-4 shadow-sm"><p className="text-xs font-medium text-ui-subtle uppercase tracking-wide">{isAr ? 'أعلى تكلفة نسبة' : 'Highest cost ratio'}</p><p className="mt-1 truncate font-semibold text-ui-text">{stats.worst ? stats.worst.product_name : '-'}</p></div>
           </div>
         </DesignPanel>
-        <DesignPanel testId="costing-search-panel"><div className="flex flex-col sm:flex-row gap-3"><DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={t('search')} testId="costing-search" /><Select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="sm:w-44"><option value="">{t('allBranches')}</option>{visibleBranches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></div></DesignPanel>
+        <WorkspaceControls><div data-testid="costing-search-panel"><div className="flex flex-col sm:flex-row gap-3"><DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={t('search')} testId="costing-search" /><Select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="sm:w-44"><option value="">{t('allBranches')}</option>{visibleBranches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></div></div></WorkspaceControls>
         <DesignPanel testId="costing-table-panel"><DataTable columns={overviewColumns} data={filteredOverview.map((r) => ({ ...r, id: r.product_id }))} loading={loading} error={error} emptyMessage={t('noData')} onRowClick={(r) => void openDetail(r.product_id)} /></DesignPanel>
       </>}
 
@@ -503,12 +504,12 @@ export function CostingCenterPage() {
             </p>
           </div>
         </DesignPanel>
-        <DesignPanel testId="raw-material-cost-search">
+        <WorkspaceControls><div data-testid="raw-material-cost-search">
           <div className="flex flex-col sm:flex-row gap-3">
             <DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={isAr ? 'بحث باسم الخامة أو الكود أو المرجع' : 'Search raw material, code or reference'} testId="raw-cost-search" />
             <Select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="sm:w-44"><option value="">{t('allBranches')}</option>{visibleBranches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select>
           </div>
-        </DesignPanel>
+        </div></WorkspaceControls>
         <DesignPanel testId="raw-material-cost-table">
           <DataTable columns={rawCostColumns} data={filteredRawCosts.map((r) => ({ ...r, id: r.raw_material_id }))} loading={loading} error={error} emptyMessage={t('noData')} onRowClick={(r) => void openRawHistory(r)} />
         </DesignPanel>
@@ -520,7 +521,7 @@ export function CostingCenterPage() {
       </DesignPanel>}
 
       {tab === 'variance' && <>
-        <DesignPanel testId="cost-variance-filters">
+        <WorkspaceControls><div data-testid="cost-variance-filters">
           <div className="flex flex-col gap-3 sm:flex-row">
             <input type="date" value={fromDate} min={history.minDate} onChange={(e) => setFromDate(history.clampRange(e.target.value, toDate).from)} className="border border-ui-border rounded-lg px-3 py-2 bg-ui-page text-sm" />
             <input type="date" value={toDate} onChange={(e) => { const allowed = history.clampRange(fromDate, e.target.value); setFromDate(allowed.from); setToDate(allowed.to); }} className="border border-ui-border rounded-lg px-3 py-2 bg-ui-page text-sm" />
@@ -531,7 +532,7 @@ export function CostingCenterPage() {
             <Button size="sm" onClick={() => void loadVariance()} disabled={!effBranch}>{t('search')}</Button>
           </div>
           {!effBranch && <p className="mt-3 text-sm text-ui-warning">{isAr ? 'اختر فرعًا لعرض انحرافات التكلفة. يتم الحساب على مستوى الفرع لضمان دقة المخزون والمحاسبة.' : 'Select a branch to view cost variance. Calculations are branch-scoped for inventory and accounting accuracy.'}</p>}
-        </DesignPanel>
+        </div></WorkspaceControls>
 
         {effBranch && varianceSummary && <DesignPanel testId="cost-variance-summary">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">

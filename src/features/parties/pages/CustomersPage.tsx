@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { CustomerSupportInbox } from '@/features/support/CustomerSupportInbox';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -388,7 +389,7 @@ export function CustomersPage() {
           <CustomerSupportInbox key={branchFilter} branchId={branchFilter} />
         </DesignPanel>
       ) : <DesignPanel testId="customers-table-panel" bodyClassName="p-4 sm:p-5">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <WorkspaceControls><div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2" role="tablist" aria-label={ar ? 'عرض العملاء' : 'Customer views'}>
             {([
               { key: 'all', ar: 'الكل', en: 'All customers', count: allRows.length },
@@ -463,7 +464,7 @@ export function CustomersPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div></WorkspaceControls>
         {qrLoading && <p role="status" className="mb-2 text-xs text-ui-muted">{ar ? 'جارٍ تحميل عملاء QR...' : 'Loading QR customers...'}</p>}
         {qrLoadError && <p role="alert" className="mb-2 text-xs text-ui-danger">
           {ar ? 'تعذر تحميل عملاء QR؛ تظهر سجلات العملاء المسجلين فقط. ' : 'Could not load QR customers; showing registered customers only. '}{qrLoadError}

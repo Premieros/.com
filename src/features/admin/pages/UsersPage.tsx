@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useMemo, useState } from 'react';
 import { Edit2, Plus, Shield, Trash2 } from 'lucide-react';
 import { supabase } from '@/api';
@@ -288,9 +289,9 @@ export function UsersPage() {
       <DesignPageHeader title={t('users')} actions={
         canCreateUsers ? <Button size="sm" onClick={openAdd} data-testid="users-add"><Plus className="w-4 h-4" /> {t('addUser')}</Button> : undefined
       } />
-      <DesignPanel testId="users-search-panel" className="ui-accent-system">
+      <WorkspaceControls><div data-testid="users-search-panel">
         <DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="users-search" />
-      </DesignPanel>
+      </div></WorkspaceControls>
       <DesignPanel testId="users-table-panel" className="ui-accent-system">
         <DataTable columns={columns} data={filtered} loading={loading} emptyMessage={t('noData')} />
         <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />

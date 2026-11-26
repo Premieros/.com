@@ -957,3 +957,12 @@
     animation: none !important;
   }
 }
+
+.workspace-toolbar:not(:has(nav, [data-testid='page-actions'])) { display: none; }
+.workspace-toolbar [data-testid='page-actions'] > div { flex-wrap: nowrap; }
+.workspace-kitchen-cards [class~='w-max'] { align-items: stretch; }
+.workspace-kitchen-cards [class~='w-max'] > * { width: clamp(240px, 30vw, 340px); flex-shrink: 0; }
+.workspace-toolbar [data-testid='page-actions'] :where(.flex-wrap) { flex-wrap: nowrap; }
+.workspace-toolbar [data-testid='page-actions'] :where(.flex-col) { flex-direction: row; }
+.workspace-toolbar [data-testid='page-actions'] :where(button, label, select) { white-space: nowrap; }
+.workspace-toolbar [data-testid='page-actions'] input[type='search'] { min-width: 10rem; }

@@ -1,5 +1,6 @@
+import { WorkspaceScrollRow, WorkspaceToolbarTarget } from './WorkspaceToolbar';
 import { BUNKER_BRANCH } from '@/features/qr/websiteInlineEditor';
-import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity, AlertTriangle, ArrowDown, ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUp, BarChart3, BadgeDollarSign, Boxes, BookOpenText, Building2, Calculator, ChefHat,
@@ -111,8 +112,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
   const [accountOpen, setAccountOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const quickNewRef = useRef<HTMLDivElement>(null);
-  const sectionNavRef = useRef<HTMLElement>(null);
-  const [sectionPill, setSectionPill] = useState<{ left: number; width: number } | null>(null);
+  const [toolbarTarget, setToolbarTarget] = useState<HTMLDivElement | null>(null);
   const preferenceKey = `premier:sidebar:${user?.id ?? 'guest'}`;
   const [desktopSidebarHidden, setDesktopSidebarHidden] = useState(
     () => readSidebarPreference(`${preferenceKey}:hidden`, false) === true,
@@ -207,34 +207,6 @@ function AccountLayout({ children }: { children: ReactNode }) {
     return !!link.permission && can(link.permission) &&
       canAccessModule(moduleForPath(link.route)) && canAccessPath(link.route);
   }) ?? [];
-
-  const hasWorkspace = Boolean(workspace);
-  const workspaceRoute = workspace?.route ?? '';
-  useLayoutEffect(() => {
-    const nav = sectionNavRef.current;
-    if (!nav || sectionLinks.length <= 1 || !hasWorkspace) {
-      setSectionPill(null);
-      return;
-    }
-    const update = () => {
-      const activeEl = nav.querySelector<HTMLElement>('[aria-current="page"]');
-      if (!activeEl) {
-        setSectionPill(null);
-        return;
-      }
-      setSectionPill({ left: activeEl.offsetLeft, width: activeEl.offsetWidth });
-    };
-    update();
-    let cancelled = false;
-    void document.fonts?.ready?.then(() => { if (!cancelled) update(); });
-    if (typeof ResizeObserver === 'undefined') return () => { cancelled = true; };
-    const ro = new ResizeObserver(update);
-    ro.observe(nav);
-    return () => {
-      cancelled = true;
-      ro.disconnect();
-    };
-  }, [hasWorkspace, workspaceRoute, sectionLinks.length, ar]);
 
   const activeMenuGroup = useMemo<SidebarSection | null>(() => {
     const activeItem = visibleItems.find((item) => item.route === workspace?.section.anchor)
@@ -763,41 +735,23 @@ function AccountLayout({ children }: { children: ReactNode }) {
       {mobileOpen && <button data-testid="mobile-sidebar-backdrop" type="button" className="fixed inset-0 z-40 bg-ui-text/20 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} aria-label={ar ? 'إغلاق' : 'Close'} />}
 
       <div data-testid="app-content-shell" className={`min-h-screen pt-[68px] transition-all duration-200 ${desktopSidebarHidden ? 'lg:ms-[96px]' : 'lg:ms-[276px]'}`}>
-        {sectionLinks.length > 1 && workspace && (
-          <nav
-            ref={sectionNavRef}
-            aria-label={ar ? 'صفحات القسم' : 'Pages in this section'}
-            data-testid="workspace-section-navigation"
-            className="sticky top-[82px] z-[35] mx-3 mt-4 flex min-w-0 gap-1 overflow-x-auto rounded-full border border-ui-border bg-ui-surface/95 p-1 shadow-ui-sm sm:mx-5"
-          >
-            {sectionPill && (
-              <span
-                aria-hidden="true"
-                className="pointer-events-none absolute top-1 bottom-1 rounded-full bg-ui-text shadow-ui-sm transition-[left,width] duration-200 motion-reduce:transition-none ease-[var(--ui-ease)]"
-                style={{ left: sectionPill.left, width: sectionPill.width }}
-              />
+        <div className="workspace-toolbar sticky top-[82px] z-[35] mx-3 mt-4 rounded-3xl border border-ui-border bg-ui-surface shadow-ui-sm sm:mx-5">
+          <WorkspaceScrollRow className="p-1">
+            {sectionLinks.length > 1 && workspace && (
+              <nav aria-label={ar ? 'صفحات القسم' : 'Pages in this section'} data-testid="workspace-section-navigation" className="flex shrink-0 items-center gap-1">
+                {sectionLinks.map(link => {
+                  const active = workspace.route === link.route;
+                  return <Link key={link.route} to={link.route} aria-current={active ? 'page' : undefined}
+                    onPointerEnter={() => prefetchAppRoute(link.route)} onFocus={() => prefetchAppRoute(link.route)}
+                    className={`flex h-8 items-center whitespace-nowrap rounded-full px-3.5 text-[13px] ${active ? 'bg-ui-text font-semibold text-ui-surface' : 'font-medium text-ui-muted hover:text-ui-text'}`}>
+                    {link.label[ar ? 0 : 1]}
+                  </Link>;
+                })}
+              </nav>
             )}
-            {sectionLinks.map((link) => {
-              const active = workspace.route === link.route;
-              return (
-                <Link
-                  key={link.route}
-                  to={link.route}
-                  aria-current={active ? 'page' : undefined}
-                  onPointerEnter={() => prefetchAppRoute(link.route)}
-                  onFocus={() => prefetchAppRoute(link.route)}
-                  className={`relative z-10 flex h-8 shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-ui-ring ${
-                    active
-                      ? sectionPill ? 'font-semibold text-ui-surface' : 'bg-ui-text font-semibold text-ui-surface'
-                      : 'font-medium text-ui-muted hover:text-ui-text'
-                  }`}
-                >
-                  {link.label[ar ? 0 : 1]}
-                </Link>
-              );
-            })}
-          </nav>
-        )}
+            <div ref={setToolbarTarget} className="flex shrink-0 items-center gap-2 empty:hidden" />
+          </WorkspaceScrollRow>
+        </div>
 
         <ReturnContextBanner />
         {branchScope.isAggregate && (
@@ -835,12 +789,12 @@ function AccountLayout({ children }: { children: ReactNode }) {
             </div>
           </div>
         )}
-        <main data-testid="app-main" className="min-h-[calc(100vh-68px)] bg-transparent px-3 pb-36 pt-6 sm:px-5 sm:pb-24 sm:pt-7 lg:px-6 lg:pb-24 lg:pt-8">
+        <main data-testid="app-main" className="min-h-[calc(100vh-68px)] bg-transparent px-3 pb-36 pt-3 sm:px-5 sm:pb-24 lg:px-6 lg:pb-24">
           <div
             data-testid="design-content-surface"
             className={`min-h-[calc(100vh-68px)] w-full min-w-0 space-y-5 ${fullWidthContent ? 'max-w-none' : 'mx-auto max-w-[1600px]'}`}
           >
-            {children}
+            <WorkspaceToolbarTarget.Provider value={toolbarTarget}>{children}</WorkspaceToolbarTarget.Provider>
           </div>
         </main>
       </div>

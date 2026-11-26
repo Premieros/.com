@@ -710,11 +710,11 @@ export function DashboardDataPage() {
           <WorkspaceLiveDot tone="success" />
           <span>{new Date().toLocaleDateString(ar ? 'ar-EG' : 'en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
         </div>
-        <h1 className="text-[clamp(1.75rem,2.7vw,2.45rem)] font-semibold leading-[1.06] tracking-[-0.025em] text-ui-text">
+        <h1 className="sr-only">
           {ar ? `لوحة ${runtime.title.ar}` : `${runtime.title.en} Dashboard`}
         </h1>
         {(runtime.description.ar || runtime.description.en) && (
-          <p className="mt-1.5 text-sm text-ui-muted">{ar ? runtime.description.ar : runtime.description.en}</p>
+          <p className="sr-only">{ar ? runtime.description.ar : runtime.description.en}</p>
         )}
         {((canCreateSale && !quickRoutes.has(APP_ROUTES.pos)) || (can('sales.view') && canAccessPath(APP_ROUTES.sales) && !quickRoutes.has(APP_ROUTES.sales))) && (
           <div className="mt-3.5 flex flex-wrap items-center gap-2">

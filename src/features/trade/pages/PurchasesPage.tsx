@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useState, useMemo } from 'react';
 import { Plus, Trash2, Eye, Download, Send, Check, X, PackageOpen, RotateCcw, Edit2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -648,9 +649,9 @@ export function PurchasesPage() {
         />
       )}
 
-      <DesignPanel testId="purchases-search-panel" className="ui-accent-purchase">
+      <WorkspaceControls><div data-testid="purchases-search-panel">
         <DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} testId="purchases-search" />
-      </DesignPanel>
+      </div></WorkspaceControls>
       <DesignPanel testId="purchases-table-panel" className="ui-accent-purchase">
         <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} onRowClick={viewPurchase}
           columnTotals={branchScope.selectedBranchIds.length === 1 ? [

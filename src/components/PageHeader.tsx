@@ -1,4 +1,5 @@
-import { type HTMLAttributes, type ReactNode } from 'react';
+import { WorkspaceControls, WorkspaceToolbarTarget } from './WorkspaceToolbar';
+import { useContext, type HTMLAttributes, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight } from 'lucide-react';
 import clsx from 'clsx';
@@ -18,6 +19,14 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, actions, breadcrumbs }: PageHeaderProps) {
   const embedded = useEmbeddedCenterPage();
+  const toolbar = useContext(WorkspaceToolbarTarget);
+  if (!embedded && toolbar !== undefined) return <>
+    <div className="sr-only">
+      <h1 data-testid="page-title">{title}</h1>
+      {subtitle && <p data-testid="page-description">{subtitle}</p>}
+    </div>
+    {actions && <WorkspaceControls>{actions}</WorkspaceControls>}
+  </>;
   if (embedded) return actions ? <div data-testid="page-actions" className="flex min-w-0 flex-wrap items-center gap-2 py-2">{actions}</div> : null;
   return (
     <div data-testid="page-header" className="mb-5 grid min-w-0 grid-cols-1 items-center gap-x-5 gap-y-3 sm:min-h-16 sm:grid-cols-[minmax(0,1fr)_minmax(0,auto)]">
