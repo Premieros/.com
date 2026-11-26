@@ -40,7 +40,7 @@ export function DesignPageHeader({
 
 export function DesignFilterBar({ children }: { children: ReactNode }) {
   return (
-    <div data-testid="design-filter-bar" className="ui-accent-card ui-accent-system flex min-h-11 min-w-0 flex-wrap items-center justify-start gap-2 rounded-xl border border-ui-border bg-ui-surface px-3 py-2 shadow-ui-sm">
+    <div data-testid="design-filter-bar" className="ui-accent-card ui-accent-system flex min-h-11 min-w-0 flex-wrap items-center justify-start gap-2 rounded-[20px] border border-ui-border bg-ui-surface px-4 py-2.5 shadow-ui-sm">
       {children}
     </div>
   );

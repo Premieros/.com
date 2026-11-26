@@ -36,11 +36,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     localStorage.setItem(THEME_STORAGE_KEY, theme);
   }, [theme]);
 
-  // Restore the persisted surface tint on load. Accent + mode are driven by
-  // DB settings through SettingsContext so this only touches surfaces.
+  // Restore the persisted surface tint & accent on load.
   useEffect(() => {
     const p = findUiTheme(uiTheme);
-    if (p) applySurfaceColor(p.surfaceHue, p.surfaceSat);
+    if (p) {
+      if (p.accent) document.documentElement.setAttribute('data-accent', p.accent);
+      else document.documentElement.removeAttribute('data-accent');
+      applySurfaceColor(p.surfaceHue, p.surfaceSat);
+    }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const lockThemePreference = useCallback(() => {

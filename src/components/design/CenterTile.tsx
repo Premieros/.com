@@ -41,9 +41,9 @@ export function CenterTile({ item, testIdPrefix, inline = false, selected = fals
       to={inline ? `?page=${encodeURIComponent(item.route)}` : item.route}
       title={description || label}
       className={() =>
-        `inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border px-3 py-2 text-sm font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-ring ${selected
-          ? 'border-ui-primary bg-ui-primary-soft text-ui-primary'
-          : 'border-ui-border bg-ui-surface text-ui-text hover:border-ui-primary hover:bg-ui-page-alt'}`
+        `inline-flex min-h-9 shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-ring ${selected
+          ? 'bg-ui-text text-ui-surface shadow-ui-sm'
+          : 'text-ui-muted hover:bg-ui-surface hover:text-ui-text'}`
       }
     >
       <Icon aria-hidden="true" className="h-4 w-4 shrink-0" />
@@ -72,13 +72,13 @@ export function CenterGrid({ items, testIdPrefix }: CenterGridProps) {
   const firstEmbeddable = visibleItems.find(item => !['/pos', '/inventory-center', '/procurement-center', '/finance', '/people', '/administration', '/operations'].includes(item.route));
   const selected = visibleItems.find(item => item.route === selectedRoute) ?? firstEmbeddable;
   return (
-    <div className="overflow-hidden rounded-2xl border border-ui-border bg-ui-surface shadow-ui-sm">
+    <div className="overflow-hidden rounded-[22px] border border-ui-border bg-ui-surface shadow-ui">
     <nav
       aria-label={lang === 'ar' ? 'صفحات المركز' : 'Center pages'}
       data-testid={`${testIdPrefix}-navigation`}
-      className="w-full border-b border-ui-border bg-ui-surface px-2 py-1.5"
+      className="w-full border-b border-ui-border bg-ui-surface px-3 py-2.5"
     >
-      <div className="flex w-full flex-nowrap items-center gap-1.5 overflow-x-auto pb-0.5">
+      <div className="inline-flex max-w-full flex-nowrap items-center gap-1 overflow-x-auto rounded-full border border-ui-border bg-ui-page-alt p-1">
         {visibleItems.map(item => (
           <CenterTile key={item.id} item={item} selected={selected?.route === item.route} inline={!['/pos', '/inventory-center', '/procurement-center', '/finance', '/people', '/administration', '/operations'].includes(item.route)} testIdPrefix={testIdPrefix} />
         ))}

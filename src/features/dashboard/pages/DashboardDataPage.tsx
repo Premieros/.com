@@ -178,7 +178,7 @@ function periodWindow(range: Range) {
 }
 
 function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <section className={`ui-accent-card ui-accent-primary rounded-3xl border border-ui-border bg-ui-surface p-5 shadow-ui ${className}`}>{children}</section>;
+  return <section className={`rounded-[22px] border border-ui-border bg-ui-surface p-5 shadow-ui ${className}`}>{children}</section>;
 }
 
 function Empty({ ar }: { ar: boolean }) {
@@ -191,15 +191,30 @@ function Metric({ testId, icon: Icon, title, value, display, previous, href, ar,
   const change = previous > 0 ? ((value - previous) / previous) * 100 : null;
   const positive = (change ?? 0) >= 0;
   const content = <>
-    <div className="flex items-start justify-between"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-ui-primary-soft text-ui-primary"><Icon className="h-5 w-5" /></div>{href && <ArrowUpRight className="h-4 w-4 text-ui-subtle" />}</div>
-    <p className="mt-5 text-sm font-semibold text-ui-muted">{title}</p><p className="mt-1 text-3xl font-extrabold tracking-tight text-ui-text tabular-nums">{display}</p>
+    <div className="flex items-center justify-between gap-2">
+      <div className="flex min-w-0 items-center gap-2.5">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ui-primary-soft text-ui-primary">
+          <Icon className="h-4 w-4" />
+        </div>
+        <p className="truncate text-[13px] font-semibold text-ui-muted">{title}</p>
+      </div>
+      {href && <ArrowUpRight className="h-4 w-4 shrink-0 text-ui-subtle transition group-hover:text-ui-primary" />}
+    </div>
+    <p className="mt-4 text-[28px] font-bold leading-none tracking-[-0.025em] text-ui-text tabular-nums">{display}</p>
     {detail && <div className="mt-2 text-xs font-semibold text-ui-muted">{detail}</div>}
-    <div className="mt-2 flex items-center gap-2 text-xs">{change === null ? <span className="text-ui-subtle">—</span> : <span className={`inline-flex items-center gap-0.5 font-bold ${positive ? 'text-ui-success' : 'text-ui-danger'}`}>{positive ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}{formatPercent(Math.abs(change), 1)}</span>}<span className="text-ui-subtle">{ar ? 'مقارنة بالفترة السابقة' : 'vs previous period'}</span></div>
+    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+      {change === null ? <span className="text-ui-subtle">—</span> : (
+        <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold ${positive ? 'bg-ui-success-soft text-ui-success' : 'bg-ui-danger-soft text-ui-danger'}`}>
+          {positive ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}{formatPercent(Math.abs(change), 1)}
+        </span>
+      )}
+      <span className="text-ui-subtle">{ar ? 'مقارنة بالفترة السابقة' : 'vs previous period'}</span>
+    </div>
   </>;
-  const className = `ui-accent-card ui-accent-primary rounded-3xl border border-ui-border bg-ui-surface p-5 shadow-ui ${href ? 'group transition hover:-translate-y-0.5 hover:shadow-ui-lg' : ''}`;
+  const className = `rounded-[22px] border border-ui-border bg-ui-surface p-5 shadow-ui transition-all ${href ? 'group hover:-translate-y-0.5 hover:shadow-ui-lg' : ''}`;
   if (onSelect) return (
     <button type="button" data-testid={testId} aria-pressed={selected} onClick={onSelect}
-      className={`${className} text-start transition-colors hover:border-ui-primary focus-visible:outline-2 focus-visible:outline-ui-ring ${selected ? 'ring-2 ring-ui-primary' : ''}`}>
+      className={`${className} text-start transition-colors hover:border-ui-primary/50 focus-visible:outline-2 focus-visible:outline-ui-ring ${selected ? 'border-ui-primary ring-2 ring-ui-primary/25' : ''}`}>
       {content}
     </button>
   );
@@ -661,10 +676,46 @@ export function DashboardDataPage() {
     </div>
   );
 
-  return <div dir={ar ? 'rtl' : 'ltr'} className="min-h-[calc(100vh-64px)] w-full min-w-0 bg-ui-page py-3 sm:py-4" data-testid="dashboard-surface"><div className="w-full min-w-0 space-y-5">
+  return <div dir={ar ? 'rtl' : 'ltr'} className="min-h-[calc(100vh-64px)] w-full min-w-0 bg-transparent py-2 sm:py-3" data-testid="dashboard-surface"><div className="w-full min-w-0 space-y-5">
     <DashboardStandbyBar canCreateSale={canCreateSale} />
 
-    <section className="rounded-[32px] bg-gradient-to-br from-[#24114f] via-[#4b20a9] to-[#6d35df] p-6 text-white shadow-ui-lg"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex items-center gap-2 text-white/80"><BarChart3 className="h-4 w-4" /><span className="text-xs font-bold uppercase tracking-[0.18em]">Premier Control</span></div><h2 className="mt-2 text-3xl font-black">{ar ? `لوحة ${runtime.title.ar}` : `${runtime.title.en} Dashboard`}</h2><p className="mt-1 text-sm text-white/70">{ar ? runtime.description.ar : runtime.description.en}</p></div><div className="flex flex-wrap gap-2">{(Object.keys(rangeLabels) as Range[]).map((item) => <button key={item} type="button" aria-pressed={range === item} onClick={() => updateView('range', item)} className={`rounded-xl px-4 py-2 text-sm font-bold ${range === item ? 'bg-white text-ui-primary' : 'bg-white/10 text-white'}`}>{rangeLabels[item][ar ? 0 : 1]}</button>)}<button onClick={() => void load()} className="rounded-xl bg-white/10 p-2" aria-label={ar ? 'تحديث' : 'Refresh'}><RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /></button></div></div></section>
+    <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div>
+        <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-ui-border bg-ui-surface px-3 py-1 text-xs font-medium text-ui-muted shadow-ui-sm">
+          <span className="h-2 w-2 rounded-full bg-ui-success" aria-hidden="true" />
+          <span>{new Date().toLocaleDateString(ar ? 'ar-EG' : 'en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
+        </div>
+        <h1 className="text-[clamp(1.75rem,2.7vw,2.45rem)] font-semibold leading-[1.06] tracking-[-0.025em] text-ui-text">
+          {ar ? `لوحة ${runtime.title.ar}` : `${runtime.title.en} Dashboard`}
+        </h1>
+        {(runtime.description.ar || runtime.description.en) && (
+          <p className="mt-1.5 text-sm text-ui-muted">{ar ? runtime.description.ar : runtime.description.en}</p>
+        )}
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-ui-border bg-ui-surface p-1 shadow-ui-sm">
+          {(Object.keys(rangeLabels) as Range[]).map((item) => (
+            <button
+              key={item}
+              type="button"
+              aria-pressed={range === item}
+              onClick={() => updateView('range', item)}
+              className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all ${range === item ? 'bg-ui-text text-ui-surface shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
+            >
+              {rangeLabels[item][ar ? 0 : 1]}
+            </button>
+          ))}
+        </div>
+        <button
+          type="button"
+          onClick={() => void load()}
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-ui-border bg-ui-surface text-ui-muted shadow-ui-sm transition hover:border-ui-border-strong hover:text-ui-text"
+          aria-label={ar ? 'تحديث' : 'Refresh'}
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+    </section>
 
     <section data-testid="business-runtime-quick-actions" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
       {runtime.dashboard.quickActions
@@ -677,20 +728,20 @@ export function DashboardDataPage() {
           <Link
             key={action.id}
             to={action.route}
-            className="rounded-2xl border border-ui-border bg-ui-surface p-4 text-sm font-extrabold text-ui-text shadow-ui-sm transition hover:-translate-y-0.5 hover:border-ui-primary/30 hover:shadow-ui-md"
+            className="flex items-center justify-between gap-2 rounded-[18px] border border-ui-border bg-ui-surface px-4 py-3.5 text-sm font-semibold text-ui-text shadow-ui-sm transition hover:-translate-y-0.5 hover:border-ui-primary/40 hover:shadow-ui"
           >
-            <span className="text-ui-primary">→</span>{' '}
-            {ar ? action.ar : action.en}
+            <span>{ar ? action.ar : action.en}</span>
+            <span className="grid h-7 w-7 place-items-center rounded-full bg-ui-primary-soft text-xs font-bold text-ui-primary">→</span>
           </Link>
         ))}
     </section>
 
-    {error && <div className="rounded-2xl border border-ui-danger/30 bg-ui-danger-soft p-4 text-sm font-bold text-ui-danger">{error}</div>}
+    {error && <div className="rounded-[20px] border border-ui-danger/30 bg-ui-danger-soft p-4 text-sm font-bold text-ui-danger">{error}</div>}
 
-    {(canViewSales || canViewFinancial || canViewInventory) && <Card><div className="mb-4"><h2 className="text-lg font-black text-ui-text">{ar ? `ملخص ${rangeLabels[range][0]}` : `${rangeLabels[range][1]} summary`}</h2><p className="text-xs text-ui-subtle">{ar ? 'المبيعات صافية بعد المرتجعات، والربح من قائمة الدخل المحاسبية' : 'Sales are net of refunds; profit comes from the accounting income statement'}</p></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {canViewFinancial && <div className="ui-accent-top ui-accent-finance rounded-2xl border border-ui-border bg-ui-surface p-4"><p className="text-xs text-ui-subtle">{ar ? 'المصروفات المحاسبية' : 'Accounting expenses'}</p><p className="mt-2 text-xl font-black text-ui-text">{quick(quickStats.expenses, money)}</p></div>}
-      {canViewFinancial && <div className="ui-accent-top ui-accent-inventory rounded-2xl border border-ui-border bg-ui-surface p-4"><p className="text-xs text-ui-subtle">{ar ? 'صافي الربح المحاسبي' : 'Accounting net profit'}</p><p className="mt-2 text-xl font-black text-ui-text">{quick(quickStats.profit, money)}</p></div>}
-      {canViewInventory && <div className="ui-accent-top ui-accent-inventory rounded-2xl border border-ui-border bg-ui-surface p-4"><p className="text-xs text-ui-subtle">{ar ? 'تنبيهات المخزون' : 'Low stock alerts'}</p><p className="mt-2 text-xl font-black text-ui-text">{quick(quickStats.lowStockCount, (value) => formatNumber(value, 0))}</p></div>}
+    {(canViewSales || canViewFinancial || canViewInventory) && <Card><div className="mb-4"><h2 className="text-lg font-bold text-ui-text">{ar ? `ملخص ${rangeLabels[range][0]}` : `${rangeLabels[range][1]} summary`}</h2><p className="text-xs text-ui-subtle">{ar ? 'المبيعات صافية بعد المرتجعات، والربح من قائمة الدخل المحاسبية' : 'Sales are net of refunds; profit comes from the accounting income statement'}</p></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {canViewFinancial && <div className="rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="text-xs font-medium text-ui-muted">{ar ? 'المصروفات المحاسبية' : 'Accounting expenses'}</p><p className="mt-2 text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.expenses, money)}</p></div>}
+      {canViewFinancial && <div className="rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="text-xs font-medium text-ui-muted">{ar ? 'صافي الربح المحاسبي' : 'Accounting net profit'}</p><p className="mt-2 text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.profit, money)}</p></div>}
+      {canViewInventory && <div className="rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="text-xs font-medium text-ui-muted">{ar ? 'تنبيهات المخزون' : 'Low stock alerts'}</p><p className="mt-2 text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.lowStockCount, (value) => formatNumber(value, 0))}</p></div>}
     </div></Card>}
 
     {loading ? <div className="flex h-64 items-center justify-center rounded-3xl border border-ui-border bg-ui-surface"><RefreshCw className="h-7 w-7 animate-spin text-ui-primary" /></div> : <>

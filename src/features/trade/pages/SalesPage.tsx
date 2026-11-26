@@ -726,7 +726,7 @@ export function SalesPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
             placeholder={searchAllInvoices ? (isAr ? 'رقم الفاتورة في كل السجلات...' : 'Invoice number across all records...') : (isAr ? 'بحث في الفواتير المحمّلة...' : 'Search loaded invoices...')}
-            className="h-9 w-32 min-w-0 rounded-lg border border-ui-border bg-ui-surface px-3 text-xs text-ui-text outline-none focus:border-ui-primary sm:w-52"
+            className="h-9 w-32 min-w-0 rounded-full border border-ui-border bg-ui-surface-raised px-3.5 text-xs text-ui-text outline-none focus:border-ui-primary sm:w-52"
           />
           <label className="inline-flex items-center gap-1.5 text-xs font-medium text-ui-muted">
             <input type="checkbox" data-testid="sales-global-invoice-search" checked={searchAllInvoices}
@@ -816,8 +816,8 @@ export function SalesPage() {
       )}
 
       <DesignPanel testId="sales-table-panel" bodyClassName="p-0">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ui-border px-4 py-3 sm:px-5">
-          <div className="flex max-w-full items-center gap-1 overflow-x-auto" role="group" aria-label={isAr ? 'عرض الفواتير حسب الحالة' : 'Invoice display filter'}>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ui-border px-4 py-3.5 sm:px-5">
+          <div className="flex max-w-full items-center gap-1.5 overflow-x-auto" role="group" aria-label={isAr ? 'عرض الفواتير حسب الحالة' : 'Invoice display filter'}>
             {([
               ['all', isAr ? 'الكل' : 'All'],
               ['today', isAr ? 'اليوم (تقويمي)' : 'Today (calendar)'],
@@ -828,10 +828,10 @@ export function SalesPage() {
               <button key={key} type="button" data-testid={`sales-view-tab-${key}`}
                 aria-pressed={displayStatus === key}
                 onClick={() => { setDisplayStatus(key); if (key === 'today') setDisplayDate(''); }}
-                className={`shrink-0 rounded-lg px-3 py-2 text-sm font-semibold transition ${
+                className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition ${
                   displayStatus === key
-                    ? 'bg-brand-600/10 text-brand-600 dark:text-brand-400'
-                    : 'text-ui-muted hover:bg-ui-page-alt hover:text-ui-text'
+                    ? 'border-ui-text bg-ui-text text-ui-surface shadow-ui-sm'
+                    : 'border-ui-border bg-ui-surface text-ui-muted hover:border-ui-border-strong hover:text-ui-text'
                 }`}>
                 {label}
               </button>

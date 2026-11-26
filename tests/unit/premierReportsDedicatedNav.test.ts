@@ -24,15 +24,15 @@ describe('Dedicated Reports Center navigation and reference-inspired UI', () => 
   it('keeps the global sidebar styling identical across reporting and other routes', () => {
     // Reports can have their own internal directory, but must not restyle the app shell.
     expect(layout).toContain('const fullWidthContent = true');
-    expect(layout).toContain('data-testid="app-sidebar" className=');
-    expect(layout).toContain('className="text-ui-primary"');
+    expect(layout).toContain('data-testid="app-sidebar"');
+    expect(layout).toContain('tone="navy"');
     expect(layout).not.toContain('style={isReportsWorkspace');
     expect(layout).not.toContain("isReportsWorkspace ? 'text-violet-300'");
     expect(layout).not.toContain("isReportsWorkspace ? 'text-slate-300");
     expect(layout).not.toContain("isReportsWorkspace ? (isActive");
     // Nested detail routes share the same active styling as their parent.
     expect(layout).toContain("isActive || location.pathname.startsWith(`${item.route}/`)");
-    expect(layout).toContain("bg-[#c8c8cd] font-bold text-[#17171d]");
+    expect(layout).toContain("bg-ui-primary font-semibold text-ui-primary-fg");
   });
 
   it('retains current reporting engines and places the report directory on the visual left', () => {

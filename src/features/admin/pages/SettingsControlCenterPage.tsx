@@ -812,7 +812,7 @@ export function SettingsControlCenterPage() {
           )}
 
           {active === 'appearance' && (
-            <Card className="space-y-6 p-4 sm:p-6">
+            <Card className="space-y-6 p-5 sm:p-6">
               <div>
                 <h2 className="text-lg font-bold text-ui-text">{isAr ? 'المظهر وسمات الواجهة' : 'Appearance & Themes'}</h2>
                 <p className="text-xs text-ui-subtle">{isAr ? 'اختر السمة واللون المفضل لواجهة الاستخدام' : 'Select your preferred visual style and theme mode'}</p>
@@ -821,21 +821,43 @@ export function SettingsControlCenterPage() {
               <div>
                 <p className="text-xs font-bold text-ui-text mb-2">{isAr ? 'وضع الإضاءة:' : 'Theme Mode:'}</p>
                 <p className="mb-3 text-xs text-ui-muted">{isAr ? 'اختيارك يغيّر واجهة Premier على هذا الجهاز، وينشر نفس الوضع لموقع الفرع المحدد وصفحة طلبات عملائه.' : 'Changing mode updates Premier on this device and publishes the selected branch website and customer ordering theme.'}</p>
-                <div className="flex gap-2">
-                  <Button
-                    variant={theme === 'light' ? 'primary' : 'outline'}
-                    size="sm"
+                <div className="grid max-w-md grid-cols-2 gap-3">
+                  <button
+                    type="button"
                     onClick={() => changeThemeMode('light')}
+                    className={`group rounded-[20px] border p-3 text-start transition-all ${theme === 'light' ? 'border-ui-primary ring-2 ring-ui-primary/25 bg-ui-page-alt' : 'border-ui-border bg-ui-surface hover:border-ui-border-strong'}`}
                   >
-                    {isAr ? 'الوضع النهاري (Light)' : 'Light'}
-                  </Button>
-                  <Button
-                    variant={theme === 'dark' ? 'primary' : 'outline'}
-                    size="sm"
+                    <div className="mb-2.5 h-16 rounded-[12px] border border-[#dfe3dd] bg-[#eef0ec] p-2">
+                      <div className="mb-1.5 h-2.5 w-14 rounded-full bg-[#fcfdfc]" />
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <div className="h-7 rounded-md bg-[#fcfdfc]" />
+                        <div className="h-7 rounded-md bg-[#fcfdfc]" />
+                        <div className="h-7 rounded-md bg-[#a8481c]/20" />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs font-bold text-ui-text">
+                      <span>{isAr ? 'الوضع النهاري (Light)' : 'Light'}</span>
+                      {theme === 'light' && <span className="h-2 w-2 rounded-full bg-ui-primary" />}
+                    </div>
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => changeThemeMode('dark')}
+                    className={`group rounded-[20px] border p-3 text-start transition-all ${theme === 'dark' ? 'border-ui-primary ring-2 ring-ui-primary/25 bg-ui-page-alt' : 'border-ui-border bg-ui-surface hover:border-ui-border-strong'}`}
                   >
-                    {isAr ? 'الوضع الليلي (Dark)' : 'Dark'}
-                  </Button>
+                    <div className="mb-2.5 h-16 rounded-[12px] border border-[#28302c] bg-[#0f1412] p-2">
+                      <div className="mb-1.5 h-2.5 w-14 rounded-full bg-[#171d1a]" />
+                      <div className="grid grid-cols-3 gap-1.5">
+                        <div className="h-7 rounded-md bg-[#171d1a]" />
+                        <div className="h-7 rounded-md bg-[#171d1a]" />
+                        <div className="h-7 rounded-md bg-[#ffa77a]/30" />
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between text-xs font-bold text-ui-text">
+                      <span>{isAr ? 'الوضع الليلي (Dark)' : 'Dark'}</span>
+                      {theme === 'dark' && <span className="h-2 w-2 rounded-full bg-ui-primary" />}
+                    </div>
+                  </button>
                 </div>
                 <p role="status" className="mt-3 text-xs text-ui-muted">
                   {isAr ? 'مظهر عملاء الفرع المحفوظ: ' : 'Published customer theme: '}
@@ -846,16 +868,24 @@ export function SettingsControlCenterPage() {
               </div>
 
               <div>
-                <p className="text-xs font-bold text-ui-text mb-2">{isAr ? 'سمات الواجهة المصممة بعناية:' : 'Curated Themes:'}</p>
-                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                <p className="text-xs font-bold text-ui-text mb-2">{isAr ? 'سمات الواجهة والألوان:' : 'Curated Themes & Accents:'}</p>
+                <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                   {UI_THEMES.map((th) => (
                     <button
                       key={th.key}
+                      type="button"
                       onClick={() => pickTheme(th.key)}
-                      className="p-3 rounded-xl border border-ui-border bg-ui-page hover:border-brand-500/50 flex items-center justify-between text-start transition"
+                      className="flex items-center justify-between gap-2 rounded-[16px] border border-ui-border bg-ui-page-alt px-3.5 py-3 text-start transition hover:border-ui-primary/50 hover:bg-ui-surface"
                     >
-                      <span className="text-xs font-bold text-ui-text">{isAr ? th.ar : th.en}</span>
-                      <span className="text-[10px] text-ui-subtle px-1.5 py-0.5 rounded bg-ui-surface">
+                      <span className="flex min-w-0 items-center gap-2.5">
+                        <span
+                          className="h-4 w-4 shrink-0 rounded-full border border-black/10"
+                          style={{ backgroundColor: th.swatch || '#a8481c' }}
+                          aria-hidden="true"
+                        />
+                        <span className="truncate text-xs font-bold text-ui-text">{isAr ? th.ar : th.en}</span>
+                      </span>
+                      <span className="shrink-0 rounded-full bg-ui-surface px-2 py-0.5 text-[10px] font-semibold text-ui-subtle">
                         {th.mode}
                       </span>
                     </button>

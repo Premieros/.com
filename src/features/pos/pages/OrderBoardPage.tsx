@@ -124,37 +124,52 @@ function OrderBoard({ branch }: { branch: string }) {
 
   return (
     <DesignSurface testId="order-board-page">
-      <DesignPageHeader title={ar ? 'لوحة متابعة الطلبات' : 'Order board'} actions={(canDelivery || canKitchen) && (
-        <Button size="sm" variant="outline" disabled={loadingBoard} onClick={() => setRefresh((value) => value + 1)}>{ar ? 'تحديث الحالات' : 'Refresh statuses'}</Button>
-      )} />
-      {loadingBoard && <p role="status">{ar ? 'جارٍ تحميل الطلبات…' : 'Loading orders…'}</p>}
+      <DesignPageHeader
+        title={ar ? 'لوحة متابعة الطلبات' : 'Order board'}
+        subtitle={ar ? 'متابعة حالة الطلبات بين الكاشير والمطبخ والتوصيل' : 'Track order stages across cashier, kitchen and delivery'}
+        actions={(canDelivery || canKitchen) && (
+          <Button size="sm" variant="outline" disabled={loadingBoard} onClick={() => setRefresh((value) => value + 1)}>{ar ? 'تحديث الحالات' : 'Refresh statuses'}</Button>
+        )}
+      />
+      {loadingBoard && <p role="status" className="text-xs text-ui-muted">{ar ? 'جارٍ تحميل الطلبات…' : 'Loading orders…'}</p>}
       {(error || (canDelivery && dispatchError) || (canKitchen && kitchenError)) && <p role="alert" className="mb-2 text-ui-danger">
         {error || (ar ? 'تعذّر تحميل بعض حالات التوصيل أو المطبخ.' : 'Some delivery or kitchen states could not be loaded.')}
       </p>}
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {(Object.keys(columns) as Array<keyof typeof columns>).filter((group) =>
           group === 'cashier' || (group === 'delivery' ? canDelivery : canKitchen),
-        ).map((group) => (
-          <section key={group} className="min-w-0 rounded-xl border border-ui-border bg-ui-page-alt p-3">
-            <h2 className="mb-3 flex justify-between gap-2 font-bold">{columns[group][ar ? 0 : 1]} <span>{buckets[group].length}</span></h2>
-            <div className="space-y-2">
-              {buckets[group].length === 0 && !loadingBoard && <p className="text-sm text-ui-muted">{ar ? 'لا توجد طلبات' : 'No orders'}</p>}
+        ).map((group) => {
+          const badgeTone = group === 'cashier'
+            ? 'bg-ui-info-soft text-ui-info'
+            : group === 'kitchen'
+              ? 'bg-ui-warning-soft text-ui-warning'
+              : group === 'ready'
+                ? 'bg-ui-success-soft text-ui-success'
+                : 'bg-ui-primary-soft text-ui-primary';
+          return (
+          <section key={group} className="min-w-0 rounded-[22px] border border-ui-border bg-ui-page-alt p-3.5 shadow-ui-sm">
+            <h2 className="mb-3 flex items-center justify-between gap-2 px-1 text-sm font-bold text-ui-text">
+              <span>{columns[group][ar ? 0 : 1]}</span>
+              <span className={`inline-flex h-6 min-w-6 items-center justify-center rounded-full px-2 text-xs font-bold tabular-nums ${badgeTone}`}>{buckets[group].length}</span>
+            </h2>
+            <div className="space-y-2.5">
+              {buckets[group].length === 0 && !loadingBoard && <p className="rounded-[16px] border border-dashed border-ui-border py-6 text-center text-xs text-ui-muted">{ar ? 'لا توجد طلبات' : 'No orders'}</p>}
               {buckets[group].map((card) => {
                 const age = Math.max(0, Math.floor((now - Date.parse(card.created)) / 60000));
                 return (
-                  <article key={card.id} className="rounded-lg border border-ui-border bg-ui-surface p-3">
-                    <div className="flex flex-wrap justify-between gap-1 font-bold">
-                      <span>{card.number}</span>
-                      <span className="text-xs text-ui-muted">{Number.isFinite(age) ? `${age} ${ar ? 'دقيقة' : 'min'}` : '—'}</span>
+                  <article key={card.id} className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm transition hover:border-ui-border-strong hover:shadow-ui">
+                    <div className="flex flex-wrap items-center justify-between gap-1 font-bold">
+                      <span className="text-sm text-ui-text tabular-nums">{card.number}</span>
+                      <span className="rounded-full bg-ui-page-alt px-2.5 py-0.5 text-[11px] font-semibold text-ui-muted tabular-nums">{Number.isFinite(age) ? `${age} ${ar ? 'دقيقة' : 'min'}` : '—'}</span>
                     </div>
-                    <p className="my-2 text-xs text-ui-muted">{[card.type, card.cashier && status(card.cashier), card.kitchen && status(card.kitchen), card.delivery && status(card.delivery)].filter(Boolean).join(' · ')}</p>
-                    {['open', 'held'].includes(card.cashier) && canOpenPos && <Link to={posOrderRoute(card.id)} state={{ branchId: branch }} className="text-xs font-bold text-ui-primary">
+                    <p className="my-2 text-xs font-medium text-ui-muted">{[card.type, card.cashier && status(card.cashier), card.kitchen && status(card.kitchen), card.delivery && status(card.delivery)].filter(Boolean).join(' · ')}</p>
+                    {['open', 'held'].includes(card.cashier) && canOpenPos && <Link to={posOrderRoute(card.id)} state={{ branchId: branch }} className="inline-flex items-center rounded-full bg-ui-primary-soft px-3 py-1 text-xs font-semibold text-ui-primary transition hover:bg-ui-primary hover:text-ui-primary-fg">
                       {ar ? 'فتح الطلب' : 'Open order'}
                     </Link>}
-                    {card.cashier === 'completed' && card.delivery && canDelivery && <Link to={`${APP_ROUTES.delivery}?record=${card.id}`} className="text-xs font-bold text-ui-primary">
+                    {card.cashier === 'completed' && card.delivery && canDelivery && <Link to={`${APP_ROUTES.delivery}?record=${card.id}`} className="inline-flex items-center rounded-full bg-ui-primary-soft px-3 py-1 text-xs font-semibold text-ui-primary transition hover:bg-ui-primary hover:text-ui-primary-fg">
                       {ar ? 'فتح التوصيل' : 'Open delivery'}
                     </Link>}
-                    {!card.cashier && canKitchen && <Link to={APP_ROUTES.kitchenDisplay} className="text-xs font-bold text-ui-primary">
+                    {!card.cashier && canKitchen && <Link to={APP_ROUTES.kitchenDisplay} className="inline-flex items-center rounded-full bg-ui-primary-soft px-3 py-1 text-xs font-semibold text-ui-primary transition hover:bg-ui-primary hover:text-ui-primary-fg">
                       {ar ? 'فتح المطبخ' : 'Open kitchen'}
                     </Link>}
                   </article>
@@ -162,7 +177,8 @@ function OrderBoard({ branch }: { branch: string }) {
               })}
             </div>
           </section>
-        ))}
+          );
+        })}
       </div>
     </DesignSurface>
   );

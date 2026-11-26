@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Warehouse as WarehouseIcon, CheckCircle2, MapPin } from 'lucide-react';
 import { supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
@@ -7,6 +7,8 @@ import { DesignSurface, DesignPageHeader } from '@/components/design/DesignSurfa
 import { DesignPanel } from '@/components/design/DesignPanel';
 import { DesignPagination } from '@/components/design/DesignPagination';
 import { DataTable, type Column } from '@/components/DataTable';
+import { StatCard } from '@/components/PageHeader';
+import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { Input, Select } from '@/components/Input';
 import { Modal } from '@/components/Modal';
@@ -21,7 +23,8 @@ import { useGuidedWorkflow } from '@/core/guard';
 import type { Warehouse, Branch } from '@/lib/types';
 
 export function WarehousesPage() {
-  const { t } = useLanguage();
+  const { t, lang } = useLanguage();
+  const ar = lang === 'ar';
   const { show } = useToast();
   const can = useCan();
   const branchFilter = useBranchFilter();
@@ -95,11 +98,69 @@ export function WarehousesPage() {
     )},
   ];
 
+  const activeCount = items.filter((w) => w.is_active).length;
+
   return (
     <DesignSurface testId="warehouses-page">
-      <DesignPageHeader title={t('warehouses')} actions={
+      <DesignPageHeader
+        title={t('warehouses')}
+        subtitle={ar ? 'مواقع التخزين والفروع وحالة التفعيل' : 'Storage locations, branches and site status'}
+        actions={
         can('warehouses.manage') && <Button size="sm" onClick={openAdd} data-testid="warehouses-add"><Plus className="w-4 h-4" /> {t('add')}</Button>
       } />
+      <section className="grid gap-3.5 sm:grid-cols-3">
+        <StatCard
+          title={ar ? 'إجمالي المستودعات' : 'Total locations'}
+          value={String(items.length)}
+          icon={<WarehouseIcon className="h-4 w-4" />}
+          color="brand"
+        />
+        <StatCard
+          title={ar ? 'مستودعات نشطة' : 'Active sites'}
+          value={String(activeCount)}
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          color="green"
+        />
+        <StatCard
+          title={ar ? 'غير نشطة' : 'Inactive'}
+          value={String(Math.max(0, items.length - activeCount))}
+          icon={<MapPin className="h-4 w-4" />}
+          color="amber"
+        />
+      </section>
+      {items.length > 0 && (
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+          {items.slice(0, 6).map((w) => {
+            const branchName = (w as Warehouse & { branch?: Branch }).branch?.name || '-';
+            return (
+              <div
+                key={w.id}
+                onClick={can('warehouses.manage') ? () => openEdit(w) : undefined}
+                className={`rounded-[22px] border border-ui-border bg-ui-surface p-5 shadow-ui transition hover:border-ui-primary/40 ${can('warehouses.manage') ? 'cursor-pointer' : ''}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-ui-primary-soft text-ui-primary">
+                      <WarehouseIcon className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-[15px] font-bold text-ui-text">{w.name}</h3>
+                      <p className="truncate text-xs text-ui-muted">{branchName}</p>
+                    </div>
+                  </div>
+                  <Badge variant={w.is_active ? 'success' : 'default'} size="sm">
+                    {w.is_active ? t('active') : t('inactive')}
+                  </Badge>
+                </div>
+                <div className="mt-3.5 flex items-center gap-1.5 text-xs text-ui-muted">
+                  <MapPin className="h-3.5 w-3.5 shrink-0 text-ui-subtle" />
+                  <span className="truncate">{w.address || '—'}</span>
+                </div>
+              </div>
+            );
+          })}
+        </section>
+      )}
       <DesignPanel testId="warehouses-table-panel">
         <DataTable columns={columns} data={items} loading={loading} emptyMessage={t('noData')} onRowClick={can('warehouses.manage') ? openEdit : undefined} />
         <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />

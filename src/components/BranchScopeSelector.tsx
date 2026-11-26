@@ -156,11 +156,11 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className={`flex w-full min-w-0 items-center gap-1.5 rounded-xl border border-ui-border bg-ui-surface px-2 py-1.5 text-xs font-semibold text-ui-text transition hover:bg-ui-page-alt ${
+        className={`flex w-full min-w-0 items-center gap-1.5 rounded-full border border-ui-border bg-ui-page-alt px-3 py-1.5 text-xs font-semibold text-ui-text transition hover:border-ui-border-strong hover:bg-ui-surface-raised ${
           compact ? 'max-w-[210px]' : 'max-w-[260px]'
         }`}
       >
-        {scope.isAggregate ? <Layers3 className="h-4 w-4 shrink-0 text-ui-primary" /> : <Building2 className="h-4 w-4 shrink-0 text-ui-primary" />}
+        {scope.isAggregate ? <Layers3 className="h-3.5 w-3.5 shrink-0 text-ui-primary" /> : <Building2 className="h-3.5 w-3.5 shrink-0 text-ui-primary" />}
         <span className="min-w-0 flex-1 truncate text-start">{label}</span>
         <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-ui-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -168,7 +168,7 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
       {open && (
         <div
           data-testid="branch-scope-menu"
-          className="absolute end-0 top-full z-50 mt-1.5 w-[min(300px,calc(100vw-24px))] overflow-hidden rounded-xl border border-ui-border bg-ui-surface shadow-ui-lg"
+          className="absolute end-0 top-full z-50 mt-2 w-[min(300px,calc(100vw-24px))] overflow-hidden rounded-[22px] border border-ui-border bg-ui-surface shadow-ui-xl"
         >
           <div className="border-b border-ui-border p-2">
             <button
