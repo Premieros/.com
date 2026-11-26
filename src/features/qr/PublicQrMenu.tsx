@@ -3,7 +3,7 @@ import { useBunkerPublicTheme } from './useBunkerPublicTheme';
 import { supabase } from '@/api';
 import { BranchSocialLinks } from './BranchSocialLinks';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
-import { ArrowRight, ChevronLeft, ChevronRight, Heart, Search, SlidersHorizontal, ShoppingBag, Home, MapPin, Plus, Minus, UtensilsCrossed, ReceiptText, Check } from 'lucide-react';
+import { ArrowRight, Heart, Search, ShoppingBag, Home, MapPin, Plus, Minus, Trash2, UtensilsCrossed, ReceiptText, Check } from 'lucide-react';
 import { ProductImage } from '@/features/catalog/components/ProductImage';
 import { qrPublic } from '@/api/domains/qrPublic';
 import type { GuestIdentity, GuestOrderType, QrAppearance, QrItem, QrProduct, QrTable } from './service';
@@ -25,6 +25,7 @@ function foodSymbol(name: string) {
   if (/cake|حلو|dessert|كيك|waffle|وافل/i.test(name)) return '🍰';
   return '🍽️';
 }
+
 function demoSymbol(name: string, category?: string) {
   const text = `${name} ${category || ''}`.toLowerCase();
   if (/chicken/.test(text)) return '🍗';
@@ -99,10 +100,7 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
   const [receipt, setReceipt] = useState('');
   const [retry, setRetry] = useState<Draft | null>(null);
   const lock = useRef(false);
-  const categoriesRef = useRef<HTMLDivElement>(null);
-  const categoryDrag = useRef<{ x: number; scroll: number; moved: boolean } | null>(null);
-  const suppressCategoryClick = useRef(false);
-  const [categoryScroll, setCategoryScroll] = useState({ back: false, next: false });
+  const [sortMode, setSortMode] = useState<'default' | 'price-asc' | 'price-desc' | 'name'>('default');
   const legacyStorageKey = `premier_qr_pending_v1_${token}`;
   const storageKey = secure ? `${legacyStorageKey}:${session}` : legacyStorageKey;
   // Each screen starts at its header, even after scrolling a long product list.
@@ -110,23 +108,6 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
   useEffect(() => { document.documentElement.scrollTop = 0; }, [detailId, page]);
   const activeBill = [...visit.tracking.bills].reverse().find(b => ['open', 'held'].includes(b.status));
   useEffect(() => { if (activeBill?.table_id) setTable(activeBill.table_id); }, [activeBill?.table_id]);
-  useEffect(() => {
-    const node = categoriesRef.current;
-    if (!node) return;
-    const update = () => setCategoryScroll({ back: Math.abs(node.scrollLeft) > 2, next: Math.abs(node.scrollLeft) + node.clientWidth < node.scrollWidth - 2 });
-    const wheel = (event: WheelEvent) => {
-      if (!event.deltaY || event.deltaX || event.ctrlKey) return;
-      const previous = node.scrollLeft;
-      node.scrollLeft += isBunker ? event.deltaY : -event.deltaY;
-      if (node.scrollLeft !== previous) event.preventDefault();
-    };
-    update();
-    node.addEventListener('scroll', update, { passive: true });
-    node.addEventListener('wheel', wheel, { passive: false });
-    const resize = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(update) : null;
-    resize?.observe(node);
-    return () => { node.removeEventListener('scroll', update); node.removeEventListener('wheel', wheel); resize?.disconnect(); };
-  }, [menu, detailId, page, isBunker]);
   useEffect(() => {
     let alive = true;
     let restoredRetry = false;
@@ -251,7 +232,13 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
   const currency = menu?.currency || 'ج.م';
   const categories = [...new Map((menu?.products || []).filter(p => p.category_id).map(p => [p.category_id!, { id: p.category_id!, name: p.category_name || 'أصناف', product: p }])).values()];
   const filtered = (menu?.products || []).filter(p => (!category || p.category_id === category) && (!onlyFavorites || favorites.includes(p.id)) && `${p.name} ${p.description || ''}`.toLowerCase().includes(query.toLowerCase()));
-  useEffect(() => { setVisibleProducts(24); }, [category, query, onlyFavorites, menu]);
+  // Adapted from Restaurant & Cafe Website Menu.tsx (MIT, restaurant-cafe.LICENSE).
+  switch (sortMode) {
+    case 'price-asc': filtered.sort((a, b) => a.price - b.price); break;
+    case 'price-desc': filtered.sort((a, b) => b.price - a.price); break;
+    case 'name': filtered.sort((a, b) => a.name.localeCompare(b.name)); break;
+  }
+  useEffect(() => { setVisibleProducts(24); }, [category, query, onlyFavorites, menu, sortMode]);
   const disabled = busy || !!retry || changingFulfillment;
   function openProduct(p: QrProduct) { setDetail(p); setQuantity(cart[p.id]?.quantity || 1); setNote(cart[p.id]?.notes || ''); }
   function addProduct() {
@@ -260,7 +247,7 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
     setDetail(null); setReceipt('');
   }
   function changeQuantity(id: string, value: number) { setCart(c => ({ ...c, [id]: { ...c[id], quantity: Math.max(0, Math.min(99, Math.trunc(value) || 0)) } })); }
-  return <main dir={isBunker ? "ltr" : "rtl"} data-bunker-theme={isBunker ? bunkerMode : undefined} className={`customer-app${page === 'home' && count > 0 && !detail ? ' customer-has-cart-dock' : ''}${isBunker ? " bunker-customer" : ""}`}>
+  return <main dir={isBunker ? "ltr" : "rtl"} data-bunker-theme={isBunker ? bunkerMode : undefined} className={`customer-app customer-order-menu${page === 'home' && count > 0 && !detail ? ' customer-has-cart-dock' : ''}${isBunker ? " bunker-customer" : ""}`}>
     <CustomerSupportLink token={token} />
     {detail ? <>
       <header className="customer-detail-header"><button aria-label={isBunker ? "Back to menu" : "العودة للمنيو"} onClick={() => setDetail(null)}><ArrowRight size={22} /></button><h1>{isBunker ? "Item details" : "تفاصيل الصنف"}</h1><button aria-label={isBunker ? 'Add to favorites' : 'إضافة للمفضلة'} aria-pressed={favorites.includes(detail.id)} onClick={() => setFavorites(f => f.includes(detail.id) ? f.filter(id => id !== detail.id) : [...f, detail.id])}><Heart size={22} fill={favorites.includes(detail.id) ? '#ff8a35' : 'none'} /></button></header>
@@ -278,13 +265,25 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
       {recoveryCode && <div className="customer-recovery" role="status"><strong>{isBunker ? 'Your recovery code:' : 'رمز استرجاع طلبك:'} <b dir="ltr">{recoveryCode}</b></strong><p>{isBunker ? 'Keep this code to open your order on another device. Do not share it. Ask our team for help if lost.' : 'احتفظ به لفتح طلبك من جهاز جديد. لا تشاركه مع الآخرين. إذا نسيته اطلب رمزًا جديدًا من الموظف.'}</p></div>}
       {receipt && <div role="status" className="customer-receipt"><Check size={26} /><strong>{isBunker ? 'Your order has reached our team' : 'وصل طلبك للموظف'}</strong><p>{receipt}</p><small>{isBunker ? 'Track your order under My Order.' : 'تابع حالة طلبك وحسابك من زر «طلبي».'}</small></div>}
       {page === 'home' ? <>
-        <div className="customer-search"><Search size={21} /><input aria-label={isBunker ? "Search menu" : "ابحث في المنيو"} placeholder={isBunker ? "Search the menu" : "ابحث الآن"} value={query} onChange={e => setQuery(e.target.value)} /><button aria-label={isBunker ? 'Show all categories' : 'عرض كل التصنيفات'} onClick={() => { setCategory(''); document.getElementById('customer-categories')?.scrollIntoView({ behavior: 'smooth', block: 'center' }); }}><SlidersHorizontal size={20} /></button></div>
-        <div className="customer-category-navigation"><div className="customer-category-heading"><h2>{isBunker ? "Categories" : "الأقسام"}</h2><div><button aria-label={isBunker ? 'Previous categories' : 'الأقسام السابقة'} disabled={!categoryScroll.back} onClick={() => categoriesRef.current?.scrollBy({ left: isBunker ? -250 : 250, behavior: 'smooth' })}><ChevronRight size={21} /></button><button aria-label={isBunker ? 'Next categories' : 'الأقسام التالية'} disabled={!categoryScroll.next} onClick={() => categoriesRef.current?.scrollBy({ left: isBunker ? 250 : -250, behavior: 'smooth' })}><ChevronLeft size={21} /></button></div></div><div id="customer-categories" ref={categoriesRef} className="customer-categories" aria-label={isBunker ? 'Menu categories' : 'أقسام المنيو'}
-          onPointerDown={e => { if (e.pointerType === 'mouse' && e.button === 0) { categoryDrag.current = { x: e.clientX, scroll: e.currentTarget.scrollLeft, moved: false }; suppressCategoryClick.current = false; } }}
-          onPointerMove={e => { const drag = categoryDrag.current; if (!drag) return; if (Math.abs(e.clientX - drag.x) > 6) { drag.moved = true; suppressCategoryClick.current = true; e.currentTarget.setPointerCapture(e.pointerId); } if (drag.moved) { e.currentTarget.scrollLeft = drag.scroll - (e.clientX - drag.x); e.preventDefault(); } }}
-          onPointerUp={() => { categoryDrag.current = null; }} onPointerCancel={() => { categoryDrag.current = null; }}
-          onClickCapture={e => { if (suppressCategoryClick.current) { e.preventDefault(); e.stopPropagation(); suppressCategoryClick.current = false; } }}><button className={!category ? 'is-selected' : ''} onClick={() => setCategory('')}><span>🍽️</span>{isBunker ? "All" : "الكل"}</button>{categories.map(c => <button key={c.id} className={category === c.id ? 'is-selected' : ''} onClick={() => setCategory(c.id)}><span>{foodSymbol(c.name)}</span>{c.name}</button>)}</div></div>
-        <div className="customer-section-title"><h2>{onlyFavorites ? (isBunker ? 'Favorites' : 'المفضلة') : category ? categories.find(c => c.id === category)?.name : (isBunker ? 'Made for you' : 'اقتراحات لك')}</h2><button onClick={() => { setCategory(''); setQuery(''); setOnlyFavorites(false); }}>{isBunker ? 'View all' : 'الكل ‹'}</button></div>
+        <div className="cafe-menu-heading">
+          <h2>{isBunker ? 'Our Menu' : 'المنيو'}</h2>
+          {onlyFavorites && <button type="button" onClick={() => setOnlyFavorites(false)}>{isBunker ? 'Clear favorites filter' : 'إلغاء فلتر المفضلة'}</button>}
+        </div>
+        <div className="cafe-menu-controls">
+          <div className="customer-search"><Search size={20} aria-hidden="true" />
+            <input aria-label={isBunker ? 'Search menu' : 'ابحث في المنيو'} placeholder={isBunker ? 'Search our menu…' : 'ابحث في المنيو…'} value={query} onChange={e => setQuery(e.target.value)} />
+          </div>
+          <select aria-label={isBunker ? 'Sort menu' : 'ترتيب المنيو'} value={sortMode} onChange={e => setSortMode(e.target.value as typeof sortMode)}>
+            <option value="default">{isBunker ? 'Default order' : 'الترتيب الافتراضي'}</option>
+            <option value="price-asc">{isBunker ? 'Price: low to high' : 'السعر من الأقل للأعلى'}</option>
+            <option value="price-desc">{isBunker ? 'Price: high to low' : 'السعر من الأعلى للأقل'}</option>
+            <option value="name">{isBunker ? 'Name' : 'الاسم'}</option>
+          </select>
+        </div>
+        <div className="cafe-category-tabs" role="group" aria-label={isBunker ? 'Menu categories' : 'أقسام المنيو'}>
+          <button type="button" aria-pressed={!category} onClick={() => setCategory('')}>{isBunker ? 'All' : 'الكل'}</button>
+          {categories.map(c => <button type="button" key={c.id} aria-pressed={category === c.id} onClick={() => setCategory(c.id)}>{c.name}</button>)}
+        </div>
         {!menu && !error && <p className="customer-empty" role="status">{isBunker ? 'Loading menu…' : 'جارٍ تحميل المنيو…'}</p>}
         {menu && filtered.length === 0 && <p className="customer-empty">{isBunker ? 'No items available yet.' : 'لا توجد أصناف للعرض حاليًا.'}</p>}
         {!menu && !error && <div className="customer-products" role="status" aria-label={isBunker ? 'Loading menu' : 'جارٍ تحميل المنيو'}>
@@ -292,12 +291,49 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
             <div className="customer-product-image" /><span className="block h-6" />
           </div>)}
         </div>}
-        <div className="customer-products">{filtered.slice(0, visibleProducts).map((p, index) => <article key={p.id} className="customer-product"><button className="customer-product-open" aria-label={isBunker ? `View details for ${p.name}` : `تفاصيل ${p.name}`} onClick={() => openProduct(p)}><div className="customer-product-image"><FoodImage key={p.id} product={p} demo={demoPreview} priority={index < (isBunker ? 2 : 3)} /></div><span className="customer-product-category">{p.category_name || (isBunker ? 'Menu' : 'منيو الفرع')}</span><h3>{p.name}</h3>{p.description && <p className="customer-product-description">{p.description}</p>}<strong className="customer-product-price">{Number(p.price).toFixed(2)} <small>{currency}</small></strong></button><button className="customer-add" aria-label={isBunker ? `Add ${p.name}` : `إضافة ${p.name}`} disabled={disabled} onClick={() => openProduct(p)}>{cart[p.id]?.quantity ? <span>{cart[p.id].quantity} {isBunker ? 'in cart' : 'في السلة'}</span> : <Plus size={20} />}</button></article>)}</div>
+        <div className="customer-products cafe-food-grid">{filtered.slice(0, visibleProducts).map((product, index) => (
+          <article key={product.id} className="customer-product cafe-food-card">
+            <button type="button" className="customer-product-open" aria-label={isBunker ? `View details for ${product.name}` : `تفاصيل ${product.name}`} onClick={() => openProduct(product)}>
+              <div className="customer-product-image">
+                <FoodImage key={product.id} product={product} demo={demoPreview} priority={index < 3} />
+                {product.category_name && <span className="cafe-category-badge">{product.category_name}</span>}
+              </div>
+              <div className="cafe-food-copy">
+                <h3>{product.name}</h3>
+                {product.description && <p className="customer-product-description">{product.description}</p>}
+              </div>
+            </button>
+            <footer className="cafe-food-footer">
+              <strong className="customer-product-price">{Number(product.price).toFixed(2)} <small>{currency}</small></strong>
+              <button type="button" className="customer-add" aria-label={isBunker ? `Add ${product.name}` : `إضافة ${product.name}`} disabled={disabled} onClick={() => openProduct(product)}>
+                <Plus size={18} aria-hidden="true" />{cart[product.id]?.quantity || (isBunker ? 'Add' : 'إضافة')}
+              </button>
+            </footer>
+          </article>
+        ))}</div>
         {filtered.length > visibleProducts && <button className="customer-refresh" onClick={() => setVisibleProducts(count => count + 24)}>
           {isBunker ? 'Show more items' : 'عرض أصناف إضافية'}
         </button>}
         {!retry && <button className="customer-refresh" disabled={busy} onClick={() => window.location.reload()}>{isBunker ? 'Refresh menu & prices' : 'تحديث المنيو والأسعار'}</button>}
-      </> : page === 'visit' && demoPreview ? <section className="customer-cart customer-demo-checkout" role="status"><div className="customer-section-title"><h2>{demoOrder ? 'Demo order confirmed' : 'Demo order preview'}</h2></div>{demoOrder ? <><p className="customer-demo-notice"><strong>SIMULATION ONLY</strong> · The products are in the branch catalog, but this test order was not sent to staff, the kitchen, or the sales system.</p><div className="customer-demo-summary">{demoOrder.items.map(item => <div key={item.product_id} className="customer-demo-summary-line"><span>{item.quantity} × {item.name}</span><strong>{(item.price * item.quantity).toFixed(2)} {currency}</strong>{item.notes && <small>Note: {item.notes}</small>}</div>)}</div><div className="customer-total"><span>Demo total</span><strong>{demoOrder.total.toFixed(2)} {currency}</strong></div><p className="customer-table-hint">No payment was taken. Your test order was not registered.</p><button className="customer-primary" onClick={() => { setDemoOrder(null); setPage('home'); }}>Try another order</button></> : <><p className="customer-demo-notice">Add products to your cart and press <strong>Simulate order</strong> to preview a confirmation without sending anything.</p><button className="customer-primary" onClick={() => setPage(items.length ? 'cart' : 'home')}>{items.length ? 'Continue to cart' : 'Explore menu'}</button></>}</section> : page === 'visit' ? <>{orderSwitcher}{!browseOnly && <GuestVisitPanel secure={secure} key={visit.session} token={token} session={visit.session} table={table} currency={currency} tracking={visit.tracking} error={visit.error} refresh={visit.refresh} newVisit={() => { if (!retry) { visit.newVisit(); setReceipt(''); setTable(''); } }} />}</> : <section className="customer-cart"><div className="customer-section-title"><h2>{isBunker ? 'Your cart' : 'سلتك'}</h2><span>{count} {isBunker ? 'items' : 'أصناف'}</span></div>{items.length === 0 && !receipt && <div className="customer-empty"><ShoppingBag size={42} /><p>{isBunker ? 'Your cart is waiting for something delicious.' : 'سلتك في انتظار اختياراتك'}</p><button onClick={() => setPage('home')}>{isBunker ? 'Explore menu' : 'استكشف المنيو'}</button></div>}{items.map(i => <article className="customer-cart-item" key={i.product_id}><strong>{menu?.products.find(p => p.id === i.product_id)?.name || i.name || 'صنف'}</strong><span>{(i.price * i.quantity).toFixed(2)} {currency}</span><label>{isBunker ? 'Quantity' : 'الكمية'}<input aria-label={`كمية ${i.name || menu?.products.find(p => p.id === i.product_id)?.name}`} type="number" min="0" max="99" value={i.quantity} disabled={disabled} onChange={e => changeQuantity(i.product_id, Number(e.target.value))} /></label><label>{isBunker ? 'Notes' : 'ملاحظات'}<input maxLength={300} value={i.notes} disabled={disabled} onChange={e => setCart(c => ({ ...c, [i.product_id]: { ...c[i.product_id], notes: e.target.value } }))} /></label></article>)}
+      </> : page === 'visit' && demoPreview ? <section className="customer-cart customer-demo-checkout" role="status"><div className="customer-section-title"><h2>{demoOrder ? 'Demo order confirmed' : 'Demo order preview'}</h2></div>{demoOrder ? <><p className="customer-demo-notice"><strong>SIMULATION ONLY</strong> · The products are in the branch catalog, but this test order was not sent to staff, the kitchen, or the sales system.</p><div className="customer-demo-summary">{demoOrder.items.map(item => <div key={item.product_id} className="customer-demo-summary-line"><span>{item.quantity} × {item.name}</span><strong>{(item.price * item.quantity).toFixed(2)} {currency}</strong>{item.notes && <small>Note: {item.notes}</small>}</div>)}</div><div className="customer-total"><span>Demo total</span><strong>{demoOrder.total.toFixed(2)} {currency}</strong></div><p className="customer-table-hint">No payment was taken. Your test order was not registered.</p><button className="customer-primary" onClick={() => { setDemoOrder(null); setPage('home'); }}>Try another order</button></> : <><p className="customer-demo-notice">Add products to your cart and press <strong>Simulate order</strong> to preview a confirmation without sending anything.</p><button className="customer-primary" onClick={() => setPage(items.length ? 'cart' : 'home')}>{items.length ? 'Continue to cart' : 'Explore menu'}</button></>}</section> : page === 'visit' ? <>{orderSwitcher}{!browseOnly && <GuestVisitPanel secure={secure} key={visit.session} token={token} session={visit.session} table={table} currency={currency} tracking={visit.tracking} error={visit.error} refresh={visit.refresh} newVisit={() => { if (!retry) { visit.newVisit(); setReceipt(''); setTable(''); } }} />}</> : <section className="customer-cart"><div className="customer-section-title"><h2>{isBunker ? 'Your cart' : 'سلتك'}</h2><span>{count} {isBunker ? 'items' : 'أصناف'}</span></div>{items.length === 0 && !receipt && <div className="customer-empty"><ShoppingBag size={42} /><p>{isBunker ? 'Your cart is waiting for something delicious.' : 'سلتك في انتظار اختياراتك'}</p><button onClick={() => setPage('home')}>{isBunker ? 'Explore menu' : 'استكشف المنيو'}</button></div>}{items.map(item => {
+          const product = menu?.products.find(candidate => candidate.id === item.product_id);
+          const name = product?.name || item.name || (isBunker ? 'Item' : 'صنف');
+          return <article className="customer-cart-item cafe-cart-item" key={item.product_id}>
+            {product && <div className="cafe-cart-photo"><FoodImage product={product} demo={demoPreview} /></div>}
+            <div className="cafe-cart-copy">
+              <strong>{name}</strong><span>{(item.price * item.quantity).toFixed(2)} {currency}</span>
+              <label>{isBunker ? 'Notes' : 'ملاحظات'}<input maxLength={300} value={item.notes} disabled={disabled} onChange={e => setCart(c => ({ ...c, [item.product_id]: { ...item, notes: e.target.value } }))} /></label>
+            </div>
+            <div className="cafe-cart-actions">
+              <button type="button" disabled={disabled} aria-label={isBunker ? `Remove ${name}` : `حذف ${name}`} onClick={() => changeQuantity(item.product_id, 0)}><Trash2 size={18} /></button>
+              <div className="customer-stepper">
+                <button type="button" disabled={disabled || item.quantity <= 1} aria-label={isBunker ? `Decrease ${name}` : `تقليل ${name}`} onClick={() => changeQuantity(item.product_id, item.quantity - 1)}><Minus size={16} /></button>
+                <input aria-label={isBunker ? `Quantity of ${name}` : `كمية ${name}`} type="number" min="0" max="99" value={item.quantity} disabled={disabled} onChange={e => changeQuantity(item.product_id, Number(e.target.value))} />
+                <button type="button" disabled={disabled || item.quantity >= 99} aria-label={isBunker ? `Increase ${name}` : `زيادة ${name}`} onClick={() => changeQuantity(item.product_id, item.quantity + 1)}><Plus size={16} /></button>
+              </div>
+            </div>
+          </article>;
+        })}
       {!demoPreview && !secure && !browseOnly && <div className="customer-table"><label htmlFor="customer-table">{withoutTable ? (isBunker ? 'Order type' : 'نوع الطلب') : secure ? (isBunker ? 'Your table' : 'طاولتك المعتمدة') : (isBunker ? 'Choose a table' : 'اختر طاولتك')}</label>{withoutTable ? <strong>{pickup ? (isBunker ? 'Pickup' : 'استلام من المطعم') : (isBunker ? 'Delivery' : 'توصيل')}</strong> : <select id="customer-table" value={table} disabled={secure || disabled || !!activeBill} onChange={e => setTable(e.target.value)}><option value="">{isBunker ? 'Select a table' : 'اختر الطاولة'}</option>{menu?.tables?.map(t => <option key={t.id} value={t.id}>{t.name}{t.busy ? (isBunker ? ' · Occupied' : ' · مشغولة') : ''}</option>)}</select>}</div>}
       {!demoPreview && !secure && !browseOnly && <p className="customer-table-hint">{secure ? withoutTable ? (isBunker ? 'Follow your order in My Order.' : 'تابع حالة الطلب من زر طلبي.') : (isBunker ? 'Your table is linked to your visit. Please ask our team to change it.' : 'الطاولة مرتبطة بزيارتك؛ تغييرها يتم لدى الموظف فقط.') : menu?.tables?.find(t => t.id === table)?.busy ? (isBunker ? 'This table is occupied. Our team will confirm an alternative.' : 'هذه الطاولة مشغولة؛ سيؤكد الموظف طاولة بديلة معك.') : (isBunker ? 'Our team confirms your table and order before preparation.' : 'الموظف يؤكد الطاولة والطلب قبل التحضير.')}</p>}
         {!demoPreview && identity && <CartFulfillment type={identity.order_type}

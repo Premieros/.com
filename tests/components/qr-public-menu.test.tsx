@@ -44,17 +44,16 @@ describe('public QR mobile order intake', () => {
     fireEvent.click(screen.getByRole('button', { name: 'تفاصيل Tea' }));
     expect(screen.getByRole('img', { name: 'Tea' })).toHaveClass('customer-image-large');
   });
-  it('scrolls category navigation in both RTL directions without selecting another category', async () => {
-    render(<PublicQrMenu token={token} />); await screen.findByRole('heading', { name: 'Tea' });
-    const categories = screen.getByLabelText('أقسام المنيو');
-    Object.defineProperties(categories, { scrollWidth: { value: 900 }, clientWidth: { value: 300 } });
-    categories.scrollBy = vi.fn();
-    fireEvent.scroll(categories);
-    fireEvent.click(screen.getByRole('button', { name: 'الأقسام التالية' }));
-    expect(categories.scrollBy).toHaveBeenCalledWith({ left: -250, behavior: 'smooth' });
-    categories.scrollLeft = -200; fireEvent.scroll(categories);
-    fireEvent.click(screen.getByRole('button', { name: 'الأقسام السابقة' }));
-    expect(categories.scrollBy).toHaveBeenCalledWith({ left: 250, behavior: 'smooth' });
+  it('filters the cafe menu through accessible category tabs', async () => {
+    mocks.rpc.mockImplementation(async (name: string) => ({ data: name === 'qr_menu' ? {
+      ...menu, products: [{ ...menu.products[0], category_id: 'drinks', category_name: 'مشروبات' },
+        { id: 'p2', name: 'Cake', price: 40, category_id: 'desserts', category_name: 'حلويات' }],
+    } : null, error: null }));
+    render(<PublicQrMenu token={token} />);
+    fireEvent.click(await screen.findByRole('button', { name: 'حلويات' }));
+    expect(screen.getByRole('button', { name: 'حلويات' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('heading', { name: 'Cake' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Tea' })).not.toBeInTheDocument();
   });
   it('prevents rapid double submission and confirms pending status', async () => {
     let resolve: (value: unknown) => void = () => undefined;
