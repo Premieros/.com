@@ -15,9 +15,9 @@ describe('compact RTL/LTR global header', () => {
     expect(layout).toContain('data-testid="header-pos-shortcut"');
   });
 
-  it('hides only optional text on narrower screens while preserving accessible buttons', () => {
+  it('keeps account controls and section tabs accessible outside the header row', () => {
     expect(layout).toContain('hidden 2xl:inline');
-    expect(layout).toContain('hidden min-w-0 max-w-32 text-start 2xl:block');
+    expect(layout).toContain('data-testid="user-menu-button"');
     expect(layout).toContain('data-testid="language-toggle"');
     expect(layout).toContain('data-testid="sign-out-button"');
     expect(layout).toContain('data-testid="theme-toggle"');
