@@ -1,10 +1,10 @@
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity, AlertTriangle, ArrowDown, ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUp, BarChart3, BadgeDollarSign, Boxes, BookOpenText, Building2, Calculator, ChefHat,
   ChevronDown, ClipboardCheck, FileSpreadsheet, FileText, FlaskConical,
-  Globe, GripVertical, HandCoins, Landmark, Layers, LayoutDashboard, LayoutGrid, LogOut, Menu, Moon, NotebookPen,
-  Package, Receipt, Scale, ScrollText, Settings, ShoppingCart, SlidersHorizontal, Store, Sun,
+  Globe, GripVertical, HandCoins, HelpCircle, Keyboard, Landmark, Layers, LayoutDashboard, LayoutGrid, LogOut, Menu, Moon, NotebookPen,
+  Package, Plus, Receipt, Scale, ScrollText, Settings, ShoppingCart, SlidersHorizontal, Store, Sun,
   Tags, Timer, Trash2, Truck, UserCog, Users, Wallet, Warehouse, X,
 } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
@@ -21,6 +21,7 @@ import { workspaceSectionForPath } from '@/core/navigation/workspaceSections';
 import { prefetchAppRoute } from '@/core/navigation/prefetch';
 import { MENU_GROUPS, MENU_ITEMS, SIDEBAR_SECTION_ORDER, sidebarSectionForItem, type MenuIcon, type SidebarSection } from '@/core/navigation/menu.config';
 import { CommandPalette, CommandPaletteTrigger } from './CommandPalette';
+import { Modal } from './Modal';
 import { OfflineStatusIndicator } from './OfflineStatusIndicator';
 import { PageUtilityControls } from './PageUtilityControls';
 import { ReturnContextBanner } from '@/core/guard/ReturnContextBanner';
@@ -103,6 +104,9 @@ function AccountLayout({ children }: { children: ReactNode }) {
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [quickNewOpen, setQuickNewOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const quickNewRef = useRef<HTMLDivElement>(null);
   const preferenceKey = `premier:sidebar:${user?.id ?? 'guest'}`;
   const [desktopSidebarHidden, setDesktopSidebarHidden] = useState(
     () => readSidebarPreference(`${preferenceKey}:hidden`, false) === true,
@@ -160,6 +164,30 @@ function AccountLayout({ children }: { children: ReactNode }) {
   // organization-module and route filters as every other navigation entry.
   const canOpenPos = visibleItems.some((item) => item.id === 'pos');
   const canOpenKitchen = visibleItems.some((item) => item.id === 'kitchen-display');
+  const quickCreateActions = useMemo(() => [
+    { id: 'pos-sale', to: APP_ROUTES.pos, ar: 'طلب / فاتورة بيع', en: 'New POS order', allowed: canOpenPos && can('pos.order.create'), icon: <ShoppingCart className="h-4 w-4" /> },
+    { id: 'new-customer', to: `${APP_ROUTES.customers}?new=1`, ar: 'عميل جديد', en: 'New customer', allowed: can('customers.manage') && can('customers.view') && canAccessModule('customers') && canAccessPath(APP_ROUTES.customers), icon: <Users className="h-4 w-4" /> },
+    { id: 'new-product', to: `${APP_ROUTES.products}?new=1`, ar: 'منتج جديد', en: 'New product', allowed: can('products.create') && can('products.view') && canAccessModule('catalog') && canAccessPath(APP_ROUTES.products), icon: <Package className="h-4 w-4" /> },
+    { id: 'new-purchase', to: APP_ROUTES.purchases, ar: 'فاتورة شراء', en: 'Purchases', allowed: can('purchases.manage') && canAccessModule('purchases') && canAccessPath(APP_ROUTES.purchases), icon: <Truck className="h-4 w-4" /> },
+    { id: 'stock-transfer', to: APP_ROUTES.transfers, ar: 'تحويل مخزون', en: 'Stock transfers', allowed: can('inventory.view') && canAccessModule('inventory') && canAccessPath(APP_ROUTES.transfers), icon: <ArrowLeftRight className="h-4 w-4" /> },
+    { id: 'stock-count', to: APP_ROUTES.stockCounts, ar: 'جرد مخزني', en: 'Stock counts', allowed: can('inventory.view') && canAccessModule('inventory') && canAccessPath(APP_ROUTES.stockCounts), icon: <ClipboardCheck className="h-4 w-4" /> },
+  ].filter((entry) => entry.allowed), [can, canAccessModule, canAccessPath, canOpenPos]);
+
+  useEffect(() => {
+    if (!quickNewOpen) return;
+    const handleOutside = (event: MouseEvent | TouchEvent) => {
+      if (quickNewRef.current && !quickNewRef.current.contains(event.target as Node)) setQuickNewOpen(false);
+    };
+    const handleEsc = (event: KeyboardEvent) => { if (event.key === 'Escape') setQuickNewOpen(false); };
+    document.addEventListener('mousedown', handleOutside);
+    document.addEventListener('touchstart', handleOutside);
+    document.addEventListener('keydown', handleEsc);
+    return () => {
+      document.removeEventListener('mousedown', handleOutside);
+      document.removeEventListener('touchstart', handleOutside);
+      document.removeEventListener('keydown', handleEsc);
+    };
+  }, [quickNewOpen]);
   const grouped = useMemo(() => visibleItems.reduce<Partial<Record<SidebarSection, typeof visibleItems>>>((acc, item) => {
     if (item.id === 'pos') return acc;
     const section = sidebarSectionForItem(item);
@@ -351,6 +379,39 @@ function AccountLayout({ children }: { children: ReactNode }) {
               <Activity className="h-4 w-4" />
               {activeOrderCount > 0 && <span data-testid="active-orders-count" className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ui-danger px-1 text-[9px] font-bold text-white">{activeOrderCount}</span>}
             </button>
+          )}
+          {quickCreateActions.length > 0 && (
+            <div ref={quickNewRef} className="relative hidden sm:block">
+              <button
+                type="button"
+                data-testid="header-quick-new"
+                aria-expanded={quickNewOpen}
+                onClick={() => setQuickNewOpen((open) => !open)}
+                className="flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-ui-primary px-3.5 text-xs font-semibold text-ui-primary-fg shadow-ui-sm transition hover:bg-ui-primary-hover active:scale-95"
+              >
+                <Plus className="h-3.5 w-3.5" />
+                <span>{ar ? 'جديد' : 'New'}</span>
+              </button>
+              {quickNewOpen && (
+                <div className="absolute end-0 top-full z-[80] mt-2 w-60 overflow-hidden rounded-[22px] border border-ui-border bg-ui-surface p-1.5 shadow-ui-xl">
+                  <p className="px-3 py-1.5 text-[11px] font-bold text-ui-subtle">{ar ? 'إنشاء سريع' : 'Quick create'}</p>
+                  {quickCreateActions.map((action) => (
+                    <button
+                      key={action.id}
+                      type="button"
+                      onClick={() => {
+                        setQuickNewOpen(false);
+                        navigate(action.to);
+                      }}
+                      className="flex w-full items-center gap-2.5 rounded-[14px] px-3 py-2 text-start text-[13px] font-semibold text-ui-text transition hover:bg-ui-page-alt hover:text-ui-primary"
+                    >
+                      <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-ui-primary-soft text-ui-primary">{action.icon}</span>
+                      <span className="truncate">{ar ? action.ar : action.en}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
           )}
           <button
             data-testid="user-menu-button"
@@ -613,6 +674,14 @@ function AccountLayout({ children }: { children: ReactNode }) {
 
         <div className="hidden flex-col gap-1 rounded-[22px] border border-ui-border bg-ui-surface p-2 shadow-ui lg:flex">
           <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            className="flex h-10 w-full items-center gap-3 rounded-[14px] px-3 text-[13px] font-medium text-ui-muted transition hover:bg-ui-page-alt hover:text-ui-text"
+          >
+            <HelpCircle className="h-4 w-4 shrink-0" />
+            <span>{ar ? 'الاختصارات والمساعدة' : 'Help & keys'}</span>
+          </button>
+          <button
             data-testid="desktop-sidebar-hide"
             type="button"
             onClick={() => setDesktopSidebarHidden(true)}
@@ -788,6 +857,28 @@ function AccountLayout({ children }: { children: ReactNode }) {
       </footer>
 
       <CommandPalette />
+      <Modal open={helpOpen} onClose={() => setHelpOpen(false)} title={ar ? 'اختصارات لوحة المفاتيح والمساعدة' : 'Keyboard shortcuts & help'} size="sm">
+        <div className="space-y-3 text-sm">
+          <div className="flex items-center justify-between rounded-[16px] border border-ui-border bg-ui-page-alt px-4 py-3">
+            <span className="flex items-center gap-2 font-semibold text-ui-text"><Keyboard className="h-4 w-4 text-ui-primary" />{ar ? 'البحث السريع والأوامر' : 'Quick search & command palette'}</span>
+            <kbd className="rounded-full border border-ui-border bg-ui-surface px-2.5 py-0.5 text-xs font-bold text-ui-muted">Ctrl / ⌘ + K</kbd>
+          </div>
+          <div className="flex items-center justify-between rounded-[16px] border border-ui-border bg-ui-page-alt px-4 py-3">
+            <span className="font-semibold text-ui-text">{ar ? 'إغلاق النوافذ المنبثقة' : 'Close open modal or drawer'}</span>
+            <kbd className="rounded-full border border-ui-border bg-ui-surface px-2.5 py-0.5 text-xs font-bold text-ui-muted">Esc</kbd>
+          </div>
+          {canOpenSettings && (
+            <button
+              type="button"
+              onClick={() => { setHelpOpen(false); navigate(APP_ROUTES.settings); }}
+              className="flex w-full items-center justify-between rounded-[16px] border border-ui-border bg-ui-surface px-4 py-3 font-semibold text-ui-text transition hover:border-ui-primary/40 hover:bg-ui-page-alt"
+            >
+              <span>{ar ? 'إعدادات المظهر والفرع' : 'Appearance & branch settings'}</span>
+              <span className="text-ui-primary">→</span>
+            </button>
+          )}
+        </div>
+      </Modal>
     </div>
   );
 }

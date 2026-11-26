@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Trash2, FileText, Edit2, RotateCcw, Eye, Printer, RefreshCw, CalendarDays, Filter } from 'lucide-react';
+import { Trash2, FileText, Edit2, RotateCcw, Eye, Printer, RefreshCw, CalendarDays, Filter, ReceiptText, Wallet, Banknote } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
 import { DesignSurface, DesignPageHeader, DesignPanel, DesignPagination } from '@/components/design';
 import { DataTable, type Column } from '@/components/DataTable';
+import { StatCard } from '@/components/PageHeader';
 import { Button } from '@/components/Button';
 import { Select, Textarea } from '@/components/Input';
 import { Modal } from '@/components/Modal';
@@ -756,6 +757,40 @@ export function SalesPage() {
           )}
         </>
       } />
+
+      {(() => {
+        const netTotal = filtered.reduce((sum, r) => sum + Number(r.total || 0), 0);
+        const paidTotal = filtered.reduce((sum, r) => sum + Number(r.paid_amount || 0), 0);
+        const refundedTotal = filtered.reduce((sum, r) => sum + Number(r.refunded_amount || 0), 0);
+        return (
+          <section className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+            <StatCard
+              title={isAr ? 'الفواتير المعروضة' : 'Loaded invoices'}
+              value={String(filtered.length)}
+              icon={<ReceiptText className="h-4 w-4" />}
+              color="brand"
+            />
+            <StatCard
+              title={isAr ? 'إجمالي الفواتير' : 'Total amount'}
+              value={formatFinancialCurrency(netTotal, currency, lang)}
+              icon={<Wallet className="h-4 w-4" />}
+              color="green"
+            />
+            <StatCard
+              title={isAr ? 'إجمالي المحصل' : 'Collected'}
+              value={formatFinancialCurrency(paidTotal, currency, lang)}
+              icon={<Banknote className="h-4 w-4" />}
+              color="blue"
+            />
+            <StatCard
+              title={isAr ? 'المرتجعات' : 'Refunded'}
+              value={formatFinancialCurrency(refundedTotal, currency, lang)}
+              icon={<RotateCcw className="h-4 w-4" />}
+              color="amber"
+            />
+          </section>
+        );
+      })()}
 
       {requestedSaleId && (
         <div role={sourceLookup === 'unavailable' ? 'alert' : 'status'}

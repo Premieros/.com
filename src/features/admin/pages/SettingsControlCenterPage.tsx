@@ -52,7 +52,7 @@ export function SettingsControlCenterPage() {
   const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const { t, lang, setLang, languageLocked, lockLanguagePreference, unlockLanguagePreference } = useLanguage();
-  const { theme, setTheme, setUiTheme } = useTheme();
+  const { theme, setTheme, uiTheme, setUiTheme } = useTheme();
   const { settings, branchSettingsMap, saveBranchSettings } = useSettings();
   const { branches } = useBranches();
   const { show } = useToast();
@@ -868,6 +868,37 @@ export function SettingsControlCenterPage() {
               </div>
 
               <div>
+                <p className="text-xs font-bold text-ui-text mb-2">{isAr ? 'لون التمييز السريع (Premier Accents):' : 'Accent colour:'}</p>
+                <div className="mb-5 flex flex-wrap items-center gap-3">
+                  {([
+                    { accent: 'copper', themeKey: 'premier-refresh-copper', color: '#a8481c', ar: 'نحاسي', en: 'Copper' },
+                    { accent: 'cobalt', themeKey: 'premier-refresh-cobalt', color: '#2747c4', ar: 'كوبالت', en: 'Cobalt' },
+                    { accent: 'ocean', themeKey: 'premier-refresh-ocean', color: '#16627a', ar: 'محيطي', en: 'Ocean' },
+                    { accent: 'pine', themeKey: 'premier-refresh-pine', color: '#17704b', ar: 'صنوبري', en: 'Pine' },
+                    { accent: 'graphite', themeKey: 'premier-refresh-graphite', color: '#2c2c33', ar: 'جرافيت', en: 'Graphite' },
+                  ] as const).map((swatch) => {
+                    const currentAccent = findUiTheme(uiTheme)?.accent ?? 'copper';
+                    const isActive = currentAccent === swatch.accent;
+                    return (
+                      <button
+                        key={swatch.accent}
+                        type="button"
+                        onClick={() => {
+                          const currentMode = theme;
+                          setUiTheme(swatch.themeKey);
+                          if (currentMode === 'dark') setTheme('dark');
+                          document.documentElement.setAttribute('data-accent', swatch.accent);
+                        }}
+                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
+                          isActive ? 'border-ui-text bg-ui-text text-ui-surface shadow-ui-sm' : 'border-ui-border bg-ui-page-alt text-ui-text hover:border-ui-border-strong'
+                        }`}
+                      >
+                        <span className="h-3.5 w-3.5 rounded-full border border-white/30" style={{ backgroundColor: swatch.color }} aria-hidden="true" />
+                        <span>{isAr ? swatch.ar : swatch.en}</span>
+                      </button>
+                    );
+                  })}
+                </div>
                 <p className="text-xs font-bold text-ui-text mb-2">{isAr ? 'سمات الواجهة والألوان:' : 'Curated Themes & Accents:'}</p>
                 <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
                   {UI_THEMES.map((th) => (
@@ -875,7 +906,7 @@ export function SettingsControlCenterPage() {
                       key={th.key}
                       type="button"
                       onClick={() => pickTheme(th.key)}
-                      className="flex items-center justify-between gap-2 rounded-[16px] border border-ui-border bg-ui-page-alt px-3.5 py-3 text-start transition hover:border-ui-primary/50 hover:bg-ui-surface"
+                      className={`flex items-center justify-between gap-2 rounded-[16px] border px-3.5 py-3 text-start transition hover:border-ui-primary/50 hover:bg-ui-surface ${uiTheme === th.key ? 'border-ui-primary bg-ui-surface ring-1 ring-ui-primary/30' : 'border-ui-border bg-ui-page-alt'}`}
                     >
                       <span className="flex min-w-0 items-center gap-2.5">
                         <span

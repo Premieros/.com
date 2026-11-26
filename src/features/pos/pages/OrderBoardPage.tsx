@@ -50,6 +50,7 @@ function OrderBoard({ branch }: { branch: string }) {
   const [kitchenError, setKitchenError] = useState(false);
   const [dispatchError, setDispatchError] = useState(false);
   const [refresh, setRefresh] = useState(0);
+  const [channelFilter, setChannelFilter] = useState<string>('all');
   const [now, setNow] = useState(Date.now);
 
   useEffect(() => {
@@ -112,8 +113,10 @@ function OrderBoard({ branch }: { branch: string }) {
       type: ar ? 'تذكرة مطبخ' : 'Kitchen ticket', cashier: '', kitchen: ticket.kitchen_status,
     });
   }
+  const channelOptions = Array.from(new Set(cards.map((c) => c.type).filter(Boolean)));
+  const visibleCards = channelFilter === 'all' ? cards : cards.filter((c) => c.type === channelFilter);
   const buckets: Record<keyof typeof columns, Card[]> = { cashier: [], kitchen: [], ready: [], delivery: [] };
-  for (const card of cards) {
+  for (const card of visibleCards) {
     const group = card.delivery && (card.delivery !== 'waiting' || card.cashier === 'completed')
       ? 'delivery' : card.kitchen === 'ready' ? 'ready'
         : card.kitchen === 'sent' || card.kitchen === 'cooking' ? 'kitchen' : 'cashier';
@@ -127,9 +130,32 @@ function OrderBoard({ branch }: { branch: string }) {
       <DesignPageHeader
         title={ar ? 'لوحة متابعة الطلبات' : 'Order board'}
         subtitle={ar ? 'متابعة حالة الطلبات بين الكاشير والمطبخ والتوصيل' : 'Track order stages across cashier, kitchen and delivery'}
-        actions={(canDelivery || canKitchen) && (
-          <Button size="sm" variant="outline" disabled={loadingBoard} onClick={() => setRefresh((value) => value + 1)}>{ar ? 'تحديث الحالات' : 'Refresh statuses'}</Button>
-        )}
+        actions={<div className="flex flex-wrap items-center gap-2">
+          {channelOptions.length > 0 && (
+            <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-ui-border bg-ui-page-alt p-1">
+              <button
+                type="button"
+                onClick={() => setChannelFilter('all')}
+                className={`rounded-full px-3 py-1 text-xs font-semibold transition ${channelFilter === 'all' ? 'bg-ui-text text-ui-surface shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
+              >
+                {ar ? 'الكل' : 'All'}
+              </button>
+              {channelOptions.map((ch) => (
+                <button
+                  key={ch}
+                  type="button"
+                  onClick={() => setChannelFilter(ch)}
+                  className={`rounded-full px-3 py-1 text-xs font-semibold transition ${channelFilter === ch ? 'bg-ui-text text-ui-surface shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
+                >
+                  {ch}
+                </button>
+              ))}
+            </div>
+          )}
+          {(canDelivery || canKitchen) && (
+            <Button size="sm" variant="outline" disabled={loadingBoard} onClick={() => setRefresh((value) => value + 1)}>{ar ? 'تحديث الحالات' : 'Refresh statuses'}</Button>
+          )}
+        </div>}
       />
       {loadingBoard && <p role="status" className="text-xs text-ui-muted">{ar ? 'جارٍ تحميل الطلبات…' : 'Loading orders…'}</p>}
       {(error || (canDelivery && dispatchError) || (canKitchen && kitchenError)) && <p role="alert" className="mb-2 text-ui-danger">

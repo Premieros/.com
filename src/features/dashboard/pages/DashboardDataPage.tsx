@@ -691,6 +691,28 @@ export function DashboardDataPage() {
         {(runtime.description.ar || runtime.description.en) && (
           <p className="mt-1.5 text-sm text-ui-muted">{ar ? runtime.description.ar : runtime.description.en}</p>
         )}
+        {(canCreateSale || canViewSales) && (
+          <div className="mt-3.5 flex flex-wrap items-center gap-2">
+            {canCreateSale && (
+              <Link
+                to={APP_ROUTES.pos}
+                className="inline-flex items-center gap-1.5 rounded-full bg-ui-primary px-4 py-2 text-xs font-semibold text-ui-primary-fg shadow-ui-sm transition hover:bg-ui-primary-hover"
+              >
+                <ShoppingCart className="h-3.5 w-3.5" />
+                <span>{ar ? 'طلب جديد' : 'New order'}</span>
+              </Link>
+            )}
+            {canViewSales && (
+              <Link
+                to={APP_ROUTES.sales}
+                className="inline-flex items-center gap-1.5 rounded-full border border-ui-border bg-ui-surface px-4 py-2 text-xs font-semibold text-ui-text shadow-ui-sm transition hover:border-ui-border-strong hover:bg-ui-page-alt"
+              >
+                <ReceiptText className="h-3.5 w-3.5 text-ui-primary" />
+                <span>{ar ? 'سجل الفواتير' : 'View invoices'}</span>
+              </Link>
+            )}
+          </div>
+        )}
       </div>
       <div className="flex flex-wrap items-center gap-2">
         <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-ui-border bg-ui-surface p-1 shadow-ui-sm">
@@ -759,42 +781,111 @@ export function DashboardDataPage() {
       </section>
 
       {canViewSales && (
-        <Card>
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h2 aria-live="polite" className="text-lg font-black text-ui-text">{analysis.title}</h2>
-            <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
-              {metric === 'sales' && range === 'month' && (
-                <div role="group" aria-label={ar ? 'تجميع الرسم' : 'Chart grouping'} className="flex rounded-lg border border-ui-border">
-                  <button type="button" aria-pressed={!groupByWeek} onClick={() => updateView('group', '')}
-                    className="rounded-lg px-3 py-2 aria-pressed:bg-ui-primary-soft">
-                    {ar ? 'يومي' : 'Daily'}
+        <div className="grid gap-5 xl:grid-cols-[1.65fr_1fr]">
+          <Card>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <h2 aria-live="polite" className="text-lg font-bold text-ui-text">{analysis.title}</h2>
+              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
+                {metric === 'sales' && range === 'month' && (
+                  <div role="group" aria-label={ar ? 'تجميع الرسم' : 'Chart grouping'} className="flex rounded-full border border-ui-border bg-ui-page-alt p-0.5">
+                    <button type="button" aria-pressed={!groupByWeek} onClick={() => updateView('group', '')}
+                      className="rounded-full px-3 py-1.5 aria-pressed:bg-ui-surface aria-pressed:text-ui-text aria-pressed:shadow-ui-sm">
+                      {ar ? 'يومي' : 'Daily'}
+                    </button>
+                    <button type="button" aria-pressed={groupByWeek} onClick={() => updateView('group', 'week')}
+                      className="rounded-full px-3 py-1.5 aria-pressed:bg-ui-surface aria-pressed:text-ui-text aria-pressed:shadow-ui-sm">
+                      {ar ? 'أسبوعي' : 'Weekly'}
+                    </button>
+                  </div>
+                )}
+                {metric === 'sales' && canCompare && (
+                  <button type="button" aria-pressed={compare} onClick={() => updateView('compare', compare ? '' : '1')}
+                    className="rounded-full border border-ui-border px-3 py-1.5 aria-pressed:border-ui-primary aria-pressed:bg-ui-primary-soft aria-pressed:text-ui-primary">
+                    {ar ? 'مقارنة بالفترة السابقة' : 'Compare previous period'}
                   </button>
-                  <button type="button" aria-pressed={groupByWeek} onClick={() => updateView('group', 'week')}
-                    className="rounded-lg px-3 py-2 aria-pressed:bg-ui-primary-soft">
-                    {ar ? 'أسبوعي' : 'Weekly'}
-                  </button>
-                </div>
-              )}
-              {metric === 'sales' && canCompare && (
-                <button type="button" aria-pressed={compare} onClick={() => updateView('compare', compare ? '' : '1')}
-                  className="rounded-lg border border-ui-border px-3 py-2 aria-pressed:border-ui-primary aria-pressed:bg-ui-primary-soft">
-                  {ar ? 'مقارنة بالفترة السابقة' : 'Compare previous period'}
+                )}
+                <button type="button" onClick={() => setExpanded(true)} className="rounded-full border border-ui-border px-3 py-1.5 hover:bg-ui-page-alt">
+                  {ar ? 'توسيع العرض' : 'Expand view'}
                 </button>
-              )}
-              <button type="button" onClick={() => setExpanded(true)} className="rounded-lg border border-ui-border px-3 py-2">
-                {ar ? 'توسيع العرض' : 'Expand view'}
-              </button>
-              {analysis.href && <Link to={analysis.href} className="rounded-lg px-3 py-2 text-ui-primary">{ar ? 'فتح التقرير' : 'Open report'}</Link>}
+                {analysis.href && <Link to={analysis.href} className="rounded-full bg-ui-primary-soft px-3 py-1.5 text-ui-primary hover:bg-ui-primary hover:text-ui-primary-fg">{ar ? 'فتح التقرير' : 'Open report'}</Link>}
+              </div>
             </div>
-          </div>
-          <div aria-hidden={expanded}>{renderAnalysis(false)}</div>
-          <Modal manageFocus open={expanded} onClose={() => setExpanded(false)} title={analysis.title} size="xl">
-            {expanded && renderAnalysis(true)}
-          </Modal>
-        </Card>
+            <div aria-hidden={expanded}>{renderAnalysis(false)}</div>
+            <Modal manageFocus open={expanded} onClose={() => setExpanded(false)} title={analysis.title} size="xl">
+              {expanded && renderAnalysis(true)}
+            </Modal>
+          </Card>
+
+          <Card className="flex flex-col justify-between">
+            <div className="flex items-center justify-between gap-2">
+              <h2 className="text-lg font-bold text-ui-text">{ar ? 'نظرة التحصيل والمبيعات' : 'Sales & collection'}</h2>
+              <span className="rounded-full bg-ui-page-alt px-2.5 py-1 text-[11px] font-semibold text-ui-muted">
+                {rangeLabels[range][ar ? 0 : 1]}
+              </span>
+            </div>
+            {(() => {
+              const ratio = current.sales > 0 ? Math.min(100, Math.max(0, (current.payments / current.sales) * 100)) : 0;
+              const ticks = 36;
+              const filled = Math.round((ratio / 100) * ticks);
+              return (
+                <div className="my-4 flex flex-col items-center">
+                  <svg viewBox="0 0 220 120" className="w-full max-w-[240px]" aria-hidden="true">
+                    {Array.from({ length: ticks }).map((_, idx) => {
+                      const angle = Math.PI - (idx / (ticks - 1)) * Math.PI;
+                      const r1 = 76;
+                      const r2 = 96;
+                      const x1 = 110 + Math.cos(angle) * r1;
+                      const y1 = 108 - Math.sin(angle) * r1;
+                      const x2 = 110 + Math.cos(angle) * r2;
+                      const y2 = 108 - Math.sin(angle) * r2;
+                      return (
+                        <line
+                          key={idx}
+                          x1={x1}
+                          y1={y1}
+                          x2={x2}
+                          y2={y2}
+                          stroke={idx < filled ? 'rgb(var(--ui-primary))' : 'rgb(var(--ui-border-strong))'}
+                          strokeWidth="3"
+                          strokeLinecap="round"
+                          opacity={idx < filled ? 1 : 0.45}
+                        />
+                      );
+                    })}
+                  </svg>
+                  <p className="-mt-11 text-3xl font-bold tracking-tight text-ui-text tabular-nums">{formatPercent(ratio, 1)}</p>
+                  <p className="mt-1 text-xs font-medium text-ui-muted">{ar ? 'نسبة المحصل من صافي المبيعات' : 'Collected of net sales'}</p>
+                </div>
+              );
+            })()}
+            <div className="grid grid-cols-2 gap-3 border-t border-ui-border pt-4">
+              <div>
+                <p className="text-xs text-ui-muted">{ar ? 'عدد الطلبات' : 'Orders'}</p>
+                <p className="mt-1 text-lg font-bold text-ui-text tabular-nums">{formatNumber(current.orders, 0)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-ui-muted">{ar ? 'صافي المبيعات' : 'Net sales'}</p>
+                <p className="mt-1 text-lg font-bold text-ui-text tabular-nums">{money(current.sales)}</p>
+              </div>
+            </div>
+          </Card>
+        </div>
       )}
 
-      {canViewSales && <section className="grid gap-5 xl:grid-cols-3">{can('branches.manage') && <Card><h2 className="mb-3 font-black text-ui-text">{ar ? 'الفروع حسب صافي المبيعات' : 'Branches by net sales'}</h2>{branchRows.length ? branchRows.map(([name, row]) => <div key={name} className="mb-3 flex justify-between gap-3 text-sm"><span className="font-semibold text-ui-text">{name}</span><span className="text-ui-muted">{formatNumber(row.orders, 0)} · {money(row.sales)}</span></div>) : <Empty ar={ar} />}</Card>}
+      {canViewSales && <section className="grid gap-5 xl:grid-cols-3">{can('branches.manage') && <Card><h2 className="mb-3 font-bold text-ui-text">{ar ? 'الفروع حسب صافي المبيعات' : 'Branches by net sales'}</h2>{branchRows.length ? (() => {
+        const maxSales = Math.max(1, ...branchRows.map(([, r]) => r.sales));
+        return branchRows.map(([name, row]) => (
+          <div key={name} className="mb-3 last:mb-0">
+            <div className="mb-1 flex justify-between gap-3 text-sm">
+              <span className="font-semibold text-ui-text">{name}</span>
+              <span className="text-ui-muted tabular-nums">{formatNumber(row.orders, 0)} · {money(row.sales)}</span>
+            </div>
+            <div className="h-2 w-full overflow-hidden rounded-full bg-ui-page-alt">
+              <div className="h-full rounded-full bg-ui-primary transition-all" style={{ width: `${Math.max(4, Math.round((row.sales / maxSales) * 100))}%` }} />
+            </div>
+          </div>
+        ));
+      })() : <Empty ar={ar} />}</Card>}
       <Card><h2 className="mb-3 font-black text-ui-text">{ar ? 'أكثر الأصناف مبيعًا' : 'Top selling items'}</h2>{productRows.length ? productRows.map(([name, qty]) => <div key={name} className="mb-3 flex justify-between gap-3 text-sm"><span className="font-semibold text-ui-text">{name}</span><span className="text-ui-muted">{formatNumber(qty, 2)}</span></div>) : <Empty ar={ar} />}</Card>
       <Card><h2 className="mb-3 font-black text-ui-text">{ar ? 'أحدث الطلبات' : 'Recent orders'}</h2>{recent.length ? recent.map((sale) => <div key={sale.id} className="mb-3 flex justify-between gap-3 text-sm"><span className="font-semibold text-ui-text">{sale.invoice_number || '—'}</span><span className="text-ui-muted">{money(netSaleAmount(sale))}</span></div>) : <Empty ar={ar} />}</Card></section>}
 
