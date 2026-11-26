@@ -34,6 +34,8 @@ import type { Product, Category, ProductUnit, ProductComponentInput } from '@/li
 import { APP_ROUTES } from '@/core/navigation/routes';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
 
+import { includePendingComponent, positiveRecipeYield, validComponentRows } from '@/features/catalog/productCompositionDraft';
+
 const UNIT_NAMES = ['piece', 'carton', 'box', 'pack', 'kg', 'liter', 'meter', 'gram'];
 
 type OperationalIngredient = { raw_material_id: string; quantity: number; wastage_percent: number; raw_material?: { name: string } | null };
@@ -170,10 +172,14 @@ export function ProductsPage() {
 
   const [saving, setSaving] = useState(false);
   const saveLock = useRef(false);
+  const openingProduct = useRef(false);
+  const initialRecipeVersion = useRef<number | null>(null);
+  const initialLinks = useRef<{ unit_id: string; quantity: number }[]>([]);
+  const initialLegacy = useRef<ProductComponentInput[]>([]);
   const canManageRecipes = can('recipes.manage');
 
   useEffect(() => {
-    if (!quickModalOpen || editing || !supportsRawComposition || !canManageRecipes || !form.branch_id) return;
+    if (!(quickModalOpen || modalOpen || ingredientsModalOpen) || editing || !supportsRawComposition || !canManageRecipes || !form.branch_id) return;
     let active = true;
     setRawMaterialOptions([]);
     supabase.from('raw_materials').select('id,name,branch_id')
@@ -184,16 +190,40 @@ export function ProductsPage() {
         else setRawMaterialOptions(data ?? []);
       });
     return () => { active = false; };
-  }, [quickModalOpen, editing, supportsRawComposition, canManageRecipes, form.branch_id, show]);
+  }, [quickModalOpen, modalOpen, ingredientsModalOpen, editing, supportsRawComposition, canManageRecipes, form.branch_id, show]);
+
+  useEffect(() => {
+    if (!(quickModalOpen || modalOpen || ingredientsModalOpen) || editing || !supportsComponentGroups || !form.branch_id) return;
+    let active = true;
+    setManufacturedInventoryUnits([]);
+    supabase.from('inventory_units').select('id,name,unit_type,cost_price,branch_id')
+      .eq('branch_id', form.branch_id).eq('unit_type', 'manufactured').eq('is_active', true).order('name')
+      .then(({ data, error }) => {
+        if (!active) return;
+        if (error) show(error.message, 'error');
+        else setManufacturedInventoryUnits((data || []) as ManufacturedInventoryUnit[]);
+      });
+    return () => { active = false; };
+  }, [quickModalOpen, modalOpen, ingredientsModalOpen, editing, supportsComponentGroups, form.branch_id, show]);
 
   const filtered = products;
   const availableToAdd = stockComponents.filter((s) => s.product_id !== editing?.id && !productComponents.some((c) => c.component_product_id === s.product_id));
-  const availableManufacturedToAdd = manufacturedInventoryUnits.filter((unit) => !linkedInventoryUnits.some((row) => row.unit_id === unit.id));
+  const availableManufacturedToAdd = manufacturedInventoryUnits.filter((unit) => unit.branch_id === form.branch_id && !linkedInventoryUnits.some((row) => row.unit_id === unit.id));
   const availableRawMaterialsToAdd = rawMaterialOptions.filter((material) => !recipeIngredients.some((row) => row.raw_material_id === material.id));
 
   const openAdd = () => {
-    if (!can('products.create')) return;
+    if (!can('products.create') || openingProduct.current || saveLock.current) return;
     setEditing(null);
+    initialRecipeVersion.current = null;
+    initialLinks.current = [];
+    initialLegacy.current = [];
+    setRawMaterialOptions([]);
+    setRawMaterialWaste(0);
+    setComponentSel('');
+    setComponentQty(1);
+    setManufacturedInventoryUnits([]);
+    setLinkedUnitSel('');
+    setLinkedUnitQty(1);
     setEditSection('basic');
     setBusinessAttributes({});
     setProductComponents([]);
@@ -214,6 +244,9 @@ export function ProductsPage() {
   };
 
   const openEdit = async (p: Product) => {
+    if (openingProduct.current || saveLock.current) return;
+    openingProduct.current = true;
+    try {
     const stockComponentsPromise = supportsComposition ? loadStockComponents() : Promise.resolve();
     setEditing(p);
     setEditSection('basic');
@@ -225,7 +258,10 @@ export function ProductsPage() {
         ? supabase.from('product_components').select('component_product_id, quantity').eq('product_id', p.id)
         : Promise.resolve({ data: [], error: null }),
     ]);
+    if (u.error || comps.error) { show((u.error || comps.error)?.message || t('error'), 'error'); return; }
     setUnits((u.data as ProductUnit[]) || [{ id: '', product_id: p.id, unit_name: 'piece', unit_name_en: 'piece', conversion_factor: 1, sale_price: p.sale_price, cost_price: p.cost_price, barcode: p.barcode || '', is_base: true, created_at: '' }]);
+    initialLegacy.current = ((comps.data || []) as ProductComponentInput[]).map(c => ({ component_product_id: c.component_product_id, quantity: Number(c.quantity) })).sort((a,b) => a.component_product_id < b.component_product_id ? -1 : a.component_product_id > b.component_product_id ? 1 : 0);
+    initialRecipeVersion.current = null;
     setProductComponents(((comps.data as { component_product_id: string; quantity: number }[] | null) || []).map((c) => ({ component_product_id: c.component_product_id, quantity: Number(c.quantity) || 1 })));
     const effectiveProductBranch = p.branch_id || branchFilter || '';
     setLiveCompositionCost(null);
@@ -276,6 +312,7 @@ export function ProductsPage() {
         setRawMaterialOptions(options);
         const names = new Map(options.map((row) => [row.id, row.name]));
         currentYield = Number(composition.yield_quantity) || 1;
+        initialRecipeVersion.current = composition.recipe_version ?? null;
         recipeRows = composition.items.map((row) => ({
           raw_material_id: row.raw_material_id,
           quantity: Number(row.quantity) || 0,
@@ -285,17 +322,19 @@ export function ProductsPage() {
       } catch (compositionError) {
         show(compositionError instanceof Error ? compositionError.message : String(compositionError), 'error');
         setRawMaterialOptions([]);
+        return;
       }
     } else {
       setRawMaterialOptions([]);
     }
     let displayInventoryLinks: LinkedInventoryUnit[] = [];
     if (supportsComponentGroups) {
-      const { data: inventoryLinks } = await supabase.from('product_unit_links').select('unit_id,quantity,unit:inventory_units(id,name,unit_type,cost_price)').eq('product_id', p.id);
+      const { data: inventoryLinks, error: inventoryLinksError } = await supabase.from('product_unit_links').select('unit_id,quantity,unit:inventory_units(id,name,unit_type,cost_price)').eq('product_id', p.id);
+      if (inventoryLinksError) { show(inventoryLinksError.message, 'error'); return; }
       displayInventoryLinks = ((inventoryLinks || []) as unknown as LinkedInventoryUnit[]).map((row) => ({ ...row, quantity: Number(row.quantity) || 0 }));
       if (effectiveProductBranch) {
         const { data: manufacturedUnits, error: manufacturedUnitsError } = await supabase.from('inventory_units').select('id,name,unit_type,cost_price,branch_id').eq('branch_id', effectiveProductBranch).eq('unit_type', 'manufactured').eq('is_active', true).order('name');
-        if (manufacturedUnitsError) show(manufacturedUnitsError.message, 'error');
+        if (manufacturedUnitsError) { show(manufacturedUnitsError.message, 'error'); return; }
         setManufacturedInventoryUnits(((manufacturedUnits || []) as unknown as ManufacturedInventoryUnit[]));
       } else {
         setManufacturedInventoryUnits([]);
@@ -309,32 +348,78 @@ export function ProductsPage() {
     setRawMaterialSel('');
     setRawMaterialQty(1);
     setRawMaterialWaste(0);
+    initialLinks.current = displayInventoryLinks.map(({unit_id,quantity}) => ({unit_id,quantity})).sort((a,b) => a.unit_id < b.unit_id ? -1 : a.unit_id > b.unit_id ? 1 : 0);
     setLinkedInventoryUnits(displayInventoryLinks);
     setLinkedUnitSel('');
     setLinkedUnitQty(1);
     setComponentSel('');
     setComponentQty(1);
     setQuickModalOpen(true);
+    } catch (error) {
+      show(error instanceof Error ? error.message : String(error), 'error');
+    } finally {
+      openingProduct.current = false;
+    }
   };
 
   const saveProduct = async () => {
     if (editing ? !can('products.edit') : !can('products.create')) return;
-    if (!form.name) { show(t('required') + ': ' + t('name'), 'error'); return; }
+    if (!form.name.trim()) { show(t('required') + ': ' + t('name'), 'error'); return; }
     const effectiveBranch = form.branch_id || branchFilter || '';
     if (!effectiveBranch) { show(lang === 'ar' ? 'اختر الفرع أولاً' : 'Select a branch first', 'error'); return; }
-    if (supportsComposition && form.product_type === 'manufactured' && productComponents.length === 0 && recipeIngredients.length === 0 && linkedInventoryUnits.length === 0) { show(t('manufacturedRequiresComponents'), 'error'); return; }
-    if (supportsComponentGroups && linkedInventoryUnits.some((row) => row.quantity <= 0 || !manufacturedInventoryUnits.some((unit) => unit.id === row.unit_id && unit.branch_id === effectiveBranch))) { show(lang === 'ar' ? 'تحقق من مجموعات المكونات وكمياتها للفرع الحالي' : 'Check component groups and quantities for the current branch', 'error'); return; }
-    if (supportsRawComposition && recipeIngredients.some((row) => row.quantity <= 0 || row.wastage_percent < 0 || !rawMaterialOptions.some((material) => material.id === row.raw_material_id && material.branch_id === effectiveBranch))) { show(lang === 'ar' ? 'تحقق من الخامات المباشرة وكمياتها للفرع الحالي' : 'Check direct raw materials and quantities for the current branch', 'error'); return; }
-    if (supportsRawComposition && editing && recipeIngredients.length > 0 && !can('recipes.manage')) { show(lang === 'ar' ? 'لا تملك صلاحية إدارة الخامات المباشرة للمنتج.' : 'You do not have permission to manage direct product raw materials.', 'error'); return; }
-    const payload = { ...form, category_id: form.category_id || null, branch_id: effectiveBranch, business_attributes: businessAttributes };
+    if (editing && editing.branch_id && editing.branch_id !== effectiveBranch) { show(lang === 'ar' ? 'لا يمكن نقل المنتج بين الفروع من محرر المكونات.' : 'Cannot move a product between branches in the component editor.', 'error'); return; }
+    let rawRows = recipeIngredients;
+    let unitRows = linkedInventoryUnits;
+    let legacyRows = productComponents;
+    try {
+      if (rawMaterialSel) {
+        const material = rawMaterialOptions.find(row => row.id === rawMaterialSel && row.branch_id === effectiveBranch);
+        if (!supportsRawComposition || !canManageRecipes || !material || !Number.isFinite(rawMaterialWaste) || rawMaterialWaste < 0) throw new Error('INVALID_DIRECT_RAW_COMPONENT');
+        rawRows = includePendingComponent(rawRows, rawMaterialSel, rawMaterialQty, row => row.raw_material_id, (id, quantity) => ({ raw_material_id: id, quantity: quantity * positiveRecipeYield(recipeYield), wastage_percent: rawMaterialWaste, raw_material: { name: material.name } }));
+      }
+      if (componentSel) {
+        if (!supportsComposition || componentSel === editing?.id || !availableToAdd.some(row => row.product_id === componentSel)) throw new Error('INVALID_LEGACY_COMPONENT');
+        legacyRows = includePendingComponent(legacyRows, componentSel, componentQty, row => row.component_product_id, (id, quantity) => ({component_product_id:id,quantity}));
+      }
+      if (linkedUnitSel) {
+        const unit = manufacturedInventoryUnits.find(row => row.id === linkedUnitSel && row.branch_id === effectiveBranch);
+        if (!supportsComponentGroups || !unit) throw new Error('INVALID_MANUFACTURED_COMPONENT');
+        unitRows = includePendingComponent(unitRows, linkedUnitSel, linkedUnitQty, row => row.unit_id, (id, quantity) => ({ unit_id: id, quantity, unit }));
+      }
+    } catch {
+      show(lang === 'ar' ? 'تحقق من اختيار المكون والكمية والفرع قبل الحفظ.' : 'Check the selected component, quantity and branch before saving.', 'error');
+      return;
+    }
+    if (!validComponentRows(rawRows, row => row.raw_material_id) || !validComponentRows(unitRows, row => row.unit_id) || !validComponentRows(legacyRows, row => row.component_product_id) || rawRows.some(row => !Number.isFinite(row.wastage_percent) || row.wastage_percent < 0)) { show(lang === 'ar' ? 'تحقق من كميات المكونات وعدم تكرارها.' : 'Check component quantities and duplicates.', 'error'); return; }
+    const hasComponents = rawRows.length > 0 || unitRows.length > 0 || legacyRows.length > 0;
+    const productType = hasComponents ? 'manufactured' as const : form.product_type;
+    if (supportsComposition && productType === 'manufactured' && !hasComponents) { show(t('manufacturedRequiresComponents'), 'error'); return; }
+    if (legacyRows.length > 0 && (rawRows.length > 0 || unitRows.length > 0)) {
+      show(lang === 'ar' ? 'راجع مكونات المنتجات المخزنية القديمة قبل خلطها بالخامات والمصنّعات.' : 'Review legacy stock-product components before mixing them with raw materials and manufactured groups.', 'error'); return;
+    }
+    setRecipeIngredients(rawRows);
+    setLinkedInventoryUnits(unitRows);
+    setProductComponents(legacyRows);
+    setComponentSel('');
+    setRawMaterialSel('');
+    setLinkedUnitSel('');
+    setForm(current => ({ ...current, product_type: productType }));
+    if (supportsComponentGroups && unitRows.some((row) => row.quantity <= 0 || !manufacturedInventoryUnits.some((unit) => unit.id === row.unit_id && unit.branch_id === effectiveBranch))) { show(lang === 'ar' ? 'تحقق من مجموعات المكونات وكمياتها للفرع الحالي' : 'Check component groups and quantities for the current branch', 'error'); return; }
+    if (supportsRawComposition && canManageRecipes && rawRows.some((row) => row.quantity <= 0 || row.wastage_percent < 0 || !rawMaterialOptions.some((material) => material.id === row.raw_material_id && material.branch_id === effectiveBranch))) { show(lang === 'ar' ? 'تحقق من الخامات المباشرة وكمياتها للفرع الحالي' : 'Check direct raw materials and quantities for the current branch', 'error'); return; }
+    if (!editing && supportsRawComposition && rawRows.length > 0 && !can('recipes.manage')) { show(lang === 'ar' ? 'لا تملك صلاحية إدارة الخامات المباشرة للمنتج.' : 'You do not have permission to manage direct product raw materials.', 'error'); return; }
+    const payload = { ...form, product_type: productType, category_id: form.category_id || null, branch_id: effectiveBranch, business_attributes: businessAttributes };
     const unitPayload = units.filter(u => u.unit_name).map((u) => ({ unit_name: u.unit_name, unit_name_en: u.unit_name_en || u.unit_name, conversion_factor: u.conversion_factor, sale_price: u.sale_price, cost_price: u.cost_price, barcode: u.barcode || null, is_base: u.is_base }));
-    let pid: string;
     if (editing) {
-      const { error } = await supabase.from('products').update(payload).eq('id', editing.id);
-      if (error) { show(error.message, 'error'); return; }
-      pid = editing.id;
-      const { error: unitError } = await api.catalog.replaceProductUnits({ p_product_id: editing.id, p_units: unitPayload });
-      if (unitError) { show(unitError.message, 'error'); return; }
+      const { data, error } = await api.catalog.editProductOperational({
+        p_product_id: editing.id, p_branch_id: effectiveBranch,
+        p_expected_version: initialRecipeVersion.current, p_expected_links: initialLinks.current,
+        p_product: payload, p_units: unitPayload.length > 0 ? unitPayload : null,
+        p_items: supportsRawComposition && canManageRecipes ? rawRows.map(({raw_material_id,quantity,wastage_percent}) => ({raw_material_id,quantity,wastage_percent})) : null,
+        p_links: supportsComponentGroups ? unitRows.map(({unit_id,quantity}) => ({unit_id,quantity})) : null,
+        p_expected_legacy: supportsComposition ? initialLegacy.current : null,
+        p_legacy: supportsComposition ? legacyRows : null,
+      });
+      if (error || !data?.success || data.product_id !== editing.id) { show(error?.message || data?.detail || data?.error || 'PRODUCT_NOT_SAVED', 'error'); return; }
       await logAudit('update', 'products', editing.id, { name: form.name });
     } else {
       const createInput: CreateProductInput = {
@@ -356,56 +441,13 @@ export function ProductsPage() {
         p_product_type: payload.product_type,
         p_is_active: payload.is_active,
         p_units: unitPayload.length > 0 ? unitPayload : null,
+        p_unit_links: supportsComponentGroups && unitRows.length > 0 ? unitRows.map(({ unit_id, quantity }) => ({ unit_id, quantity })) : null,
       };
-      const { data, error } = recipeIngredients.length > 0
-        ? await api.catalog.createProductWithRawComponents({
-          p_product: createInput,
-          p_items: recipeIngredients.map(({ raw_material_id, quantity, wastage_percent }) =>
-            ({ raw_material_id, quantity, wastage_percent })),
-        })
-        : await api.catalog.createProduct(createInput);
-      if (error || !data || data.success === false) { show(error?.message || data?.error || 'error', 'error'); return; }
-      pid = data.product_id!;
-    }
-
-    if (editing && supportsComposition) {
-      const desiredLinks = supportsComponentGroups && form.product_type === 'manufactured'
-        ? linkedInventoryUnits.map(({ unit_id, quantity }) => ({ unit_id, quantity }))
-        : [];
-      try {
-        if (supportsComponentGroups) await api.catalog.setProductUnitLinks(pid, desiredLinks);
-        if (supportsRawComposition && can('recipes.manage')) {
-          await api.catalog.saveProductDirectRawComponents({
-            product_id: pid,
-            branch_id: effectiveBranch,
-            product_name: form.name.trim(),
-            items: form.product_type === 'manufactured'
-              ? recipeIngredients.map((row) => ({
-                  raw_material_id: row.raw_material_id,
-                  quantity: Number(row.quantity),
-                  wastage_percent: Number(row.wastage_percent) || 0,
-                }))
-              : [],
-          });
-        } else if (supportsRawComposition && form.product_type === 'ready' && recipeIngredients.length > 0) {
-          throw new Error(lang === 'ar'
-            ? 'لا يمكن تحويل المنتج إلى بدون مكونات قبل إزالة خاماته المباشرة بصلاحية مناسبة.'
-            : 'Direct raw materials must be removed with the proper permission before changing this product to no-components.');
-        }
-      } catch (compositionError) {
-        show(compositionError instanceof Error ? compositionError.message : String(compositionError), 'error');
-        return;
-      }
-    }
-
-    const usesOperationalComposition = recipeIngredients.length > 0 || linkedInventoryUnits.length > 0;
-    if (supportsComposition && !usesOperationalComposition) {
-      const { error: compDelError } = await supabase.from('product_components').delete().eq('product_id', pid);
-      if (compDelError) { show(compDelError.message, 'error'); return; }
-      if (form.product_type === 'manufactured' && productComponents.length > 0) {
-        const { error: compInsError } = await supabase.from('product_components').insert(productComponents.map((c) => ({ product_id: pid, component_product_id: c.component_product_id, quantity: c.quantity })));
-        if (compInsError) { show(compInsError.message, 'error'); return; }
-      }
+      const { data, error } = await api.catalog.createProductOperational({
+        p_product: { ...createInput, p_business_attributes: businessAttributes, p_legacy_components: legacyRows },
+        p_items: rawRows.map(({ raw_material_id, quantity, wastage_percent }) => ({ raw_material_id, quantity, wastage_percent })),
+      });
+      if (error || !data?.success || !data.product_id) { show(error?.message || data?.error || 'PRODUCT_CREATE_FAILED', 'error'); return; }
     }
     show(t('saveSuccess'), 'success');
     setModalOpen(false);
@@ -428,16 +470,17 @@ export function ProductsPage() {
     }
   };
 
-  const addComponentRow = () => { if (!componentSel) { show(t('required'), 'error'); return; } setProductComponents([...productComponents, { component_product_id: componentSel, quantity: componentQty > 0 ? componentQty : 1 }]); setComponentSel(''); setComponentQty(1); };
-  const updateComponentQty = (i: number, qty: number) => setProductComponents(productComponents.map((c, idx) => idx === i ? { ...c, quantity: qty > 0 ? qty : 1 } : c));
-  const removeComponentRow = (i: number) => setProductComponents(productComponents.filter((_, idx) => idx !== i));
+  const addComponentRow = () => { if (!componentSel || !Number.isFinite(componentQty) || componentQty <= 0 || !availableToAdd.some(row => row.product_id === componentSel)) { show(t('required'), 'error'); return; } setProductComponents(prev => [...prev, { component_product_id: componentSel, quantity: componentQty }]); setForm(prev => ({ ...prev, product_type: 'manufactured' })); setComponentSel(''); setComponentQty(1); };
+  const updateComponentQty = (i: number, qty: number) => setProductComponents(productComponents.map((c, idx) => idx === i ? { ...c, quantity: qty } : c));
+  const removeComponentRow = (i: number) => { const next = productComponents.filter((_, idx) => idx !== i); setProductComponents(next); if (!next.length && !recipeIngredients.length && !linkedInventoryUnits.length) setForm(prev => ({ ...prev, product_type: 'ready' })); };
   const addDirectRawIngredient = () => {
     if (!rawMaterialSel || !can('recipes.manage')) return;
     const material = rawMaterialOptions.find((row) => row.id === rawMaterialSel);
-    if (!material || recipeIngredients.some((row) => row.raw_material_id === rawMaterialSel)) return;
+    if (!material || recipeIngredients.some((row) => row.raw_material_id === rawMaterialSel) || !Number.isFinite(rawMaterialQty) || rawMaterialQty <= 0) return;
+    setForm(f => ({ ...f, product_type: 'manufactured' }));
     setRecipeIngredients([...recipeIngredients, {
       raw_material_id: material.id,
-      quantity: Math.max(0.0001, rawMaterialQty) * Math.max(1, recipeYield),
+      quantity: Math.max(0.0001, rawMaterialQty) * positiveRecipeYield(recipeYield),
       wastage_percent: Math.max(0, rawMaterialWaste),
       raw_material: { name: material.name },
     }]);
@@ -452,19 +495,24 @@ export function ProductsPage() {
   const removeDirectRawIngredient = (index: number) => {
     if (!can('recipes.manage')) return;
     setRecipeIngredients(recipeIngredients.filter((_, i) => i !== index));
-    if (!editing && recipeIngredients.length === 1) setForm(f=>({...f,product_type:'ready'}));
+    if (recipeIngredients.length === 1 && !linkedInventoryUnits.length && !productComponents.length) setForm(f=>({...f,product_type:'ready'}));
   };
 
   const addLinkedInventoryUnit = () => {
     if (!linkedUnitSel) { show(t('required'), 'error'); return; }
     const unit = manufacturedInventoryUnits.find((item) => item.id === linkedUnitSel);
     if (!unit || linkedInventoryUnits.some((row) => row.unit_id === linkedUnitSel)) return;
-    setLinkedInventoryUnits([...linkedInventoryUnits, { unit_id: unit.id, quantity: linkedUnitQty > 0 ? linkedUnitQty : 1, unit }]);
+    if (!Number.isFinite(linkedUnitQty) || linkedUnitQty <= 0 || unit.branch_id !== form.branch_id) return;
+    setLinkedInventoryUnits([...linkedInventoryUnits, { unit_id: unit.id, quantity: linkedUnitQty, unit }]);
+    setForm(f => ({ ...f, product_type: 'manufactured' }));
     setLinkedUnitSel('');
     setLinkedUnitQty(1);
   };
-  const updateLinkedInventoryUnitQty = (i: number, qty: number) => setLinkedInventoryUnits(linkedInventoryUnits.map((row, idx) => idx === i ? { ...row, quantity: qty > 0 ? qty : 1 } : row));
-  const removeLinkedInventoryUnit = (i: number) => setLinkedInventoryUnits(linkedInventoryUnits.filter((_, idx) => idx !== i));
+  const updateLinkedInventoryUnitQty = (i: number, qty: number) => setLinkedInventoryUnits(linkedInventoryUnits.map((row, idx) => idx === i ? { ...row, quantity: qty } : row));
+  const removeLinkedInventoryUnit = (i: number) => {
+    setLinkedInventoryUnits(linkedInventoryUnits.filter((_, idx) => idx !== i));
+    if (linkedInventoryUnits.length === 1 && !recipeIngredients.length && !productComponents.length) setForm(f => ({ ...f, product_type: 'ready' }));
+  };
 
   const remove = async () => {
     if (!deleteId || !can('products.delete')) return;
@@ -534,9 +582,9 @@ export function ProductsPage() {
             {recipeIngredients.map((row,i)=><div key={row.raw_material_id} className="flex items-end gap-2 rounded-xl border border-ui-border p-2">
               <div className="min-w-0 flex-1 text-sm font-semibold text-ui-text">{row.raw_material?.name || rawMaterialOptions.find(x=>x.id===row.raw_material_id)?.name}</div>
               <Input label={lang==='ar'?'الكمية':'Qty'} type="number" min={0.0001} step={0.0001}
-                value={row.quantity / Math.max(1,recipeYield)} className="w-28"
+                value={row.quantity / positiveRecipeYield(recipeYield)} className="w-28"
                 disabled={!can('recipes.manage')}
-                onChange={e=>updateDirectRawIngredient(i,{quantity:(Number(e.target.value)||0)*Math.max(1,recipeYield)})}/>
+                onChange={e=>updateDirectRawIngredient(i,{quantity:(Number(e.target.value)||0)*positiveRecipeYield(recipeYield)})}/>
               {can('recipes.manage') && <button type="button" className="p-2 text-ui-danger" onClick={()=>removeDirectRawIngredient(i)} aria-label={lang==='ar'?'حذف المكون':'Remove ingredient'}><Trash2 className="h-4 w-4"/></button>}
             </div>)}
           </div>
@@ -555,6 +603,24 @@ export function ProductsPage() {
           </div>}
           {!rawMaterialOptions.length && <p className="text-xs text-ui-muted">{lang==='ar'?'لا توجد خامات مسجلة في هذا الفرع. أضف الخامات من المخزون أولاً.':'No branch raw materials available. Register ingredients in inventory first.'}</p>}
   </>;
+
+  const manufacturedIngredientFields = supportsComponentGroups && <div className="space-y-3" data-testid="product-manufactured-components">
+    <h3 className="font-semibold">{lang === 'ar' ? 'المصنّعات / مجموعات المكونات' : 'Manufactured component groups'}</h3>
+    {linkedInventoryUnits.map((row, i) => <div key={row.unit_id} className="flex items-end gap-2 rounded-xl border border-ui-border p-2">
+      <span className="min-w-0 flex-1 text-sm font-semibold">{row.unit?.name || manufacturedInventoryUnits.find(unit => unit.id === row.unit_id)?.name || row.unit_id}</span>
+      <Input label={lang === 'ar' ? 'الكمية' : 'Qty'} type="number" min={0.0001} step={0.0001} value={row.quantity} onChange={e => updateLinkedInventoryUnitQty(i, Number(e.target.value))} className="w-28" />
+      <button type="button" aria-label={lang === 'ar' ? 'حذف المصنّع' : 'Remove manufactured component'} onClick={() => removeLinkedInventoryUnit(i)} className="p-2 text-ui-danger"><Trash2 className="w-4 h-4" /></button>
+    </div>)}
+    <div className="grid gap-2 sm:grid-cols-[1fr_100px_auto] sm:items-end">
+      <Select label={lang === 'ar' ? 'إضافة مصنّع' : 'Add manufactured component'} value={linkedUnitSel} onChange={e => setLinkedUnitSel(e.target.value)}>
+        <option value="">{lang === 'ar' ? 'اختر مصنّعًا' : 'Choose manufactured component'}</option>
+        {availableManufacturedToAdd.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
+      </Select>
+      <Input label={lang === 'ar' ? 'الكمية' : 'Qty'} type="number" min={0.0001} step={0.0001} value={linkedUnitQty} onChange={e => setLinkedUnitQty(Number(e.target.value))} />
+      <Button type="button" variant="outline" onClick={addLinkedInventoryUnit} disabled={!linkedUnitSel || linkedUnitQty <= 0}><Plus className="w-4 h-4" />{t('add')}</Button>
+    </div>
+    {!manufacturedInventoryUnits.length && <p className="text-xs text-ui-muted">{lang === 'ar' ? 'لا توجد مصنّعات نشطة متاحة للفرع الحالي.' : 'No active manufactured groups available for this branch.'}</p>}
+  </div>;
 
   return (
     <DesignSurface testId="products-page">
@@ -594,6 +660,8 @@ export function ProductsPage() {
                 setForm(f=>({...f,branch_id:e.target.value,category_id:'',product_type:'ready'}));
                 setRecipeIngredients([]);
                 setRawMaterialSel('');
+                setLinkedInventoryUnits([]);
+                setLinkedUnitSel('');
               }}>
               <option value="">{lang === 'ar' ? 'اختر الفرع' : 'Select branch'}</option>
               {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
@@ -606,6 +674,7 @@ export function ProductsPage() {
               {directIngredientFields}
             </details>
           )}
+          {!editing && manufacturedIngredientFields}
           <div className="flex flex-wrap gap-2 rounded-xl border border-ui-border bg-ui-page-alt p-3">
             {editing && supportsComposition && <Button size="sm" variant="outline" onClick={() => {
               setQuickModalOpen(false);setIngredientsModalOpen(true);
@@ -616,7 +685,7 @@ export function ProductsPage() {
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={()=>setQuickModalOpen(false)}>{t('cancel')}</Button>
-            <Button onClick={()=>void save()} disabled={saving || !form.name.trim() || !form.branch_id || form.sale_price<0 || (!editing && !!rawMaterialSel)}>{t('save')}</Button>
+            <Button onClick={()=>void save()} disabled={saving || !form.name.trim() || !form.branch_id || form.sale_price<0}>{t('save')}</Button>
           </div>
         </div>
       </Modal>
@@ -625,8 +694,9 @@ export function ProductsPage() {
         <div className="space-y-4" data-testid="product-ingredients-quick-editor">
           <p className="text-sm text-ui-muted">{lang==='ar' ? 'اختر الخامة والكمية المستخدمة لكل وحدة بيع. يتم تطبيق المكونات على المخزون عند إرسال الطلب للمطبخ.' : 'Choose each ingredient and quantity per item. Inventory is consumed when sent to the kitchen.'}</p>
           {!can('recipes.manage') && <p className="rounded-lg bg-ui-warning-soft p-3 text-sm text-ui-warning">{lang==='ar'?'تحتاج صلاحية إدارة الوصفات لتعديل الخامات.':'Recipe permissions are required to edit raw ingredients.'}</p>}
-          {directIngredientFields}
-          {(linkedInventoryUnits.length>0 || productComponents.length>0) && <p className="text-xs text-ui-muted">{lang==='ar'?'يوجد مكونات أو مجموعات متقدمة محفوظة، يمكن تعديلها من التفاصيل الإضافية.':'Existing advanced component groups can be edited under Advanced details.'}</p>}
+          {supportsRawComposition && directIngredientFields}
+          {manufacturedIngredientFields}
+          {productComponents.length>0 && <p className="text-xs text-ui-muted">{lang==='ar'?'يوجد مكونات أو مجموعات متقدمة محفوظة، يمكن تعديلها من التفاصيل الإضافية.':'Existing advanced component groups can be edited under Advanced details.'}</p>}
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={()=>{setIngredientsModalOpen(false);setQuickModalOpen(true);}}>{lang==='ar'?'رجوع':'Back'}</Button>
             <Button onClick={()=>void save()} disabled={saving}>{t('save')}</Button>
@@ -643,7 +713,7 @@ export function ProductsPage() {
             <Input label={t('sku')} value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
             <Select label={t('category')} value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}><option value="">--</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
             <div><label className="block text-sm font-medium text-ui-muted mb-1">{t('productType')}</label><div className={`grid ${supportsComposition ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}><button type="button" onClick={() => setForm({ ...form, product_type: 'ready' })} className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors ${form.product_type === 'ready' ? 'bg-brand-600 text-white border-brand-600' : 'bg-ui-surface border-ui-border text-ui-text hover:border-brand-400'}`}>{supportsComposition ? t('withoutIngredients') : itemLabel}</button>{supportsComposition && <button type="button" onClick={() => setForm({ ...form, product_type: 'manufactured' })} className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors ${form.product_type === 'manufactured' ? 'bg-purple-600 text-white border-purple-600' : 'bg-ui-surface border-ui-border text-ui-text hover:border-purple-400'}`}>{t('withIngredients')}</button>}</div></div>
-            {branchFilter ? <div><label className="block text-sm font-medium text-ui-muted mb-1">{t('branch')}</label><div className="min-h-11 flex items-center"><BranchBadge name={branchLabel(form.branch_id || branchFilter)} /></div></div> : <Select label={t('branch')} value={form.branch_id} onChange={(e) => setForm({ ...form, branch_id: e.target.value })}><option value="">--</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select>}
+            {branchFilter ? <div><label className="block text-sm font-medium text-ui-muted mb-1">{t('branch')}</label><div className="min-h-11 flex items-center"><BranchBadge name={branchLabel(form.branch_id || branchFilter)} /></div></div> : <Select label={t('branch')} value={form.branch_id} disabled={!!editing} onChange={(e) => { setForm({ ...form, branch_id: e.target.value, category_id: '', product_type: 'ready' }); setRecipeIngredients([]); setLinkedInventoryUnits([]); setProductComponents([]); setRawMaterialSel(''); setLinkedUnitSel(''); setComponentSel(''); }}><option value="">--</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select>}
             <div className="sm:col-span-2">
               <Input label={t('image') + ' URL'} value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value, image_position_x: 0, image_position_y: 0, image_zoom: 1 })} />
               {form.image_url && (
@@ -681,10 +751,10 @@ export function ProductsPage() {
           </div>
           <Textarea label={t('description')} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} />
           <BusinessAttributesFields entity="product" value={businessAttributes} onChange={setBusinessAttributes} /></>}
-          {supportsComposition && editing && editSection === 'components' && <div data-testid="product-operational-composition" className="rounded-xl border border-brand-200 dark:border-brand-800/50 bg-brand-50/40 dark:bg-brand-900/10 p-4 space-y-4"><div><h3 className="font-semibold text-ui-text">{lang === 'ar' ? 'مكونات التشغيل الفعلية' : 'Operational composition'}</h3><p className="mt-1 text-xs text-ui-subtle">{lang === 'ar' ? 'هذه هي المكونات التشغيلية التي يعتمد عليها خصم الخامات عند إرسال الطلب للمطبخ.' : 'These are the operational components used for raw-material deduction when the order is sent to the kitchen.'}</p></div><div className="rounded-lg border border-brand-200 bg-ui-surface px-4 py-3 dark:border-brand-800/50"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-medium text-ui-subtle">{lang === 'ar' ? 'التكلفة الحية المحسوبة' : 'Live calculated cost'}</p><p className="text-[11px] text-ui-subtle">{lang === 'ar' ? 'الخامات المباشرة + الوحدات المجمعة بجميع مستوياتها' : 'Direct raw materials + linked component groups at every level'}</p></div><p className="text-lg font-black text-brand-600 dark:text-brand-400">{formatCurrency(liveCompositionCost ?? liveProductCosts[editing.id] ?? form.cost_price, currency, lang)}</p></div></div><div className="grid grid-cols-1 lg:grid-cols-2 gap-4"><div className="rounded-lg border border-ui-border bg-ui-surface p-3"><div className="flex items-center justify-between mb-2"><div><h4 className="text-sm font-semibold text-ui-text">{lang === 'ar' ? 'الخامات المباشرة' : 'Direct raw materials'}</h4><p className="text-[11px] text-ui-subtle">{can('recipes.manage') ? (lang === 'ar' ? 'تُخصم مع إرسال الطلب للمطبخ.' : 'Consumed when the order is sent to the kitchen.') : (lang === 'ar' ? 'عرض فقط — يلزم صلاحية إدارة الخامات المباشرة للتعديل.' : 'Read only — permission is required to edit direct raw materials.')}</p></div><span className="text-xs text-ui-subtle">{recipeIngredients.length}</span></div>{recipeIngredients.length === 0 ? <p className="text-sm text-ui-subtle">{lang === 'ar' ? 'لا توجد خامات مباشرة مرتبطة بالمنتج.' : 'No direct raw materials are linked to this product.'}</p> : <div className="space-y-2">{recipeIngredients.map((row, index) => <div key={row.raw_material_id} className="grid items-end gap-2 rounded-md bg-ui-page-alt px-3 py-2 sm:grid-cols-[1fr_120px_100px_auto]"><span className="self-center text-sm font-medium text-ui-text">{row.raw_material?.name || rawMaterialOptions.find((material) => material.id === row.raw_material_id)?.name || row.raw_material_id}</span>{can('recipes.manage') ? <><Input label={lang === 'ar' ? 'الكمية/وحدة بيع' : 'Qty / sale unit'} type="number" min={0.0001} step={0.0001} value={row.quantity / Math.max(1, recipeYield) || ''} onChange={(e) => updateDirectRawIngredient(index, { quantity: (parseFloat(e.target.value) || 0) * Math.max(1, recipeYield) })} /><Input label={lang === 'ar' ? 'هالك %' : 'Waste %'} type="number" min={0} step={0.01} value={row.wastage_percent || ''} onChange={(e) => updateDirectRawIngredient(index, { wastage_percent: parseFloat(e.target.value) || 0 })} /><button type="button" onClick={() => removeDirectRawIngredient(index)} className="mb-0.5 p-2 rounded-md text-ui-danger hover:bg-ui-danger-soft" title={t('delete')}><Trash2 className="w-4 h-4" /></button></> : <span className="text-xs font-semibold text-ui-muted sm:col-span-3">{formatNumber(row.quantity / Math.max(1, recipeYield))} / {lang === 'ar' ? 'وحدة بيع' : 'sale unit'}</span>}</div>)}</div>}{can('recipes.manage') && <div className="mt-3 grid items-end gap-2 sm:grid-cols-[1fr_120px_100px_auto]"><Select label={lang === 'ar' ? 'إضافة خامة' : 'Add raw material'} value={rawMaterialSel} onChange={(e) => setRawMaterialSel(e.target.value)}><option value="">{lang === 'ar' ? 'اختر خامة' : 'Choose raw material'}</option>{availableRawMaterialsToAdd.map((material) => <option key={material.id} value={material.id}>{material.name}</option>)}</Select><Input label={lang === 'ar' ? 'الكمية' : 'Quantity'} type="number" min={0.0001} step={0.0001} value={rawMaterialQty || ''} onChange={(e) => setRawMaterialQty(parseFloat(e.target.value) || 0)} /><Input label={lang === 'ar' ? 'هالك %' : 'Waste %'} type="number" min={0} step={0.01} value={rawMaterialWaste || ''} onChange={(e) => setRawMaterialWaste(parseFloat(e.target.value) || 0)} /><Button type="button" size="sm" onClick={addDirectRawIngredient} disabled={!rawMaterialSel}><Plus className="w-4 h-4" />{t('add')}</Button></div>}</div><div className="rounded-lg border border-ui-border bg-ui-surface p-3"><div className="flex items-center justify-between mb-2"><h4 className="text-sm font-semibold text-ui-text">{lang === 'ar' ? 'مجموعات المكونات المرتبطة' : 'Linked component groups'}</h4><span className="text-xs text-ui-subtle">{linkedInventoryUnits.length}</span></div>{linkedInventoryUnits.length === 0 ? <p className="text-sm text-ui-subtle">{lang === 'ar' ? 'لا توجد مجموعات مكونات مرتبطة بالمنتج.' : 'No component groups are linked to this product.'}</p> : <div className="space-y-2">{linkedInventoryUnits.map((row, index) => { const liveUnit = linkedUnitLiveCosts[row.unit_id]; const expanded = expandedUnitRawMaterials.filter((item) => item.root_unit_id === row.unit_id); return <div key={row.unit_id} className="rounded-md bg-ui-page-alt px-3 py-2"><div className="flex items-end gap-2"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-ui-text">{row.unit?.name || manufacturedInventoryUnits.find((unit) => unit.id === row.unit_id)?.name || row.unit_id}</p><p className="text-xs text-ui-subtle">{liveUnit ? `${lang === 'ar' ? 'تكلفة الوحدة' : 'Unit cost'}: ${formatCurrency(liveUnit.unit_cost, currency, lang)} · ${lang === 'ar' ? 'تكلفة السطر' : 'Line cost'}: ${formatCurrency(liveUnit.line_cost, currency, lang)}` : (lang === 'ar' ? 'مجموعة مكونات مرتبطة' : 'Linked component group')}</p></div><Input label={lang === 'ar' ? 'الكمية' : 'Quantity'} type="number" min={0.0001} step="0.0001" value={row.quantity || ''} onChange={(e) => updateLinkedInventoryUnitQty(index, parseFloat(e.target.value) || 1)} className="w-28" /><button type="button" onClick={() => removeLinkedInventoryUnit(index)} className="mb-0.5 p-2 rounded-md text-ui-danger hover:bg-ui-danger-soft" title={t('delete')}><Trash2 className="w-4 h-4" /></button></div>{expanded.length > 0 && <div className="mt-2 space-y-1 border-t border-ui-border pt-2">{expanded.map((item) => <div key={`${item.unit_id}:${item.raw_material_id}:${item.depth}`} className="flex items-center justify-between gap-2 text-[11px] text-ui-subtle"><span style={{ paddingInlineStart: `${Math.min(item.depth, 6) * 12}px` }}>{item.depth > 0 ? '↳ ' : ''}{item.unit_name} → {item.raw_material_name} × {formatNumber(item.effective_quantity)}</span><span className="shrink-0 font-semibold text-ui-muted">{formatCurrency(item.line_cost, currency, lang)}</span></div>)}</div>}</div>; })}</div>}<div className="mt-3 flex flex-wrap items-end gap-2"><div className="flex-1 min-w-[180px]"><Select label={lang === 'ar' ? 'إضافة مجموعة مكونات' : 'Add component group'} value={linkedUnitSel} onChange={(e) => setLinkedUnitSel(e.target.value)}><option value="">--</option>{availableManufacturedToAdd.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</Select></div><Input label={lang === 'ar' ? 'الكمية' : 'Quantity'} type="number" min={0.0001} step="0.0001" value={linkedUnitQty || ''} onChange={(e) => setLinkedUnitQty(parseFloat(e.target.value) || 1)} className="w-28" /><Button type="button" size="sm" onClick={addLinkedInventoryUnit} disabled={!linkedUnitSel}><Plus className="w-4 h-4" />{t('add')}</Button></div></div></div></div>}
-          {supportsComposition && editSection === 'components' && form.product_type === 'manufactured' && recipeIngredients.length === 0 && linkedInventoryUnits.length === 0 && <div className="rounded-xl border border-purple-200 dark:border-purple-800/50 bg-purple-50/40 dark:bg-purple-900/10 p-4 space-y-3"><div className="flex items-center justify-between"><h3 className="font-semibold text-ui-muted">{t('components')}</h3></div>{productComponents.length === 0 && <p className="text-sm text-ui-subtle dark:text-ui-subtle">{t('selectComponent')}</p>}<div className="space-y-2">{productComponents.map((c, i) => { const info = stockComponents.find((s) => s.product_id === c.component_product_id); return <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-ui-surface border border-ui-border"><div className="flex-1 min-w-0"><p className="text-sm font-medium text-ui-text truncate">{info?.name || c.component_product_id}</p><p className="text-xs text-ui-subtle">{t('availableStock')}: {formatNumber(info?.total || 0)}</p></div><Input label={t('usageQuantityPerUnit')} type="number" min={1} step="0.01" value={c.quantity || ''} onChange={(e) => updateComponentQty(i, parseFloat(e.target.value) || 1)} className="w-32" /><button onClick={() => removeComponentRow(i)} className="p-2 rounded-md text-ui-danger hover:bg-ui-danger-soft"><Trash2 className="w-4 h-4" /></button></div>; })}</div>{stockComponents.length > 0 ? <div className="flex flex-wrap items-end gap-2"><div className="flex-1 min-w-[200px]"><Select label={t('addComponent')} value={componentSel} onChange={(e) => setComponentSel(e.target.value)}><option value="">--</option>{availableToAdd.map((s) => <option key={s.product_id} value={s.product_id}>{s.name} ({formatNumber(s.total)})</option>)}</Select></div><Input label={t('usageQuantityPerUnit')} type="number" min={1} step="0.01" value={componentQty || ''} onChange={(e) => setComponentQty(parseFloat(e.target.value) || 1)} className="w-32" /><Button size="sm" onClick={addComponentRow}><Plus className="w-4 h-4" /> {t('addComponent')}</Button></div> : <p className="text-sm text-ui-warning">{t('noAvailableComponents')}</p>}</div>}
+          {supportsComposition && editing && editSection === 'components' && <div data-testid="product-operational-composition" className="rounded-xl border border-brand-200 dark:border-brand-800/50 bg-brand-50/40 dark:bg-brand-900/10 p-4 space-y-4"><div><h3 className="font-semibold text-ui-text">{lang === 'ar' ? 'مكونات التشغيل الفعلية' : 'Operational composition'}</h3><p className="mt-1 text-xs text-ui-subtle">{lang === 'ar' ? 'هذه هي المكونات التشغيلية التي يعتمد عليها خصم الخامات عند إرسال الطلب للمطبخ.' : 'These are the operational components used for raw-material deduction when the order is sent to the kitchen.'}</p></div><div className="rounded-lg border border-brand-200 bg-ui-surface px-4 py-3 dark:border-brand-800/50"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-medium text-ui-subtle">{lang === 'ar' ? 'التكلفة الحية المحسوبة' : 'Live calculated cost'}</p><p className="text-[11px] text-ui-subtle">{lang === 'ar' ? 'الخامات المباشرة + الوحدات المجمعة بجميع مستوياتها' : 'Direct raw materials + linked component groups at every level'}</p></div><p className="text-lg font-black text-brand-600 dark:text-brand-400">{formatCurrency(liveCompositionCost ?? liveProductCosts[editing.id] ?? form.cost_price, currency, lang)}</p></div></div><div className="grid grid-cols-1 lg:grid-cols-2 gap-4"><div className="rounded-lg border border-ui-border bg-ui-surface p-3"><div className="flex items-center justify-between mb-2"><div><h4 className="text-sm font-semibold text-ui-text">{lang === 'ar' ? 'الخامات المباشرة' : 'Direct raw materials'}</h4><p className="text-[11px] text-ui-subtle">{can('recipes.manage') ? (lang === 'ar' ? 'تُخصم مع إرسال الطلب للمطبخ.' : 'Consumed when the order is sent to the kitchen.') : (lang === 'ar' ? 'عرض فقط — يلزم صلاحية إدارة الخامات المباشرة للتعديل.' : 'Read only — permission is required to edit direct raw materials.')}</p></div><span className="text-xs text-ui-subtle">{recipeIngredients.length}</span></div>{recipeIngredients.length === 0 ? <p className="text-sm text-ui-subtle">{lang === 'ar' ? 'لا توجد خامات مباشرة مرتبطة بالمنتج.' : 'No direct raw materials are linked to this product.'}</p> : <div className="space-y-2">{recipeIngredients.map((row, index) => <div key={row.raw_material_id} className="grid items-end gap-2 rounded-md bg-ui-page-alt px-3 py-2 sm:grid-cols-[1fr_120px_100px_auto]"><span className="self-center text-sm font-medium text-ui-text">{row.raw_material?.name || rawMaterialOptions.find((material) => material.id === row.raw_material_id)?.name || row.raw_material_id}</span>{can('recipes.manage') ? <><Input label={lang === 'ar' ? 'الكمية/وحدة بيع' : 'Qty / sale unit'} type="number" min={0.0001} step={0.0001} value={row.quantity / positiveRecipeYield(recipeYield) || ''} onChange={(e) => updateDirectRawIngredient(index, { quantity: (parseFloat(e.target.value) || 0) * positiveRecipeYield(recipeYield) })} /><Input label={lang === 'ar' ? 'هالك %' : 'Waste %'} type="number" min={0} step={0.01} value={row.wastage_percent || ''} onChange={(e) => updateDirectRawIngredient(index, { wastage_percent: parseFloat(e.target.value) || 0 })} /><button type="button" onClick={() => removeDirectRawIngredient(index)} className="mb-0.5 p-2 rounded-md text-ui-danger hover:bg-ui-danger-soft" title={t('delete')}><Trash2 className="w-4 h-4" /></button></> : <span className="text-xs font-semibold text-ui-muted sm:col-span-3">{formatNumber(row.quantity / positiveRecipeYield(recipeYield))} / {lang === 'ar' ? 'وحدة بيع' : 'sale unit'}</span>}</div>)}</div>}{can('recipes.manage') && <div className="mt-3 grid items-end gap-2 sm:grid-cols-[1fr_120px_100px_auto]"><Select label={lang === 'ar' ? 'إضافة خامة' : 'Add raw material'} value={rawMaterialSel} onChange={(e) => setRawMaterialSel(e.target.value)}><option value="">{lang === 'ar' ? 'اختر خامة' : 'Choose raw material'}</option>{availableRawMaterialsToAdd.map((material) => <option key={material.id} value={material.id}>{material.name}</option>)}</Select><Input label={lang === 'ar' ? 'الكمية' : 'Quantity'} type="number" min={0.0001} step={0.0001} value={rawMaterialQty || ''} onChange={(e) => setRawMaterialQty(parseFloat(e.target.value) || 0)} /><Input label={lang === 'ar' ? 'هالك %' : 'Waste %'} type="number" min={0} step={0.01} value={rawMaterialWaste || ''} onChange={(e) => setRawMaterialWaste(parseFloat(e.target.value) || 0)} /><Button type="button" size="sm" onClick={addDirectRawIngredient} disabled={!rawMaterialSel}><Plus className="w-4 h-4" />{t('add')}</Button></div>}</div><div className="rounded-lg border border-ui-border bg-ui-surface p-3"><div className="flex items-center justify-between mb-2"><h4 className="text-sm font-semibold text-ui-text">{lang === 'ar' ? 'مجموعات المكونات المرتبطة' : 'Linked component groups'}</h4><span className="text-xs text-ui-subtle">{linkedInventoryUnits.length}</span></div>{linkedInventoryUnits.length === 0 ? <p className="text-sm text-ui-subtle">{lang === 'ar' ? 'لا توجد مجموعات مكونات مرتبطة بالمنتج.' : 'No component groups are linked to this product.'}</p> : <div className="space-y-2">{linkedInventoryUnits.map((row, index) => { const liveUnit = linkedUnitLiveCosts[row.unit_id]; const expanded = expandedUnitRawMaterials.filter((item) => item.root_unit_id === row.unit_id); return <div key={row.unit_id} className="rounded-md bg-ui-page-alt px-3 py-2"><div className="flex items-end gap-2"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-ui-text">{row.unit?.name || manufacturedInventoryUnits.find((unit) => unit.id === row.unit_id)?.name || row.unit_id}</p><p className="text-xs text-ui-subtle">{liveUnit ? `${lang === 'ar' ? 'تكلفة الوحدة' : 'Unit cost'}: ${formatCurrency(liveUnit.unit_cost, currency, lang)} · ${lang === 'ar' ? 'تكلفة السطر' : 'Line cost'}: ${formatCurrency(liveUnit.line_cost, currency, lang)}` : (lang === 'ar' ? 'مجموعة مكونات مرتبطة' : 'Linked component group')}</p></div><Input label={lang === 'ar' ? 'الكمية' : 'Quantity'} type="number" min={0.0001} step="0.0001" value={row.quantity || ''} onChange={(e) => updateLinkedInventoryUnitQty(index, parseFloat(e.target.value) || 0)} className="w-28" /><button type="button" onClick={() => removeLinkedInventoryUnit(index)} className="mb-0.5 p-2 rounded-md text-ui-danger hover:bg-ui-danger-soft" title={t('delete')}><Trash2 className="w-4 h-4" /></button></div>{expanded.length > 0 && <div className="mt-2 space-y-1 border-t border-ui-border pt-2">{expanded.map((item) => <div key={`${item.unit_id}:${item.raw_material_id}:${item.depth}`} className="flex items-center justify-between gap-2 text-[11px] text-ui-subtle"><span style={{ paddingInlineStart: `${Math.min(item.depth, 6) * 12}px` }}>{item.depth > 0 ? '↳ ' : ''}{item.unit_name} → {item.raw_material_name} × {formatNumber(item.effective_quantity)}</span><span className="shrink-0 font-semibold text-ui-muted">{formatCurrency(item.line_cost, currency, lang)}</span></div>)}</div>}</div>; })}</div>}<div className="mt-3 flex flex-wrap items-end gap-2"><div className="flex-1 min-w-[180px]"><Select label={lang === 'ar' ? 'إضافة مجموعة مكونات' : 'Add component group'} value={linkedUnitSel} onChange={(e) => setLinkedUnitSel(e.target.value)}><option value="">--</option>{availableManufacturedToAdd.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</Select></div><Input label={lang === 'ar' ? 'الكمية' : 'Quantity'} type="number" min={0.0001} step="0.0001" value={linkedUnitQty || ''} onChange={(e) => setLinkedUnitQty(parseFloat(e.target.value) || 0)} className="w-28" /><Button type="button" size="sm" onClick={addLinkedInventoryUnit} disabled={!linkedUnitSel}><Plus className="w-4 h-4" />{t('add')}</Button></div></div></div></div>}
+          {supportsComposition && editSection === 'components' && (productComponents.length > 0 || (form.product_type === 'manufactured' && recipeIngredients.length === 0 && linkedInventoryUnits.length === 0)) && <div className="rounded-xl border border-purple-200 dark:border-purple-800/50 bg-purple-50/40 dark:bg-purple-900/10 p-4 space-y-3"><div className="flex items-center justify-between"><h3 className="font-semibold text-ui-muted">{t('components')}</h3></div>{productComponents.length === 0 && <p className="text-sm text-ui-subtle dark:text-ui-subtle">{t('selectComponent')}</p>}<div className="space-y-2">{productComponents.map((c, i) => { const info = stockComponents.find((s) => s.product_id === c.component_product_id); return <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-ui-surface border border-ui-border"><div className="flex-1 min-w-0"><p className="text-sm font-medium text-ui-text truncate">{info?.name || c.component_product_id}</p><p className="text-xs text-ui-subtle">{t('availableStock')}: {formatNumber(info?.total || 0)}</p></div><Input label={t('usageQuantityPerUnit')} type="number" min={1} step="0.01" value={c.quantity || ''} onChange={(e) => updateComponentQty(i, parseFloat(e.target.value) || 1)} className="w-32" /><button onClick={() => removeComponentRow(i)} className="p-2 rounded-md text-ui-danger hover:bg-ui-danger-soft"><Trash2 className="w-4 h-4" /></button></div>; })}</div>{stockComponents.length > 0 ? <div className="flex flex-wrap items-end gap-2"><div className="flex-1 min-w-[200px]"><Select label={t('addComponent')} value={componentSel} onChange={(e) => setComponentSel(e.target.value)}><option value="">--</option>{availableToAdd.map((s) => <option key={s.product_id} value={s.product_id}>{s.name} ({formatNumber(s.total)})</option>)}</Select></div><Input label={t('usageQuantityPerUnit')} type="number" min={1} step="0.01" value={componentQty || ''} onChange={(e) => setComponentQty(parseFloat(e.target.value) || 1)} className="w-32" /><Button size="sm" onClick={addComponentRow}><Plus className="w-4 h-4" /> {t('addComponent')}</Button></div> : <p className="text-sm text-ui-warning">{t('noAvailableComponents')}</p>}</div>}
           {editSection === 'units' && <div><div className="flex items-center justify-between mb-2"><div><h3 className="font-semibold text-ui-muted">{lang === 'ar' ? 'وحدات البيع' : 'Sales units'}</h3><p className="text-xs text-ui-subtle mt-0.5">{lang === 'ar' ? 'قطعة / كرتونة / عبوة — منفصلة عن مجموعات المكونات أعلاه.' : 'Piece / carton / pack — separate from component groups above.'}</p></div><Button size="sm" variant="outline" onClick={addUnit}><Plus className="w-4 h-4" /> {t('add')}</Button></div><div className="space-y-2">{units.map((u, i) => <div key={i} className="grid grid-cols-2 sm:grid-cols-6 gap-2 items-end p-2 rounded-lg bg-ui-page-alt"><div><label className="text-xs text-ui-subtle">{t('unitName')}</label><select value={u.unit_name} onChange={(e) => updateUnit(i, 'unit_name', e.target.value)} className="w-full rounded-md border border-ui-border bg-ui-surface px-2 py-1.5 text-sm">{UNIT_NAMES.map(n => <option key={n} value={n}>{n}</option>)}</select></div><Input label={t('conversionFactor')} type="number" step="0.0001" value={u.conversion_factor || ''} onChange={(e) => updateUnit(i, 'conversion_factor', parseFloat(e.target.value) || 1)} /><Input label={t('salePrice')} type="number" step="0.01" value={u.sale_price || ''} onChange={(e) => updateUnit(i, 'sale_price', parseFloat(e.target.value) || 0)} /><Input label={t('costPrice')} type="number" step="0.01" value={u.cost_price || ''} onChange={(e) => updateUnit(i, 'cost_price', parseFloat(e.target.value) || 0)} /><Input label={t('barcode')} value={u.barcode || ''} onChange={(e) => updateUnit(i, 'barcode', e.target.value)} /><button onClick={() => removeUnit(i)} className="p-2 rounded-md text-ui-danger hover:bg-ui-danger-soft"><Trash2 className="w-4 h-4" /></button></div>)}</div></div>}
-          <div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setModalOpen(false)}>{t('cancel')}</Button><Button onClick={save}>{t('save')}</Button></div>
+          <div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setModalOpen(false)}>{t('cancel')}</Button><Button onClick={save} disabled={saving}>{t('save')}</Button></div>
         </div>
       </Modal>
       <Modal open={catalogToolsOpen} onClose={() => setCatalogToolsOpen(false)} title={lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'} size="sm"><div className="grid gap-2">{[{ route: APP_ROUTES.pricing, ar: 'التسعير', en: 'Pricing' }, { route: APP_ROUTES.productModifiers, ar: 'مجموعات الإضافات', en: 'Modifier groups' }, { route: APP_ROUTES.productModifierOptions, ar: 'خيارات الإضافات', en: 'Modifier options' }, { route: APP_ROUTES.categories, ar: 'التصنيفات', en: 'Categories' }, { route: APP_ROUTES.inventoryUnits, ar: 'مجموعات المكونات', en: 'Component groups' }].filter((item) => canAccessPath(item.route)).map((item) => <button key={item.route} type="button" onClick={() => { setCatalogToolsOpen(false); window.location.hash = item.route; }} className="flex min-h-11 items-center justify-between rounded-xl border border-ui-border bg-ui-surface px-4 text-sm font-bold text-ui-text transition hover:bg-ui-page-alt"><span>{lang === 'ar' ? item.ar : item.en}</span><span className="text-ui-subtle">›</span></button>)}</div></Modal>

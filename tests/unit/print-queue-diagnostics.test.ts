@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  filterPrintQueueJobs, printQueueDiagnostics, printQueueJobSummary,
+  filterPrintQueueJobs, printQueueDiagnostics, printQueueJobSummary, isStalePrintJob,
 } from '../../src/features/pos/services/printQueueDiagnostics';
 import type { CloudPrintQueueRow } from '../../src/features/pos/services/cloudPrint';
 
@@ -43,4 +43,14 @@ describe('print queue read-only diagnostics', () => {
     const local = make();
     expect(filterPrintQueueJobs([local], 'pending', '')).toEqual([]);
   });
+});
+
+it('flags only active jobs older than ten minutes without reprinting', () => {
+  const now = Date.parse('2026-11-15T09:15:00Z');
+  const pending = make({status:'pending'});
+  const fresh = make({id:'fresh',status:'pending',created_at:'2026-11-15T09:10:00Z'});
+  const submitted = make({id:'submitted',status:'submitted'});
+  expect(isStalePrintJob(pending, now)).toBe(true);
+  expect(filterPrintQueueJobs([pending,fresh,submitted], 'stale', '', now)).toEqual([pending]);
+  expect(isStalePrintJob(make({status:'pending',created_at:'invalid'}),now)).toBe(false);
 });

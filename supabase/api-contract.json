@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-11-22T13:10:47.576Z",
+  "generated_at": "2026-11-25T14:36:30.000Z",
   "source": "scripts/db/gen-contract.js (extracted from src/api/domains + src)",
   "rpcs": [
     {
@@ -190,6 +190,13 @@
       ]
     },
     {
+      "name": "create_product_operational",
+      "params": [
+        "items",
+        "product"
+      ]
+    },
+    {
       "name": "create_product_with_raw_components",
       "params": [
         "items",
@@ -328,6 +335,21 @@
       ]
     },
     {
+      "name": "edit_product_operational_composition",
+      "params": [
+        "branch_id",
+        "expected_legacy",
+        "expected_links",
+        "expected_version",
+        "items",
+        "legacy",
+        "links",
+        "product",
+        "product_id",
+        "units"
+      ]
+    },
+    {
       "name": "edit_shift_expense",
       "params": [
         "amount",
@@ -341,6 +363,22 @@
         "payment_method",
         "reason",
         "treasury_account_id"
+      ]
+    },
+    {
+      "name": "edit_stock_count_draft",
+      "params": [
+        "count_id",
+        "expected",
+        "items"
+      ]
+    },
+    {
+      "name": "edit_stock_count_draft_items",
+      "params": [
+        "count_id",
+        "expected",
+        "items"
       ]
     },
     {
