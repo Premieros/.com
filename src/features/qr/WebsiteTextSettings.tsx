@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { supabase } from '@/api';
+import { useAuth } from '@/context/AuthContext';
+import { WebsiteEditorLaunch } from './WebsiteEditorLaunch';
+import { BUNKER_BRANCH } from './websiteInlineEditor';
 
 const fields = [
  ['eyebrow','النص أعلى العنوان'],['heroSub','العنوان الفرعي'],['heroCopy','وصف الصفحة'],
@@ -12,6 +15,8 @@ const fields = [
 ] as const;
 
 export function WebsiteTextSettings({branchId}:{branchId:string}) {
+ const {user,loading:authLoading}=useAuth();
+ const userId=user?.id;
  const [content,setContent]=useState<Record<string,string>>({});
  const [revision,setRevision]=useState(0);
  const [loading,setLoading]=useState(true);
@@ -22,6 +27,9 @@ export function WebsiteTextSettings({branchId}:{branchId:string}) {
  useEffect(()=>{
   let cancelled=false;
   alive.current=true;
+  setFailed(false);
+  setLoading(true);
+  setMessage('');
   void Promise.resolve(supabase.rpc('branch_website_content_settings',{p_branch:branchId})).then(({data,error})=>{
    if(cancelled)return;
    if(error){setFailed(true);setMessage('تعذر تحميل نصوص الموقع. '+error.message);}
@@ -32,7 +40,7 @@ export function WebsiteTextSettings({branchId}:{branchId:string}) {
    setFailed(true);setMessage('تعذر الاتصال لحفظ محتوى الموقع. أعد تحميل الصفحة للمحاولة.');setLoading(false);
   });
   return()=>{cancelled=true;alive.current=false;};
- },[branchId]);
+ },[branchId,userId]);
  async function publish(){
   if(saving||loading||failed)return;
   setSaving(true);setMessage('');
@@ -52,6 +60,7 @@ export function WebsiteTextSettings({branchId}:{branchId:string}) {
   <h2 className="text-xl font-bold text-ui-text">نصوص الموقع</h2>
   <p className="text-sm text-ui-muted">تُنشر التعديلات على موقع الفرع لجميع الزوار. الحقل غير المخصص يستخدم النص الافتراضي.</p>
   {loading?<p role="status">جار تحميل النصوص…</p>:!failed&&<>
+   {!authLoading&&userId&&branchId===BUNKER_BRANCH&&<WebsiteEditorLaunch key={userId} />}
    <div className="grid gap-4 md:grid-cols-2">{fields.map(([key,label])=><label key={key} className="space-y-1 text-sm text-ui-text">
     <span>{label}</span>
     <textarea value={content[key]??''} maxLength={3000} disabled={saving}

@@ -2,28 +2,34 @@ import {readFileSync} from 'node:fs';
 import {fireEvent,waitFor} from '@testing-library/react';
 import {afterEach,expect,it,vi} from 'vitest';
 
-afterEach(()=>{vi.restoreAllMocks();document.body.innerHTML='';});
+afterEach(()=>{vi.restoreAllMocks();window.history.replaceState(null,'','/');document.body.innerHTML='';});
 it('enables double-click editing and per-image controls only after an authenticated handshake',async()=>{
  document.body.innerHTML='<button id="editToggle"></button><section class="hero"><img id="heroImage" data-editable-image="heroImage" alt="Hero"></section><p data-editable-text="heroCopy">Published text</p>';
  const popup={closed:false,postMessage:vi.fn()} as unknown as Window;
- const open=vi.spyOn(window,'open').mockReturnValue(popup);
+ const nonce='a'.repeat(32);
+ Object.defineProperty(window,'opener',{configurable:true,value:popup});
  const script=readFileSync('public/bunker/inline-editor.js','utf8');
- // Exercise the shipped public script; no server credentials are present in this page.
- window.eval(`{const content={heroCopy:'Published text'}; const render=()=>{}; ${script}}`);
+ const run=()=>window.eval(`{const content={heroCopy:'Published text'}; const render=()=>{}; ${script}}`);
+ const toggle=document.getElementById('editToggle')!;
+ run();
+ expect(toggle).not.toHaveClass('show');
+ expect(popup.postMessage).not.toHaveBeenCalled();
+ window.history.replaceState(null,'','/?editor='+nonce);
+ run();
+ expect(toggle).not.toHaveClass('show');
  const text=document.querySelector<HTMLElement>('[data-editable-text]')!;
  fireEvent.doubleClick(text);
  expect(text.hasAttribute('contenteditable')).toBe(false);
- fireEvent.click(document.getElementById('editToggle')!);
- const nonce=new URLSearchParams(String(open.mock.calls[0][0]).split('?')[1]).get('nonce');
  const send=(payload:object,origin='https://premieros-sage.vercel.app')=>window.dispatchEvent(new MessageEvent('message',{
   origin,source:popup,data:{channel:'bunker-editor-v1',nonce,...payload},
  }));
- send({type:'ready'},'https://attacker.example');
- expect(popup.postMessage).not.toHaveBeenCalled();
- send({type:'ready'});
  const load=(popup.postMessage as ReturnType<typeof vi.fn>).mock.calls[0][0];
- send({id:load.id,ok:true,result:{content:{heroCopy:'Published text'},photos:{},revision:3}});
+ const grant={id:load.id,ok:true,result:{content:{heroCopy:'Published text'},photos:{},revision:3}};
+ send(grant,'https://attacker.example');
+ expect(toggle).not.toHaveClass('show');
+ send(grant);
  await waitFor(()=>expect(document.body.classList.contains('website-editing')).toBe(true));
+ expect(toggle).toHaveClass('show');
  expect(document.querySelectorAll('.inline-image-change')).toHaveLength(1);
  fireEvent.doubleClick(text);
  expect(text.getAttribute('contenteditable')).toBe('plaintext-only');
@@ -38,4 +44,6 @@ it('enables double-click editing and per-image controls only after an authentica
  expect(text.textContent).toBe('Published text');
  fireEvent.click(document.getElementById('editToggle')!);
  expect(document.body.classList.contains('website-editing')).toBe(false);
+ expect(toggle).not.toHaveClass('show');
+ Reflect.deleteProperty(window,'opener');
 });

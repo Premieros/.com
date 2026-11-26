@@ -1,3 +1,4 @@
+import { BUNKER_BRANCH } from '@/features/qr/websiteInlineEditor';
 import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
@@ -907,6 +908,11 @@ function AccountLayout({ children }: { children: ReactNode }) {
             className="flex items-center gap-2 rounded-lg border border-ui-border px-3 py-2 text-sm hover:bg-ui-page-alt">
             <Settings className="h-4 w-4" />{ar ? 'الإعدادات' : 'Settings'}
           </Link>}
+          {can('website.edit') && branchScope.actionBranchId === BUNKER_BRANCH &&
+            <Link to={`/website-contact/${BUNKER_BRANCH}`} onClick={() => setAccountOpen(false)}
+              className="flex items-center gap-2 rounded-lg border border-ui-border px-3 py-2 text-sm hover:bg-ui-page-alt">
+              <Globe className="h-4 w-4" />{ar ? 'تعديل موقع الفرع' : 'Edit branch website'}
+            </Link>}
           <button data-testid="language-toggle" type="button" onClick={() => setLang(ar ? 'en' : 'ar')}
             className="flex items-center gap-2 rounded-lg border border-ui-border px-3 py-2 text-sm hover:bg-ui-page-alt">
             <Globe className="h-4 w-4" />{ar ? 'اللغة: English' : 'Language: العربية'}

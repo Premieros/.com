@@ -12,6 +12,6 @@ it('ships editing tools inside the website document despite host-wide HTML rewri
  expect(output).toContain(css);
  expect(output).not.toContain('src="/bunker/inline-editor.js"');
  expect(output).not.toContain('href="/bunker/inline-editor.css"');
- expect(output).toContain('window.open(');
+ expect(output).toContain('const bridge=window.opener');
  expect(()=>inlineBunkerAssets('<html></html>',css,js)).toThrow('markers');
 });
