@@ -1,7 +1,8 @@
 import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import type { CreateProductInput } from '@/api/domains/catalog';
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { Plus, Edit2, Trash2, Download, Upload, Barcode as BarcodeIcon, QrCode, Move, SlidersHorizontal, Package, CheckCircle2, Layers, Tag, LayoutGrid, List } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Plus, Edit2, Trash2, Download, Upload, Barcode as BarcodeIcon, QrCode, Move, SlidersHorizontal, Package, CheckCircle2, Layers, Tag, LayoutGrid, List, ArrowUpDown, Eye, X } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -88,6 +89,10 @@ export function ProductsPage() {
   const [catalogToolsOpen, setCatalogToolsOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [composedOnly, setComposedOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<'newest' | 'name' | 'price-desc' | 'price-asc'>('newest');
+  const [inspectProduct, setInspectProduct] = useState<Product | null>(null);
+  const [searchParams, setSearchParams] = useSearchParams();
   const [editing, setEditing] = useState<Product | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [barcodeModal, setBarcodeModal] = useState<Product | null>(null);
@@ -626,12 +631,25 @@ export function ProductsPage() {
     {!manufacturedInventoryUnits.length && <p className="text-xs text-ui-muted">{lang === 'ar' ? 'لا توجد مصنّعات نشطة متاحة للفرع الحالي.' : 'No active manufactured groups available for this branch.'}</p>}
   </div>;
 
-  const displayedProducts = useMemo(
-    () => categoryFilter === 'all' ? filtered : filtered.filter((p) => (p.category_id || 'uncategorized') === categoryFilter),
-    [filtered, categoryFilter],
-  );
+  const displayedProducts = useMemo(() => {
+    const byCat = categoryFilter === 'all' ? filtered : filtered.filter((p) => (p.category_id || 'uncategorized') === categoryFilter);
+    const byType = composedOnly ? byCat.filter((p) => p.product_type === 'manufactured') : byCat;
+    if (sortBy === 'name') return [...byType].sort((a, b) => a.name.localeCompare(b.name));
+    if (sortBy === 'price-desc') return [...byType].sort((a, b) => Number(b.sale_price || 0) - Number(a.sale_price || 0));
+    if (sortBy === 'price-asc') return [...byType].sort((a, b) => Number(a.sale_price || 0) - Number(b.sale_price || 0));
+    return byType;
+  }, [filtered, categoryFilter, composedOnly, sortBy]);
   const activeCount = useMemo(() => filtered.filter((p) => p.is_active).length, [filtered]);
   const manufacturedCount = useMemo(() => filtered.filter((p) => p.product_type === 'manufactured').length, [filtered]);
+
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    if (can('products.create')) openAdd();
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   return (
     <DesignSurface testId="products-page">
@@ -694,7 +712,35 @@ export function ProductsPage() {
             })}
           </div>
           <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-            <DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="products-search" className="w-full sm:w-64" />
+            {supportsComposition && (
+              <button
+                type="button"
+                aria-pressed={composedOnly}
+                onClick={() => setComposedOnly((v) => !v)}
+                className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-semibold transition ${
+                  composedOnly ? 'border-ui-primary bg-ui-primary-soft text-ui-primary' : 'border-ui-border bg-ui-surface text-ui-muted hover:border-ui-border-strong hover:text-ui-text'
+                }`}
+              >
+                <Layers className="h-3.5 w-3.5" />
+                <span>{lang === 'ar' ? 'بمكونات فقط' : 'Composed only'}</span>
+                <span className="tabular-nums opacity-75">{manufacturedCount}</span>
+              </button>
+            )}
+            <DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="products-search" className="w-full sm:w-60" />
+            <label className="inline-flex h-10 items-center gap-1.5 rounded-full border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-muted shadow-ui-sm">
+              <ArrowUpDown className="h-3.5 w-3.5 text-ui-subtle" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as 'newest' | 'name' | 'price-desc' | 'price-asc')}
+                aria-label={lang === 'ar' ? 'ترتيب المنتجات' : 'Sort products'}
+                className="bg-transparent text-xs font-semibold text-ui-text outline-none"
+              >
+                <option value="newest">{lang === 'ar' ? 'الأحدث' : 'Newest'}</option>
+                <option value="name">{lang === 'ar' ? 'الاسم أ-ي' : 'Name A–Z'}</option>
+                <option value="price-desc">{lang === 'ar' ? 'الأعلى سعراً' : 'Price: High–Low'}</option>
+                <option value="price-asc">{lang === 'ar' ? 'الأقل سعراً' : 'Price: Low–High'}</option>
+              </select>
+            </label>
             <div className="inline-flex items-center gap-1 rounded-full border border-ui-border bg-ui-page-alt p-1" role="group" aria-label={lang === 'ar' ? 'طريقة العرض' : 'View mode'}>
               <button
                 type="button"
@@ -788,6 +834,7 @@ export function ProductsPage() {
                     </div>
 
                     <div className="mt-3 flex items-center justify-end gap-1 border-t border-ui-border pt-2.5" onClick={(e) => e.stopPropagation()}>
+                      <button type="button" onClick={() => setInspectProduct(p)} className="ui-icon-action" title={lang === 'ar' ? 'معاينة الصنف' : 'Inspect item'}><Eye className="h-4 w-4" /></button>
                       <button type="button" onClick={() => showBarcode(p)} className="ui-icon-action" title={t('barcode')}><BarcodeIcon className="h-4 w-4" /></button>
                       <button type="button" onClick={() => showQR(p)} className="ui-icon-action" title={t('generateQR')}><QrCode className="h-4 w-4" /></button>
                       {can('products.edit') && <button type="button" onClick={() => openEdit(p)} className="ui-icon-action ui-icon-action-info" title={t('edit')}><Edit2 className="h-4 w-4" /></button>}
@@ -949,6 +996,71 @@ export function ProductsPage() {
         }}
       />
       <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={remove} title={t('delete')} message={t('confirmDelete')} confirmLabel={t('delete')} cancelLabel={t('cancel')} />
+      {inspectProduct && (() => {
+        const cost = inspectProduct.product_type === 'manufactured' ? (liveProductCosts[inspectProduct.id] ?? inspectProduct.cost_price) : inspectProduct.cost_price;
+        const margin = inspectProduct.sale_price > 0 ? ((inspectProduct.sale_price - cost) / inspectProduct.sale_price) * 100 : 0;
+        const catName = productCategoryName(inspectProduct);
+        return (
+          <div className="fixed inset-0 z-[75] flex justify-end p-2.5 sm:p-3.5" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
+            <div className="absolute inset-0 bg-ui-text/30 backdrop-blur-sm" onClick={() => setInspectProduct(null)} aria-hidden="true" />
+            <aside role="dialog" aria-modal="true" aria-label={inspectProduct.name} className="premier-refresh-drawer relative z-10 flex h-full w-full max-w-[460px] flex-col overflow-hidden">
+              <div className="flex items-start justify-between gap-3 border-b border-ui-border px-6 py-5">
+                <div className="min-w-0">
+                  <h2 className="truncate text-lg font-bold text-ui-text">{inspectProduct.name}</h2>
+                  <p className="truncate text-xs text-ui-muted">{[inspectProduct.sku || inspectProduct.barcode, branchLabel(inspectProduct.branch_id)].filter(Boolean).join(' · ') || '—'}</p>
+                </div>
+                <button type="button" onClick={() => setInspectProduct(null)} aria-label={lang === 'ar' ? 'إغلاق' : 'Close'} className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-ui-border bg-ui-page-alt text-ui-muted hover:text-ui-text">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
+                <div className="flex h-52 w-full items-center justify-center overflow-hidden rounded-[20px] bg-[#e9ede8] dark:bg-ui-page-alt">
+                  {inspectProduct.image_url ? (
+                    <ProductImage src={inspectProduct.image_url} name={inspectProduct.name} category={catName} className="h-full w-full" imgClassName="h-full w-full object-cover" positionX={inspectProduct.image_position_x} positionY={inspectProduct.image_position_y} zoom={inspectProduct.image_zoom} />
+                  ) : (
+                    <Package className="h-12 w-12 text-ui-subtle/60" />
+                  )}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  <Badge variant={inspectProduct.is_active ? 'success' : 'default'}>{inspectProduct.is_active ? t('active') : t('inactive')}</Badge>
+                  {catName && <Badge variant="info">{catName}</Badge>}
+                  {inspectProduct.product_type === 'manufactured' && <Badge variant="primary">{lang === 'ar' ? 'بمكونات' : 'Composed'}</Badge>}
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
+                    <p className="text-xs text-ui-muted">{t('salePrice')}</p>
+                    <p className="mt-1 text-xl font-bold text-ui-primary tabular-nums">{formatCurrency(inspectProduct.sale_price, currency, lang)}</p>
+                  </div>
+                  <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
+                    <p className="text-xs text-ui-muted">{t('costPrice')}</p>
+                    <p className="mt-1 text-xl font-bold text-ui-text tabular-nums">{formatCurrency(cost, currency, lang)}</p>
+                  </div>
+                  <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
+                    <p className="text-xs text-ui-muted">{t('wholesalePrice')}</p>
+                    <p className="mt-1 text-lg font-bold text-ui-text tabular-nums">{formatCurrency(inspectProduct.wholesale_price, currency, lang)}</p>
+                  </div>
+                  <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
+                    <p className="text-xs text-ui-muted">{lang === 'ar' ? 'هامش الربح' : 'Gross margin'}</p>
+                    <p className="mt-1 text-lg font-bold text-ui-success tabular-nums">{margin.toFixed(1)}%</p>
+                  </div>
+                </div>
+                {inspectProduct.description && (
+                  <div className="rounded-[16px] border border-ui-border bg-ui-page-alt p-3.5 text-sm text-ui-muted">{inspectProduct.description}</div>
+                )}
+              </div>
+              <div className="flex items-center gap-2 border-t border-ui-border bg-ui-surface px-6 py-4">
+                {can('products.edit') && (
+                  <Button className="flex-1" onClick={() => { const target = inspectProduct; setInspectProduct(null); openEdit(target); }}>
+                    <Edit2 className="h-4 w-4" /><span>{t('edit')}</span>
+                  </Button>
+                )}
+                <Button variant="outline" onClick={() => showBarcode(inspectProduct)}><BarcodeIcon className="h-4 w-4" /></Button>
+                <Button variant="outline" onClick={() => showQR(inspectProduct)}><QrCode className="h-4 w-4" /></Button>
+              </div>
+            </aside>
+          </div>
+        );
+      })()}
     </DesignSurface>
   );
 }

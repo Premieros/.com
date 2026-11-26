@@ -1,7 +1,8 @@
 import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { CustomerSupportInbox } from '@/features/support/CustomerSupportInbox';
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Edit2, Trash2, Users, UserCheck, QrCode, Wallet, MapPin, Mail, Phone, LayoutGrid, List, X } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Plus, Edit2, Trash2, Users, UserCheck, QrCode, Wallet, MapPin, Mail, Phone, LayoutGrid, List, X, ArrowUpDown } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -34,6 +35,14 @@ import { qrError } from '@/features/qr/errors';
 import type { QrCustomerHistory } from '@/features/qr/service';
 
 type CustomerViewRow = Customer & { qrHistory?: QrCustomerHistory };
+type CustomerSaleSummary = {
+  id: string;
+  invoice_number: string | null;
+  total: number | null;
+  refunded_amount?: number | null;
+  status: string | null;
+  created_at: string;
+};
 const isQrGuest = (row: CustomerViewRow) => Boolean(row.qrHistory);
 
 const AVATAR_TONES = [
@@ -100,7 +109,11 @@ export function CustomersPage() {
   const [qrLoadError, setQrLoadError] = useState('');
   const [selectedQrGuest, setSelectedQrGuest] = useState<QrCustomerHistory | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerViewRow | null>(null);
+  const [customerSales, setCustomerSales] = useState<CustomerSaleSummary[]>([]);
+  const [customerSalesLoading, setCustomerSalesLoading] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  const [sortBy, setSortBy] = useState<'recent' | 'name' | 'balance'>('recent');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -165,8 +178,60 @@ export function CustomersPage() {
     (customerView === 'registered' && !isQrGuest(customer)) ||
     (customerView === 'qr' && isQrGuest(customer)) ||
     (customerView === 'outstanding' && !isQrGuest(customer) && balanceFor(customer) > 0);
-  const filtered = allRows.filter((c) => record.id ? c.id === record.id : matchesCustomerView(c) &&
-    (!term || c.name.toLowerCase().includes(term) || c.phone?.includes(term)));
+  const filtered = useMemo(() => {
+    const base = allRows.filter((c) => record.id ? c.id === record.id : matchesCustomerView(c) &&
+      (!term || c.name.toLowerCase().includes(term) || c.phone?.includes(term)));
+    if (sortBy === 'name') return [...base].sort((a, b) => a.name.localeCompare(b.name));
+    if (sortBy === 'balance') return [...base].sort((a, b) => (isQrGuest(b) ? 0 : balanceFor(b)) - (isQrGuest(a) ? 0 : balanceFor(a)));
+    return base;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [allRows, record.id, customerView, term, sortBy, openBalances]);
+
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    if (can('customers.manage')) {
+      setEditing(null);
+      setBusinessAttributes({});
+      setForm({ name: '', name_en: '', phone: '', email: '', address: '', tax_number: '', balance: 0, notes: '', branch_id: branchFilter || '' });
+      setModalOpen(true);
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
+
+  useEffect(() => {
+    let active = true;
+    if (!selectedCustomer || isQrGuest(selectedCustomer) || !can('sales.view')) {
+      setCustomerSales([]);
+      setCustomerSalesLoading(false);
+      return;
+    }
+    setCustomerSalesLoading(true);
+    void (async () => {
+      try {
+        let query = supabase
+          .from('sales')
+          .select('id, invoice_number, total, refunded_amount, status, created_at')
+          .eq('customer_id', selectedCustomer.id)
+          .eq('is_archived', false)
+          .order('created_at', { ascending: false })
+          .limit(30);
+        if (branchScope.selectedBranchIds.length) {
+          query = query.in('branch_id', branchScope.selectedBranchIds);
+        }
+        const { data, error } = await query;
+        if (!active) return;
+        if (error || !Array.isArray(data)) setCustomerSales([]);
+        else setCustomerSales(data as CustomerSaleSummary[]);
+      } finally {
+        if (active) setCustomerSalesLoading(false);
+      }
+    })();
+    return () => { active = false; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedCustomer?.id, branchScope.scopeKey]);
   const openAdd = () => { setEditing(null); setBusinessAttributes({}); setForm({ name: '', name_en: '', phone: '', email: '', address: '', tax_number: '', balance: 0, notes: '', branch_id: branchFilter || '' }); setModalOpen(true); };
   const openEdit = (c: Customer) => { setEditing(c); setBusinessAttributes(((c as Customer & { business_attributes?: Record<string, unknown> }).business_attributes) || {}); setForm({ name: c.name, name_en: c.name_en || '', phone: c.phone || '', email: c.email || '', address: c.address || '', tax_number: c.tax_number || '', balance: c.balance, notes: c.notes || '', branch_id: c.branch_id || branchFilter || '' }); setModalOpen(true); };
 
@@ -336,6 +401,19 @@ export function CustomersPage() {
             <DesignSearch value={search} onChange={setSearch}
               placeholder={ar ? 'بحث بالاسم أو الهاتف…' : 'Name, phone or city…'}
               label={t('search')} testId="customers-search" className="w-full sm:w-64" />
+            <label className="inline-flex h-10 items-center gap-1.5 rounded-full border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-muted shadow-ui-sm">
+              <ArrowUpDown className="h-3.5 w-3.5 text-ui-subtle" />
+              <select
+                value={sortBy}
+                onChange={(event) => setSortBy(event.target.value as 'recent' | 'name' | 'balance')}
+                aria-label={ar ? 'ترتيب حسب' : 'Sort by'}
+                className="bg-transparent text-xs font-semibold text-ui-text outline-none"
+              >
+                <option value="recent">{ar ? 'الأحدث' : 'Most recent'}</option>
+                <option value="name">{ar ? 'الاسم أ-ي' : 'Name A–Z'}</option>
+                <option value="balance">{ar ? 'الأعلى رصيداً' : 'Open balance'}</option>
+              </select>
+            </label>
             <div className="inline-flex items-center gap-1 rounded-full border border-ui-border bg-ui-page-alt p-1" role="group" aria-label={ar ? 'طريقة العرض' : 'View mode'}>
               <button
                 type="button"
@@ -536,16 +614,92 @@ export function CustomersPage() {
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
+                  <p className="text-xs text-ui-muted">{ar ? 'إجمالي المشتريات' : 'Lifetime spend'}</p>
+                  <p className="mt-1 text-xl font-bold text-ui-text tabular-nums">
+                    {formatCurrency(
+                      customerSales.reduce((sum, s) => sum + Math.max(0, Number(s.total || 0) - Number(s.refunded_amount || 0)), 0),
+                      currency,
+                      lang,
+                    )}
+                  </p>
+                </div>
+                <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
                   <p className="text-xs text-ui-muted">{ar ? 'الرصيد المستحق' : 'Open balance'}</p>
                   <p className={`mt-1 text-xl font-bold tabular-nums ${balanceFor(selectedCustomer) > 0 ? 'text-ui-danger' : 'text-ui-text'}`}>
                     {formatCurrency(balanceFor(selectedCustomer), currency, lang)}
                   </p>
                 </div>
                 <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
+                  <p className="text-xs text-ui-muted">{ar ? 'عدد الفواتير' : 'Orders'}</p>
+                  <p className="mt-1 text-lg font-bold text-ui-text tabular-nums">{formatNumber(customerSales.length, 0)}</p>
+                </div>
+                <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
                   <p className="text-xs text-ui-muted">{ar ? 'الرقم الضريبي' : 'Tax number'}</p>
                   <p className="mt-1 truncate text-base font-bold text-ui-text tabular-nums">{selectedCustomer.tax_number || '—'}</p>
                 </div>
               </div>
+
+              {(() => {
+                const now = new Date();
+                const buckets = Array.from({ length: 6 }, (_, idx) => {
+                  const d = new Date(now.getFullYear(), now.getMonth() - (5 - idx), 1);
+                  const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+                  return {
+                    key,
+                    label: d.toLocaleDateString(ar ? 'ar-EG' : 'en-US', { month: 'short' }),
+                    value: 0,
+                  };
+                });
+                const map = new Map(buckets.map((b) => [b.key, b]));
+                customerSales.forEach((sale) => {
+                  const key = sale.created_at.slice(0, 7);
+                  const bucket = map.get(key);
+                  if (bucket) bucket.value += Math.max(0, Number(sale.total || 0) - Number(sale.refunded_amount || 0));
+                });
+                const peak = Math.max(1, ...buckets.map((b) => b.value));
+                return (
+                  <div className="rounded-[18px] border border-ui-border bg-ui-page-alt p-4">
+                    <div className="mb-3 flex items-center justify-between">
+                      <p className="text-xs font-bold text-ui-text">{ar ? 'الإنفاق الشهري (آخر 6 أشهر)' : 'Monthly spend (6 months)'}</p>
+                      {customerSalesLoading && <span className="text-[11px] text-ui-muted">{ar ? 'جارٍ التحميل...' : 'Loading...'}</span>}
+                    </div>
+                    <div className="grid grid-cols-6 items-end gap-2">
+                      {buckets.map((b) => (
+                        <div key={b.key} className="flex flex-col items-center gap-1.5">
+                          <div className="flex h-20 w-full items-end overflow-hidden rounded-[10px] bg-ui-surface p-0.5">
+                            <div
+                              className="w-full rounded-[8px] bg-ui-primary transition-all"
+                              style={{ height: `${b.value > 0 ? Math.max(12, Math.round((b.value / peak) * 100)) : 4}%`, opacity: b.value > 0 ? 1 : 0.2 }}
+                              title={`${b.label}: ${formatCurrency(b.value, currency, lang)}`}
+                            />
+                          </div>
+                          <span className="text-[10px] font-semibold text-ui-muted">{b.label}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })()}
+
+              {customerSales.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-bold text-ui-text">{ar ? 'أحدث الفواتير' : 'Recent orders'}</p>
+                  {customerSales.slice(0, 5).map((sale) => (
+                    <div key={sale.id} className="flex items-center justify-between gap-3 rounded-[14px] border border-ui-border bg-ui-page-alt px-3.5 py-2.5 text-xs">
+                      <div className="min-w-0">
+                        <p className="truncate font-bold text-ui-text tabular-nums">{sale.invoice_number || sale.id.slice(0, 8)}</p>
+                        <p className="text-[11px] text-ui-muted tabular-nums">{new Date(sale.created_at).toLocaleDateString(ar ? 'ar-EG' : 'en-US')}</p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={sale.status === 'returned' ? 'danger' : 'success'} size="sm">{sale.status || 'completed'}</Badge>
+                        <span className="font-bold text-ui-text tabular-nums">
+                          {formatCurrency(Math.max(0, Number(sale.total || 0) - Number(sale.refunded_amount || 0)), currency, lang)}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               {selectedCustomer.notes && (
                 <div className="rounded-[16px] border border-ui-border bg-ui-page-alt p-3.5">
