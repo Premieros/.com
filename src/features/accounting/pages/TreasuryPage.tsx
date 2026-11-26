@@ -358,11 +358,11 @@ export function TreasuryPage() {
       </DesignPanel>
 
       {treasuryView === 'branch' && (
-        <DesignPanel title={isAr ? 'ملخص الخزنة اليومي' : 'Daily treasury summary'} testId="treasury-day-close-reconciliation-panel">
+        <DesignPanel title={isAr ? 'ملخص خزائن الفرع اليومي' : 'Daily branch treasury summary'} testId="treasury-day-close-reconciliation-panel">
           <div className="mb-3 rounded-lg border border-ui-border bg-ui-page-alt p-3 text-sm text-ui-muted">
             {isAr
-              ? 'صف واحد لكل يوم. صافي اليوم = المبيعات - الآجل - المصروفات - المشتريات. رصيد آخر أحدث يوم يطابق الرصيد الحالي الفعلي لخزنة الفرع، وأي إيداع أو سحب أو تحويل يظهر في حركة الخزنة أدناه.'
-              : 'One row per business day. Day net = sales - credit - expenses - purchases. The latest closing balance matches the live branch treasury balance; deposits, withdrawals and transfers remain visible in Treasury Movements below.'}
+              ? 'يشمل الملخص حسابات النقدية والبنك التابعة للفرع. حركات الخزنة الرئيسية للمؤسسة تظهر في تبويب الخزنة الرئيسية. صافي اليوم = المبيعات - الآجل - المصروفات - المشتريات. رصيد آخر أحدث يوم يطابق الرصيد الحالي الفعلي لخزنة الفرع، وأي إيداع أو سحب أو تحويل يظهر في حركة الخزنة أدناه.'
+              : 'Includes branch cash and bank accounts. Organization-level movements appear under Main Treasury. Day net = sales - credit - expenses - purchases. The latest closing balance matches the live branch treasury balance; deposits, withdrawals and transfers remain visible in Treasury Movements below.'}
           </div>
           <DataTable columns={dailyColumns} data={dailyRows} loading={loading} error={txError} emptyMessage={t('noData')} />
         </DesignPanel>
