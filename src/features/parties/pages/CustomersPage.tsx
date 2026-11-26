@@ -1,8 +1,8 @@
 import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { CustomerSupportInbox } from '@/features/support/CustomerSupportInbox';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Users, UserCheck, QrCode, Wallet, MapPin, Mail, Phone, LayoutGrid, List, Rows3, X, ArrowUpDown } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Plus, Edit2, Trash2, Users, UserCheck, QrCode, Wallet, MapPin, Mail, Phone, LayoutGrid, List, Rows3, X, ArrowUpDown, ArrowUpRight } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -31,6 +31,7 @@ import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
 import type { ArAgingRow, Customer } from '@/lib/types';
+import { APP_ROUTES } from '@/core/navigation/routes';
 import { qr } from '@/api/domains/qr';
 import { qrError } from '@/features/qr/errors';
 import type { QrCustomerHistory } from '@/features/qr/service';
@@ -232,6 +233,14 @@ export function CustomersPage() {
     return () => { active = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedCustomer?.id, branchScope.scopeKey]);
+
+  useEffect(() => {
+    if (!selectedCustomer) return;
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setSelectedCustomer(null); };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  }, [selectedCustomer]);
+
   const openAdd = () => { setEditing(null); setBusinessAttributes({}); setForm({ name: '', name_en: '', phone: '', email: '', address: '', tax_number: '', balance: 0, notes: '', branch_id: branchFilter || '' }); setModalOpen(true); };
   const openEdit = (c: Customer) => { setEditing(c); setBusinessAttributes(((c as Customer & { business_attributes?: Record<string, unknown> }).business_attributes) || {}); setForm({ name: c.name, name_en: c.name_en || '', phone: c.phone || '', email: c.email || '', address: c.address || '', tax_number: c.tax_number || '', balance: c.balance, notes: c.notes || '', branch_id: c.branch_id || branchFilter || '' }); setModalOpen(true); };
 
@@ -242,6 +251,9 @@ export function CustomersPage() {
       const { error } = await supabase.from('customers').update(payload).eq('id', editing.id);
       if (error) { show(error.message, 'error'); return; }
       await logAudit('update', 'customers', editing.id);
+      if (selectedCustomer?.id === editing.id) {
+        setSelectedCustomer((prev) => (prev ? { ...prev, ...payload } : null));
+      }
     } else {
       const { error } = await supabase.from('customers').insert(payload);
       if (error) { show(error.message, 'error'); return; }
@@ -254,9 +266,14 @@ export function CustomersPage() {
 
   const remove = async () => {
     if (!deleteId) return;
-    const { error } = await supabase.from('customers').delete().eq('id', deleteId);
+    const removedId = deleteId;
+    const { error } = await supabase.from('customers').delete().eq('id', removedId);
     if (error) show(error.message, 'error');
-    else { show(t('deleteSuccess'), 'success'); await logAudit('delete', 'customers', deleteId); }
+    else {
+      show(t('deleteSuccess'), 'success');
+      await logAudit('delete', 'customers', removedId);
+      if (selectedCustomer?.id === removedId) setSelectedCustomer(null);
+    }
     setDeleteId(null);
     reloadCustomers();
   };
@@ -767,9 +784,14 @@ export function CustomersPage() {
                 <div className="space-y-2">
                   <p className="text-xs font-bold text-ui-text">{ar ? 'أحدث الفواتير' : 'Recent orders'}</p>
                   {customerSales.slice(0, 5).map((sale) => (
-                    <div key={sale.id} className="flex items-center justify-between gap-3 rounded-[14px] border border-ui-border bg-ui-page-alt px-3.5 py-2.5 text-xs">
+                    <Link
+                      key={sale.id}
+                      to={`${APP_ROUTES.sales}?saleId=${encodeURIComponent(sale.id)}`}
+                      onClick={() => setSelectedCustomer(null)}
+                      className="group flex items-center justify-between gap-3 rounded-[14px] border border-ui-border bg-ui-page-alt px-3.5 py-2.5 text-xs transition hover:border-ui-primary/40 hover:bg-ui-surface"
+                    >
                       <div className="min-w-0">
-                        <p className="truncate font-bold text-ui-text tabular-nums">{sale.invoice_number || sale.id.slice(0, 8)}</p>
+                        <p className="truncate font-bold text-ui-text tabular-nums group-hover:text-ui-primary">{sale.invoice_number || sale.id.slice(0, 8)}</p>
                         <p className="text-[11px] text-ui-muted tabular-nums">{new Date(sale.created_at).toLocaleDateString(ar ? 'ar-EG' : 'en-US')}</p>
                       </div>
                       <div className="flex items-center gap-2">
@@ -777,8 +799,9 @@ export function CustomersPage() {
                         <span className="font-bold text-ui-text tabular-nums">
                           {formatCurrency(Math.max(0, Number(sale.total || 0) - Number(sale.refunded_amount || 0)), currency, lang)}
                         </span>
+                        <ArrowUpRight className="h-3.5 w-3.5 text-ui-subtle group-hover:text-ui-primary" />
                       </div>
-                    </div>
+                    </Link>
                   ))}
                 </div>
               )}

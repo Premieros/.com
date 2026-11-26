@@ -37,7 +37,7 @@
   --gold-800: 95 61 6;
   --gold-900: 74 47 5;
 
-  /* Premier Design Tokens mapped to Premier unified design system */
+  /* Vessa Design Tokens mapped to Premier unified design system */
   /* === Identity (Default Copper #a8481c) === */
   --ui-primary: 168 72 28;
   --ui-primary-hover: 146 61 23;
@@ -46,7 +46,7 @@
   --ui-primary-fg: 255 247 242;
   --ui-accent: 185 83 31;
 
-  /* === Premier Semantic & Chart Palette === */
+  /* === Vessa Semantic & Chart Palette === */
   --premier-refresh-pine: #b9531f;
   --premier-refresh-ochre: #c88a12;
   --premier-refresh-teal: #1d8a7b;
@@ -58,7 +58,7 @@
   --premier-refresh-glow-a: color-mix(in srgb, var(--premier-refresh-pine) 14%, #f8faf7);
   --premier-refresh-glow-b: #f1ead6;
 
-  /* === Surfaces (Premier warm organic sage-ivory & pure paper cards) === */
+  /* === Surfaces (Vessa warm organic sage-ivory & pure paper cards) === */
   --ui-surface: 252 253 252;
   --ui-surface-raised: 255 255 255;
   --ui-page: 238 240 236;
@@ -100,14 +100,14 @@
   --ui-info-hover: 38 82 156;
   --ui-info-active: 30 67 130;
 
-  /* === Radius (Premier tactile geometry) === */
+  /* === Radius (Vessa tactile geometry) === */
   --ui-radius-sm: 10px;
   --ui-radius: 14px;
   --ui-radius-lg: 18px;
   --ui-radius-xl: 22px;
   --ui-radius-2xl: 26px;
 
-  /* === Shadows (Premier soft organic elevation) === */
+  /* === Shadows (Vessa soft organic elevation) === */
   --ui-shadow-sm: 0 1px 2px rgba(20, 36, 28, 0.04);
   --ui-shadow: 0 1px 2px rgba(20, 36, 28, 0.04), 0 14px 34px -22px rgba(20, 36, 28, 0.28);
   --ui-shadow-md: 0 4px 12px -2px rgba(20, 36, 28, 0.08), 0 14px 30px -18px rgba(20, 36, 28, 0.24);
@@ -197,7 +197,7 @@
 }
 
 .dark {
-  /* Premier Dark Forest-Charcoal mode */
+  /* Vessa Dark Forest-Charcoal mode */
   --ui-surface: 23 29 26;
   --ui-surface-raised: 36 44 40;
   --ui-page: 15 20 18;
@@ -639,7 +639,7 @@
 }
 
 /*
- * Premier Design System + Premier backoffice foundation.
+ * Vessa Design System + Premier backoffice foundation.
  * Warm organic surfaces, floating glass header & rail, pill controls, and tabular numbers.
  */
 .premier-backoffice {
@@ -719,7 +719,7 @@
   background: rgb(var(--ui-surface));
 }
 
-/* === Premier Shared Surface & Component Classes === */
+/* === Vessa Shared Surface & Component Classes === */
 .premier-refresh-brand-mark {
   background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--premier-refresh-pine) 70%, #fff), rgb(var(--ui-primary)) 70%);
   color: rgb(var(--ui-primary-fg));

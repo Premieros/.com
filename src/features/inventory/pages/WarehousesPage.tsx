@@ -16,6 +16,7 @@ import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { BranchBadge } from '@/components/BranchBadge';
 import { logAudit } from '@/lib/audit';
 import { useBranchFilter } from '@/lib/useBranchFilter';
+import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { useBranches } from '@/hooks/useBranches';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
@@ -28,12 +29,13 @@ export function WarehousesPage() {
   const { show } = useToast();
   const can = useCan();
   const branchFilter = useBranchFilter();
+  const branchScope = useBranchScope();
   const { guidedContext, completePrerequisiteAndReturn } = useGuidedWorkflow();
   const { rows: items, loading, total, hasMore, loadMore, loadingMore, refresh: reloadWarehouses } = usePaginatedRows<Warehouse>({
     table: 'warehouses',
     select: '*, branch:branches(*)',
     order: { column: 'created_at', ascending: false },
-    branch_id: branchFilter,
+    branch_ids: branchScope.selectedBranchIds,
     pageSize: 100,
   });
   const { branches } = useBranches();

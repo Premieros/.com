@@ -2,6 +2,9 @@
 (() => {
  'use strict';
  const channel='bunker-editor-v1', origin='https://premieros-sage.vercel.app';
+ const nonce=new URLSearchParams(location.search).get('editor');
+ const bridge=window.opener;
+ if(!bridge||!/^[a-f0-9]{32}$/.test(nonce||''))return;
  const toggle=document.getElementById('editToggle');
  const socialEdit=document.createElement('a');
  socialEdit.href=origin+'/#/website-contact/d56aae83-f1b3-4153-9224-87594500368d';
@@ -15,14 +18,14 @@
  const instructions=document.createElement('p');instructions.id='inlineEditorInstructions';
  instructions.textContent='اضغط مرتين على النص لتعديله، أو استخدم زر تغيير الصورة. احفظ كل تعديل أو ألغِه.';
  instructions.className='inline-editor-instructions';instructions.dir='rtl';document.body.append(instructions);
- let bridge=null,nonce='',active=false,busy=false,revision=0,photos={},edited=null,connecting=false;
+ let active=false,busy=false,revision=0,photos={},edited=null,connecting=true;
  const pending=new Map();
- let helloTimer=null,closeTimer=null;
+ let closeTimer=null;
  const tell=message=>{status.textContent=message;};
  function stop(){
   socialEdit.hidden=true;active=false;connecting=false;document.body.classList.remove('website-editing');
-  toggle.textContent='تعديل الموقع';
-  if(helloTimer)clearInterval(helloTimer);if(closeTimer)clearInterval(closeTimer);
+  toggle.classList.remove('show');
+  if(closeTimer)clearInterval(closeTimer);
   for(const request of pending.values()){clearTimeout(request.timer);request.reject(new Error('انقطع اتصال التحرير. افتح وضع التعديل مجددًا.'));}pending.clear();
   if(edited)cancelText();
   document.querySelectorAll('[data-editable-text]').forEach(node=>node.removeAttribute('tabindex'));
@@ -39,7 +42,6 @@
  window.addEventListener('message',event=>{
   const data=event.data;
   if(event.origin!==origin||event.source!==bridge||data?.channel!==channel||data?.nonce!==nonce)return;
-  if(data.type==='ready'&&connecting){void connect();return;}
   if(data.type==='disconnected'){stop();tell('انتهت جلسة التعديل.');return;}
   const waiting=pending.get(data.id);if(!waiting)return;
   pending.delete(data.id);clearTimeout(waiting.timer);
@@ -55,23 +57,16 @@
    socialEdit.hidden=false;active=true;connecting=false;document.body.classList.add('website-editing');
    document.querySelectorAll('[data-editable-text]').forEach(node=>node.tabIndex=0);
    toggle.textContent='إنهاء التعديل';tell('وضع التعديل متاح. اضغط مرتين على النص أو غيّر الصورة من زرها.');
-   clearInterval(helloTimer);
+   toggle.classList.add('show');
    window.focus();
   }catch(error){tell(error.message);stop();}finally{loadInFlight=false;}
  }
- toggle.textContent='تعديل الموقع';toggle.classList.add('show');
  toggle.addEventListener('click',()=>{
   if(busy){tell('انتظر اكتمال الحفظ.');return;}
-  if(active||connecting){stop();tell('انتهى وضع التعديل.');return;}
-  nonce=Array.from(crypto.getRandomValues(new Uint8Array(16)),value=>value.toString(16).padStart(2,'0')).join('');
-  bridge=window.open(`${origin}/#/website-editor?origin=${encodeURIComponent(location.origin)}&nonce=${nonce}`,
-   'bunkerWebsiteEditor','popup,width=520,height=620');
-  if(!bridge){tell('اسمح بفتح نافذة تسجيل دخول المدير ثم اضغط تعديل الموقع.');return;}
-  connecting=true;toggle.textContent='إلغاء فتح التعديل';tell('جار التحقق من صلاحية المدير. أكمل تسجيل الدخول في النافذة المفتوحة إن لزم.');
-  // Handles both a warm popup and a fresh application/auth load.
-  helloTimer=setInterval(()=>{if(connecting)bridge.postMessage({channel,nonce,id:'hello',op:'hello'},origin);},2500);
-  closeTimer=setInterval(()=>{if(bridge?.closed){stop();tell('أُغلقت نافذة المدير وانتهى وضع التعديل.');}},1000);
+  stop();tell('انتهى وضع التعديل.');
  });
+ closeTimer=setInterval(()=>{if(bridge.closed){stop();tell('انتهت جلسة التعديل.');}},1000);
+ void connect();
  function cancelText(){
   if(!edited)return;
   const {node,original,controls}=edited;node.textContent=original;node.removeAttribute('contenteditable');

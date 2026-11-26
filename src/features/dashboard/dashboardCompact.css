@@ -1,4 +1,4 @@
-/* Standby bar motion & containment; Dashboard hero uses native Premier styling. */
+/* Standby bar motion & containment; Dashboard hero uses native Vessa styling. */
 .dashboard-standby-viewport {
   contain: layout paint;
   isolation: isolate;
