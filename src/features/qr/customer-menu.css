@@ -774,3 +774,77 @@ body:has(.bunker-customer[data-bunker-theme="light"]){background:#eee6d9!importa
 }
 .customer-cart-dock strong { margin-inline-start: auto; }
 .bunker-customer .customer-cart-dock { background: #ead3aa; color: #20160e; }
+
+/* The QR ordering workspace expands with the viewport. */
+.customer-order-menu .customer-product-image {
+  aspect-ratio: 4 / 3;
+}
+.customer-order-menu .customer-categories button {
+  scroll-margin-inline: 12px;
+}
+
+@media (min-width: 760px) {
+  .customer-app.customer-order-menu {
+    width: calc(100% - 48px);
+    max-width: 1120px;
+    padding: 24px 28px 36px;
+  }
+  .customer-order-menu .customer-header { margin-bottom: 12px; }
+  .customer-order-menu .customer-category-navigation { padding: 8px 0; }
+  .customer-order-menu .customer-products {
+    grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+    gap: 16px;
+  }
+  .customer-order-menu .customer-product { max-width: 340px; }
+  .customer-order-menu .customer-product-image .customer-image-content {
+    max-width: 100%;
+    max-height: 100%;
+  }
+  .customer-order-menu .customer-bottom.customer-glass-nav {
+    position: sticky;
+    width: min(100%, 448px);
+    left: auto;
+    bottom: 12px;
+    transform: none;
+    margin: 18px auto 0;
+  }
+  .customer-order-menu .customer-cart-dock {
+    bottom: calc(100px + env(safe-area-inset-bottom));
+  }
+  .customer-order-menu .customer-detail-copy,
+  .customer-order-menu .customer-detail-image,
+  .customer-order-menu .customer-cart,
+  .customer-order-menu .customer-visit {
+    max-width: 680px;
+    margin-inline: auto;
+  }
+}
+
+/* Restaurant & Cafe Website menu and card layout, adapted for Premier QR. */
+.cafe-menu-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-block:20px; }
+.cafe-menu-heading h2 { font-size:clamp(1.9rem, 5vw, 3.3rem); font-weight:850; line-height:1.1; }
+.cafe-menu-controls { display:flex; flex-wrap:wrap; align-items:center; gap:12px; margin-bottom:14px; }
+.cafe-menu-controls .customer-search { flex:1 1 230px; margin:0; }
+.cafe-menu-controls select { min-height:44px; border:1px solid currentColor; border-radius:12px; padding-inline:10px; background:transparent; color:inherit; }
+.cafe-menu-controls option { color:#29231d; background:#fff; }
+.cafe-category-tabs { display:flex; flex-wrap:wrap; justify-content:center; gap:8px; margin-bottom:22px; }
+.cafe-category-tabs button { border:1px solid currentColor; border-radius:999px; padding:6px 13px; background:transparent; color:inherit; }
+.cafe-category-tabs button[aria-pressed=true], .cafe-food-card .customer-add { background:#9b4429; color:#fff; border-color:transparent; }
+.cafe-food-grid { grid-template-columns:repeat(auto-fill,minmax(min(100%, 215px),1fr)); gap:18px; }
+.cafe-food-grid .cafe-food-card { max-width:none; padding:0; position:relative; display:flex; flex-direction:column; overflow:hidden; background:#fffdf8; border-radius:18px; }
+.bunker-customer[data-bunker-theme=dark] .cafe-food-grid .cafe-food-card { background:#28221a; }
+.cafe-food-card .customer-product-open { flex:1; }
+.cafe-food-card .customer-product-image { position:relative; border-radius:0; margin:0; padding:0; aspect-ratio:4/3; }
+.cafe-food-card .customer-product-image .customer-image-content { width:100%; height:100%; max-width:none; max-height:none; border-radius:0; }
+.cafe-food-card .customer-product-image img { object-fit:cover; }
+.cafe-category-badge { position:absolute; inset-inline-start:12px; bottom:10px; border-radius:999px; background:#522c20; color:#fff; padding:3px 10px; font-size:.75rem; }
+.cafe-food-copy { padding:14px 16px 0; }
+.cafe-food-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:12px 16px 16px; }
+.cafe-food-card .customer-add { display:inline-flex; width:auto; min-height:42px; padding:5px 12px; align-items:center; gap:5px; margin:0; }
+@media(max-width:759px) { .cafe-food-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; } .cafe-food-copy,.cafe-food-footer { padding-inline:10px; } }
+.cafe-cart-item { display:flex; flex-wrap:wrap; align-items:flex-start; gap:12px; }
+.cafe-cart-photo { width:72px; height:72px; overflow:hidden; border-radius:10px; }
+.cafe-cart-photo .customer-image-content { width:100%; height:100%; }
+.cafe-cart-copy { flex:1 1 155px; min-width:0; display:grid; gap:4px; }
+.cafe-cart-actions { display:flex; gap:8px; align-items:center; margin-inline-start:auto; }
+.cafe-cart-actions .customer-stepper input { width:3rem; text-align:center; }
