@@ -1,5 +1,5 @@
 import { WorkspaceControls } from '@/components/WorkspaceToolbar';
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Download, Pencil, Plus, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';

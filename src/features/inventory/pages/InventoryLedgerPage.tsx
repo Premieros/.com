@@ -1,5 +1,5 @@
 import { WorkspaceControls } from '@/components/WorkspaceToolbar';
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { BookOpenText } from 'lucide-react';
 import { supabase } from '@/api';
 import { rpc } from '@/api/rpc';

@@ -1,5 +1,5 @@
 import { WorkspaceControls } from '@/components/WorkspaceToolbar';
-﻿import { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useBranchFilter } from '@/lib/useBranchFilter';
