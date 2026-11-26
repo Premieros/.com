@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -257,7 +258,7 @@ export function SuppliersPage() {
             <StatCard title={ar ? 'الفروع النشطة' : 'Branches'} value={String(branches.length)} icon={<MapPin className="h-4 w-4" />} color="green" />
           </section>
           <DesignPanel testId="suppliers-table-panel" bodyClassName="p-4 sm:p-5">
-            <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+            <WorkspaceControls><div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex min-w-0 flex-wrap items-center gap-2" role="tablist" aria-label={ar ? 'تصفية الموردين' : 'Supplier filters'}>
                 {([
                   { key: 'all', label: ar ? 'الكل' : 'All suppliers', count: items.length },
@@ -305,7 +306,7 @@ export function SuppliersPage() {
                   </button>
                 </div>
               </div>
-            </div>
+            </div></WorkspaceControls>
             {viewMode === 'cards' ? (
               loading ? (
                 <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import { WorkspaceControls, WorkspaceToolbarTarget } from '@/components/WorkspaceToolbar';
+import { useContext, type ReactNode } from 'react';
 import clsx from 'clsx';
 import { PageHeader, type BreadcrumbItem } from '@/components/PageHeader';
 
@@ -39,6 +40,8 @@ export function DesignPageHeader({
 }
 
 export function DesignFilterBar({ children }: { children: ReactNode }) {
+  const toolbar = useContext(WorkspaceToolbarTarget);
+  if (toolbar !== undefined) return <WorkspaceControls>{children}</WorkspaceControls>;
   return (
     <div data-testid="design-filter-bar" className="ui-accent-card ui-accent-system flex min-h-11 min-w-0 flex-wrap items-center justify-start gap-2 rounded-[20px] border border-ui-border bg-ui-surface px-4 py-2.5 shadow-ui-sm">
       {children}

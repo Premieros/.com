@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useRef, useState } from 'react';
 import { ClipboardCheck, Plus, Eye, Send, CheckCircle2, XCircle, CheckCheck, Trash2, Download, Upload } from 'lucide-react';
 import { supabase } from '@/api';
@@ -356,7 +357,7 @@ export function StockCountsPage() {
   return (
     <DesignSurface testId="stock-counts-page">
       <DesignPageHeader title={t('stockCounts')} subtitle={isAr ? 'جرد الخامات بالمخزن مع الاعتماد وتطبيق الرصيد' : 'Raw-material warehouse counts with approval and stock adjustment'} actions={can('inventory.count.create') ? <Button size="sm" onClick={openCreate}><ClipboardCheck className="w-4 h-4" /> {t('newStockCount')}</Button> : undefined} />
-      <DesignPanel testId="stock-counts-search-panel"><div className="flex flex-col sm:flex-row gap-3"><DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={t('search')} testId="stock-counts-search" /><Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="sm:w-44"><option value="all">{t('all')}</option>{statusOptions.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</Select><Select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="sm:w-48"><option value="">{t('allBranches')}</option>{visibleBranches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}</Select></div></DesignPanel>
+      <WorkspaceControls><div data-testid="stock-counts-search-panel"><div className="flex flex-col sm:flex-row gap-3"><DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={t('search')} testId="stock-counts-search" /><Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="sm:w-44"><option value="all">{t('all')}</option>{statusOptions.map((s) => <option key={s.key} value={s.key}>{s.label}</option>)}</Select><Select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="sm:w-48"><option value="">{t('allBranches')}</option>{visibleBranches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}</Select></div></div></WorkspaceControls>
       <DesignPanel testId="stock-counts-table-panel"><DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} /><DesignPagination loaded={counts.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} /></DesignPanel>
 
       <Modal open={createOpen} onClose={() => setCreateOpen(false)} title={t('newStockCount')} size="lg"><div className="space-y-4">

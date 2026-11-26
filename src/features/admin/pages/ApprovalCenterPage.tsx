@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Check, Clock3, Plus, RefreshCw, ShieldCheck, Trash2, X } from 'lucide-react';
 import { supabase } from '@/api';
@@ -108,7 +109,7 @@ export function ApprovalCenterPage() {
           />
         )}
 
-        <DesignPanel testId="approval-center-filter-panel" className="ui-accent-system">
+        <WorkspaceControls><div data-testid="approval-center-filter-panel">
           <div className="flex flex-wrap items-center gap-3">
             <ShieldCheck className="w-5 h-5 text-ui-primary" />
             <span className="font-semibold">{ar ? 'الفرع' : 'Branch'}</span>
@@ -118,7 +119,7 @@ export function ApprovalCenterPage() {
             </Select>
             <span className="ms-auto text-sm text-ui-muted">{ar ? `معلق: ${rows.length}` : `Pending: ${rows.length}`}</span>
           </div>
-        </DesignPanel>
+        </div></WorkspaceControls>
 
         <DesignPanel testId="approval-center-queue-panel" title={ar ? 'قائمة الاعتماد' : 'Approval Queue'}>
           {loading ? <div className="p-8 text-center text-ui-muted">{ar ? 'جاري التحميل...' : 'Loading...'}</div> : rows.length === 0 ? (

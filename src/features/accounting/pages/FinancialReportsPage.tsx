@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { classifyReportFailure, describeReportFailure, type ReportFailure } from '@/features/reporting/reportFailure';
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -601,7 +602,7 @@ export function FinancialReportsPage({ hideViewPicker = false, compactFilters = 
         </div>}
         {(!compactFilters || filtersOpen) && <div data-testid="financial-filters-popup"
           className={compactFilters ? 'absolute end-0 top-full z-30 mt-2 max-h-[70vh] w-[min(90vw,680px)] overflow-y-auto rounded-xl border border-ui-border bg-ui-surface p-3 shadow-xl' : ''}>
-      <DesignPanel testId="financial-reports-filters" className="ui-accent-finance">
+      <WorkspaceControls><div data-testid="financial-reports-filters">
         <div className="flex flex-col gap-4">
           {!hideViewPicker && (
             <div className="flex flex-wrap gap-2">
@@ -658,7 +659,7 @@ export function FinancialReportsPage({ hideViewPicker = false, compactFilters = 
             )}
           </div>
         </div>
-      </DesignPanel>
+      </div></WorkspaceControls>
         </div>}
       </div>
 

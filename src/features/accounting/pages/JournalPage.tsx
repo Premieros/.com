@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { Eye, Scale, Plus, Trash2, RotateCcw, Maximize2, Minimize2 } from 'lucide-react';
 import { supabase } from '@/api';
@@ -339,7 +340,7 @@ export function JournalPage() {
             <StatCard title={t('totalCredit')} value={formatCurrency(items.reduce((sum, entry) => sum + Number(entry.credit_total), 0), currency, lang)} icon={<Scale className="w-5 h-5" />} color="amber" />
             <StatCard title={t('balance')} value={formatCurrency(items.reduce((sum, entry) => sum + Number(entry.debit_total) - Number(entry.credit_total), 0), currency, lang)} icon={<Scale className="w-5 h-5" />} color="green" />
           </div>
-          <DesignPanel testId="journal-search-panel">
+          <WorkspaceControls><div data-testid="journal-search-panel">
             <div className="flex flex-col flex-wrap items-end justify-between gap-4 sm:flex-row">
               <DesignSearch value={search} onChange={setSearch} className="w-full flex-1" label={t('search')} placeholder={t('search')} testId="journal-search" />
               <div className="flex flex-wrap items-end gap-3">
@@ -351,7 +352,7 @@ export function JournalPage() {
                 <Input label={t('to')} type="date" value={to} onChange={(e) => { const allowed = history.clampRange(from, e.target.value); setFrom(allowed.from); setTo(allowed.to); }} />
               </div>
             </div>
-          </DesignPanel>
+          </div></WorkspaceControls>
           <DesignPanel testId="journal-table-panel">
             <DataTable columns={columns} data={items} loading={loading} emptyMessage={t('noData')} />
           </DesignPanel>

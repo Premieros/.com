@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FileText, HandCoins, Plus, UserRound } from 'lucide-react';
 import { supabase } from '@/api';
@@ -221,13 +222,13 @@ export function EmployeeReceivablesPage() {
         actions={can('customers.manage') ? <Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" />{ar ? 'إضافة موظف' : 'Add Employee'}</Button> : undefined}
       />
 
-      <DesignPanel>
+      <WorkspaceControls>
         <div className="grid gap-4 md:grid-cols-[minmax(220px,1fr)_minmax(220px,1fr)_auto] md:items-end">
           {!branchFilter ? <Select label={ar ? 'الفرع' : 'Branch'} value={selectedBranchId} onChange={(e) => setSelectedBranchId(e.target.value)}><option value="">{ar ? 'اختر الفرع' : 'Select branch'}</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</Select> : <div />}
           <DesignSearch value={search} onChange={setSearch} placeholder={ar ? 'بحث بالاسم أو الهاتف' : 'Search name or phone'} label={ar ? 'بحث' : 'Search'} />
           <div className="rounded-xl border border-ui-border bg-ui-page-alt px-4 py-3 text-end"><p className="text-xs text-ui-muted">{ar ? 'إجمالي الذمم' : 'Total Receivables'}</p><p className="text-lg font-black text-ui-danger">{formatCurrency(totalOpen, currency, lang)}</p></div>
         </div>
-      </DesignPanel>
+      </WorkspaceControls>
 
       {effectiveBranchId && can('accounts.view') && <>
         <button type="button" onClick={() => setShowHistoricalBalances(value => !value)}

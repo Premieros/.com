@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { useNavigate } from 'react-router-dom';
@@ -300,7 +301,7 @@ export function LowStockAlertsPage() {
         </div>
       </DesignPanel>
 
-      <DesignPanel testId="alerts-search-panel">
+      <WorkspaceControls><div data-testid="alerts-search-panel">
         <div className="flex flex-col sm:flex-row gap-3">
           <DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={t('search')} testId="alerts-search" />
           <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="sm:w-36">
@@ -317,7 +318,7 @@ export function LowStockAlertsPage() {
             {warehouses.filter((w) => !branchId || w.branch_id === branchId).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </Select>
         </div>
-      </DesignPanel>
+      </div></WorkspaceControls>
 
       <DesignPanel testId="alerts-table-panel">
         <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} />

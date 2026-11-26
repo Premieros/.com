@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, Edit2, Trash2, Warehouse as WarehouseIcon, CheckCircle2, MapPin, LayoutGrid, List } from 'lucide-react';
@@ -162,7 +163,7 @@ export function WarehousesPage() {
         />
       </section>
       <DesignPanel testId="warehouses-table-panel" bodyClassName="p-4 sm:p-5">
-        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+        <WorkspaceControls><div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-center gap-2" role="tablist" aria-label={ar ? 'حالة المستودعات' : 'Warehouse status'}>
             {([
               { key: 'all', label: ar ? 'الكل' : 'All', count: items.length },
@@ -198,7 +199,7 @@ export function WarehousesPage() {
               </button>
             </div>
           </div>
-        </div>
+        </div></WorkspaceControls>
         {viewMode === 'cards' ? (
           loading ? (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">

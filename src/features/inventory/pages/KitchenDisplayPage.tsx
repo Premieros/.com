@@ -1,3 +1,4 @@
+import { WorkspaceScrollRow } from '@/components/WorkspaceToolbar';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { RefreshCw, ChefHat, CheckCircle2, UtensilsCrossed, Volume2, VolumeX, AlertTriangle, User } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -303,9 +304,8 @@ function KitchenDisplay({ branchFilter, canViewKds, canUpdateKds }: {
 
   return (
     <DesignSurface testId="kitchen-display">
-      <DesignPageHeader title={ar ? 'شاشة المطبخ' : 'Kitchen Display'} subtitle={ar ? 'الطلبات النشطة حسب المحطات المسموح بها للمستخدم' : 'Active orders for the stations assigned to this user'} />
-      <div className="space-y-4">
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+      <DesignPageHeader title={ar ? 'شاشة المطبخ' : 'Kitchen Display'} subtitle={ar ? 'الطلبات النشطة حسب المحطات المسموح بها للمستخدم' : 'Active orders for the stations assigned to this user'} actions={<>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3">
           <Select value={station} onChange={e => setStation(e.target.value)} className="min-w-0 flex-1 sm:w-44 sm:flex-none" disabled={!canViewKds}>
             <option value="">{ar ? 'كل المحطات المسموح بها' : 'All Allowed Stations'}</option>
             {stations.filter(s => s.is_active).map(s => <option key={s.code} value={s.code}>{ar ? s.name_ar : s.name_en}</option>)}
@@ -315,10 +315,10 @@ function KitchenDisplay({ branchFilter, canViewKds, canUpdateKds }: {
             {soundEnabled ? <Volume2 className="h-5 w-5" /> : <VolumeX className="h-5 w-5" />}
           </button>
           {soundEnabled && !bell.ready && <button type="button" className="rounded-lg border border-ui-border px-3 py-1 text-xs" onClick={() => void bell.unlock()}>{ar ? 'تفعيل جرس المطبخ' : 'Enable kitchen bell'}</button>}
-          <span className="w-full text-xs text-ui-muted sm:w-auto sm:text-sm"><span className="me-1 inline-block h-2 w-2 rounded-full bg-ui-success animate-pulse" />{items.length} {ar ? 'طلب/محطة نشطة' : 'active order/station cards'}</span>
+          <span className="whitespace-nowrap text-xs text-ui-muted sm:w-auto sm:text-sm"><span className="me-1 inline-block h-2 w-2 rounded-full bg-ui-success animate-pulse" />{items.length} {ar ? 'طلب/محطة نشطة' : 'active order/station cards'}</span>
         </div>
 
-        <div role="tablist" aria-label={ar ? 'عرض طلبات المطبخ' : 'Kitchen order views'} className="flex flex-wrap gap-2">
+        <div role="tablist" aria-label={ar ? 'عرض طلبات المطبخ' : 'Kitchen order views'} className="flex shrink-0 gap-2">
           <button
             role="tab"
             aria-selected={view === 'active'}
@@ -337,14 +337,8 @@ function KitchenDisplay({ branchFilter, canViewKds, canUpdateKds }: {
           </button>
         </div>
 
-        {view === 'active' && (
-          <p className="text-xs font-medium text-ui-muted">
-            {ar
-              ? 'تظل الطلبات غير المكتملة ظاهرة حتى يتم تحديث حالتها بواسطة مستخدم مخوّل. يتم تمييز الطلبات المتأخرة فقط.'
-              : 'Unfinished orders remain visible until an authorized operator updates their status. Overdue orders are highlighted only.'}
-          </p>
-        )}
-
+      </>} />
+      <div className="space-y-4">
         {view === 'active' && canViewKds && transferNotices.length > 0 && (
           <section data-testid="kds-transfer-notices" className="rounded-xl border border-ui-info/30 bg-ui-info-soft p-3">
             <h3 className="mb-2 text-xs font-black text-ui-text">
@@ -401,7 +395,7 @@ function KitchenDisplay({ branchFilter, canViewKds, canUpdateKds }: {
           </div>)}
         </div>}
 
-        {view === 'active' && <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        {view === 'active' && items.length > 0 && <WorkspaceScrollRow className="workspace-kitchen-cards">
           {items.map(item => {
             const context = orderContext[item.order_id];
             const tableLabel = context?.table_name || (item.table_number ? `Table ${String(item.table_number).padStart(2, '0')}` : null);
@@ -452,7 +446,7 @@ function KitchenDisplay({ branchFilter, canViewKds, canUpdateKds }: {
             </div>
             );
           })}
-        </div>}
+        </WorkspaceScrollRow>}
 
         {view === 'active' && !loading && !items.length && !loadError && !refreshInterrupted && <div className="text-center py-16 text-ui-muted"><ChefHat className="h-12 w-12 mx-auto mb-3 opacity-30" /><div className="text-lg">{ar ? 'لا توجد طلبات نشطة ضمن المحطات المسموح بها' : 'No active orders in your allowed stations'}</div></div>}
       </div>

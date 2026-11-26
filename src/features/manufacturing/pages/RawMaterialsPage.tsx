@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useState } from 'react';
 import { Plus, Edit2, Boxes, Layers, Trash2 } from 'lucide-react';
 import { supabase } from '@/api';
@@ -295,7 +296,7 @@ export function RawMaterialsPage() {
       <div className="flex flex-wrap gap-2 mb-4">{tabs.map((tb) => <button key={tb.key} onClick={() => setTab(tb.key)} className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${tab === tb.key ? 'bg-ui-primary text-ui-primary-fg shadow-lg shadow-ui-primary/25 scale-[1.02]' : 'liquid-glass text-ui-text hover:border-ui-primary/40 hover:bg-ui-surface/90'}`}>{tb.icon}{tb.label}</button>)}</div>
 
       {tab !== 'materials' && <DesignPanel testId="raw-materials-branch-panel"><div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center"><Select value={stockBranch} onChange={(e) => setStockBranch(e.target.value)} label={t('branch')} className="sm:w-64"><option value="">{t('all')} - {t('branches')}</option>{branches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}</Select></div></DesignPanel>}
-      {tab === 'materials' && <DesignPanel testId="raw-materials-search-panel"><DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} testId="raw-materials-search" /></DesignPanel>}
+      {tab === 'materials' && <WorkspaceControls><div data-testid="raw-materials-search-panel"><DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} testId="raw-materials-search" /></div></WorkspaceControls>}
 
       <DesignPanel testId="raw-materials-table-panel">
         {tab === 'materials' && <><DataTable columns={materialColumns} data={filteredMaterials} loading={materialsLoading} error={error} emptyMessage={t('noData')} /><DesignPagination loaded={materials.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} /></>}

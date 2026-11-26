@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import type { CreateProductInput } from '@/api/domains/catalog';
 import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
@@ -704,8 +705,7 @@ export function ProductsPage() {
           color="amber"
         />
       </section>
-      <DesignPanel testId="products-search-panel" bodyClassName="p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
+      <WorkspaceControls><div data-testid="products-search-panel" className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex max-w-full flex-wrap items-center gap-2">
             <button
               type="button"
@@ -780,8 +780,7 @@ export function ProductsPage() {
               </button>
             </div>
           </div>
-        </div>
-      </DesignPanel>
+        </div></WorkspaceControls>
       <DesignPanel testId="products-table-panel" bodyClassName="p-4 sm:p-5">
         {viewMode === 'grid' ? (
           loading ? (

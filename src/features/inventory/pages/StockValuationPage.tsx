@@ -1,4 +1,5 @@
-﻿import { useEffect, useState } from 'react';
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
+import { useEffect, useState } from 'react';
 import { supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useBranchFilter } from '@/lib/useBranchFilter';
@@ -169,7 +170,7 @@ export function StockValuationPage() {
         )}
       </DesignPanel>
 
-      <DesignPanel testId="valuation-search-panel">
+      <WorkspaceControls><div data-testid="valuation-search-panel">
         <div className="flex flex-col sm:flex-row gap-3">
           <DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={t('search')} testId="valuation-search" />
           <span className="text-sm text-ui-muted">{branches.find((b) => b.id === branchFilter)?.name || (isAr ? 'الفرع النشط' : 'Active branch')}</span>
@@ -178,7 +179,7 @@ export function StockValuationPage() {
             {warehouses.filter((w) => w.branch_id === branchFilter).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </Select>
         </div>
-      </DesignPanel>
+      </div></WorkspaceControls>
 
       <DesignPanel testId="valuation-table-panel">
         <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')}

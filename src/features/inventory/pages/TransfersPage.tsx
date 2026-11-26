@@ -1,3 +1,4 @@
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useMemo, useState, useRef } from 'react';
 import { useLocation, useSearchParams } from 'react-router-dom';
 import { Plus, CheckCircle2, XCircle, ArrowLeftRight, Trash2 } from 'lucide-react';
@@ -268,7 +269,7 @@ export function TransfersPage() {
     <DesignSurface testId="transfers-page">
       <DesignPageHeader title={t('warehouseTransfers')} subtitle={t('transfers')} actions={can('inventory.transfer.create') ? <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4" /> {t('newTransfer')}</Button> : undefined} />
       {warehouses.length < 2 && !loading && <PrerequisiteAlertBanner step={PREREQUISITE_STEPS.create_second_warehouse} onAction={() => startGuidance(PREREQUISITE_STEPS.create_second_warehouse, 'transfer_create', location.pathname, { form, lines }, 'التحويل المخزني', 'Warehouse Transfers')} />}
-      <DesignPanel testId="transfers-search-panel"><DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} testId="transfers-search" /></DesignPanel>
+      <WorkspaceControls><div data-testid="transfers-search-panel"><DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} testId="transfers-search" /></div></WorkspaceControls>
       <DesignPanel testId="transfers-table-panel"><DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} /><DesignPagination loaded={transfers.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} /></DesignPanel>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={t('newTransfer')} size="lg">
         <div className="space-y-5">

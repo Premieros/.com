@@ -1,4 +1,5 @@
-﻿import { useCallback, useEffect, useRef, useState } from 'react';
+import { WorkspaceControls } from '@/components/WorkspaceToolbar';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { BookOpenText } from 'lucide-react';
 import { supabase } from '@/api';
 import { rpc } from '@/api/rpc';
@@ -266,7 +267,7 @@ export function InventoryLedgerPage() {
         </button>
       } />
 
-      <DesignPanel testId="inventory-ledger-search-panel">
+      <WorkspaceControls><div data-testid="inventory-ledger-search-panel">
         <div className="flex flex-col sm:flex-row gap-3">
           <DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={t('search')} testId="inventory-ledger-search" />
           <Select value={entryType} onChange={(e) => setEntryType(e.target.value)} className="sm:w-48">
@@ -278,7 +279,7 @@ export function InventoryLedgerPage() {
             {branches.map((br) => <option key={br.id} value={br.id}>{br.name}</option>)}
           </Select>
         </div>
-      </DesignPanel>
+      </div></WorkspaceControls>
 
       <DesignPanel testId="inventory-ledger-table-panel">
         <DataTable columns={columns} data={rows} loading={loading} error={error} emptyMessage={t('noData')} />
