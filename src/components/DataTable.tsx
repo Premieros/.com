@@ -750,7 +750,7 @@ export function DataTable<T extends { id?: string }>({
           <div
             key={row.id || i}
             onClick={(e) => {
-              if (showCheckbox && (e.target as HTMLElement).closest('input[type="checkbox"]')) return;
+              if (e.target instanceof Element && e.target.closest('button, a, input, select, textarea, summary, [role="button"]')) return;
               onRowClick?.(row);
             }}
             className={`min-w-0 overflow-hidden rounded-xl border border-ui-border bg-ui-surface p-3 shadow-ui-sm transition-colors ${onRowClick ? 'cursor-pointer active:bg-ui-page-alt' : ''} ${selectedIds?.has(row.id || '') ? 'border-ui-primary bg-ui-primary-soft/30' : ''}`}
@@ -821,7 +821,7 @@ export function DataTable<T extends { id?: string }>({
                 <div
                   key={row.id || i}
                   onClick={(e) => {
-                    if (showCheckbox && (e.target as HTMLElement).closest('input[type="checkbox"]')) return;
+                    if (e.target instanceof Element && e.target.closest('button, a, input, select, textarea, summary, [role="button"]')) return;
                     onRowClick?.(row);
                   }}
                   className={`premier-refresh-subcard flex h-full min-w-0 flex-col justify-between overflow-hidden p-4 ${onRowClick ? 'cursor-pointer' : ''} ${selectedIds?.has(row.id || '') ? 'border-ui-primary ring-1 ring-ui-primary/30' : ''}`}
@@ -845,6 +845,12 @@ export function DataTable<T extends { id?: string }>({
                       </div>
                     ))}
                   </dl>
+                  {onRowClick && (
+                    <button type="button" onClick={(event) => { event.stopPropagation(); onRowClick(row); }}
+                      className="mt-2 self-start rounded-lg px-2 py-1 text-xs font-semibold text-ui-primary hover:bg-ui-primary-soft">
+                      {isRtl ? 'فتح السجل' : 'Open record'}
+                    </button>
+                  )}
                   {mobileSecondaryColumns.length > 0 && (
                     <details className="mt-2.5 rounded-[14px] border border-ui-border bg-ui-surface/80" onClick={(event) => event.stopPropagation()}>
                       <summary className="flex min-h-9 cursor-pointer list-none items-center justify-center px-3 text-xs font-semibold text-ui-primary">
@@ -903,7 +909,7 @@ export function DataTable<T extends { id?: string }>({
               <tr
                 key={row.id || i}
                 onClick={(e) => {
-                  if (showCheckbox && (e.target as HTMLElement).closest('input[type="checkbox"]')) return;
+                  if (e.target instanceof Element && e.target.closest('button, a, input, select, textarea, summary, [role="button"]')) return;
                   onRowClick?.(row);
                 }}
                 className={`hover:bg-ui-page-alt/60 transition-colors duration-150 ${onRowClick ? 'cursor-pointer' : ''} ${selectedIds?.has(row.id || '') ? 'bg-ui-primary-soft/50' : ''}`}

@@ -7,7 +7,7 @@ export interface BrandPreset {
 }
 
 export const BRAND_PRESETS: BrandPreset[] = [
-  { key: 'copper', ar: 'نحاسي (Vessa)', en: 'Copper', hue: 19, sat: 72 },
+  { key: 'copper', ar: 'نحاسي', en: 'Copper', hue: 19, sat: 72 },
   { key: 'cobalt', ar: 'كوبالت', en: 'Cobalt', hue: 228, sat: 67 },
   { key: 'ocean', ar: 'محيطي', en: 'Ocean', hue: 194, sat: 69 },
   { key: 'pine', ar: 'صنوبري', en: 'Pine', hue: 155, sat: 66 },
