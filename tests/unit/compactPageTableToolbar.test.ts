@@ -20,7 +20,8 @@ describe('compact above-table page controls', () => {
     expect(header).toContain('data-testid="page-header"');
     expect(header).toContain('sm:overflow-x-auto sm:overscroll-x-contain');
     expect(surface).toContain("'min-w-0 space-y-2'");
-    expect(layout).toContain('lg:pt-8');
+    expect(layout).toContain('workspace-toolbar sticky');
+    expect(header).toContain('className="sr-only"');
   });
 
   it('scrolls rows inside a bounded table while keeping bold column labels and the footer visible', () => {
