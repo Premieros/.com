@@ -36,6 +36,8 @@ import { Input, Select, Textarea } from '@/components/Input';
 import { logAudit } from '@/lib/audit';
 import { findUiTheme, UI_THEMES } from '@/lib/themes';
 import type { BranchSettings } from '@/lib/types';
+import { useCan } from '@/lib/permissions';
+import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
 import { APP_ROUTES } from '@/core/navigation/routes';
 
 type SettingsTab = 'website_social' | 'customer_orders' | 'branch_profile' | 'tax' | 'business_day' | 'inventory' | 'payments' | 'branch_staff' | 'appearance' | 'language';
@@ -56,9 +58,13 @@ export function SettingsControlCenterPage() {
   const { settings, branchSettingsMap, saveBranchSettings } = useSettings();
   const { branches } = useBranches();
   const { show } = useToast();
+  const can = useCan();
+  const { canAccessPath } = useOrganizationModules();
   const isAr = lang === 'ar';
 
   const isSuperAdmin = user?.role === 'super_admin';
+  const canViewBranchStaff = isSuperAdmin || can('users.view');
+  const canOpenIntegrations = can('settings.manage') && canAccessPath(APP_ROUTES.integrations);
 
   const [active, setActive] = useState<SettingsTab>('branch_profile');
   const [saving, setSaving] = useState(false);
@@ -152,8 +158,8 @@ export function SettingsControlCenterPage() {
   }, [targetBranchId]);
 
   useEffect(() => {
-    if (active === 'branch_staff') void loadBranchStaff();
-  }, [active, loadBranchStaff]);
+    if (active === 'branch_staff' && canViewBranchStaff) void loadBranchStaff();
+  }, [active, canViewBranchStaff, loadBranchStaff]);
 
   const pickTheme = (key: string) => {
     const p = findUiTheme(key);
@@ -203,7 +209,7 @@ export function SettingsControlCenterPage() {
     { key: 'business_day', label: isAr ? 'اليوم المالي والشفتات' : 'Business Day & Shifts', icon: <CalendarClock className="w-4 h-4" /> },
     { key: 'inventory', label: isAr ? 'المخزون والبيع بالسالب' : 'Inventory & Negative Stock', icon: <Boxes className="w-4 h-4" /> },
     { key: 'payments', label: isAr ? 'InstaPay والتحويل البنكي' : 'InstaPay & Bank Transfer', icon: <Landmark className="w-4 h-4" /> },
-    { key: 'branch_staff', label: isAr ? 'طاقم عمل الفرع' : 'Branch Staff', icon: <Users className="w-4 h-4" /> },
+    ...(canViewBranchStaff ? [{ key: 'branch_staff' as const, label: isAr ? 'طاقم عمل الفرع' : 'Branch Staff', icon: <Users className="w-4 h-4" /> }] : []),
     { key: 'appearance', label: isAr ? 'المظهر والثيم' : 'Appearance & Theme', icon: <Palette className="w-4 h-4" /> },
     { key: 'language', label: isAr ? 'اللغة والتوطين' : 'Language', icon: <Languages className="w-4 h-4" /> },
   ];
@@ -256,16 +262,18 @@ export function SettingsControlCenterPage() {
         ) : undefined}
       />
 
-      <Link
-        to={APP_ROUTES.integrations}
-        data-testid="settings-integrations-link"
-        className="flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-600/5 p-4 text-sm font-bold text-ui-text hover:bg-brand-600/10"
-      >
-        <span className="flex items-center gap-2"><Smartphone className="h-5 w-5 text-brand-600" />
-          {isAr ? 'التكاملات والربط — الضرائب المصرية والسعودية وتطبيقات التوصيل' : 'Integrations Hub — Egypt, Saudi Arabia and delivery apps'}
-        </span>
-        <span className="text-brand-600">{isAr ? 'فتح الشاشة' : 'Open'}</span>
-      </Link>
+      {canOpenIntegrations && (
+        <Link
+          to={APP_ROUTES.integrations}
+          data-testid="settings-integrations-link"
+          className="flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-600/5 p-4 text-sm font-bold text-ui-text hover:bg-brand-600/10"
+        >
+          <span className="flex items-center gap-2"><Smartphone className="h-5 w-5 text-brand-600" />
+            {isAr ? 'التكاملات والربط — الضرائب المصرية والسعودية وتطبيقات التوصيل' : 'Integrations Hub — Egypt, Saudi Arabia and delivery apps'}
+          </span>
+          <span className="text-brand-600">{isAr ? 'فتح الشاشة' : 'Open'}</span>
+        </Link>
+      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4 md:gap-6">
         <div data-testid="settings-section-rail" className="flex gap-2 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:col-span-1 md:block md:space-y-1 md:overflow-visible md:pb-0">

@@ -141,12 +141,9 @@ function AccountLayout({ children }: { children: ReactNode }) {
   const branchScope = useBranchScope();
   const { canAccessModule, canAccessPath, runtime } = useOrganizationModules();
   const isPosRoute = location.pathname === APP_ROUTES.pos || location.pathname.startsWith(`${APP_ROUTES.pos}/`);
-  const orderTrackingEnabled = canAccessModule('pos') && canAccessPath(APP_ROUTES.floorPlan) && !isPosRoute;
-  const activeOrderCount = useActiveOrderCount(branchFilter || user?.branch_id || '', orderTrackingEnabled);
-
   const isAdmin = isAdminRole(user?.role);
   const canViewFloorPlan = can('floor_plan.view') && canAccessPath(APP_ROUTES.floorPlan);
-  const canOpenSettings = can('settings.manage');
+  const canOpenSettings = can('settings.manage') && canAccessPath(APP_ROUTES.settings);
 
   const showBackButton = location.pathname !== APP_ROUTES.dashboard;
   // Back-office data grids need the full workspace, not a 1600px cap.
@@ -170,13 +167,15 @@ function AccountLayout({ children }: { children: ReactNode }) {
   // organization-module and route filters as every other navigation entry.
   const canOpenPos = visibleItems.some((item) => item.id === 'pos');
   const canOpenKitchen = visibleItems.some((item) => item.id === 'kitchen-display');
+  const orderTrackingEnabled = canAccessModule('pos') && canAccessPath(APP_ROUTES.floorPlan) && !isPosRoute && (canViewFloorPlan || canOpenPos);
+  const activeOrderCount = useActiveOrderCount(branchFilter || user?.branch_id || '', orderTrackingEnabled);
   const quickCreateActions = useMemo(() => [
     { id: 'pos-sale', to: APP_ROUTES.pos, ar: 'طلب / فاتورة بيع', en: 'New POS order', allowed: canOpenPos && can('pos.order.create'), icon: <ShoppingCart className="h-4 w-4" /> },
     { id: 'new-customer', to: `${APP_ROUTES.customers}?new=1`, ar: 'عميل جديد', en: 'New customer', allowed: can('customers.manage') && can('customers.view') && canAccessModule('customers') && canAccessPath(APP_ROUTES.customers), icon: <Users className="h-4 w-4" /> },
     { id: 'new-product', to: `${APP_ROUTES.products}?new=1`, ar: 'منتج جديد', en: 'New product', allowed: can('products.create') && can('products.view') && canAccessModule('catalog') && canAccessPath(APP_ROUTES.products), icon: <Package className="h-4 w-4" /> },
-    { id: 'new-purchase', to: APP_ROUTES.purchases, ar: 'فاتورة شراء', en: 'Purchases', allowed: can('purchases.manage') && canAccessModule('purchases') && canAccessPath(APP_ROUTES.purchases), icon: <Truck className="h-4 w-4" /> },
-    { id: 'stock-transfer', to: APP_ROUTES.transfers, ar: 'تحويل مخزون', en: 'Stock transfers', allowed: can('inventory.view') && canAccessModule('inventory') && canAccessPath(APP_ROUTES.transfers), icon: <ArrowLeftRight className="h-4 w-4" /> },
-    { id: 'stock-count', to: APP_ROUTES.stockCounts, ar: 'جرد مخزني', en: 'Stock counts', allowed: can('inventory.view') && canAccessModule('inventory') && canAccessPath(APP_ROUTES.stockCounts), icon: <ClipboardCheck className="h-4 w-4" /> },
+    { id: 'new-purchase', to: APP_ROUTES.purchases, ar: 'فاتورة شراء', en: 'Purchases', allowed: can('purchases.view') && (can('purchases.manage') || can('procurement.order.create')) && canAccessModule('purchases') && canAccessPath(APP_ROUTES.purchases), icon: <Truck className="h-4 w-4" /> },
+    { id: 'stock-transfer', to: APP_ROUTES.transfers, ar: 'تحويل مخزون', en: 'Stock transfers', allowed: can('inventory.view') && can('inventory.transfer.create') && canAccessModule('inventory') && canAccessPath(APP_ROUTES.transfers), icon: <ArrowLeftRight className="h-4 w-4" /> },
+    { id: 'stock-count', to: APP_ROUTES.stockCounts, ar: 'جرد مخزني', en: 'Stock counts', allowed: can('inventory.view') && can('inventory.count.create') && canAccessModule('inventory') && canAccessPath(APP_ROUTES.stockCounts), icon: <ClipboardCheck className="h-4 w-4" /> },
   ].filter((entry) => entry.allowed), [can, canAccessModule, canAccessPath, canOpenPos]);
 
   useEffect(() => {

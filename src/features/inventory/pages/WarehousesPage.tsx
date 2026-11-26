@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Edit2, Trash2, Warehouse as WarehouseIcon, CheckCircle2, MapPin, LayoutGrid, List } from 'lucide-react';
 import { supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
 import { DesignSurface, DesignPageHeader } from '@/components/design/DesignSurface';
+import { DesignSearch } from '@/components/design/DesignSearch';
 import { DesignPanel } from '@/components/design/DesignPanel';
 import { DesignPagination } from '@/components/design/DesignPagination';
 import { DataTable, type Column } from '@/components/DataTable';
@@ -36,14 +38,31 @@ export function WarehousesPage() {
     select: '*, branch:branches(*)',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
+    enabled: can('warehouses.view'),
     pageSize: 100,
   });
   const { branches } = useBranches();
+  const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  const [searchParams, setSearchParams] = useSearchParams();
   const [editing, setEditing] = useState<Warehouse | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', branch_id: '', address: '', is_active: true });
+
+  useEffect(() => {
+    if (searchParams.get('new') !== '1') return;
+    if (can('warehouses.manage')) {
+      setEditing(null);
+      setForm({ name: '', branch_id: branchFilter || '', address: '', is_active: true });
+      setModalOpen(true);
+    }
+    const next = new URLSearchParams(searchParams);
+    next.delete('new');
+    setSearchParams(next, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams]);
 
   const openAdd = () => { setEditing(null); setForm({ name: '', branch_id: branchFilter || '', address: '', is_active: true }); setModalOpen(true); };
   const openEdit = (w: Warehouse) => { setEditing(w); setForm({ name: w.name, branch_id: w.branch_id || '', address: w.address || '', is_active: w.is_active }); setModalOpen(true); };
@@ -101,7 +120,18 @@ export function WarehousesPage() {
     )},
   ];
 
-  const activeCount = items.filter((w) => w.is_active).length;
+  const activeCount = useMemo(() => items.filter((w) => w.is_active).length, [items]);
+  const inactiveCount = Math.max(0, items.length - activeCount);
+  const filtered = useMemo(() => {
+    const term = search.trim().toLowerCase();
+    return items.filter((w) => {
+      if (statusFilter === 'active' && !w.is_active) return false;
+      if (statusFilter === 'inactive' && w.is_active) return false;
+      if (!term) return true;
+      const branchName = (w as Warehouse & { branch?: Branch }).branch?.name || '';
+      return w.name.toLowerCase().includes(term) || (w.address || '').toLowerCase().includes(term) || branchName.toLowerCase().includes(term);
+    });
+  }, [items, search, statusFilter]);
 
   return (
     <DesignSurface testId="warehouses-page">
@@ -126,25 +156,49 @@ export function WarehousesPage() {
         />
         <StatCard
           title={ar ? 'غير نشطة' : 'Inactive'}
-          value={String(Math.max(0, items.length - activeCount))}
+          value={String(inactiveCount)}
           icon={<MapPin className="h-4 w-4" />}
           color="amber"
         />
       </section>
-      <DesignPanel
-        testId="warehouses-table-panel"
-        title={t('warehouses')}
-        actions={
-          <div className="inline-flex items-center gap-1 rounded-full border border-ui-border bg-ui-page-alt p-1" role="group" aria-label={ar ? 'طريقة العرض' : 'View mode'}>
-            <button type="button" onClick={() => setViewMode('cards')} aria-pressed={viewMode === 'cards'} title={ar ? 'عرض البطاقات' : 'Cards view'} className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'cards' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}>
-              <LayoutGrid className="h-4 w-4" />
-            </button>
-            <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title={ar ? 'عرض الجدول' : 'Table view'} className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'list' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}>
-              <List className="h-4 w-4" />
-            </button>
+      <DesignPanel testId="warehouses-table-panel" bodyClassName="p-4 sm:p-5">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-center gap-2" role="tablist" aria-label={ar ? 'حالة المستودعات' : 'Warehouse status'}>
+            {([
+              { key: 'all', label: ar ? 'الكل' : 'All', count: items.length },
+              { key: 'active', label: t('active'), count: activeCount },
+              { key: 'inactive', label: t('inactive'), count: inactiveCount },
+            ] as const).map((tab) => {
+              const active = statusFilter === tab.key;
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={active}
+                  onClick={() => setStatusFilter(tab.key)}
+                  className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-1.5 text-[13px] font-semibold transition-all ${
+                    active ? 'border-ui-text bg-ui-text text-ui-surface shadow-ui-sm' : 'border-ui-border bg-ui-surface text-ui-muted hover:border-ui-border-strong hover:text-ui-text'
+                  }`}
+                >
+                  <span>{tab.label}</span>
+                  <span className={`tabular-nums text-[11px] ${active ? 'opacity-75' : 'text-ui-subtle'}`}>{tab.count}</span>
+                </button>
+              );
+            })}
           </div>
-        }
-      >
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 sm:flex-initial">
+            <DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="warehouses-search" className="min-w-0 w-full sm:w-64" />
+            <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ui-border bg-ui-page-alt p-1" role="group" aria-label={ar ? 'طريقة العرض' : 'View mode'}>
+              <button type="button" onClick={() => setViewMode('cards')} aria-pressed={viewMode === 'cards'} title={ar ? 'عرض البطاقات' : 'Cards view'} className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'cards' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}>
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title={ar ? 'عرض الجدول' : 'Table view'} className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'list' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}>
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
         {viewMode === 'cards' ? (
           loading ? (
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
@@ -152,13 +206,13 @@ export function WarehousesPage() {
                 <div key={idx} className="h-36 animate-pulse rounded-[20px] border border-ui-border bg-ui-page-alt" />
               ))}
             </div>
-          ) : items.length === 0 ? (
+          ) : filtered.length === 0 ? (
             <div className="rounded-[20px] border border-dashed border-ui-border bg-ui-page-alt/60 py-14 text-center text-sm text-ui-muted">
               {t('noData')}
             </div>
           ) : (
             <section className="premier-refresh-stagger grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {items.map((w) => {
+              {filtered.map((w) => {
                 const branchName = (w as Warehouse & { branch?: Branch }).branch?.name || '-';
                 return (
                   <article
@@ -198,7 +252,7 @@ export function WarehousesPage() {
             </section>
           )
         ) : (
-          <DataTable columns={columns} data={items} loading={loading} emptyMessage={t('noData')} onRowClick={can('warehouses.manage') ? openEdit : undefined} />
+          <DataTable columns={columns} data={filtered} loading={loading} emptyMessage={t('noData')} onRowClick={can('warehouses.manage') ? openEdit : undefined} />
         )}
         <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
       </DesignPanel>
