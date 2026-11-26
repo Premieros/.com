@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
@@ -69,7 +70,7 @@ export function Modal({ open, isOpen, onClose, title, children, size = 'md', man
 
   if (!isModalOpen) return null;
 
-  return (
+  return createPortal(
     <div data-testid="modal-root" className="fixed inset-0 z-[70] flex items-end justify-center p-0 animate-fade-in sm:items-center sm:p-4">
       <div data-testid="modal-backdrop" className="absolute inset-0 bg-ui-text/40 backdrop-blur-md" onClick={onClose} aria-hidden="true" />
       <div
@@ -95,6 +96,7 @@ export function Modal({ open, isOpen, onClose, title, children, size = 'md', man
           {children}
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

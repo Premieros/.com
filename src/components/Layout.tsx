@@ -105,6 +105,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [quickNewOpen, setQuickNewOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const quickNewRef = useRef<HTMLDivElement>(null);
   const preferenceKey = `premier:sidebar:${user?.id ?? 'guest'}`;
@@ -280,7 +281,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
             <Menu className="h-5 w-5" />
           </button>
           <Link to={APP_ROUTES.dashboard} className="hidden items-center gap-2.5 pe-1 lg:flex">
-            <Logo variant="horizontal" size={40} tone="navy" showTagline tagline={ar ? 'إدارة الأعمال' : 'Business OS'} />
+            <Logo variant="horizontal" size={32} tone="navy" showTagline={false} />
           </Link>
           {desktopSidebarHidden && (
             <button
@@ -322,7 +323,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
               className={`flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition active:scale-95 ${isPosRoute ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'border border-ui-border bg-ui-page-alt text-ui-text hover:border-ui-border-strong hover:bg-ui-surface-raised'}`}
             >
               <ShoppingCart className="h-3.5 w-3.5 shrink-0" />
-              <span className="hidden xl:inline">{ar ? 'نقطة البيع' : 'Point of Sale'}</span>
+              <span className="hidden 2xl:inline">{ar ? 'نقطة البيع' : 'Point of Sale'}</span>
             </NavLink>
           )}
           {canOpenKitchen && (
@@ -336,38 +337,10 @@ function AccountLayout({ children }: { children: ReactNode }) {
               className={({ isActive }) => `flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition active:scale-95 ${isActive ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'border border-ui-border bg-ui-page-alt text-ui-text hover:border-ui-border-strong hover:bg-ui-surface-raised'}`}
             >
               <ChefHat className="h-3.5 w-3.5 shrink-0" />
-              <span className="hidden xl:inline">{ar ? 'شاشة المطبخ' : 'Kitchen Display'}</span>
+              <span className="hidden 2xl:inline">{ar ? 'شاشة المطبخ' : 'Kitchen Display'}</span>
             </NavLink>
           )}
         </div>
-
-        {sectionLinks.length > 1 && workspace && (
-          <nav
-            aria-label={ar ? 'صفحات القسم' : 'Pages in this section'}
-            data-testid="workspace-section-navigation"
-            className="hidden min-w-0 max-w-[40vw] items-center gap-0.5 overflow-x-auto rounded-full border border-ui-border bg-ui-page-alt p-1 xl:inline-flex [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
-          >
-            {sectionLinks.map((link) => {
-              const active = workspace.route === link.route;
-              return (
-                <Link
-                  key={link.route}
-                  to={link.route}
-                  aria-current={active ? 'page' : undefined}
-                  onPointerEnter={() => prefetchAppRoute(link.route)}
-                  onFocus={() => prefetchAppRoute(link.route)}
-                  className={`flex h-8 shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-[13px] transition-all focus-visible:outline-2 focus-visible:outline-ui-ring ${
-                    active
-                      ? 'bg-ui-text font-semibold text-ui-surface shadow-ui-sm'
-                      : 'font-medium text-ui-muted hover:text-ui-text'
-                  }`}
-                >
-                  {link.label[ar ? 0 : 1]}
-                </Link>
-              );
-            })}
-          </nav>
-        )}
 
         <div className="relative flex min-w-0 flex-1 items-center justify-end gap-1.5" data-testid="app-header-utilities">
           <CommandPaletteTrigger />
@@ -416,29 +389,12 @@ function AccountLayout({ children }: { children: ReactNode }) {
           <button
             data-testid="user-menu-button"
             type="button"
-            onPointerEnter={canOpenSettings ? () => prefetchAppRoute(APP_ROUTES.settings) : undefined}
-            onFocus={canOpenSettings ? () => prefetchAppRoute(APP_ROUTES.settings) : undefined}
-            onTouchStart={canOpenSettings ? () => prefetchAppRoute(APP_ROUTES.settings) : undefined}
-            onClick={canOpenSettings ? () => navigate(APP_ROUTES.settings) : undefined}
-            disabled={!canOpenSettings}
-            aria-label={canOpenSettings ? (ar ? 'فتح الإعدادات' : 'Open settings') : (ar ? 'هوية المستخدم' : 'User identity')}
-            title={canOpenSettings ? (ar ? 'الإعدادات' : 'Settings') : undefined}
-            className={`hidden min-w-0 shrink-0 items-center gap-2 rounded-full border border-ui-border bg-ui-page-alt p-1 pe-1.5 transition-colors lg:flex ${canOpenSettings ? 'hover:border-ui-border-strong hover:bg-ui-surface-raised' : 'cursor-default'}`}
+            onClick={() => setAccountOpen(true)}
+            aria-haspopup="dialog"
+            aria-label={ar ? 'قائمة الحساب' : 'Account menu'}
+            className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ui-border bg-ui-primary-soft text-xs font-bold text-ui-primary transition hover:border-ui-border-strong lg:flex"
           >
-            <div className="flex h-7 w-7 items-center justify-center rounded-full bg-ui-primary-soft text-xs font-bold text-ui-primary">{(user?.full_name || user?.email || 'A').slice(0, 2).toUpperCase()}</div>
-            <div className="hidden min-w-0 max-w-32 text-start 2xl:block">
-              <p className="truncate whitespace-nowrap text-xs font-semibold leading-tight text-ui-text">{user?.full_name || user?.email || (ar ? 'مدير النظام' : 'System Admin')}</p>
-              <p className="truncate whitespace-nowrap text-[10px] leading-tight text-ui-subtle">{user?.role || 'admin'}</p>
-            </div>
-          </button>
-          <button data-testid="language-toggle" type="button" onClick={() => setLang(ar ? 'en' : 'ar')} className="hidden h-9 shrink-0 items-center gap-1 rounded-full border border-ui-border bg-ui-page-alt px-2.5 text-xs font-semibold text-ui-muted transition-colors hover:border-ui-border-strong hover:text-ui-text lg:flex">
-            <Globe className="h-3.5 w-3.5" /><span className="hidden 2xl:inline">{ar ? 'العربية' : 'English'}</span>
-          </button>
-          <button data-testid="theme-toggle" type="button" onClick={toggleTheme} className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ui-border bg-ui-page-alt text-ui-muted transition-colors hover:border-ui-border-strong hover:text-ui-text lg:flex" aria-label={ar ? 'تغيير المظهر' : 'Toggle theme'}>
-            {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
-          </button>
-          <button data-testid="sign-out-button" type="button" onClick={signOut} className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ui-border bg-ui-page-alt text-ui-subtle transition-colors hover:border-ui-danger/30 hover:bg-ui-danger-soft hover:text-ui-danger lg:flex" aria-label={ar ? 'تسجيل الخروج' : 'Sign out'}>
-            <LogOut className="h-4 w-4" />
+            {(user?.full_name || user?.email || 'A').slice(0, 2).toUpperCase()}
           </button>
         </div>
       </header>
@@ -745,7 +701,8 @@ function AccountLayout({ children }: { children: ReactNode }) {
       <div data-testid="app-content-shell" className={`min-h-screen pt-[68px] transition-all duration-200 ${desktopSidebarHidden ? 'lg:ms-[88px]' : 'lg:ms-[272px]'}`}>
         {sectionLinks.length > 1 && workspace && (
           <nav aria-label={ar ? 'صفحات القسم' : 'Pages in this section'}
-            className="sticky top-[82px] z-[35] mx-3 mt-4 flex min-w-0 gap-1 overflow-x-auto rounded-full border border-ui-border bg-ui-surface/90 p-1 shadow-ui-sm backdrop-blur-md sm:mx-5 xl:hidden">
+            data-testid="workspace-section-navigation"
+            className="sticky top-[82px] z-[35] mx-3 mt-4 flex min-w-0 gap-1 overflow-x-auto rounded-full border border-ui-border bg-ui-surface/90 p-1 shadow-ui-sm backdrop-blur-md sm:mx-5">
             {sectionLinks.map((link) => (
               <Link key={link.route} to={link.route}
                 aria-current={workspace.route === link.route ? 'page' : undefined}
@@ -857,6 +814,28 @@ function AccountLayout({ children }: { children: ReactNode }) {
       </footer>
 
       <CommandPalette />
+      <Modal open={accountOpen} onClose={() => setAccountOpen(false)} title={ar ? 'الحساب' : 'Account'} size="sm" manageFocus>
+        <p className="mb-3 truncate font-semibold text-ui-text">{user?.full_name || user?.email}</p>
+        <div className="grid gap-2">
+          {canOpenSettings && <Link to={APP_ROUTES.settings} onClick={() => setAccountOpen(false)}
+            className="flex items-center gap-2 rounded-lg border border-ui-border px-3 py-2 text-sm hover:bg-ui-page-alt">
+            <Settings className="h-4 w-4" />{ar ? 'الإعدادات' : 'Settings'}
+          </Link>}
+          <button data-testid="language-toggle" type="button" onClick={() => setLang(ar ? 'en' : 'ar')}
+            className="flex items-center gap-2 rounded-lg border border-ui-border px-3 py-2 text-sm hover:bg-ui-page-alt">
+            <Globe className="h-4 w-4" />{ar ? 'اللغة: English' : 'Language: العربية'}
+          </button>
+          <button data-testid="theme-toggle" type="button" onClick={toggleTheme}
+            className="flex items-center gap-2 rounded-lg border border-ui-border px-3 py-2 text-sm hover:bg-ui-page-alt">
+            {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
+            {theme === 'light' ? (ar ? 'الوضع الليلي' : 'Dark mode') : (ar ? 'الوضع النهاري' : 'Light mode')}
+          </button>
+          <button data-testid="sign-out-button" type="button" onClick={signOut}
+            className="flex items-center gap-2 rounded-lg border border-ui-border px-3 py-2 text-sm text-ui-danger hover:bg-ui-danger-soft">
+            <LogOut className="h-4 w-4" />{ar ? 'تسجيل الخروج' : 'Sign out'}
+          </button>
+        </div>
+      </Modal>
       <Modal open={helpOpen} onClose={() => setHelpOpen(false)} title={ar ? 'اختصارات لوحة المفاتيح والمساعدة' : 'Keyboard shortcuts & help'} size="sm">
         <div className="space-y-3 text-sm">
           <div className="flex items-center justify-between rounded-[16px] border border-ui-border bg-ui-page-alt px-4 py-3">
