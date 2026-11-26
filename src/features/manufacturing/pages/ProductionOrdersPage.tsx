@@ -1,3 +1,4 @@
+import { Modal } from '@/components/Modal';
 import { useCallback, useEffect, useState } from 'react';
 import { supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -22,6 +23,7 @@ export function ProductionOrdersPage() {
   const [units, setUnits] = useState<Item[]>([]);
   const [warehouses, setWarehouses] = useState<Item[]>([]);
   const [productions, setProductions] = useState<Production[]>([]);
+  const [confirmOpen, setConfirmOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const [unitsError, setUnitsError] = useState('');
@@ -51,7 +53,7 @@ export function ProductionOrdersPage() {
       setError(ar?'اختر المجموعة والمخزن وكمية صحيحة':'Select a manufactured group, warehouse and valid quantity');
       return;
     }
-    if (!window.confirm(ar?'تأكيد الإنتاج؟ سيتم خصم الخامات وإضافة رصيد المجموعة المصنّعة الآن.':'Confirm production? Raw materials will be consumed and manufactured stock added now.')) return;
+    setConfirmOpen(false);
     setBusy(true);setError('');setNotice('');
     try {
       const { data, error:rpcError }=await supabase.rpc('produce_inventory_unit',{
@@ -62,7 +64,7 @@ export function ProductionOrdersPage() {
       setNotice(ar?'تم تنفيذ الإنتاج وتحديث أرصدة الخامات والمصنّعات.':'Production completed; raw and manufactured stock updated.');
       setNotes('');
       await load();
-    } catch(e){setError(e instanceof Error?e.message:String(e));}
+    } catch(e){setError(e && typeof e === 'object' && 'message' in e ? String(e.message) : String(e));}
     finally{setBusy(false);}
   };
   const unitNames=new Map(units.map(i=>[i.id,i.name]));
@@ -76,7 +78,7 @@ export function ProductionOrdersPage() {
         <select aria-label={ar?'المخزن':'Warehouse'} className="rounded-lg border border-ui-border p-2 bg-ui-surface" value={warehouse} onChange={e=>setWarehouse(e.target.value)}><option value="">{ar?'اختر المخزن':'Select warehouse'}</option>{warehouses.map(w=><option key={w.id} value={w.id}>{w.name}</option>)}</select>
         <input aria-label={ar?'الكمية':'Quantity'} className="w-28 rounded-lg border border-ui-border p-2 bg-ui-surface" type="number" min="0.0001" step="any" value={quantity} onChange={e=>setQuantity(e.target.value)}/>
         <input aria-label={ar?'ملاحظات':'Notes'} className="rounded-lg border border-ui-border p-2 bg-ui-surface" value={notes} onChange={e=>setNotes(e.target.value)} placeholder={ar?'ملاحظات':'Notes'}/>
-        <button type="button" className="rounded-lg bg-blue-600 px-4 py-2 text-white disabled:opacity-50" disabled={busy||!effectiveBranch||!warehouse||!unit} onClick={()=>void produce()}>{busy?(ar?'جارٍ التنفيذ...':'Producing...'):(ar?'تنفيذ الإنتاج':'Complete production')}</button>
+        <button type="button" className="rounded-lg bg-blue-600 px-4 py-2 text-white disabled:opacity-50" disabled={busy||!effectiveBranch||!warehouse||!unit} onClick={()=>setConfirmOpen(true)}>{busy?(ar?'جارٍ التنفيذ...':'Producing...'):(ar?'تنفيذ الإنتاج':'Complete production')}</button>
       </div>}
       {error&&<p role="alert" className="text-red-600">{error}</p>}
       {unitsError&&<p role="alert" className="text-red-600">{ar?'تعذر تحميل مجموعات المكونات: ':'Could not load manufactured component groups: '}{unitsError}</p>}
@@ -84,5 +86,13 @@ export function ProductionOrdersPage() {
       {notice&&<p role="status" className="text-green-600">{notice}</p>}
       <div className="overflow-x-auto"><table className="w-full text-sm"><thead><tr className="border-b border-ui-border">{[ar?'رقم العملية':'Production ID',ar?'المجموعة المصنّعة':'Manufactured group',ar?'المخزن':'Warehouse',ar?'الكمية':'Quantity',ar?'الحالة':'Status',ar?'تاريخ الإنتاج':'Completed at'].map(h=><th key={h} className="p-2 text-start">{h}</th>)}</tr></thead><tbody>{productions.map(p=><tr key={p.id} className="border-b border-ui-border"><td className="p-2">{p.id.slice(0,8)}</td><td className="p-2">{unitNames.get(p.unit_id)||p.unit_id}</td><td className="p-2">{warehouseNames.get(p.warehouse_id)||p.warehouse_id}</td><td className="p-2">{p.quantity}</td><td className="p-2">{p.status}</td><td className="p-2">{p.completed_at?new Date(p.completed_at).toLocaleString(ar?'ar-EG':'en-US'):'—'}</td></tr>)}</tbody></table>{!productions.length&&<p className="p-5 text-center text-ui-muted">{ar?'لا توجد عمليات إنتاج مسجلة للفرع':'No production records for this branch'}</p>}</div>
     </div>
+    <Modal open={confirmOpen} onClose={() => setConfirmOpen(false)} title={ar ? 'تأكيد الإنتاج' : 'Confirm production'} size="sm" manageFocus>
+      <p className="text-sm text-ui-muted">{ar ? 'سيتم خصم الخامات وإضافة رصيد المجموعة المصنّعة.' : 'Raw materials will be consumed and manufactured stock added.'}</p>
+      <p className="mt-2 text-sm font-medium">{unitNames.get(unit)} · {warehouseNames.get(warehouse)} · {quantity}</p>
+      <div className="mt-4 flex justify-end gap-2">
+        <button type="button" className="rounded-lg border border-ui-border px-4 py-2" onClick={() => setConfirmOpen(false)}>{ar ? 'إلغاء' : 'Cancel'}</button>
+        <button type="button" className="rounded-lg bg-ui-primary px-4 py-2 text-ui-primary-fg" disabled={busy} onClick={() => void produce()}>{ar ? 'تأكيد الإنتاج' : 'Confirm production'}</button>
+      </div>
+    </Modal>
   </DesignSurface>;
 }
