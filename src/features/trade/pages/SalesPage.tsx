@@ -763,7 +763,7 @@ export function SalesPage() {
         const paidTotal = filtered.reduce((sum, r) => sum + Number(r.paid_amount || 0), 0);
         const refundedTotal = filtered.reduce((sum, r) => sum + Number(r.refunded_amount || 0), 0);
         return (
-          <section className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+          <section className="premier-refresh-stagger grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
             <StatCard
               title={isAr ? 'الفواتير المعروضة' : 'Loaded invoices'}
               value={String(filtered.length)}

@@ -257,7 +257,7 @@ export function ReportsShowcase({
     <section data-testid="reports-visual-overview" className="space-y-4">
       <div className="rounded-[22px] border border-ui-border bg-ui-surface p-4 shadow-ui sm:p-5" data-testid="reports-performance-summary">
         <h2 className="mb-3.5 flex items-center gap-2 text-base font-bold text-ui-text"><BarChart3 className="h-5 w-5 text-ui-primary" />{isAr ? 'ملخص الأداء' : 'Performance summary'}</h2>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-6">
+        <div className="premier-refresh-stagger grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-6">
           {summaryCards.map((card) => {
             const target = card.id === 'orders' ? 'orders' : card.id === 'sales' ? 'time' : null;
             const available = target && panels.some((panel) => panel.id === target);
@@ -310,7 +310,7 @@ export function ReportsShowcase({
           </button>
         ))}
       </div>
-      <div className={`grid gap-4 ${activePanel ? '' : 'md:grid-cols-2'}`}>
+      <div className={`premier-refresh-stagger grid gap-4 ${activePanel ? '' : 'md:grid-cols-2'}`}>
         {displayedPanels.map((panel) => {
           const Icon = panel.icon;
           return (

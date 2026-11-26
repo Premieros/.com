@@ -50,6 +50,7 @@ export function LoginPage() {
   useEffect(() => {
     if (!open) return;
     const focusBefore = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    const triggerEl = triggerRef.current;
     const dialog = dialogRef.current;
     dialog?.querySelector<HTMLInputElement>('input')?.focus();
     const onKeyDown = (event: KeyboardEvent) => {
@@ -66,7 +67,7 @@ export function LoginPage() {
     return () => {
       document.removeEventListener('keydown', onKeyDown);
       if (focusBefore?.isConnected) focusBefore.focus();
-      else triggerRef.current?.focus();
+      else triggerEl?.focus();
     };
   }, [open, loading]);
 

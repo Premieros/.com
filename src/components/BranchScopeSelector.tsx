@@ -25,14 +25,15 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
     });
     return () => { mounted = false; };
   }, [superAdmin]);
+  const orgBranches = scope.organizationBranches;
   const groups = useMemo(() => {
-    const grouped = new Map<string, typeof scope.organizationBranches>();
-    for (const branch of scope.organizationBranches) {
+    const grouped = new Map<string, typeof orgBranches>();
+    for (const branch of orgBranches) {
       const key = branch.organization_id || 'unassigned';
       grouped.set(key, [...(grouped.get(key) || []), branch]);
     }
     return [...grouped.entries()];
-  }, [scope.organizationBranches]);
+  }, [orgBranches]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 

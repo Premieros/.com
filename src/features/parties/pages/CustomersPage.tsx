@@ -1,8 +1,8 @@
 import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { CustomerSupportInbox } from '@/features/support/CustomerSupportInbox';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Users, UserCheck, QrCode, Wallet, MapPin, Mail, Phone, LayoutGrid, List, X, ArrowUpDown } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users, UserCheck, QrCode, Wallet, MapPin, Mail, Phone, LayoutGrid, List, Rows3, X, ArrowUpDown } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -11,6 +11,7 @@ import { DesignSurface, DesignPageHeader } from '@/components/design/DesignSurfa
 import { DesignSearch } from '@/components/design/DesignSearch';
 import { DesignPanel } from '@/components/design/DesignPanel';
 import { DesignPagination } from '@/components/design/DesignPagination';
+import { WorkspaceMeter } from '@/components/design/WorkspaceIndicators';
 import { DataTable, type Column } from '@/components/DataTable';
 import { StatCard } from '@/components/PageHeader';
 import { Badge } from '@/components/Badge';
@@ -111,7 +112,7 @@ export function CustomersPage() {
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerViewRow | null>(null);
   const [customerSales, setCustomerSales] = useState<CustomerSaleSummary[]>([]);
   const [customerSalesLoading, setCustomerSalesLoading] = useState(false);
-  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
+  const [viewMode, setViewMode] = useState<'cards' | 'rows' | 'list'>('cards');
   const [sortBy, setSortBy] = useState<'recent' | 'name' | 'balance'>('recent');
   const [searchParams, setSearchParams] = useSearchParams();
   const [modalOpen, setModalOpen] = useState(false);
@@ -127,13 +128,12 @@ export function CustomersPage() {
   useEffect(() => {
     let cancelled = false;
     const loadOpenBalances = async () => {
-      const branchIds = branchScope.selectedBranchIds;
-      if (!branchIds.length) {
+      if (!branchScope.selectedBranchIds.length) {
         if (!cancelled) setOpenBalances({});
         return;
       }
       const results = await Promise.all(
-        branchIds.map((branchId) => api.accounting.getArAging({ p_branch_id: branchId, p_as_of: new Date().toISOString().slice(0, 10) })),
+        branchScope.selectedBranchIds.map((branchId) => api.accounting.getArAging({ p_branch_id: branchId, p_as_of: new Date().toISOString().slice(0, 10) })),
       );
       const next: Record<string, number> = {};
       results.forEach(({ data }) => {
@@ -143,7 +143,7 @@ export function CustomersPage() {
     };
     void loadOpenBalances();
     return () => { cancelled = true; };
-  }, [branchScope.scopeKey]);
+  }, [branchScope.selectedBranchIds]);
 
   useEffect(() => {
     let active = true;
@@ -167,11 +167,11 @@ export function CustomersPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [branchScope.scopeKey]);
 
-  const balanceFor = (customer: Customer) => Number(openBalances[customer.id] || 0);
+  const balanceFor = useCallback((customer: Customer) => Number(openBalances[customer.id] || 0), [openBalances]);
   const allRows = useMemo<CustomerViewRow[]>(() => [
     ...items,
     ...qrGuests.filter((guest) => !record.id && branchScope.selectedBranchSet.has(guest.branch_id)).map(toQrCustomerRow),
-  ], [items, qrGuests, branchScope.scopeKey, record.id]);
+  ], [items, qrGuests, branchScope.selectedBranchSet, record.id]);
   const term = search.trim().toLowerCase();
   const matchesCustomerView = (customer: CustomerViewRow) =>
     customerView === 'all' ||
@@ -305,10 +305,10 @@ export function CustomersPage() {
 
   const registeredCount = useMemo(() => allRows.filter((row) => !isQrGuest(row)).length, [allRows]);
   const qrCount = useMemo(() => allRows.filter((row) => isQrGuest(row)).length, [allRows]);
-  const outstandingRows = useMemo(() => allRows.filter((row) => !isQrGuest(row) && balanceFor(row) > 0), [allRows, openBalances]);
+  const outstandingRows = useMemo(() => allRows.filter((row) => !isQrGuest(row) && balanceFor(row) > 0), [allRows, balanceFor]);
   const totalOpenBalance = useMemo(
     () => outstandingRows.reduce((sum, row) => sum + balanceFor(row), 0),
-    [outstandingRows, openBalances],
+    [outstandingRows, balanceFor],
   );
   const ar = lang === 'ar';
 
@@ -334,7 +334,7 @@ export function CustomersPage() {
       } />
 
       {!supportOpen && (
-        <section className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+        <section className="premier-refresh-stagger grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
           <StatCard
             title={ar ? 'إجمالي العملاء' : 'Total customers'}
             value={formatNumber(allRows.length, 0)}
@@ -370,7 +370,7 @@ export function CustomersPage() {
         </DesignPanel>
       ) : <DesignPanel testId="customers-table-panel" bodyClassName="p-4 sm:p-5">
         <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex max-w-full flex-wrap items-center gap-2" role="tablist" aria-label={ar ? 'عرض العملاء' : 'Customer views'}>
+          <div className="flex min-w-0 max-w-full flex-wrap items-center gap-2" role="tablist" aria-label={ar ? 'عرض العملاء' : 'Customer views'}>
             {([
               { key: 'all', ar: 'الكل', en: 'All customers', count: allRows.length },
               { key: 'registered', ar: 'المسجلون', en: 'Registered', count: registeredCount },
@@ -397,11 +397,11 @@ export function CustomersPage() {
               );
             })}
           </div>
-          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+          <div className="flex min-w-0 flex-1 flex-wrap items-center justify-end gap-2 sm:flex-initial">
             <DesignSearch value={search} onChange={setSearch}
               placeholder={ar ? 'بحث بالاسم أو الهاتف…' : 'Name, phone or city…'}
-              label={t('search')} testId="customers-search" className="w-full sm:w-64" />
-            <label className="inline-flex h-10 items-center gap-1.5 rounded-full border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-muted shadow-ui-sm">
+              label={t('search')} testId="customers-search" className="min-w-0 w-full sm:w-56 xl:w-64" />
+            <label className="inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-muted shadow-ui-sm">
               <ArrowUpDown className="h-3.5 w-3.5 text-ui-subtle" />
               <select
                 value={sortBy}
@@ -414,7 +414,7 @@ export function CustomersPage() {
                 <option value="balance">{ar ? 'الأعلى رصيداً' : 'Open balance'}</option>
               </select>
             </label>
-            <div className="inline-flex items-center gap-1 rounded-full border border-ui-border bg-ui-page-alt p-1" role="group" aria-label={ar ? 'طريقة العرض' : 'View mode'}>
+            <div className="inline-flex shrink-0 items-center gap-1 rounded-full border border-ui-border bg-ui-page-alt p-1" role="group" aria-label={ar ? 'طريقة العرض' : 'View mode'}>
               <button
                 type="button"
                 onClick={() => setViewMode('cards')}
@@ -426,9 +426,18 @@ export function CustomersPage() {
               </button>
               <button
                 type="button"
+                onClick={() => setViewMode('rows')}
+                aria-pressed={viewMode === 'rows'}
+                title={ar ? 'قائمة مضغوطة' : 'Compact list'}
+                className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'rows' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
+              >
+                <Rows3 className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
                 onClick={() => setViewMode('list')}
                 aria-pressed={viewMode === 'list'}
-                title={ar ? 'عرض الجدول' : 'List view'}
+                title={ar ? 'عرض الجدول' : 'Table view'}
                 className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'list' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
               >
                 <List className="h-4 w-4" />
@@ -452,7 +461,95 @@ export function CustomersPage() {
               {t('noData')}
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="premier-refresh-stagger grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {filtered.map((c) => {
+                const qrGuest = isQrGuest(c);
+                const balance = qrGuest ? 0 : balanceFor(c);
+                const maxBal = Math.max(1, totalOpenBalance);
+                const branchName = branches.find((b) => b.id === c.branch_id)?.name || '—';
+                return (
+                  <div
+                    key={c.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      if (c.qrHistory) setSelectedQrGuest(c.qrHistory);
+                      else setSelectedCustomer(c);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        if (c.qrHistory) setSelectedQrGuest(c.qrHistory);
+                        else setSelectedCustomer(c);
+                      }
+                    }}
+                    className="premier-refresh-subcard group flex h-full min-w-0 cursor-pointer flex-col justify-between overflow-hidden p-4 text-start focus-visible:outline-2 focus-visible:outline-ui-primary"
+                  >
+                    <div>
+                      <div className="flex items-start gap-3">
+                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold ${avatarTone(c.id || c.name)}`}>
+                          {customerInitials(c.name)}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <h3 className="truncate text-[15px] font-semibold text-ui-text group-hover:text-ui-primary">{c.name}</h3>
+                          <p className="truncate text-xs text-ui-muted">{c.phone || c.name_en || c.email || '—'}</p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex items-center gap-1.5 text-xs text-ui-muted">
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-ui-subtle" />
+                        <span className="truncate">{c.address || branchName}</span>
+                      </div>
+
+                      <div className="mt-3 flex min-h-[26px] flex-wrap items-center gap-1.5">
+                        <Badge variant={qrGuest ? 'info' : 'success'} size="sm">
+                          {qrGuest ? 'QR' : (ar ? 'مسجل' : 'Registered')}
+                        </Badge>
+                        {!qrGuest && balance > 0 && (
+                          <Badge variant="warning" size="sm">
+                            {ar ? 'رصيد مستحق' : 'Unpaid'}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="mt-3.5">
+                      <div className="grid grid-cols-2 gap-3 border-t border-ui-border pt-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-[11px] font-medium text-ui-subtle">{qrGuest ? (ar ? 'مشتريات QR' : 'QR purchases') : (ar ? 'الرصيد المستحق' : 'Open balance')}</p>
+                          <p className={`mt-0.5 truncate text-sm font-bold tabular-nums ${balance > 0 ? 'text-ui-danger' : 'text-ui-text'}`}>
+                            {qrGuest ? formatNumber(c.qrHistory?.purchase_count || 0, 0) : formatCurrency(balance, currency, lang)}
+                          </p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-[11px] font-medium text-ui-subtle">{t('branch')}</p>
+                          <p className="mt-0.5 truncate text-sm font-semibold text-ui-text">{branchName}</p>
+                        </div>
+                      </div>
+                      <div className="mt-2.5 min-h-[6px]">
+                        {!qrGuest && balance > 0 && (
+                          <WorkspaceMeter value={balance} max={maxBal} tone="warning" height="xs" />
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : viewMode === 'rows' ? (
+          loading ? (
+            <div className="space-y-2.5">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} className="h-16 animate-pulse rounded-[16px] border border-ui-border bg-ui-page-alt" />
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="rounded-[20px] border border-dashed border-ui-border bg-ui-page-alt/60 py-14 text-center text-sm text-ui-muted">
+              {t('noData')}
+            </div>
+          ) : (
+            <div className="premier-refresh-stagger space-y-2.5">
               {filtered.map((c) => {
                 const qrGuest = isQrGuest(c);
                 const balance = qrGuest ? 0 : balanceFor(c);
@@ -473,45 +570,30 @@ export function CustomersPage() {
                         else setSelectedCustomer(c);
                       }
                     }}
-                    className="premier-refresh-subcard group cursor-pointer p-4 text-start focus-visible:outline-2 focus-visible:outline-ui-primary"
+                    className="premier-refresh-subcard group grid cursor-pointer grid-cols-1 items-center gap-3 rounded-[16px] px-4 py-3 text-start sm:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)_auto_minmax(0,0.9fr)]"
                   >
-                    <div className="flex items-start gap-3">
-                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold ${avatarTone(c.id || c.name)}`}>
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-xs font-bold ${avatarTone(c.id || c.name)}`}>
                         {customerInitials(c.name)}
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <h3 className="truncate text-[15px] font-semibold text-ui-text group-hover:text-ui-primary">{c.name}</h3>
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold text-ui-text group-hover:text-ui-primary">{c.name}</p>
                         <p className="truncate text-xs text-ui-muted">{c.phone || c.name_en || c.email || '—'}</p>
                       </div>
                     </div>
-
-                    <div className="mt-3 flex items-center gap-1.5 text-xs text-ui-muted">
+                    <div className="flex min-w-0 items-center gap-1.5 text-xs text-ui-muted">
                       <MapPin className="h-3.5 w-3.5 shrink-0 text-ui-subtle" />
                       <span className="truncate">{c.address || branchName}</span>
                     </div>
-
-                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                      <Badge variant={qrGuest ? 'info' : 'success'} size="sm">
-                        {qrGuest ? 'QR' : (ar ? 'مسجل' : 'Registered')}
-                      </Badge>
-                      {!qrGuest && balance > 0 && (
-                        <Badge variant="warning" size="sm">
-                          {ar ? 'رصيد مستحق' : 'Unpaid'}
-                        </Badge>
-                      )}
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <Badge variant={qrGuest ? 'info' : 'success'} size="sm">{qrGuest ? 'QR' : (ar ? 'مسجل' : 'Registered')}</Badge>
+                      {!qrGuest && balance > 0 && <Badge variant="warning" size="sm">{ar ? 'مستحق' : 'Unpaid'}</Badge>}
                     </div>
-
-                    <div className="mt-3.5 grid grid-cols-2 gap-3 border-t border-ui-border pt-3">
-                      <div>
-                        <p className="text-[11px] font-medium text-ui-subtle">{qrGuest ? (ar ? 'مشتريات QR' : 'QR purchases') : (ar ? 'الرصيد المستحق' : 'Open balance')}</p>
-                        <p className={`mt-0.5 text-sm font-bold tabular-nums ${balance > 0 ? 'text-ui-danger' : 'text-ui-text'}`}>
-                          {qrGuest ? formatNumber(c.qrHistory?.purchase_count || 0, 0) : formatCurrency(balance, currency, lang)}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-[11px] font-medium text-ui-subtle">{t('branch')}</p>
-                        <p className="mt-0.5 truncate text-sm font-semibold text-ui-text">{branchName}</p>
-                      </div>
+                    <div className="text-start sm:text-end">
+                      <p className="text-[11px] text-ui-subtle">{qrGuest ? (ar ? 'مشتريات QR' : 'QR purchases') : (ar ? 'الرصيد' : 'Balance')}</p>
+                      <p className={`text-sm font-bold tabular-nums ${balance > 0 ? 'text-ui-danger' : 'text-ui-text'}`}>
+                        {qrGuest ? formatNumber(c.qrHistory?.purchase_count || 0, 0) : formatCurrency(balance, currency, lang)}
+                      </p>
                     </div>
                   </div>
                 );

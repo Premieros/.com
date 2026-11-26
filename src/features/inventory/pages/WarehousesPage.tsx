@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Edit2, Trash2, Warehouse as WarehouseIcon, CheckCircle2, MapPin } from 'lucide-react';
+import { Plus, Edit2, Trash2, Warehouse as WarehouseIcon, CheckCircle2, MapPin, LayoutGrid, List } from 'lucide-react';
 import { supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
@@ -38,6 +38,7 @@ export function WarehousesPage() {
   });
   const { branches } = useBranches();
   const [modalOpen, setModalOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const [editing, setEditing] = useState<Warehouse | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [form, setForm] = useState({ name: '', branch_id: '', address: '', is_active: true });
@@ -108,7 +109,7 @@ export function WarehousesPage() {
         actions={
         can('warehouses.manage') && <Button size="sm" onClick={openAdd} data-testid="warehouses-add"><Plus className="w-4 h-4" /> {t('add')}</Button>
       } />
-      <section className="grid gap-3.5 sm:grid-cols-3">
+      <section className="premier-refresh-stagger grid gap-3.5 sm:grid-cols-3">
         <StatCard
           title={ar ? 'إجمالي المستودعات' : 'Total locations'}
           value={String(items.length)}
@@ -128,41 +129,75 @@ export function WarehousesPage() {
           color="amber"
         />
       </section>
-      {items.length > 0 && (
-        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {items.slice(0, 6).map((w) => {
-            const branchName = (w as Warehouse & { branch?: Branch }).branch?.name || '-';
-            return (
-              <div
-                key={w.id}
-                onClick={can('warehouses.manage') ? () => openEdit(w) : undefined}
-                className={`rounded-[22px] border border-ui-border bg-ui-surface p-5 shadow-ui transition hover:border-ui-primary/40 ${can('warehouses.manage') ? 'cursor-pointer' : ''}`}
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="flex min-w-0 items-center gap-3">
-                    <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-ui-primary-soft text-ui-primary">
-                      <WarehouseIcon className="h-5 w-5" />
+      <DesignPanel
+        testId="warehouses-table-panel"
+        title={t('warehouses')}
+        actions={
+          <div className="inline-flex items-center gap-1 rounded-full border border-ui-border bg-ui-page-alt p-1" role="group" aria-label={ar ? 'طريقة العرض' : 'View mode'}>
+            <button type="button" onClick={() => setViewMode('cards')} aria-pressed={viewMode === 'cards'} title={ar ? 'عرض البطاقات' : 'Cards view'} className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'cards' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}>
+              <LayoutGrid className="h-4 w-4" />
+            </button>
+            <button type="button" onClick={() => setViewMode('list')} aria-pressed={viewMode === 'list'} title={ar ? 'عرض الجدول' : 'Table view'} className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'list' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}>
+              <List className="h-4 w-4" />
+            </button>
+          </div>
+        }
+      >
+        {viewMode === 'cards' ? (
+          loading ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} className="h-36 animate-pulse rounded-[20px] border border-ui-border bg-ui-page-alt" />
+              ))}
+            </div>
+          ) : items.length === 0 ? (
+            <div className="rounded-[20px] border border-dashed border-ui-border bg-ui-page-alt/60 py-14 text-center text-sm text-ui-muted">
+              {t('noData')}
+            </div>
+          ) : (
+            <section className="premier-refresh-stagger grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {items.map((w) => {
+                const branchName = (w as Warehouse & { branch?: Branch }).branch?.name || '-';
+                return (
+                  <article
+                    key={w.id}
+                    onClick={can('warehouses.manage') ? () => openEdit(w) : undefined}
+                    className={`premier-refresh-subcard flex h-full min-w-0 flex-col justify-between overflow-hidden p-4 ${can('warehouses.manage') ? 'cursor-pointer' : ''}`}
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-3">
+                          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-ui-primary-soft text-ui-primary">
+                            <WarehouseIcon className="h-5 w-5" />
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="truncate text-[15px] font-bold text-ui-text">{w.name}</h3>
+                            <p className="truncate text-xs text-ui-muted">{branchName}</p>
+                          </div>
+                        </div>
+                        <Badge variant={w.is_active ? 'success' : 'default'} size="sm" className="shrink-0">
+                          {w.is_active ? t('active') : t('inactive')}
+                        </Badge>
+                      </div>
+                      <div className="mt-3.5 flex items-center gap-1.5 text-xs text-ui-muted">
+                        <MapPin className="h-3.5 w-3.5 shrink-0 text-ui-subtle" />
+                        <span className="truncate">{w.address || '—'}</span>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <h3 className="truncate text-[15px] font-bold text-ui-text">{w.name}</h3>
-                      <p className="truncate text-xs text-ui-muted">{branchName}</p>
-                    </div>
-                  </div>
-                  <Badge variant={w.is_active ? 'success' : 'default'} size="sm">
-                    {w.is_active ? t('active') : t('inactive')}
-                  </Badge>
-                </div>
-                <div className="mt-3.5 flex items-center gap-1.5 text-xs text-ui-muted">
-                  <MapPin className="h-3.5 w-3.5 shrink-0 text-ui-subtle" />
-                  <span className="truncate">{w.address || '—'}</span>
-                </div>
-              </div>
-            );
-          })}
-        </section>
-      )}
-      <DesignPanel testId="warehouses-table-panel">
-        <DataTable columns={columns} data={items} loading={loading} emptyMessage={t('noData')} onRowClick={can('warehouses.manage') ? openEdit : undefined} />
+                    {can('warehouses.manage') && (
+                      <div className="mt-3 flex items-center justify-end gap-1 border-t border-ui-border pt-2.5" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" onClick={() => openEdit(w)} className="ui-icon-action ui-icon-action-info" title={t('edit')}><Edit2 className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => setDeleteId(w.id)} className="ui-icon-action ui-icon-action-danger" title={t('delete')}><Trash2 className="h-4 w-4" /></button>
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </section>
+          )
+        ) : (
+          <DataTable columns={columns} data={items} loading={loading} emptyMessage={t('noData')} onRowClick={can('warehouses.manage') ? openEdit : undefined} />
+        )}
         <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
       </DesignPanel>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? t('edit') : t('add')}>

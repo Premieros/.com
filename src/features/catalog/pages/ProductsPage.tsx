@@ -11,6 +11,7 @@ import { DesignSurface, DesignPageHeader } from '@/components/design/DesignSurfa
 import { DesignSearch } from '@/components/design/DesignSearch';
 import { DesignPanel } from '@/components/design/DesignPanel';
 import { DesignPagination } from '@/components/design/DesignPagination';
+import { WorkspaceMeter } from '@/components/design/WorkspaceIndicators';
 import { DataTable, type Column } from '@/components/DataTable';
 import { StatCard } from '@/components/PageHeader';
 import { Badge } from '@/components/Badge';
@@ -659,7 +660,7 @@ export function ProductsPage() {
         subtitle={lang === 'ar' ? 'إدارة الأصناف والأسعار والتصنيفات والمكونات' : 'Manage finished goods, pricing, categories and compositions'}
         actions={<>{can('products.import') && <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} data-testid="products-import" />}{can('products.import') && <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} data-testid="products-import-button"><Upload className="w-4 h-4" /> {t('importExcel')}</Button>}{can('products.export') && <Button variant="outline" size="sm" onClick={handleExport} data-testid="products-export"><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}<Button variant="outline" size="sm" onClick={() => setCatalogToolsOpen(true)} data-testid="products-tools"><SlidersHorizontal className="w-4 h-4" /> {lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'}</Button>{can('products.create') && <Button size="sm" onClick={openAdd} data-testid="products-add"><Plus className="w-4 h-4" /> {t('add')}</Button>}</>}
       />
-      <section className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="premier-refresh-stagger grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           title={lang === 'ar' ? 'الأصناف المعروضة' : 'Catalog SKUs'}
           value={formatNumber(filtered.length, 0)}
@@ -777,68 +778,81 @@ export function ProductsPage() {
               {t('noData')}
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+            <div className="premier-refresh-stagger grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
               {displayedProducts.map((p) => {
                 const cost = p.product_type === 'manufactured' ? (liveProductCosts[p.id] ?? p.cost_price) : p.cost_price;
+                const marginPct = p.sale_price > 0 ? Math.max(0, Math.min(100, ((p.sale_price - cost) / p.sale_price) * 100)) : 0;
                 const catName = productCategoryName(p);
                 return (
                   <article
                     key={p.id}
                     onClick={can('products.edit') ? () => openEdit(p) : undefined}
-                    className={`premier-refresh-subcard group overflow-hidden p-4 ${can('products.edit') ? 'cursor-pointer' : ''}`}
+                    className={`premier-refresh-subcard group flex h-full min-w-0 flex-col justify-between overflow-hidden p-4 ${can('products.edit') ? 'cursor-pointer' : ''}`}
                   >
-                    <div className="relative mb-3.5 flex h-44 w-full items-center justify-center overflow-hidden rounded-[16px] bg-[#e9ede8] dark:bg-ui-surface">
-                      {p.image_url ? (
-                        <ProductImage
-                          src={p.image_url}
-                          name={p.name}
-                          category={catName}
-                          className="h-full w-full"
-                          imgClassName="h-full w-full object-cover"
-                          positionX={p.image_position_x}
-                          positionY={p.image_position_y}
-                          zoom={p.image_zoom}
-                        />
-                      ) : (
-                        <Package className="h-10 w-10 text-ui-subtle/60" />
-                      )}
-                      <div className="absolute start-2.5 top-2.5 flex flex-wrap gap-1.5">
-                        <Badge variant={p.is_active ? 'success' : 'default'} size="sm">
-                          {p.is_active ? t('active') : t('inactive')}
-                        </Badge>
-                        {p.product_type === 'manufactured' && (
-                          <Badge variant="primary" size="sm">
-                            {lang === 'ar' ? 'بمكونات' : 'Composed'}
-                          </Badge>
+                    <div>
+                      <div className="relative mb-3.5 flex h-44 w-full items-center justify-center overflow-hidden rounded-[16px] bg-[#e9ede8] dark:bg-ui-surface">
+                        {p.image_url ? (
+                          <ProductImage
+                            src={p.image_url}
+                            name={p.name}
+                            category={catName}
+                            className="h-full w-full transition-transform duration-300 ease-[var(--ui-ease)] group-hover:scale-[1.03]"
+                            imgClassName="h-full w-full object-cover"
+                            positionX={p.image_position_x}
+                            positionY={p.image_position_y}
+                            zoom={p.image_zoom}
+                          />
+                        ) : (
+                          <Package className="h-10 w-10 text-ui-subtle/60" />
                         )}
+                        <div className="absolute start-2.5 top-2.5 flex flex-wrap gap-1.5">
+                          <Badge variant={p.is_active ? 'success' : 'default'} size="sm">
+                            {p.is_active ? t('active') : t('inactive')}
+                          </Badge>
+                          {p.product_type === 'manufactured' && (
+                            <Badge variant="primary" size="sm">
+                              {lang === 'ar' ? 'بمكونات' : 'Composed'}
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <h3 className="truncate text-[15px] font-semibold text-ui-text group-hover:text-ui-primary">{p.name}</h3>
+                          <p className="mt-0.5 truncate text-xs text-ui-muted">{[p.sku || p.barcode, branchLabel(p.branch_id)].filter(Boolean).join(' · ') || '—'}</p>
+                        </div>
+                        {catName && <Badge variant="info" size="sm" className="shrink-0">{catName}</Badge>}
                       </div>
                     </div>
 
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="min-w-0">
-                        <h3 className="truncate text-[15px] font-semibold text-ui-text group-hover:text-ui-primary">{p.name}</h3>
-                        <p className="mt-0.5 truncate text-xs text-ui-muted">{[p.sku || p.barcode, branchLabel(p.branch_id)].filter(Boolean).join(' · ') || '—'}</p>
+                    <div className="mt-3.5">
+                      <div className="grid grid-cols-2 gap-3 border-t border-ui-border pt-3">
+                        <div className="min-w-0">
+                          <p className="truncate text-[11px] font-medium text-ui-subtle">{t('salePrice')}</p>
+                          <p className="mt-0.5 truncate text-base font-bold text-ui-primary tabular-nums">{formatCurrency(p.sale_price, currency, lang)}</p>
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-[11px] font-medium text-ui-subtle">{t('costPrice')}</p>
+                          <p className="mt-0.5 truncate text-sm font-semibold text-ui-text tabular-nums">{formatCurrency(cost, currency, lang)}</p>
+                        </div>
                       </div>
-                      {catName && <Badge variant="info" size="sm" className="shrink-0">{catName}</Badge>}
-                    </div>
 
-                    <div className="mt-3.5 grid grid-cols-2 gap-3 border-t border-ui-border pt-3">
-                      <div>
-                        <p className="text-[11px] font-medium text-ui-subtle">{t('salePrice')}</p>
-                        <p className="mt-0.5 text-base font-bold text-ui-primary tabular-nums">{formatCurrency(p.sale_price, currency, lang)}</p>
+                      <div className="mt-2.5 space-y-1">
+                        <div className="flex items-center justify-between text-[11px] text-ui-muted">
+                          <span>{lang === 'ar' ? 'الربحية' : 'Margin'}</span>
+                          <span className="font-semibold tabular-nums text-ui-text">{marginPct.toFixed(0)}%</span>
+                        </div>
+                        <WorkspaceMeter value={marginPct} max={100} tone={marginPct >= 30 ? 'success' : marginPct >= 10 ? 'primary' : 'warning'} height="xs" />
                       </div>
-                      <div>
-                        <p className="text-[11px] font-medium text-ui-subtle">{t('costPrice')}</p>
-                        <p className="mt-0.5 text-sm font-semibold text-ui-text tabular-nums">{formatCurrency(cost, currency, lang)}</p>
-                      </div>
-                    </div>
 
-                    <div className="mt-3 flex items-center justify-end gap-1 border-t border-ui-border pt-2.5" onClick={(e) => e.stopPropagation()}>
-                      <button type="button" onClick={() => setInspectProduct(p)} className="ui-icon-action" title={lang === 'ar' ? 'معاينة الصنف' : 'Inspect item'}><Eye className="h-4 w-4" /></button>
-                      <button type="button" onClick={() => showBarcode(p)} className="ui-icon-action" title={t('barcode')}><BarcodeIcon className="h-4 w-4" /></button>
-                      <button type="button" onClick={() => showQR(p)} className="ui-icon-action" title={t('generateQR')}><QrCode className="h-4 w-4" /></button>
-                      {can('products.edit') && <button type="button" onClick={() => openEdit(p)} className="ui-icon-action ui-icon-action-info" title={t('edit')}><Edit2 className="h-4 w-4" /></button>}
-                      {can('products.delete') && <button type="button" onClick={() => setDeleteId(p.id)} className="ui-icon-action ui-icon-action-danger" title={t('delete')}><Trash2 className="h-4 w-4" /></button>}
+                      <div className="mt-3 flex items-center justify-end gap-1 border-t border-ui-border pt-2.5" onClick={(e) => e.stopPropagation()}>
+                        <button type="button" onClick={() => setInspectProduct(p)} className="ui-icon-action" title={lang === 'ar' ? 'معاينة الصنف' : 'Inspect item'}><Eye className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => showBarcode(p)} className="ui-icon-action" title={t('barcode')}><BarcodeIcon className="h-4 w-4" /></button>
+                        <button type="button" onClick={() => showQR(p)} className="ui-icon-action" title={t('generateQR')}><QrCode className="h-4 w-4" /></button>
+                        {can('products.edit') && <button type="button" onClick={() => openEdit(p)} className="ui-icon-action ui-icon-action-info" title={t('edit')}><Edit2 className="h-4 w-4" /></button>}
+                        {can('products.delete') && <button type="button" onClick={() => setDeleteId(p.id)} className="ui-icon-action ui-icon-action-danger" title={t('delete')}><Trash2 className="h-4 w-4" /></button>}
+                      </div>
                     </div>
                   </article>
                 );

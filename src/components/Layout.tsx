@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ReactNode, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import {
   Activity, AlertTriangle, ArrowDown, ArrowLeft, ArrowLeftRight, ArrowRight, ArrowUp, BarChart3, BadgeDollarSign, Boxes, BookOpenText, Building2, Calculator, ChefHat,
@@ -22,6 +22,7 @@ import { prefetchAppRoute } from '@/core/navigation/prefetch';
 import { MENU_GROUPS, MENU_ITEMS, SIDEBAR_SECTION_ORDER, sidebarSectionForItem, type MenuIcon, type SidebarSection } from '@/core/navigation/menu.config';
 import { CommandPalette, CommandPaletteTrigger } from './CommandPalette';
 import { Modal } from './Modal';
+import { useToast } from './Toast';
 import { OfflineStatusIndicator } from './OfflineStatusIndicator';
 import { PageUtilityControls } from './PageUtilityControls';
 import { ReturnContextBanner } from '@/core/guard/ReturnContextBanner';
@@ -97,17 +98,20 @@ export function Layout({ children }: { children: ReactNode }) {
 }
 
 function AccountLayout({ children }: { children: ReactNode }) {
-  const { t, lang, setLang } = useLanguage();
-  const { theme, toggleTheme } = useTheme();
+  const { t, lang, setLang, lockLanguagePreference } = useLanguage();
+  const { theme, toggleTheme, saveThemePreference } = useTheme();
   const { user, signOut } = useAuth();
   const can = useCan();
   const location = useLocation();
   const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [quickNewOpen, setQuickNewOpen] = useState(false);
+  const { show } = useToast();
   const [accountOpen, setAccountOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
   const quickNewRef = useRef<HTMLDivElement>(null);
+  const sectionNavRef = useRef<HTMLElement>(null);
+  const [sectionPill, setSectionPill] = useState<{ left: number; width: number } | null>(null);
   const preferenceKey = `premier:sidebar:${user?.id ?? 'guest'}`;
   const [desktopSidebarHidden, setDesktopSidebarHidden] = useState(
     () => readSidebarPreference(`${preferenceKey}:hidden`, false) === true,
@@ -204,6 +208,34 @@ function AccountLayout({ children }: { children: ReactNode }) {
       canAccessModule(moduleForPath(link.route)) && canAccessPath(link.route);
   }) ?? [];
 
+  const hasWorkspace = Boolean(workspace);
+  const workspaceRoute = workspace?.route ?? '';
+  useLayoutEffect(() => {
+    const nav = sectionNavRef.current;
+    if (!nav || sectionLinks.length <= 1 || !hasWorkspace) {
+      setSectionPill(null);
+      return;
+    }
+    const update = () => {
+      const activeEl = nav.querySelector<HTMLElement>('[aria-current="page"]');
+      if (!activeEl) {
+        setSectionPill(null);
+        return;
+      }
+      setSectionPill({ left: activeEl.offsetLeft, width: activeEl.offsetWidth });
+    };
+    update();
+    let cancelled = false;
+    void document.fonts?.ready?.then(() => { if (!cancelled) update(); });
+    if (typeof ResizeObserver === 'undefined') return () => { cancelled = true; };
+    const ro = new ResizeObserver(update);
+    ro.observe(nav);
+    return () => {
+      cancelled = true;
+      ro.disconnect();
+    };
+  }, [hasWorkspace, workspaceRoute, sectionLinks.length, ar]);
+
   const activeMenuGroup = useMemo<SidebarSection | null>(() => {
     const activeItem = visibleItems.find((item) => item.route === workspace?.section.anchor)
       ?? visibleItems.find((item) =>
@@ -274,10 +306,10 @@ function AccountLayout({ children }: { children: ReactNode }) {
     <div dir={ar ? 'rtl' : 'ltr'} className="premier-backoffice min-h-screen bg-ui-page text-ui-text overflow-x-clip" data-testid="app-shell">
       <header
         data-testid="app-header"
-        className="premier-refresh-topbar-glass fixed top-2.5 inset-x-2.5 sm:inset-x-4 lg:inset-x-5 z-[60] flex h-[68px] min-w-0 items-center justify-between gap-2 rounded-[26px] border border-ui-border px-3 shadow-ui transition-all duration-200 sm:px-4"
+        className="premier-refresh-topbar-glass fixed top-2.5 inset-x-2.5 sm:inset-x-4 lg:inset-x-5 z-[60] flex h-[68px] min-w-0 items-center justify-between gap-2 xl:gap-4 rounded-[26px] lg:rounded-full border border-ui-border px-3 shadow-ui transition-all duration-200 sm:px-5"
       >
-        <div className="flex shrink-0 items-center gap-1.5 sm:gap-2" data-testid="app-header-navigation">
-          <button data-testid="sidebar-open" type="button" onClick={() => setMobileOpen(true)} className="rounded-full p-2 text-ui-muted hover:bg-ui-page-alt lg:hidden" aria-label={ar ? 'فتح القائمة' : 'Open sidebar'}>
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 sm:gap-2" data-testid="app-header-navigation">
+          <button data-testid="sidebar-open" type="button" onClick={() => setMobileOpen(true)} className="shrink-0 rounded-full p-2 text-ui-muted hover:bg-ui-page-alt lg:hidden" aria-label={ar ? 'فتح القائمة' : 'Open sidebar'}>
             <Menu className="h-5 w-5" />
           </button>
           <Link to={APP_ROUTES.dashboard} className="hidden items-center gap-2.5 pe-1 lg:flex">
@@ -288,7 +320,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
               data-testid="desktop-sidebar-toggle"
               type="button"
               onClick={() => setDesktopSidebarHidden(false)}
-              className="hidden h-9 w-9 items-center justify-center rounded-full border border-ui-border bg-ui-page-alt text-ui-muted shadow-ui-sm transition hover:border-ui-border-strong hover:text-ui-text lg:inline-flex"
+              className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full border border-ui-border bg-ui-page-alt text-ui-muted shadow-ui-sm transition hover:border-ui-border-strong hover:text-ui-text lg:inline-flex"
               aria-label={ar ? 'توسيع القائمة الجانبية' : 'Expand sidebar'}
               title={ar ? 'توسيع القائمة الجانبية' : 'Expand sidebar'}
             >
@@ -303,7 +335,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
                 if (window.history.length > 1) navigate(-1);
                 else navigate(APP_ROUTES.dashboard);
               }}
-              className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-ui-border bg-ui-page-alt px-3 text-xs font-semibold text-ui-text transition hover:border-ui-border-strong hover:bg-ui-surface-raised active:scale-95"
+              className="flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-ui-border bg-ui-page-alt text-xs font-semibold text-ui-text transition hover:border-ui-border-strong hover:bg-ui-surface-raised active:scale-95 2xl:w-auto 2xl:px-3"
               aria-label={ar ? 'رجوع' : 'Back'}
               title={ar ? 'رجوع' : 'Back'}
             >
@@ -320,7 +352,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
               onTouchStart={() => prefetchAppRoute(APP_ROUTES.pos)}
               aria-label={ar ? 'نقطة البيع' : 'Point of Sale'}
               title={ar ? 'نقطة البيع' : 'Point of Sale'}
-              className={`flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition active:scale-95 ${isPosRoute ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'border border-ui-border bg-ui-page-alt text-ui-text hover:border-ui-border-strong hover:bg-ui-surface-raised'}`}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-full text-xs font-semibold transition active:scale-95 2xl:w-auto 2xl:px-3 ${isPosRoute ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'border border-ui-border bg-ui-page-alt text-ui-text hover:border-ui-border-strong hover:bg-ui-surface-raised'}`}
             >
               <ShoppingCart className="h-3.5 w-3.5 shrink-0" />
               <span className="hidden 2xl:inline">{ar ? 'نقطة البيع' : 'Point of Sale'}</span>
@@ -334,7 +366,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
               onFocus={() => prefetchAppRoute(APP_ROUTES.kitchenDisplay)}
               aria-label={ar ? 'شاشة المطبخ' : 'Kitchen Display'}
               title={ar ? 'شاشة المطبخ' : 'Kitchen Display'}
-              className={({ isActive }) => `flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full px-3 text-xs font-semibold transition active:scale-95 ${isActive ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'border border-ui-border bg-ui-page-alt text-ui-text hover:border-ui-border-strong hover:bg-ui-surface-raised'}`}
+              className={({ isActive }) => `flex h-9 w-9 shrink-0 items-center justify-center gap-1.5 rounded-full text-xs font-semibold transition active:scale-95 2xl:w-auto 2xl:px-3 ${isActive ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'border border-ui-border bg-ui-page-alt text-ui-text hover:border-ui-border-strong hover:bg-ui-surface-raised'}`}
             >
               <ChefHat className="h-3.5 w-3.5 shrink-0" />
               <span className="hidden 2xl:inline">{ar ? 'شاشة المطبخ' : 'Kitchen Display'}</span>
@@ -366,7 +398,7 @@ function AccountLayout({ children }: { children: ReactNode }) {
                 <span>{ar ? 'جديد' : 'New'}</span>
               </button>
               {quickNewOpen && (
-                <div className="absolute end-0 top-full z-[80] mt-2 w-60 overflow-hidden rounded-[22px] border border-ui-border bg-ui-surface p-1.5 shadow-ui-xl">
+                <div className="premier-refresh-pop-enter absolute end-0 top-full z-[80] mt-2 w-60 overflow-hidden rounded-[22px] border border-ui-border bg-ui-surface p-1.5 shadow-ui-xl">
                   <p className="px-3 py-1.5 text-[11px] font-bold text-ui-subtle">{ar ? 'إنشاء سريع' : 'Quick create'}</p>
                   {quickCreateActions.map((action) => (
                     <button
@@ -652,18 +684,33 @@ function AccountLayout({ children }: { children: ReactNode }) {
       </aside>
 
       {desktopSidebarHidden && (
-        <nav aria-label={ar ? 'الأقسام الرئيسية' : 'Main sections'} data-testid="app-sidebar-rail"
-          className="fixed top-[88px] bottom-4 start-4 z-50 hidden w-[72px] flex-col items-center gap-1.5 overflow-y-auto rounded-[22px] border border-ui-border bg-ui-surface p-2 shadow-ui lg:flex">
-          <button
-            type="button"
-            onClick={toggleTheme}
-            aria-label={ar ? 'تغيير المظهر' : 'Toggle theme'}
-            className="mb-1 grid h-11 w-11 shrink-0 place-items-center rounded-full bg-ui-page-alt text-ui-text transition hover:bg-ui-primary-soft hover:text-ui-primary"
-          >
-            {theme === 'light' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-          </button>
-          <div className="my-0.5 h-px w-8 bg-ui-border" />
-          <div className="flex w-full flex-1 flex-col items-center gap-1 overflow-y-auto">
+        <aside
+          aria-label={ar ? 'الأقسام الرئيسية' : 'Main sections'}
+          data-testid="app-sidebar-rail"
+          className="fixed top-[88px] bottom-4 start-4 z-50 hidden w-[72px] flex-col items-center gap-2.5 lg:flex"
+        >
+          <div className="flex w-full flex-col items-center gap-1 rounded-[26px] border border-ui-border bg-ui-surface p-1.5 shadow-ui">
+            <button
+              type="button"
+              onClick={() => theme !== 'light' && toggleTheme()}
+              aria-label={ar ? 'الوضع النهاري' : 'Light mode'}
+              title={ar ? 'الوضع النهاري' : 'Light mode'}
+              className={`grid h-10 w-10 place-items-center rounded-full transition-all ${theme === 'light' ? 'bg-ui-text text-ui-surface shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
+            >
+              <Sun className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => theme !== 'dark' && toggleTheme()}
+              aria-label={ar ? 'الوضع الليلي' : 'Dark mode'}
+              title={ar ? 'الوضع الليلي' : 'Dark mode'}
+              className={`grid h-10 w-10 place-items-center rounded-full transition-all ${theme === 'dark' ? 'bg-ui-text text-ui-surface shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
+            >
+              <Moon className="h-4 w-4" />
+            </button>
+          </div>
+
+          <nav className="flex min-h-0 w-full flex-1 flex-col items-center gap-1.5 overflow-y-auto rounded-[26px] border border-ui-border bg-ui-surface p-2 shadow-ui [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             {visibleSections.flatMap((section) => {
               const entries = new Map<string, (typeof visibleItems)[number]>();
               for (const item of grouped[section] ?? []) {
@@ -677,45 +724,84 @@ function AccountLayout({ children }: { children: ReactNode }) {
                   <Link key={item.id} to={item.route} aria-label={label} title={label}
                     aria-current={active ? 'page' : undefined}
                     onPointerEnter={() => prefetchAppRoute(item.route)} onFocus={() => prefetchAppRoute(item.route)}
-                    className={`grid h-11 w-11 shrink-0 place-items-center rounded-[14px] transition-all focus-visible:outline-2 focus-visible:outline-ui-ring ${active ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:bg-ui-page-alt hover:text-ui-text'}`}>
+                    className={`relative grid h-11 w-11 shrink-0 place-items-center rounded-[15px] transition-all focus-visible:outline-2 focus-visible:outline-ui-ring ${active ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:bg-ui-page-alt hover:text-ui-text'}`}>
                     {ICONS[item.icon]}
+                    {item.id === 'sales-invoices' && activeOrderCount > 0 && (
+                      <span className="absolute -end-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-ui-danger px-1 text-[9px] font-bold text-white tabular-nums">
+                        {activeOrderCount}
+                      </span>
+                    )}
                   </Link>
                 );
               });
             })}
+          </nav>
+
+          <div className="flex w-full flex-col items-center gap-1 rounded-[26px] border border-ui-border bg-ui-surface p-1.5 shadow-ui">
+            <button
+              type="button"
+              onClick={() => setHelpOpen(true)}
+              aria-label={ar ? 'الاختصارات والمساعدة' : 'Help & keys'}
+              title={ar ? 'الاختصارات والمساعدة' : 'Help & keys'}
+              className="grid h-10 w-10 place-items-center rounded-full text-ui-muted transition hover:bg-ui-page-alt hover:text-ui-text"
+            >
+              <HelpCircle className="h-4 w-4" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setDesktopSidebarHidden(false)}
+              aria-label={ar ? 'توسيع القائمة الجانبية' : 'Expand sidebar'}
+              title={ar ? 'توسيع القائمة الجانبية' : 'Expand sidebar'}
+              className="grid h-10 w-10 place-items-center rounded-full text-ui-muted transition hover:bg-ui-page-alt hover:text-ui-text"
+            >
+              <ArrowRight className={`h-4 w-4 ${ar ? 'rotate-180' : ''}`} />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={() => setDesktopSidebarHidden(false)}
-            aria-label={ar ? 'توسيع القائمة الجانبية' : 'Expand sidebar'}
-            title={ar ? 'توسيع القائمة الجانبية' : 'Expand sidebar'}
-            className="mt-1 grid h-10 w-11 shrink-0 place-items-center rounded-[14px] text-ui-muted transition hover:bg-ui-page-alt hover:text-ui-text"
-          >
-            <ArrowRight className={`h-4 w-4 ${ar ? 'rotate-180' : ''}`} />
-          </button>
-        </nav>
+        </aside>
       )}
 
       {mobileOpen && <button data-testid="mobile-sidebar-backdrop" type="button" className="fixed inset-0 z-40 bg-ui-text/20 backdrop-blur-sm lg:hidden" onClick={() => setMobileOpen(false)} aria-label={ar ? 'إغلاق' : 'Close'} />}
 
-      <div data-testid="app-content-shell" className={`min-h-screen pt-[68px] transition-all duration-200 ${desktopSidebarHidden ? 'lg:ms-[88px]' : 'lg:ms-[272px]'}`}>
+      <div data-testid="app-content-shell" className={`min-h-screen pt-[68px] transition-all duration-200 ${desktopSidebarHidden ? 'lg:ms-[96px]' : 'lg:ms-[276px]'}`}>
         {sectionLinks.length > 1 && workspace && (
-          <nav aria-label={ar ? 'صفحات القسم' : 'Pages in this section'}
+          <nav
+            ref={sectionNavRef}
+            aria-label={ar ? 'صفحات القسم' : 'Pages in this section'}
             data-testid="workspace-section-navigation"
-            className="sticky top-[82px] z-[35] mx-3 mt-4 flex min-w-0 gap-1 overflow-x-auto rounded-full border border-ui-border bg-ui-surface/90 p-1 shadow-ui-sm backdrop-blur-md sm:mx-5">
-            {sectionLinks.map((link) => (
-              <Link key={link.route} to={link.route}
-                aria-current={workspace.route === link.route ? 'page' : undefined}
-                onPointerEnter={() => prefetchAppRoute(link.route)} onFocus={() => prefetchAppRoute(link.route)}
-                className={`flex min-h-9 shrink-0 items-center rounded-full px-3.5 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-ui-ring ${workspace.route === link.route ? 'bg-ui-text font-semibold text-ui-surface shadow-ui-sm' : 'font-medium text-ui-muted hover:text-ui-text'}`}>
-                {link.label[ar ? 0 : 1]}
-              </Link>
-            ))}
+            className="sticky top-[82px] z-[35] mx-3 mt-4 flex min-w-0 gap-1 overflow-x-auto rounded-full border border-ui-border bg-ui-surface/95 p-1 shadow-ui-sm sm:mx-5"
+          >
+            {sectionPill && (
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute top-1 bottom-1 rounded-full bg-ui-text shadow-ui-sm transition-[left,width] duration-200 motion-reduce:transition-none ease-[var(--ui-ease)]"
+                style={{ left: sectionPill.left, width: sectionPill.width }}
+              />
+            )}
+            {sectionLinks.map((link) => {
+              const active = workspace.route === link.route;
+              return (
+                <Link
+                  key={link.route}
+                  to={link.route}
+                  aria-current={active ? 'page' : undefined}
+                  onPointerEnter={() => prefetchAppRoute(link.route)}
+                  onFocus={() => prefetchAppRoute(link.route)}
+                  className={`relative z-10 flex h-8 shrink-0 items-center whitespace-nowrap rounded-full px-3.5 text-[13px] transition-colors focus-visible:outline-2 focus-visible:outline-ui-ring ${
+                    active
+                      ? sectionPill ? 'font-semibold text-ui-surface' : 'bg-ui-text font-semibold text-ui-surface'
+                      : 'font-medium text-ui-muted hover:text-ui-text'
+                  }`}
+                >
+                  {link.label[ar ? 0 : 1]}
+                </Link>
+              );
+            })}
           </nav>
         )}
+
         <ReturnContextBanner />
         {branchScope.isAggregate && (
-          <div data-testid="aggregate-branch-action-banner" className="mx-3 mt-4 rounded-[20px] border border-ui-warning/30 bg-ui-warning-soft/60 px-4 py-2.5 sm:mx-5 lg:mx-6">
+          <div data-testid="aggregate-branch-action-banner" className="mx-3 mt-5 rounded-[20px] border border-ui-warning/30 bg-ui-warning-soft/60 px-4 py-2.5 sm:mx-5 lg:mx-6">
             <div className="mx-auto flex max-w-[1600px] flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div className="min-w-0">
                 <p className="text-xs font-black text-ui-text">
@@ -829,6 +915,18 @@ function AccountLayout({ children }: { children: ReactNode }) {
             className="flex items-center gap-2 rounded-lg border border-ui-border px-3 py-2 text-sm hover:bg-ui-page-alt">
             {theme === 'light' ? <Moon className="h-4 w-4" /> : <Sun className="h-4 w-4" />}
             {theme === 'light' ? (ar ? 'الوضع الليلي' : 'Dark mode') : (ar ? 'الوضع النهاري' : 'Light mode')}
+          </button>
+          <button data-testid="save-appearance-language" type="button" onClick={() => {
+            try {
+              saveThemePreference();
+              lockLanguagePreference();
+              show(ar ? 'تم حفظ المظهر واللغة على هذا المتصفح.' : 'Appearance and language saved in this browser.', 'success');
+              setAccountOpen(false);
+            } catch {
+              show(ar ? 'تعذّر حفظ التفضيلات على هذا المتصفح.' : 'This browser could not save your preferences.', 'error');
+            }
+          }} className="rounded-lg bg-ui-primary px-3 py-2 text-sm font-bold text-ui-primary-fg hover:bg-ui-primary-hover">
+            {ar ? 'حفظ المظهر واللغة' : 'Save appearance and language'}
           </button>
           <button data-testid="sign-out-button" type="button" onClick={signOut}
             className="flex items-center gap-2 rounded-lg border border-ui-border px-3 py-2 text-sm text-ui-danger hover:bg-ui-danger-soft">

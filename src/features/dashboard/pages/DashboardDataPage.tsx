@@ -26,6 +26,7 @@ import { DashboardStandbyBar } from '../components/DashboardStandbyBar';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
 import { DashboardBreakdown } from '../components/DashboardBreakdown';
 import { Modal } from '@/components/Modal';
+import { WorkspaceLiveDot, WorkspaceMeter, WorkspaceSparkline } from '@/components/design/WorkspaceIndicators';
 import { businessDateISO } from '@/lib/businessTime';
 import { REPORT_REGISTRY } from '@/features/reporting/reportRegistry';
 import type { ReportType } from '@/features/reporting/reportFilters';
@@ -185,8 +186,8 @@ function Empty({ ar }: { ar: boolean }) {
   return <div className="flex min-h-[120px] items-center justify-center text-sm text-ui-subtle">{ar ? 'لا توجد بيانات فعلية للفترة المحددة' : 'No actual data for the selected period'}</div>;
 }
 
-function Metric({ testId, icon: Icon, title, value, display, previous, href, ar, detail, selected, onSelect }: {
-  testId: string; icon: typeof Wallet; title: string; value: number; display: string; previous: number; href?: string; ar: boolean; detail?: ReactNode; selected?: boolean; onSelect?: () => void;
+function Metric({ testId, icon: Icon, title, value, display, previous, href, ar, detail, selected, onSelect, sparkValues }: {
+  testId: string; icon: typeof Wallet; title: string; value: number; display: string; previous: number; href?: string; ar: boolean; detail?: ReactNode; selected?: boolean; onSelect?: () => void; sparkValues?: number[];
 }) {
   const change = previous > 0 ? ((value - previous) / previous) * 100 : null;
   const positive = (change ?? 0) >= 0;
@@ -200,9 +201,14 @@ function Metric({ testId, icon: Icon, title, value, display, previous, href, ar,
       </div>
       {href && <ArrowUpRight className="h-4 w-4 shrink-0 text-ui-subtle transition group-hover:text-ui-primary" />}
     </div>
-    <p className="mt-4 text-[28px] font-bold leading-none tracking-[-0.025em] text-ui-text tabular-nums">{display}</p>
+    <div className="mt-4 flex flex-wrap items-end justify-between gap-2">
+      <p className="min-w-0 truncate text-[26px] font-bold leading-none tracking-[-0.025em] text-ui-text tabular-nums">{display}</p>
+      {sparkValues && sparkValues.some((v) => v > 0) && (
+        <WorkspaceSparkline values={sparkValues.slice(-12)} tone={positive ? 'primary' : 'danger'} width={68} height={22} />
+      )}
+    </div>
     {detail && <div className="mt-2 text-xs font-semibold text-ui-muted">{detail}</div>}
-    <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+    <div className="mt-auto flex flex-wrap items-center gap-2 pt-3 text-xs">
       {change === null ? <span className="text-ui-subtle">—</span> : (
         <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold ${positive ? 'bg-ui-success-soft text-ui-success' : 'bg-ui-danger-soft text-ui-danger'}`}>
           {positive ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}{formatPercent(Math.abs(change), 1)}
@@ -211,7 +217,7 @@ function Metric({ testId, icon: Icon, title, value, display, previous, href, ar,
       <span className="text-ui-subtle">{ar ? 'مقارنة بالفترة السابقة' : 'vs previous period'}</span>
     </div>
   </>;
-  const className = `rounded-[22px] border border-ui-border bg-ui-surface p-5 shadow-ui transition-all ${href ? 'group hover:-translate-y-0.5 hover:shadow-ui-lg' : ''}`;
+  const className = `flex h-full min-w-0 flex-col overflow-hidden rounded-[22px] border border-ui-border bg-ui-surface p-5 shadow-ui transition-all ${href ? 'group hover:-translate-y-0.5 hover:shadow-ui-lg' : ''}`;
   if (onSelect) return (
     <button type="button" data-testid={testId} aria-pressed={selected} onClick={onSelect}
       className={`${className} text-start transition-colors hover:border-ui-primary/50 focus-visible:outline-2 focus-visible:outline-ui-ring ${selected ? 'border-ui-primary ring-2 ring-ui-primary/25' : ''}`}>
@@ -682,7 +688,7 @@ export function DashboardDataPage() {
     <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
       <div>
         <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-ui-border bg-ui-surface px-3 py-1 text-xs font-medium text-ui-muted shadow-ui-sm">
-          <span className="h-2 w-2 rounded-full bg-ui-success" aria-hidden="true" />
+          <WorkspaceLiveDot tone="success" />
           <span>{new Date().toLocaleDateString(ar ? 'ar-EG' : 'en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
         </div>
         <h1 className="text-[clamp(1.75rem,2.7vw,2.45rem)] font-semibold leading-[1.06] tracking-[-0.025em] text-ui-text">
@@ -760,16 +766,16 @@ export function DashboardDataPage() {
 
     {error && <div className="rounded-[20px] border border-ui-danger/30 bg-ui-danger-soft p-4 text-sm font-bold text-ui-danger">{error}</div>}
 
-    {(canViewSales || canViewFinancial || canViewInventory) && <Card><div className="mb-4"><h2 className="text-lg font-bold text-ui-text">{ar ? `ملخص ${rangeLabels[range][0]}` : `${rangeLabels[range][1]} summary`}</h2><p className="text-xs text-ui-subtle">{ar ? 'المبيعات صافية بعد المرتجعات، والربح من قائمة الدخل المحاسبية' : 'Sales are net of refunds; profit comes from the accounting income statement'}</p></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {canViewFinancial && <div className="rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="text-xs font-medium text-ui-muted">{ar ? 'المصروفات المحاسبية' : 'Accounting expenses'}</p><p className="mt-2 text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.expenses, money)}</p></div>}
-      {canViewFinancial && <div className="rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="text-xs font-medium text-ui-muted">{ar ? 'صافي الربح المحاسبي' : 'Accounting net profit'}</p><p className="mt-2 text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.profit, money)}</p></div>}
-      {canViewInventory && <div className="rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="text-xs font-medium text-ui-muted">{ar ? 'تنبيهات المخزون' : 'Low stock alerts'}</p><p className="mt-2 text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.lowStockCount, (value) => formatNumber(value, 0))}</p></div>}
+    {(canViewSales || canViewFinancial || canViewInventory) && <Card><div className="mb-4"><h2 className="text-lg font-bold text-ui-text">{ar ? `ملخص ${rangeLabels[range][0]}` : `${rangeLabels[range][1]} summary`}</h2><p className="text-xs text-ui-subtle">{ar ? 'المبيعات صافية بعد المرتجعات، والربح من قائمة الدخل المحاسبية' : 'Sales are net of refunds; profit comes from the accounting income statement'}</p></div><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {canViewFinancial && <div className="min-w-0 rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="truncate text-xs font-medium text-ui-muted">{ar ? 'المصروفات المحاسبية' : 'Accounting expenses'}</p><p className="mt-2 truncate text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.expenses, money)}</p></div>}
+      {canViewFinancial && <div className="min-w-0 rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="truncate text-xs font-medium text-ui-muted">{ar ? 'صافي الربح المحاسبي' : 'Accounting net profit'}</p><p className="mt-2 truncate text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.profit, money)}</p></div>}
+      {canViewInventory && <div className="min-w-0 rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="truncate text-xs font-medium text-ui-muted">{ar ? 'تنبيهات المخزون' : 'Low stock alerts'}</p><p className="mt-2 truncate text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.lowStockCount, (value) => formatNumber(value, 0))}</p></div>}
     </div></Card>}
 
     {loading ? <div className="flex h-64 items-center justify-center rounded-3xl border border-ui-border bg-ui-surface"><RefreshCw className="h-7 w-7 animate-spin text-ui-primary" /></div> : <>
-      <section data-testid="dashboard-permission-kpis" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section data-testid="dashboard-permission-kpis" className="premier-refresh-stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {canViewPos && <Metric testId="kpi-open-order-value" icon={Wallet} title={ar ? 'قيمة الطلبات المفتوحة' : 'Open order value'} value={ops.openOrderValue} display={money(ops.openOrderValue)} previous={0} href={canViewFloorPlan ? '/floor-plan' : undefined} ar={ar} />}
-        {canViewSales && <Metric testId="kpi-net-sales" icon={BarChart3} title={ar ? 'صافي المبيعات' : 'Net sales'} value={current.sales} display={money(current.sales)} previous={canCompare ? previous.sales : 0} selected={metric === 'sales'} onSelect={() => updateView('metric', '')} ar={ar} />}
+        {canViewSales && <Metric testId="kpi-net-sales" icon={BarChart3} title={ar ? 'صافي المبيعات' : 'Net sales'} value={current.sales} display={money(current.sales)} previous={canCompare ? previous.sales : 0} selected={metric === 'sales'} onSelect={() => updateView('metric', '')} sparkValues={chart.map((p) => p.sales)} ar={ar} />}
         {canViewSales && <Metric testId="kpi-orders" icon={ReceiptText} title={ar ? 'إجمالي الطلبات' : 'Total orders'} value={current.orders} display={formatNumber(current.orders, 0)} previous={canCompare ? previous.orders : 0} selected={metric === 'orders'} onSelect={() => updateView('metric', 'orders')} ar={ar} />}
         {canViewSales && <Metric testId="kpi-average-order" icon={Calculator} title={ar ? 'متوسط قيمة الطلب' : 'Average order'} value={current.orders ? current.sales / current.orders : 0} display={money(current.orders ? current.sales / current.orders : 0)} previous={canCompare && previous.orders ? previous.sales / previous.orders : 0} href={reportLink('sales')} ar={ar} />}
         {canViewSales && <Metric testId="kpi-net-payments" icon={CreditCard} title={ar ? 'صافي المدفوعات' : 'Net payments'} value={current.payments} display={money(current.payments)} previous={canCompare ? previous.payments : 0} selected={metric === 'payments'} onSelect={() => updateView('metric', 'payments')} ar={ar} />}
@@ -829,15 +835,15 @@ export function DashboardDataPage() {
               const filled = Math.round((ratio / 100) * ticks);
               return (
                 <div className="my-4 flex flex-col items-center">
-                  <svg viewBox="0 0 220 120" className="w-full max-w-[240px]" aria-hidden="true">
+                  <svg viewBox="0 0 220 124" className="w-full max-w-[240px]" aria-label={formatPercent(ratio, 1)}>
                     {Array.from({ length: ticks }).map((_, idx) => {
                       const angle = Math.PI - (idx / (ticks - 1)) * Math.PI;
-                      const r1 = 76;
+                      const r1 = 78;
                       const r2 = 96;
                       const x1 = 110 + Math.cos(angle) * r1;
-                      const y1 = 108 - Math.sin(angle) * r1;
+                      const y1 = 110 - Math.sin(angle) * r1;
                       const x2 = 110 + Math.cos(angle) * r2;
-                      const y2 = 108 - Math.sin(angle) * r2;
+                      const y2 = 110 - Math.sin(angle) * r2;
                       return (
                         <line
                           key={idx}
@@ -852,9 +858,17 @@ export function DashboardDataPage() {
                         />
                       );
                     })}
+                    <text
+                      x="110"
+                      y="102"
+                      textAnchor="middle"
+                      fill="rgb(var(--ui-text))"
+                      style={{ fontSize: '26px', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}
+                    >
+                      {formatPercent(ratio, 1)}
+                    </text>
                   </svg>
-                  <p className="-mt-11 text-3xl font-bold tracking-tight text-ui-text tabular-nums">{formatPercent(ratio, 1)}</p>
-                  <p className="mt-1 text-xs font-medium text-ui-muted">{ar ? 'نسبة المحصل من صافي المبيعات' : 'Collected of net sales'}</p>
+                  <p className="mt-1 text-center text-xs font-medium text-ui-muted">{ar ? 'نسبة المحصل من صافي المبيعات' : 'Collected of net sales'}</p>
                 </div>
               );
             })()}
@@ -880,9 +894,7 @@ export function DashboardDataPage() {
               <span className="font-semibold text-ui-text">{name}</span>
               <span className="text-ui-muted tabular-nums">{formatNumber(row.orders, 0)} · {money(row.sales)}</span>
             </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-ui-page-alt">
-              <div className="h-full rounded-full bg-ui-primary transition-all" style={{ width: `${Math.max(4, Math.round((row.sales / maxSales) * 100))}%` }} />
-            </div>
+            <WorkspaceMeter value={row.sales} max={maxSales} tone="primary" height="sm" />
           </div>
         ));
       })() : <Empty ar={ar} />}</Card>}
