@@ -9,7 +9,7 @@ describe('Cross-branch raw transfer source warehouse preflight',()=>{
  const db=new Client({connectionString});
  beforeAll(async()=>{await db.connect();});
  afterAll(async()=>{await db.end();});
- it('rejects a source warehouse with no stock even when another warehouse has inventory',async()=>{
+ it('rejects an empty source, then moves stock once after replenishment',async()=>{
   const org=randomUUID(),sourceBranch=randomUUID(),destinationBranch=randomUUID();
   const sourceWarehouse=randomUUID(),otherWarehouse=randomUUID(),destinationWarehouse=randomUUID();
   const sourceMaterial=randomUUID(),destMaterial=randomUUID(),user=randomUUID(),transfer=randomUUID();
@@ -51,6 +51,23 @@ describe('Cross-branch raw transfer source warehouse preflight',()=>{
      where branch_id=$1 and warehouse_id=$2 and raw_material_id=$3`,
     [sourceBranch,otherWarehouse,sourceMaterial]);
    expect(Number(stock[0].qty)).toBe(9);
+   const { rows: [receipt] } = await db.query(
+    `select private.apply_unified_raw_movement_v1(
+      gen_random_uuid(),$1,$2,$3,5,'transfer','warehouse_transfer',$4,$5,$6,true
+    ) result`,
+    [sourceBranch,sourceWarehouse,sourceMaterial,randomUUID(),`CI-REPLENISH-${suffix}`,user]);
+   expect(receipt.result).toMatchObject({success:true});
+   const approve = () => db.query('select public.approve_warehouse_transfer($1) result',[transfer]);
+   expect((await approve()).rows[0].result).toMatchObject({success:true});
+   expect((await approve()).rows[0].result).toMatchObject({success:false});
+   const { rows: balances } = await db.query(
+    `select warehouse_id,sum(quantity)::text qty from public.raw_material_batches
+      where (raw_material_id=$1 and warehouse_id in ($2,$3))
+         or (raw_material_id=$4 and warehouse_id=$5)
+      group by warehouse_id`,
+    [sourceMaterial,sourceWarehouse,otherWarehouse,destMaterial,destinationWarehouse]);
+   expect(Object.fromEntries(balances.map(row => [row.warehouse_id,Number(row.qty)])))
+    .toEqual({[sourceWarehouse]:2,[otherWarehouse]:9,[destinationWarehouse]:3});
   }finally{await db.query('ROLLBACK');}
  });
 });
