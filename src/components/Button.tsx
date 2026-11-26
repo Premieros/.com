@@ -11,20 +11,20 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
 }
 
 const variants: Record<Variant, string> = {
-  primary: 'bg-ui-primary hover:bg-ui-primary-hover text-ui-primary-fg shadow-ui-sm ring-1 ring-ui-border-strong active:bg-ui-primary-active',
-  secondary: 'bg-ui-page-alt hover:bg-ui-primary-soft text-ui-text',
+  primary: 'bg-ui-primary hover:bg-ui-primary-hover text-ui-primary-fg shadow-ui-sm active:bg-ui-primary-active',
+  secondary: 'bg-ui-page-alt hover:bg-ui-primary-soft text-ui-text border border-ui-border',
   danger: 'bg-ui-danger hover:bg-ui-danger-hover text-white shadow-ui-sm active:bg-ui-danger-active',
   ghost: 'hover:bg-ui-page-alt text-ui-text',
-  outline: 'border border-ui-border-strong hover:bg-ui-page-alt text-ui-text',
+  outline: 'bg-ui-surface border border-ui-border-strong hover:bg-ui-page-alt text-ui-text shadow-ui-sm',
   success: 'bg-ui-success hover:bg-ui-success-hover text-white shadow-ui-sm active:bg-ui-success-active',
   warning: 'bg-ui-warning hover:bg-ui-warning-hover text-white shadow-ui-sm active:bg-ui-warning-active',
 };
 
 const sizes: Record<Size, string> = {
-  sm: 'px-3 py-1.5 text-sm rounded-ui',
-  md: 'px-4 py-2 text-sm rounded-ui-lg',
-  lg: 'px-6 py-3 text-base rounded-ui-lg',
-  xl: 'px-8 py-4 text-lg rounded-ui-xl',
+  sm: 'px-3.5 py-1.5 text-sm rounded-full',
+  md: 'px-4 py-2 text-sm rounded-full',
+  lg: 'px-6 py-3 text-base rounded-full',
+  xl: 'px-8 py-4 text-lg rounded-full',
 };
 
 export function Button({ variant = 'primary', size = 'md', children, className = '', ripple = true, type = 'button', onClick, ...props }: ButtonProps) {

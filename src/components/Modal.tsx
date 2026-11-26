@@ -75,7 +75,7 @@ export function Modal({ open, isOpen, onClose, title, children, size = 'md', man
       <div
         ref={modalRef}
         data-testid="modal-panel"
-        className={`relative flex h-[min(92dvh,760px)] max-h-[92dvh] w-full flex-col rounded-t-2xl liquid-glass-card shadow-2xl animate-scale-in sm:h-auto sm:max-h-[90dvh] sm:rounded-ui-xl ${sizes[size]}`}
+        className={`relative flex h-[min(92dvh,760px)] max-h-[92dvh] w-full flex-col rounded-t-[26px] border border-ui-border bg-ui-surface shadow-ui-xl animate-scale-in sm:h-auto sm:max-h-[90dvh] sm:rounded-[26px] ${sizes[size]}`}
         tabIndex={manageFocus ? -1 : undefined}
         role="dialog"
         aria-modal="true"

@@ -3,107 +3,119 @@
 @tailwind utilities;
 
 :root {
-  --brand-50: 248 245 255;
-  --brand-100: 240 230 255;
-  --brand-200: 221 199 251;
-  --brand-300: 187 151 242;
-  --brand-400: 153 93 231;
-  --brand-500: 109 31 191;
-  --brand-600: 77 0 158;
-  --brand-700: 65 0 132;
-  --brand-800: 51 0 106;
-  --brand-900: 38 0 83;
+  --brand-50: 253 245 240;
+  --brand-100: 250 232 222;
+  --brand-200: 245 206 186;
+  --brand-300: 235 169 138;
+  --brand-400: 217 122 79;
+  --brand-500: 185 83 31;
+  --brand-600: 168 72 28;
+  --brand-700: 140 58 21;
+  --brand-800: 112 46 17;
+  --brand-900: 84 34 13;
 
-  --navy-50: 240 243 250;
-  --navy-100: 219 227 243;
-  --navy-200: 185 200 232;
-  --navy-300: 138 163 216;
-  --navy-400: 90 121 194;
-  --navy-500: 58 91 171;
-  --navy-600: 45 71 144;
-  --navy-700: 36 58 118;
-  --navy-800: 26 42 88;
-  --navy-900: 15 23 42;
-  --navy-950: 2 6 23;
+  --navy-50: 243 245 242;
+  --navy-100: 230 234 228;
+  --navy-200: 208 214 207;
+  --navy-300: 173 182 175;
+  --navy-400: 136 148 141;
+  --navy-500: 108 119 112;
+  --navy-600: 86 97 90;
+  --navy-700: 54 64 58;
+  --navy-800: 36 44 40;
+  --navy-900: 24 32 27;
+  --navy-950: 15 20 18;
 
   --gold-50: 251 248 239;
   --gold-100: 245 238 216;
   --gold-200: 234 220 175;
   --gold-300: 223 200 135;
   --gold-400: 217 188 98;
-  --gold-500: 212 175 55;
-  --gold-600: 183 149 42;
-  --gold-700: 146 116 34;
-  --gold-800: 115 91 31;
-  --gold-900: 92 74 30;
+  --gold-500: 200 138 18;
+  --gold-600: 147 96 10;
+  --gold-700: 120 77 8;
+  --gold-800: 95 61 6;
+  --gold-900: 74 47 5;
 
-  /* Premier unified solid design tokens (Enterprise ERP & Touch POS) */
-  /* === Identity === */
-  --ui-primary: 77 0 158;
-  --ui-primary-hover: 65 0 132;
-  --ui-primary-active: 54 0 110;
-  --ui-primary-soft: 246 239 255;
-  --ui-primary-fg: 255 255 255;
-  --ui-accent: var(--brand-600);
+  /* Premier Design Tokens mapped to Premier unified design system */
+  /* === Identity (Default Copper #a8481c) === */
+  --ui-primary: 168 72 28;
+  --ui-primary-hover: 146 61 23;
+  --ui-primary-active: 126 52 19;
+  --ui-primary-soft: 250 239 233;
+  --ui-primary-fg: 255 247 242;
+  --ui-accent: 185 83 31;
 
-  /* === Surfaces (Comfort-neutral, layered, opaque) === */
-  --ui-surface: 255 255 255;
+  /* === Premier Semantic & Chart Palette === */
+  --premier-refresh-pine: #b9531f;
+  --premier-refresh-ochre: #c88a12;
+  --premier-refresh-teal: #1d8a7b;
+  --premier-refresh-sky: #3a72c8;
+  --premier-refresh-rose: #cf4a5c;
+  --premier-refresh-sage: #6d9a2c;
+  --premier-refresh-slate: #6b7380;
+  --premier-refresh-ocean: #1f7f99;
+  --premier-refresh-glow-a: color-mix(in srgb, var(--premier-refresh-pine) 14%, #f8faf7);
+  --premier-refresh-glow-b: #f1ead6;
+
+  /* === Surfaces (Premier warm organic sage-ivory & pure paper cards) === */
+  --ui-surface: 252 253 252;
   --ui-surface-raised: 255 255 255;
-  --ui-page: 255 255 255;
-  --ui-page-alt: 245 245 249;
+  --ui-page: 238 240 236;
+  --ui-page-alt: 243 245 242;
 
   /* === Accent strips / section identity === */
-  --ui-strip-blue: 59 130 246;
-  --ui-strip-amber: 245 158 11;
-  --ui-strip-emerald: 16 185 129;
-  --ui-strip-violet: 139 92 246;
-  --ui-strip-rose: 244 63 94;
-  --ui-strip-cyan: 6 182 212;
-  --ui-strip-neutral: 100 116 139;
+  --ui-strip-blue: 58 114 200;
+  --ui-strip-amber: 200 138 18;
+  --ui-strip-emerald: 35 128 77;
+  --ui-strip-violet: 168 72 28;
+  --ui-strip-rose: 207 74 92;
+  --ui-strip-cyan: 31 127 153;
+  --ui-strip-neutral: 107 115 128;
 
   /* === Borders === */
-  --ui-border: 225 226 233;
-  --ui-border-strong: 196 198 208;
+  --ui-border: 223 227 221;
+  --ui-border-strong: 199 206 197;
 
   /* === Text === */
-  --ui-text: 27 29 38;
-  --ui-muted: 77 79 92;
-  --ui-subtle: 100 116 139;
+  --ui-text: 24 32 27;
+  --ui-muted: 86 97 90;
+  --ui-subtle: 108 119 112;
 
   /* === Semantic === */
-  --ui-success: 16 185 129;
-  --ui-success-soft: 236 253 245;
-  --ui-success-hover: 5 150 105;
-  --ui-success-active: 4 120 87;
-  --ui-warning: 245 158 11;
-  --ui-warning-soft: 254 243 199;
-  --ui-warning-hover: 217 119 6;
-  --ui-warning-active: 180 83 9;
-  --ui-danger: 239 68 68;
-  --ui-danger-soft: 254 242 242;
-  --ui-danger-hover: 220 38 38;
-  --ui-danger-active: 185 28 28;
-  --ui-info: 37 99 235;
-  --ui-info-soft: 239 246 255;
-  --ui-info-hover: 29 78 216;
-  --ui-info-active: 30 64 175;
+  --ui-success: 35 128 77;
+  --ui-success-soft: 232 245 237;
+  --ui-success-hover: 29 107 64;
+  --ui-success-active: 23 88 52;
+  --ui-warning: 147 96 10;
+  --ui-warning-soft: 252 243 224;
+  --ui-warning-hover: 126 81 8;
+  --ui-warning-active: 105 67 6;
+  --ui-danger: 191 58 45;
+  --ui-danger-soft: 252 235 233;
+  --ui-danger-hover: 166 47 36;
+  --ui-danger-active: 140 38 29;
+  --ui-info: 47 99 184;
+  --ui-info-soft: 234 241 252;
+  --ui-info-hover: 38 82 156;
+  --ui-info-active: 30 67 130;
 
-  /* === Radius === */
-  --ui-radius-sm: 8px;
-  --ui-radius: 10px;
-  --ui-radius-lg: 12px;
-  --ui-radius-xl: 20px;
-  --ui-radius-2xl: 24px;
+  /* === Radius (Premier tactile geometry) === */
+  --ui-radius-sm: 10px;
+  --ui-radius: 14px;
+  --ui-radius-lg: 18px;
+  --ui-radius-xl: 22px;
+  --ui-radius-2xl: 26px;
 
-  /* === Shadows === */
-  --ui-shadow-sm: 0 1px 5px rgba(24, 22, 40, 0.045);
-  --ui-shadow: 0 3px 13px rgba(24, 22, 40, 0.07);
-  --ui-shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.08), 0 2px 4px -2px rgba(0, 0, 0, 0.06);
-  --ui-shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.08), 0 4px 6px -4px rgba(0, 0, 0, 0.04);
-  --ui-shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+  /* === Shadows (Premier soft organic elevation) === */
+  --ui-shadow-sm: 0 1px 2px rgba(20, 36, 28, 0.04);
+  --ui-shadow: 0 1px 2px rgba(20, 36, 28, 0.04), 0 14px 34px -22px rgba(20, 36, 28, 0.28);
+  --ui-shadow-md: 0 4px 12px -2px rgba(20, 36, 28, 0.08), 0 14px 30px -18px rgba(20, 36, 28, 0.24);
+  --ui-shadow-lg: 0 16px 40px -16px rgba(20, 36, 28, 0.28), 0 2px 6px rgba(20, 36, 28, 0.06);
+  --ui-shadow-xl: 0 26px 60px -20px rgba(20, 36, 28, 0.34), 0 2px 6px rgba(20, 36, 28, 0.08);
 
   /* === Focus ring === */
-  --ui-ring: 109 31 191;
+  --ui-ring: 168 72 28;
 
   /* === Spacing scale (logical) === */
   --ui-space-1: 4px;
@@ -119,11 +131,11 @@
   /* === Typography === */
   --ui-text-xs: 0.6875rem;
   --ui-text-sm: 0.8125rem;
-  --ui-text-base: 0.9375rem;
-  --ui-text-lg: 1.125rem;
-  --ui-text-xl: 1.3125rem;
+  --ui-text-base: 0.875rem;
+  --ui-text-lg: 1rem;
+  --ui-text-xl: 1.25rem;
   --ui-text-2xl: 1.625rem;
-  --ui-text-3xl: 2rem;
+  --ui-text-3xl: 2.125rem;
 
   /* === Z-index scale === */
   --ui-z-sidebar: 50;
@@ -134,58 +146,161 @@
   --ui-z-command: 100;
 
   /* === Motion === */
-  --ui-duration-fast: 120ms;
-  --ui-duration-normal: 200ms;
-  --ui-duration-slow: 300ms;
-  --ui-ease: cubic-bezier(0.4, 0, 0.2, 1);
+  --ui-duration-fast: 140ms;
+  --ui-duration-normal: 220ms;
+  --ui-duration-slow: 340ms;
+  --ui-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+:root[data-accent='cobalt'] {
+  --ui-primary: 39 71 196;
+  --ui-primary-hover: 32 59 166;
+  --ui-primary-active: 26 48 138;
+  --ui-primary-soft: 235 240 253;
+  --ui-primary-fg: 255 255 255;
+  --ui-accent: 59 91 219;
+  --ui-ring: 59 91 219;
+  --premier-refresh-pine: #3b5bdb;
+}
+
+:root[data-accent='ocean'] {
+  --ui-primary: 22 98 122;
+  --ui-primary-hover: 18 82 103;
+  --ui-primary-active: 14 67 84;
+  --ui-primary-soft: 231 244 248;
+  --ui-primary-fg: 255 255 255;
+  --ui-accent: 31 127 153;
+  --ui-ring: 31 127 153;
+  --premier-refresh-pine: #1f7f99;
+}
+
+:root[data-accent='pine'] {
+  --ui-primary: 23 112 75;
+  --ui-primary-hover: 19 94 63;
+  --ui-primary-active: 15 76 51;
+  --ui-primary-soft: 232 246 239;
+  --ui-primary-fg: 255 255 255;
+  --ui-accent: 31 138 92;
+  --ui-ring: 31 138 92;
+  --premier-refresh-pine: #1f8a5c;
+}
+
+:root[data-accent='graphite'] {
+  --ui-primary: 44 44 51;
+  --ui-primary-hover: 31 31 37;
+  --ui-primary-active: 20 20 25;
+  --ui-primary-soft: 238 238 242;
+  --ui-primary-fg: 255 255 255;
+  --ui-accent: 80 80 92;
+  --ui-ring: 80 80 92;
+  --premier-refresh-pine: #50505c;
 }
 
 .dark {
-  /* Charcoal dark mode: avoids crushed black while keeping clear hierarchy. */
-  --ui-surface: 24 27 33;
-  --ui-surface-raised: 32 36 44;
-  --ui-page: 17 19 24;
-  --ui-page-alt: 21 24 32;
+  /* Premier Dark Forest-Charcoal mode */
+  --ui-surface: 23 29 26;
+  --ui-surface-raised: 36 44 40;
+  --ui-page: 15 20 18;
+  --ui-page-alt: 28 35 31;
 
-  /* Separation tuned for charcoal rather than pure black. */
-  --ui-border: 55 60 72;
-  --ui-border-strong: 78 85 101;
+  --ui-border: 40 48 44;
+  --ui-border-strong: 62 72 66;
 
-  /* High-contrast typography without harsh pure-white glare. */
-  --ui-text: 248 250 252;
-  --ui-muted: 235 240 246;
-  --ui-subtle: 211 223 236;
+  --ui-text: 236 242 238;
+  --ui-muted: 168 180 173;
+  --ui-subtle: 136 148 141;
 
-  /* Accent is intentionally brighter in dark mode for prices/actions. */
-  --ui-accent: var(--brand-400);
-  --ui-primary-soft: 23 37 84;
-  --ui-success-soft: 5 46 34;
-  --ui-warning-soft: 73 38 7;
-  --ui-danger-soft: 69 20 20;
-  --ui-info-soft: 19 42 91;
-  --ui-ring: 147 197 253;
+  --ui-primary: 255 167 122;
+  --ui-primary-hover: 255 184 148;
+  --ui-primary-active: 245 148 100;
+  --ui-primary-fg: 43 15 3;
+  --ui-primary-soft: 58 34 23;
+  --ui-accent: 255 167 122;
 
-  --ui-shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.75), 0 0 0 1px rgba(255, 255, 255, 0.03);
-  --ui-shadow: 0 3px 12px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.04);
-  --ui-shadow-md: 0 8px 22px rgba(0, 0, 0, 0.68), 0 0 0 1px rgba(255, 255, 255, 0.05);
-  --ui-shadow-lg: 0 14px 36px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.05);
-  --ui-shadow-xl: 0 24px 52px rgba(0, 0, 0, 0.78), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --premier-refresh-pine: #ffa77a;
+  --premier-refresh-ochre: #f2c056;
+  --premier-refresh-teal: #4fcab8;
+  --premier-refresh-sky: #7eacf2;
+  --premier-refresh-rose: #f2828f;
+  --premier-refresh-sage: #b4d66a;
+  --premier-refresh-glow-a: color-mix(in srgb, var(--premier-refresh-pine) 10%, #141c18);
+  --premier-refresh-glow-b: #1e1915;
+
+  --ui-success: 111 211 142;
+  --ui-success-soft: 21 51 35;
+  --ui-warning: 242 192 86;
+  --ui-warning-soft: 59 45 18;
+  --ui-danger: 245 140 127;
+  --ui-danger-soft: 64 26 24;
+  --ui-info: 126 172 242;
+  --ui-info-soft: 24 41 69;
+  --ui-ring: 255 167 122;
+
+  --ui-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.03);
+  --ui-shadow: 0 14px 34px -18px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(255, 255, 255, 0.04);
+  --ui-shadow-md: 0 14px 32px -12px rgba(0, 0, 0, 0.72), 0 0 0 1px rgba(255, 255, 255, 0.05);
+  --ui-shadow-lg: 0 22px 48px -16px rgba(0, 0, 0, 0.76), 0 0 0 1px rgba(255, 255, 255, 0.06);
+  --ui-shadow-xl: 0 30px 64px -18px rgba(0, 0, 0, 0.82), 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.dark[data-accent='cobalt'] {
+  --ui-primary: 155 177 255;
+  --ui-primary-hover: 179 196 255;
+  --ui-primary-fg: 15 24 61;
+  --ui-primary-soft: 29 41 87;
+  --ui-accent: 155 177 255;
+  --ui-ring: 155 177 255;
+  --premier-refresh-pine: #9bb1ff;
+}
+
+.dark[data-accent='ocean'] {
+  --ui-primary: 127 208 230;
+  --ui-primary-hover: 158 221 238;
+  --ui-primary-fg: 10 38 48;
+  --ui-primary-soft: 21 53 64;
+  --ui-accent: 127 208 230;
+  --ui-ring: 127 208 230;
+  --premier-refresh-pine: #7fd0e6;
+}
+
+.dark[data-accent='pine'] {
+  --ui-primary: 111 214 161;
+  --ui-primary-hover: 143 226 183;
+  --ui-primary-fg: 9 43 25;
+  --ui-primary-soft: 19 56 38;
+  --ui-accent: 111 214 161;
+  --ui-ring: 111 214 161;
+  --premier-refresh-pine: #6fd6a1;
+}
+
+.dark[data-accent='graphite'] {
+  --ui-primary: 228 228 234;
+  --ui-primary-hover: 242 242 246;
+  --ui-primary-fg: 22 22 26;
+  --ui-primary-soft: 48 48 54;
+  --ui-accent: 228 228 234;
+  --ui-ring: 228 228 234;
+  --premier-refresh-pine: #e4e4ea;
 }
 
 @layer base {
   html {
-    font-family: 'Inter', 'Cairo', system-ui, -apple-system, sans-serif;
-    font-feature-settings: 'cv02', 'cv03', 'cv04', 'cv11';
-    letter-spacing: -0.011em;
+    font-family: 'Urbanist', 'Cairo', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+    letter-spacing: -0.008em;
   }
 
   html[dir='rtl'] {
-    font-family: 'Cairo', 'Inter', system-ui, -apple-system, sans-serif;
+    font-family: 'Cairo', 'Urbanist', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
     letter-spacing: 0;
   }
 
   body {
     @apply bg-ui-page text-ui-text antialiased;
+    font-variant-numeric: tabular-nums;
+    background-image:
+      radial-gradient(65% 48% at 8% -4%, var(--premier-refresh-glow-a), transparent 72%),
+      radial-gradient(52% 42% at 96% -6%, var(--premier-refresh-glow-b), transparent 70%);
+    background-attachment: fixed;
   }
 
   * {
@@ -524,18 +639,21 @@
 }
 
 /*
- * Premier backoffice design foundation.
- * Inspired by the supplied light administrative UI references, but uses
- * Premier branding, navigation, authorization and existing business logic.
+ * Premier Design System + Premier backoffice foundation.
+ * Warm organic surfaces, floating glass header & rail, pill controls, and tabular numbers.
  */
-.premier-backoffice [data-testid='app-sidebar'] {
-  --ui-muted: 45 46 54;
+.premier-backoffice {
+  background-color: rgb(var(--ui-page));
+  background-image:
+    radial-gradient(65% 48% at 8% -4%, var(--premier-refresh-glow-a), transparent 72%),
+    radial-gradient(52% 42% at 96% -6%, var(--premier-refresh-glow-b), transparent 70%);
 }
-/* Honor dark semantic text tokens: the backoffice sidebar must not inherit
-   its light-mode muted ink when the user chooses a dark appearance. */
+.premier-backoffice [data-testid='app-sidebar'] {
+  --ui-muted: 86 97 90;
+}
 .dark .premier-backoffice [data-testid='app-sidebar'] {
-  --ui-muted: 235 240 246;
-  --ui-subtle: 211 223 236;
+  --ui-muted: 168 180 173;
+  --ui-subtle: 136 148 141;
 }
 .dark .premier-backoffice [data-testid='app-main'] {
   color: rgb(var(--ui-text));
@@ -561,34 +679,37 @@
 }
 .premier-backoffice [data-testid='app-main'] [data-testid='data-table'] {
   border: 1px solid rgb(var(--ui-border));
-  border-radius: 12px;
+  border-radius: 22px;
   background: rgb(var(--ui-surface));
-  box-shadow: 0 5px 20px rgba(30, 26, 45, 0.06);
+  box-shadow: var(--ui-shadow);
   overflow: hidden;
 }
 .premier-backoffice [data-testid='data-table-toolbar'] {
   margin-bottom: 0;
-  padding: 14px 16px;
+  padding: 14px 18px;
   border-bottom: 1px solid rgb(var(--ui-border));
 }
 .premier-backoffice [data-testid='data-table'] thead {
-  background: rgb(var(--ui-surface));
+  background: rgb(var(--ui-page-alt));
 }
 .premier-backoffice [data-testid='data-table'] th {
-  font-size: 0.8125rem;
+  font-size: 0.75rem;
   font-weight: 700;
-  color: rgb(var(--ui-text));
-  padding-block: 1rem;
+  color: rgb(var(--ui-muted));
+  padding-block: 0.875rem;
 }
 .premier-backoffice [data-testid='data-table'] td {
-  font-size: 0.8125rem;
-  padding-block: 1rem;
+  font-size: 0.84375rem;
+  padding-block: 0.925rem;
 }
 .premier-backoffice [data-testid='data-table'] tr {
   border-bottom: 1px solid rgb(var(--ui-border));
 }
+.premier-backoffice [data-testid='data-table'] tbody tr {
+  transition: background-color var(--ui-duration-fast) var(--ui-ease);
+}
 .premier-backoffice [data-testid='data-table'] tbody tr:hover {
-  background: rgb(var(--ui-page-alt) / 0.75);
+  background: rgb(var(--ui-page-alt) / 0.85);
 }
 .premier-backoffice [data-testid='data-table'] input[type='checkbox'] {
   accent-color: rgb(var(--ui-primary));
@@ -596,6 +717,50 @@
 .premier-backoffice .ui-accent-card,
 .premier-backoffice .ui-accent-top {
   background: rgb(var(--ui-surface));
+}
+
+/* === Premier Shared Surface & Component Classes === */
+.premier-refresh-brand-mark {
+  background: radial-gradient(circle at 30% 25%, color-mix(in srgb, var(--premier-refresh-pine) 70%, #fff), rgb(var(--ui-primary)) 70%);
+  color: rgb(var(--ui-primary-fg));
+  box-shadow: 0 8px 20px -8px rgb(var(--ui-primary) / 0.45);
+}
+.premier-refresh-topbar-glass {
+  background: rgb(var(--ui-surface) / 0.86);
+  backdrop-filter: saturate(1.4) blur(14px);
+  -webkit-backdrop-filter: saturate(1.4) blur(14px);
+}
+.premier-refresh-card {
+  background: rgb(var(--ui-surface));
+  border: 1px solid rgb(var(--ui-border));
+  border-radius: 22px;
+  box-shadow: var(--ui-shadow);
+}
+.premier-refresh-subcard {
+  background: rgb(var(--ui-page-alt));
+  border: 1px solid rgb(var(--ui-border));
+  border-radius: 20px;
+  transition: transform var(--ui-duration-fast) var(--ui-ease), border-color var(--ui-duration-fast) var(--ui-ease), box-shadow var(--ui-duration-fast) var(--ui-ease);
+}
+.premier-refresh-subcard:hover {
+  border-color: rgb(var(--ui-border-strong));
+  box-shadow: var(--ui-shadow);
+  transform: translateY(-1px);
+}
+.premier-refresh-pill-track {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border-radius: 999px;
+  background: rgb(var(--ui-page-alt));
+  border: 1px solid rgb(var(--ui-border));
+}
+.premier-refresh-drawer {
+  border-radius: 26px;
+  background: rgb(var(--ui-surface));
+  border: 1px solid rgb(var(--ui-border));
+  box-shadow: var(--ui-shadow-xl);
 }
 @media print {
   .premier-backoffice [data-testid='app-sidebar'],

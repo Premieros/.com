@@ -96,32 +96,32 @@ export function LoginPage() {
 
   return (
     <DesignSurface testId="login-surface" className="h-[100dvh] overflow-hidden !space-y-0">
-      <div className="relative h-[100dvh] overflow-hidden bg-[#090517] text-white" dir={isAr ? 'rtl' : 'ltr'}>
+      <div className="relative h-[100dvh] overflow-hidden bg-[#0f1412] text-[#ecf2ee]" dir={isAr ? 'rtl' : 'ltr'}>
         <AntigravityLoginHero isAr={isAr} />
 
-        <header className="absolute inset-x-0 top-0 z-20 flex items-center justify-between gap-3 border-b border-white/10 bg-[#0d071b]/60 px-4 py-3 backdrop-blur-xl sm:px-9 sm:py-5">
-          <Logo variant="horizontal" size={48} tone="white" showTagline={false} />
+        <header className="absolute inset-x-3 top-3 z-20 flex items-center justify-between gap-3 rounded-[26px] border border-white/10 bg-[#171d1a]/75 px-4 py-2.5 backdrop-blur-xl sm:inset-x-6 sm:px-6 sm:py-3">
+          <Logo variant="horizontal" size={44} tone="white" showTagline={false} />
           <div className="flex items-center gap-2">
             <button data-testid="login-language-toggle" type="button" onClick={() => setLang(isAr ? 'en' : 'ar')}
-              className="rounded-full border border-white/20 bg-white/5 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-white/15">
+              className="rounded-full border border-white/20 bg-white/5 px-4 py-2 text-xs font-bold text-white transition hover:bg-white/15">
               {isAr ? 'English' : 'العربية'}
             </button>
             <button data-testid="login-open-modal" type="button" ref={triggerRef} onClick={() => setOpen(true)}
-              className="rounded-full bg-[#8054F6] px-5 py-2.5 text-xs font-extrabold text-white shadow-lg shadow-violet-800/40 transition hover:bg-[#946fff]">
+              className="rounded-full bg-[#a8481c] px-5 py-2.5 text-xs font-bold text-[#fff7f2] shadow-lg shadow-[#a8481c]/30 transition hover:bg-[#b9531f]">
               {t('signIn')}
             </button>
           </div>
         </header>
 
         {open && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#05020d]/75 px-4 py-4 backdrop-blur-lg" onMouseDown={(event) => {
+          <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-[#0b0f0d]/75 px-4 py-4 backdrop-blur-lg" onMouseDown={(event) => {
             if (event.target === event.currentTarget && !loading) setOpen(false);
           }}>
             <div ref={dialogRef} role="dialog" aria-modal="true" aria-labelledby="premier-login-title"
               data-testid="login-modal"
-              className="relative my-auto w-full max-w-[455px] rounded-[30px] border border-white/15 bg-[#140d28]/95 p-5 text-white shadow-[0_30px_100px_rgba(0,0,0,.65)] sm:p-7">
+              className="relative my-auto w-full max-w-[430px] rounded-[30px] border border-white/15 bg-[#171d1a]/95 p-6 text-[#ecf2ee] shadow-[0_30px_100px_rgba(0,0,0,.65)] sm:p-7">
               <div className="mb-5 flex items-start justify-between gap-3">
-                <Logo variant="horizontal" size={48} tone="white" showTagline={false} />
+                <Logo variant="horizontal" size={44} tone="white" showTagline={false} />
                 <button type="button" aria-label={isAr ? 'إغلاق نافذة الدخول' : 'Close sign in dialog'}
                   onClick={() => !loading && setOpen(false)} disabled={loading}
                   className="rounded-full border border-white/15 bg-white/10 p-2 text-white hover:bg-white/20 disabled:opacity-50">
@@ -129,19 +129,19 @@ export function LoginPage() {
                 </button>
               </div>
               <div className="mb-4">
-                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-violet-500/15 px-3 py-1.5 text-[11px] font-bold text-violet-200">
+                <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-[#ffa77a]/15 px-3 py-1 text-[11px] font-bold text-[#ffa77a]">
                   <ShieldCheck className="h-4 w-4" />{isAr ? 'بوابة دخول Premier الآمنة' : 'Premier secure sign-in'}
                 </div>
-                <h2 id="premier-login-title" className="text-3xl font-black">{isAr ? 'مرحبًا بعودتك' : 'Welcome back'}</h2>
-                <p className="mt-1 text-sm text-slate-300">{isAr ? 'سجّل دخولك إلى نظام Premier' : 'Sign in to Premier'}</p>
+                <h2 id="premier-login-title" className="text-2xl font-bold tracking-tight">{isAr ? 'مرحبًا بعودتك' : 'Welcome back'}</h2>
+                <p className="mt-1 text-sm text-[#a8b4ad]">{isAr ? 'سجّل دخولك إلى نظام Premier' : 'Sign in to Premier'}</p>
               </div>
-              <div data-testid="login-mode-toggle" className="mb-4 grid grid-cols-2 gap-1 rounded-2xl bg-white/10 p-1">
+              <div data-testid="login-mode-toggle" className="mb-4 grid grid-cols-2 gap-1 rounded-full bg-white/10 p-1">
                 <button type="button" onClick={() => setMode('pin')}
-                  className={'rounded-xl px-2 py-3 text-sm font-bold transition ' + (mode === 'pin' ? 'bg-white text-[#221339]' : 'text-slate-200 hover:bg-white/10')}>
+                  className={'rounded-full px-2 py-2.5 text-sm font-semibold transition ' + (mode === 'pin' ? 'bg-white text-[#18201b]' : 'text-[#a8b4ad] hover:text-white')}>
                   {t('loginWithPin')}
                 </button>
                 <button type="button" onClick={() => setMode('password')}
-                  className={'rounded-xl px-2 py-3 text-sm font-bold transition ' + (mode === 'password' ? 'bg-white text-[#221339]' : 'text-slate-200 hover:bg-white/10')}>
+                  className={'rounded-full px-2 py-2.5 text-sm font-semibold transition ' + (mode === 'password' ? 'bg-white text-[#18201b]' : 'text-[#a8b4ad] hover:text-white')}>
                   {t('loginWithEmail')}
                 </button>
               </div>
@@ -164,7 +164,7 @@ export function LoginPage() {
                   </>
                 )}
                 <Button data-testid="login-submit" type="submit" size="lg"
-                  className="!mt-4 !min-h-14 w-full !rounded-2xl !bg-[#8054F6] !text-base !font-bold !text-white shadow-lg shadow-violet-900/30"
+                  className="!mt-4 !min-h-14 w-full !rounded-full !bg-[#a8481c] hover:!bg-[#b9531f] !text-base !font-bold !text-[#fff7f2] shadow-lg shadow-[#a8481c]/30"
                   disabled={loading}>
                   {loading ? <Loader2 className="h-5 w-5 animate-spin" /> :
                     <span className="inline-flex items-center gap-2">{t('signIn')}
@@ -173,12 +173,12 @@ export function LoginPage() {
                 </Button>
               </form>
               <button type="button" onClick={() => setMode(mode === 'pin' ? 'password' : 'pin')}
-                className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-2xl border border-white/15 bg-white/5 px-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10">
-                <LockKeyhole className="h-4 w-4 text-violet-300" />
+                className="mt-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 text-sm font-semibold text-slate-100 transition hover:bg-white/10">
+                <LockKeyhole className="h-4 w-4 text-[#ffa77a]" />
                 {mode === 'pin' ? (isAr ? 'الدخول بالبريد الإلكتروني' : 'Sign in with email') : (isAr ? 'الدخول برمز الموظف' : 'Sign in with staff PIN')}
               </button>
               <Link data-testid="login-register-link" to={APP_ROUTES.register}
-                className="mt-4 flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-violet-300/30 bg-violet-500/10 px-3 text-center text-sm font-bold text-violet-100 transition hover:bg-violet-500/20">
+                className="mt-3 flex min-h-12 items-center justify-center gap-2 rounded-full border border-[#ffa77a]/30 bg-[#a8481c]/15 px-3 text-center text-sm font-bold text-[#ffd4be] transition hover:bg-[#a8481c]/25">
                 {isAr ? 'أنشئ مؤسستك الآن — 14 يومًا مجانًا' : 'Create your business — 14 days free'}
                 {isAr ? <ArrowLeft className="h-4 w-4" /> : <ArrowRight className="h-4 w-4" />}
               </Link>

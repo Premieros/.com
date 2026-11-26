@@ -1,7 +1,7 @@
 import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { CustomerSupportInbox } from '@/features/support/CustomerSupportInbox';
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, Edit2, Trash2 } from 'lucide-react';
+import { Plus, Edit2, Trash2, Users, UserCheck, QrCode, Wallet, MapPin, Mail, Phone, LayoutGrid, List, X } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -11,13 +11,15 @@ import { DesignSearch } from '@/components/design/DesignSearch';
 import { DesignPanel } from '@/components/design/DesignPanel';
 import { DesignPagination } from '@/components/design/DesignPagination';
 import { DataTable, type Column } from '@/components/DataTable';
+import { StatCard } from '@/components/PageHeader';
+import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { Input, Select, Textarea } from '@/components/Input';
 import { Modal } from '@/components/Modal';
 import { BranchBadge } from '@/components/BranchBadge';
 import { BusinessAttributesFields } from '@/features/shared/BusinessAttributesFields';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
-import { formatCurrency } from '@/lib/format';
+import { formatCurrency, formatNumber } from '@/lib/format';
 import { importFromExcel } from '@/lib/excel';
 import { logAudit } from '@/lib/audit';
 import { useBranchFilter } from '@/lib/useBranchFilter';
@@ -33,6 +35,27 @@ import type { QrCustomerHistory } from '@/features/qr/service';
 
 type CustomerViewRow = Customer & { qrHistory?: QrCustomerHistory };
 const isQrGuest = (row: CustomerViewRow) => Boolean(row.qrHistory);
+
+const AVATAR_TONES = [
+  'bg-[#dce7f7] text-[#284b7e] dark:bg-[#1e314a] dark:text-[#a8c7f5]',
+  'bg-[#d8eee7] text-[#1c6254] dark:bg-[#193b34] dark:text-[#86d8c5]',
+  'bg-[#f4e2ec] text-[#7a3153] dark:bg-[#462133] dark:text-[#f2a8c8]',
+  'bg-[#f5ead4] text-[#7c5316] dark:bg-[#463417] dark:text-[#f2c879]',
+  'bg-[#e2ecd6] text-[#3c611e] dark:bg-[#273a18] dark:text-[#b4d66a]',
+];
+
+function customerInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return 'C';
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
+}
+
+function avatarTone(seed: string): string {
+  let hash = 0;
+  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) | 0;
+  return AVATAR_TONES[Math.abs(hash) % AVATAR_TONES.length];
+}
 
 /** View adapters only: never persist a QR guest as a CRM customer automatically. */
 const toQrCustomerRow = (guest: QrCustomerHistory): CustomerViewRow => ({
@@ -76,6 +99,8 @@ export function CustomersPage() {
   const [qrLoading, setQrLoading] = useState(false);
   const [qrLoadError, setQrLoadError] = useState('');
   const [selectedQrGuest, setSelectedQrGuest] = useState<QrCustomerHistory | null>(null);
+  const [selectedCustomer, setSelectedCustomer] = useState<CustomerViewRow | null>(null);
+  const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Customer | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
@@ -213,10 +238,22 @@ export function CustomersPage() {
     )},
   ];
 
+  const registeredCount = useMemo(() => allRows.filter((row) => !isQrGuest(row)).length, [allRows]);
+  const qrCount = useMemo(() => allRows.filter((row) => isQrGuest(row)).length, [allRows]);
+  const outstandingRows = useMemo(() => allRows.filter((row) => !isQrGuest(row) && balanceFor(row) > 0), [allRows, openBalances]);
+  const totalOpenBalance = useMemo(
+    () => outstandingRows.reduce((sum, row) => sum + balanceFor(row), 0),
+    [outstandingRows, openBalances],
+  );
+  const ar = lang === 'ar';
+
   return (
     <DesignSurface testId="customers-page">
       {record.id && <RecordFocus onClear={record.clear} />}
-      <DesignPageHeader title={customerLabel} actions={
+      <DesignPageHeader
+        title={customerLabel}
+        subtitle={ar ? 'العملاء المسجلون وضيوف QR والأرصدة المفتوحة' : 'Registered accounts, QR shoppers and open balances'}
+        actions={
         <>
           {can('customers.manage') && branchFilter && (
             <Button variant="outline" size="sm" aria-pressed={supportOpen} onClick={() => setSupportOpen((open) => !open)}>
@@ -230,35 +267,180 @@ export function CustomersPage() {
           )}
         </>
       } />
+
+      {!supportOpen && (
+        <section className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+          <StatCard
+            title={ar ? 'إجمالي العملاء' : 'Total customers'}
+            value={formatNumber(allRows.length, 0)}
+            icon={<Users className="h-4 w-4" />}
+            color="brand"
+            trend={ar ? `${registeredCount} مسجل` : `${registeredCount} registered`}
+          />
+          <StatCard
+            title={ar ? 'الحسابات المسجلة' : 'Registered accounts'}
+            value={formatNumber(registeredCount, 0)}
+            icon={<UserCheck className="h-4 w-4" />}
+            color="green"
+          />
+          <StatCard
+            title={ar ? 'ضيوف QR' : 'QR guests'}
+            value={formatNumber(qrCount, 0)}
+            icon={<QrCode className="h-4 w-4" />}
+            color="blue"
+          />
+          <StatCard
+            title={ar ? 'أرصدة مستحقة' : 'On account, unpaid'}
+            value={formatCurrency(totalOpenBalance, currency, lang)}
+            icon={<Wallet className="h-4 w-4" />}
+            color="amber"
+            trend={outstandingRows.length > 0 ? (ar ? `${outstandingRows.length} حساب` : `${outstandingRows.length} open`) : undefined}
+          />
+        </section>
+      )}
+
       {supportOpen && can('customers.manage') && branchFilter ? (
         <DesignPanel testId="customers-support-panel">
           <CustomerSupportInbox key={branchFilter} branchId={branchFilter} />
         </DesignPanel>
-      ) : <DesignPanel testId="customers-table-panel" bodyClassName="p-2 sm:p-3">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-ui-border pb-3">
-          <div className="flex max-w-full gap-4 overflow-x-auto" role="tablist" aria-label={lang === 'ar' ? 'عرض العملاء' : 'Customer views'}>
+      ) : <DesignPanel testId="customers-table-panel" bodyClassName="p-4 sm:p-5">
+        <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex max-w-full flex-wrap items-center gap-2" role="tablist" aria-label={ar ? 'عرض العملاء' : 'Customer views'}>
             {([
-              { key: 'all', ar: 'الكل', en: 'All' },
-              { key: 'registered', ar: 'المسجلون', en: 'Registered' },
-              { key: 'qr', ar: 'عملاء QR', en: 'QR guests' },
-              { key: 'outstanding', ar: 'أرصدة مستحقة', en: 'Outstanding' },
-            ] as const).map((tab) => (
-              <button type="button" role="tab" key={tab.key}
-                aria-selected={customerView === tab.key}
-                onClick={() => setCustomerView(tab.key)}
-                className={`shrink-0 border-b-2 px-1 py-2 text-sm font-semibold transition-colors ${customerView === tab.key ? 'border-ui-primary text-ui-text' : 'border-transparent text-ui-muted hover:text-ui-text'}`}>
-                {tab[lang]}
-              </button>
-            ))}
+              { key: 'all', ar: 'الكل', en: 'All customers', count: allRows.length },
+              { key: 'registered', ar: 'المسجلون', en: 'Registered', count: registeredCount },
+              { key: 'qr', ar: 'عملاء QR', en: 'QR guests', count: qrCount },
+              { key: 'outstanding', ar: 'أرصدة مستحقة', en: 'Outstanding', count: outstandingRows.length },
+            ] as const).map((tab) => {
+              const active = customerView === tab.key;
+              return (
+                <button
+                  type="button"
+                  role="tab"
+                  key={tab.key}
+                  aria-selected={active}
+                  onClick={() => setCustomerView(tab.key)}
+                  className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-4 py-1.5 text-[13px] font-semibold transition-all ${
+                    active
+                      ? 'border-ui-text bg-ui-text text-ui-surface shadow-ui-sm'
+                      : 'border-ui-border bg-ui-surface text-ui-muted hover:border-ui-border-strong hover:text-ui-text'
+                  }`}
+                >
+                  <span>{tab[lang]}</span>
+                  <span className={`tabular-nums text-[11px] ${active ? 'opacity-75' : 'text-ui-subtle'}`}>{tab.count}</span>
+                </button>
+              );
+            })}
           </div>
-          <DesignSearch value={search} onChange={setSearch}
-            placeholder={lang === 'ar' ? 'بحث بالاسم أو الهاتف' : 'Search name or phone'}
-            label={t('search')} testId="customers-search" className="w-full sm:w-64" />
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+            <DesignSearch value={search} onChange={setSearch}
+              placeholder={ar ? 'بحث بالاسم أو الهاتف…' : 'Name, phone or city…'}
+              label={t('search')} testId="customers-search" className="w-full sm:w-64" />
+            <div className="inline-flex items-center gap-1 rounded-full border border-ui-border bg-ui-page-alt p-1" role="group" aria-label={ar ? 'طريقة العرض' : 'View mode'}>
+              <button
+                type="button"
+                onClick={() => setViewMode('cards')}
+                aria-pressed={viewMode === 'cards'}
+                title={ar ? 'عرض البطاقات' : 'Cards view'}
+                className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'cards' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                aria-pressed={viewMode === 'list'}
+                title={ar ? 'عرض الجدول' : 'List view'}
+                className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'list' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
         </div>
-        {qrLoading && <p role="status" className="mb-2 text-xs text-ui-muted">{lang === 'ar' ? 'جارٍ تحميل عملاء QR...' : 'Loading QR customers...'}</p>}
+        {qrLoading && <p role="status" className="mb-2 text-xs text-ui-muted">{ar ? 'جارٍ تحميل عملاء QR...' : 'Loading QR customers...'}</p>}
         {qrLoadError && <p role="alert" className="mb-2 text-xs text-ui-danger">
-          {lang === 'ar' ? 'تعذر تحميل عملاء QR؛ تظهر سجلات العملاء المسجلين فقط. ' : 'Could not load QR customers; showing registered customers only. '}{qrLoadError}
+          {ar ? 'تعذر تحميل عملاء QR؛ تظهر سجلات العملاء المسجلين فقط. ' : 'Could not load QR customers; showing registered customers only. '}{qrLoadError}
         </p>}
+        {viewMode === 'cards' ? (
+          loading ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} className="h-48 animate-pulse rounded-[20px] border border-ui-border bg-ui-page-alt" />
+              ))}
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="rounded-[20px] border border-dashed border-ui-border bg-ui-page-alt/60 py-14 text-center text-sm text-ui-muted">
+              {t('noData')}
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {filtered.map((c) => {
+                const qrGuest = isQrGuest(c);
+                const balance = qrGuest ? 0 : balanceFor(c);
+                const branchName = branches.find((b) => b.id === c.branch_id)?.name || '—';
+                return (
+                  <div
+                    key={c.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => {
+                      if (c.qrHistory) setSelectedQrGuest(c.qrHistory);
+                      else setSelectedCustomer(c);
+                    }}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        if (c.qrHistory) setSelectedQrGuest(c.qrHistory);
+                        else setSelectedCustomer(c);
+                      }
+                    }}
+                    className="premier-refresh-subcard group cursor-pointer p-4 text-start focus-visible:outline-2 focus-visible:outline-ui-primary"
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-sm font-bold ${avatarTone(c.id || c.name)}`}>
+                        {customerInitials(c.name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate text-[15px] font-semibold text-ui-text group-hover:text-ui-primary">{c.name}</h3>
+                        <p className="truncate text-xs text-ui-muted">{c.phone || c.name_en || c.email || '—'}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center gap-1.5 text-xs text-ui-muted">
+                      <MapPin className="h-3.5 w-3.5 shrink-0 text-ui-subtle" />
+                      <span className="truncate">{c.address || branchName}</span>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                      <Badge variant={qrGuest ? 'info' : 'success'} size="sm">
+                        {qrGuest ? 'QR' : (ar ? 'مسجل' : 'Registered')}
+                      </Badge>
+                      {!qrGuest && balance > 0 && (
+                        <Badge variant="warning" size="sm">
+                          {ar ? 'رصيد مستحق' : 'Unpaid'}
+                        </Badge>
+                      )}
+                    </div>
+
+                    <div className="mt-3.5 grid grid-cols-2 gap-3 border-t border-ui-border pt-3">
+                      <div>
+                        <p className="text-[11px] font-medium text-ui-subtle">{qrGuest ? (ar ? 'مشتريات QR' : 'QR purchases') : (ar ? 'الرصيد المستحق' : 'Open balance')}</p>
+                        <p className={`mt-0.5 text-sm font-bold tabular-nums ${balance > 0 ? 'text-ui-danger' : 'text-ui-text'}`}>
+                          {qrGuest ? formatNumber(c.qrHistory?.purchase_count || 0, 0) : formatCurrency(balance, currency, lang)}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium text-ui-subtle">{t('branch')}</p>
+                        <p className="mt-0.5 truncate text-sm font-semibold text-ui-text">{branchName}</p>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )
+        ) : (
         <DataTable
           tableId="customers"
           columns={columns}
@@ -267,7 +449,7 @@ export function CustomersPage() {
           emptyMessage={t('noData')}
           onRowClick={(row) => {
             if (row.qrHistory) setSelectedQrGuest(row.qrHistory);
-            else if (can('customers.manage')) openEdit(row);
+            else setSelectedCustomer(row);
           }}
           enableExport={can('customers.export')}
           enableTemplate={can('customers.manage')}
@@ -286,8 +468,122 @@ export function CustomersPage() {
           }}
           templateFilename="customers-template"
         />
+        )}
         <DesignPagination loaded={allRows.length} total={total + qrGuests.length} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
       </DesignPanel>}
+
+      {selectedCustomer && (
+        <div className="fixed inset-0 z-[75] flex justify-end p-2.5 sm:p-3.5" dir={ar ? 'rtl' : 'ltr'}>
+          <div className="absolute inset-0 bg-ui-text/30 backdrop-blur-sm" onClick={() => setSelectedCustomer(null)} aria-hidden="true" />
+          <aside
+            role="dialog"
+            aria-modal="true"
+            aria-label={selectedCustomer.name}
+            className="premier-refresh-drawer relative z-10 flex h-full w-full max-w-[480px] flex-col overflow-hidden"
+          >
+            <div className="flex items-start justify-between gap-3 border-b border-ui-border px-6 py-5">
+              <div className="flex min-w-0 items-center gap-3.5">
+                <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-base font-bold ${avatarTone(selectedCustomer.id || selectedCustomer.name)}`}>
+                  {customerInitials(selectedCustomer.name)}
+                </div>
+                <div className="min-w-0">
+                  <h2 className="truncate text-lg font-bold text-ui-text">{selectedCustomer.name}</h2>
+                  <p className="truncate text-xs text-ui-muted">
+                    {selectedCustomer.name_en ? `${selectedCustomer.name_en} · ` : ''}
+                    {branches.find((b) => b.id === selectedCustomer.branch_id)?.name || '—'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSelectedCustomer(null)}
+                aria-label={ar ? 'إغلاق' : 'Close'}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-ui-border bg-ui-page-alt text-ui-muted hover:text-ui-text"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
+              <div className="flex flex-wrap gap-2">
+                <Badge variant="success">{ar ? 'عميل مسجل' : 'Registered account'}</Badge>
+                {balanceFor(selectedCustomer) > 0 && <Badge variant="warning">{ar ? 'رصيد مستحق' : 'Unpaid balance'}</Badge>}
+              </div>
+
+              <div className="grid gap-2.5 sm:grid-cols-2">
+                <div className="rounded-[16px] border border-ui-border bg-ui-page-alt p-3.5 sm:col-span-2">
+                  <div className="flex items-center gap-2 text-xs text-ui-muted">
+                    <Mail className="h-3.5 w-3.5 text-ui-primary" />
+                    <span>{t('emailField')}</span>
+                  </div>
+                  <p className="mt-1 truncate text-sm font-semibold text-ui-text">{selectedCustomer.email || '—'}</p>
+                </div>
+                <div className="rounded-[16px] border border-ui-border bg-ui-page-alt p-3.5">
+                  <div className="flex items-center gap-2 text-xs text-ui-muted">
+                    <Phone className="h-3.5 w-3.5 text-ui-primary" />
+                    <span>{t('phone')}</span>
+                  </div>
+                  <p dir="auto" className="mt-1 truncate text-sm font-semibold text-ui-text tabular-nums">{selectedCustomer.phone || '—'}</p>
+                </div>
+                <div className="rounded-[16px] border border-ui-border bg-ui-page-alt p-3.5">
+                  <div className="flex items-center gap-2 text-xs text-ui-muted">
+                    <MapPin className="h-3.5 w-3.5 text-ui-primary" />
+                    <span>{t('address')}</span>
+                  </div>
+                  <p className="mt-1 truncate text-sm font-semibold text-ui-text">{selectedCustomer.address || '—'}</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
+                  <p className="text-xs text-ui-muted">{ar ? 'الرصيد المستحق' : 'Open balance'}</p>
+                  <p className={`mt-1 text-xl font-bold tabular-nums ${balanceFor(selectedCustomer) > 0 ? 'text-ui-danger' : 'text-ui-text'}`}>
+                    {formatCurrency(balanceFor(selectedCustomer), currency, lang)}
+                  </p>
+                </div>
+                <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
+                  <p className="text-xs text-ui-muted">{ar ? 'الرقم الضريبي' : 'Tax number'}</p>
+                  <p className="mt-1 truncate text-base font-bold text-ui-text tabular-nums">{selectedCustomer.tax_number || '—'}</p>
+                </div>
+              </div>
+
+              {selectedCustomer.notes && (
+                <div className="rounded-[16px] border border-ui-border bg-ui-page-alt p-3.5">
+                  <p className="text-xs font-semibold text-ui-muted">{t('notes')}</p>
+                  <p className="mt-1 text-sm text-ui-text">{selectedCustomer.notes}</p>
+                </div>
+              )}
+            </div>
+
+            {can('customers.manage') && (
+              <div className="flex items-center gap-2.5 border-t border-ui-border bg-ui-surface px-6 py-4">
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    const target = selectedCustomer;
+                    setSelectedCustomer(null);
+                    openEdit(target);
+                  }}
+                >
+                  <Edit2 className="h-4 w-4" />
+                  <span>{t('edit')}</span>
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    const id = selectedCustomer.id;
+                    setSelectedCustomer(null);
+                    setDeleteId(id);
+                  }}
+                >
+                  <Trash2 className="h-4 w-4 text-ui-danger" />
+                  <span>{t('delete')}</span>
+                </Button>
+              </div>
+            )}
+          </aside>
+        </div>
+      )}
       <Modal open={!!selectedQrGuest} onClose={() => setSelectedQrGuest(null)}
         title={lang === 'ar' ? 'تفاصيل عميل QR' : 'QR customer details'} size="lg">
         {selectedQrGuest && (

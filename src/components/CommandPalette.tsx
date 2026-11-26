@@ -118,7 +118,7 @@ export function CommandPalette() {
 
   return (
     <div data-testid="command-palette-overlay" className="fixed inset-0 z-[100] bg-black/35 p-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-[max(0.5rem,env(safe-area-inset-top))] backdrop-blur-sm sm:p-4" dir={ar ? 'rtl' : 'ltr'} onMouseDown={() => setOpen(false)}>
-      <div data-testid="command-palette-panel" className="mx-auto flex h-[min(88dvh,720px)] max-w-2xl flex-col overflow-hidden rounded-2xl border border-ui-border bg-ui-surface shadow-2xl sm:mt-[10vh] sm:h-auto" onMouseDown={(event) => event.stopPropagation()}>
+      <div data-testid="command-palette-panel" className="mx-auto flex h-[min(88dvh,720px)] max-w-2xl flex-col overflow-hidden rounded-[26px] border border-ui-border bg-ui-surface shadow-ui-xl sm:mt-[10vh] sm:h-auto" onMouseDown={(event) => event.stopPropagation()}>
         <div className="flex items-center gap-2 border-b border-ui-border px-4">
           <Search className="h-5 w-5 text-ui-muted" />
           <input
@@ -183,13 +183,13 @@ export function CommandPaletteTrigger() {
     <button
       type="button"
       onClick={() => window.dispatchEvent(new Event(OPEN_COMMAND_PALETTE_EVENT))}
-      className="flex h-9 shrink-0 items-center gap-1 rounded-xl border border-ui-border bg-ui-surface px-2.5 text-xs font-semibold text-ui-muted transition hover:bg-ui-page-alt hover:text-ui-text"
+      className="flex h-9 shrink-0 items-center gap-1.5 rounded-full border border-ui-border bg-ui-page-alt px-3 text-xs font-semibold text-ui-muted transition hover:border-ui-border-strong hover:bg-ui-surface-raised hover:text-ui-text"
       aria-label={ar ? 'فتح البحث السريع' : 'Open command search'}
       title={ar ? 'بحث سريع (Ctrl+K)' : 'Quick search (Ctrl+K)'}
     >
-      <Search className="h-4 w-4" />
+      <Search className="h-3.5 w-3.5" />
       <span className="hidden xl:inline">{ar ? 'بحث' : 'Search'}</span>
-      <kbd className="hidden rounded border border-ui-border bg-ui-page-alt px-1.5 py-0.5 text-[10px] text-ui-subtle 2xl:inline">Ctrl K</kbd>
+      <kbd className="hidden rounded-full border border-ui-border bg-ui-surface px-1.5 py-0.5 text-[10px] font-semibold text-ui-subtle 2xl:inline">⌘K</kbd>
     </button>
   );
 }

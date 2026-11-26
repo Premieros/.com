@@ -219,7 +219,7 @@ export function ReportsShowcase({
               <Tooltip formatter={(value: number) => money(Number(value))} />
               {showComparison && <Legend />}
               <Area type="monotone" dataKey="value" name={isAr ? 'الفترة الحالية' : 'Current period'}
-                stroke="#7c3aed" fill="#a78bfa" fillOpacity={0.18} strokeWidth={2} isAnimationActive={false} />
+                stroke="#a8481c" fill="#b9531f" fillOpacity={0.18} strokeWidth={2.2} isAnimationActive={false} />
               {showComparison && <Area type="monotone" dataKey="previous" name={isAr ? 'الفترة السابقة' : 'Previous period'}
                 stroke="rgb(var(--ui-muted))" strokeDasharray="5 4" fill="none" isAnimationActive={false} />}
             </AreaChart>
@@ -229,7 +229,7 @@ export function ReportsShowcase({
               <XAxis dataKey="name" tick={{ fontSize: 9 }} />
               <YAxis tick={{ fontSize: 9 }} width={45} />
               <Tooltip formatter={(value: number) => money(Number(value))} />
-              <Bar dataKey="value" fill="#8b5cf6" radius={[4, 4, 0, 0]} isAnimationActive={false} />
+              <Bar dataKey="value" fill="#a8481c" radius={[6, 6, 0, 0]} isAnimationActive={false} />
             </BarChart>
           )}
         </ResponsiveContainer>
@@ -254,22 +254,22 @@ export function ReportsShowcase({
   ];
 
   return (
-    <section data-testid="reports-visual-overview" className="space-y-3">
-      <div className="rounded-xl border border-[#d9ddec] bg-white p-3 shadow-sm dark:border-ui-border dark:bg-ui-surface" data-testid="reports-performance-summary">
-        <h2 className="mb-3 flex items-center gap-2 text-base font-black text-ui-text"><BarChart3 className="h-5 w-5 text-violet-600" />{isAr ? 'ملخص الأداء' : 'Performance summary'}</h2>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 2xl:grid-cols-6">
+    <section data-testid="reports-visual-overview" className="space-y-4">
+      <div className="rounded-[22px] border border-ui-border bg-ui-surface p-4 shadow-ui sm:p-5" data-testid="reports-performance-summary">
+        <h2 className="mb-3.5 flex items-center gap-2 text-base font-bold text-ui-text"><BarChart3 className="h-5 w-5 text-ui-primary" />{isAr ? 'ملخص الأداء' : 'Performance summary'}</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-6">
           {summaryCards.map((card) => {
             const target = card.id === 'orders' ? 'orders' : card.id === 'sales' ? 'time' : null;
             const available = target && panels.some((panel) => panel.id === target);
             const content = <>
-              <span className="block text-xs font-bold text-ui-text">{isAr ? card.ar : card.en}</span>
-              <span className="mt-2 block break-words text-lg font-black tabular-nums text-ui-text">
+              <span className="block text-xs font-semibold text-ui-muted">{isAr ? card.ar : card.en}</span>
+              <span className="mt-2 block break-words text-lg font-bold tabular-nums text-ui-text">
                 {card.value ?? (loading ? (isAr ? 'جارٍ التحميل' : 'Loading') : (isAr ? 'غير متاح' : 'Unavailable'))}
               </span>
             </>;
-            const classes = `min-w-0 rounded-xl bg-gradient-to-br p-3 ${card.tone}`;
+            const classes = `min-w-0 rounded-[18px] border border-ui-border bg-ui-page-alt p-3.5 transition`;
             return available ? (
-              <button type="button" key={card.id} className={`${classes} text-start hover:ring-1 hover:ring-ui-primary focus-visible:ring-2 focus-visible:ring-ui-ring aria-pressed:ring-2 aria-pressed:ring-ui-primary`}
+              <button type="button" key={card.id} className={`${classes} text-start hover:border-ui-primary/50 focus-visible:ring-2 focus-visible:ring-ui-ring aria-pressed:border-ui-primary aria-pressed:ring-2 aria-pressed:ring-ui-primary/25`}
                 data-testid={`overview-kpi-${card.id}`} aria-pressed={activePanel?.id === target}
                 onClick={() => setFocusedPanel(activePanel?.id === target ? null : target)}>
                 {content}
@@ -277,63 +277,63 @@ export function ReportsShowcase({
             ) : <div key={card.id} className={classes} data-testid={`overview-kpi-${card.id}`}>{content}</div>;
           })}
         </div>
-        {!comparableIncome && <p className="mt-2 text-xs text-ui-muted">{accountingNotice}</p>}
+        {!comparableIncome && <p className="mt-2.5 text-xs text-ui-muted">{accountingNotice}</p>}
       </div>
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="inline-flex items-center gap-2 text-base font-black text-ui-text sm:text-lg">
+        <h2 className="inline-flex items-center gap-2 text-base font-bold text-ui-text sm:text-lg">
           <BarChart3 className="h-5 w-5 text-ui-primary" />
           {isAr ? 'التحليلات والتقارير' : 'Analytics and reports'}
         </h2>
         <button type="button" data-testid="load-overview-charts" onClick={() => void load()}
           disabled={!canReadSnapshot || !hasAuthorizedBranches || loading}
-          className="inline-flex items-center gap-2 rounded-lg bg-ui-primary px-3 py-2 text-xs font-bold text-ui-primary-fg disabled:opacity-50">
+          className="inline-flex items-center gap-2 rounded-full bg-ui-primary px-4 py-2 text-xs font-semibold text-ui-primary-fg shadow-ui-sm transition hover:bg-ui-primary-hover disabled:opacity-50">
           <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           {loading ? (isAr ? 'جارٍ التحميل...' : 'Loading...') : (isAr ? 'عرض / تحديث الرسوم' : 'Load / refresh charts')}
         </button>
       </div>
-      {current && !commonCurrency && <p role="status" className="rounded-lg border border-amber-300/60 bg-amber-50 px-3 py-2 text-xs text-amber-900 dark:bg-ui-surface dark:text-ui-text">
+      {current && !commonCurrency && <p role="status" className="rounded-[18px] border border-ui-warning/30 bg-ui-warning-soft px-4 py-2.5 text-xs text-ui-warning">
         {isAr ? 'تعذّر جمع المبالغ: بعض الفروع المختارة لا تستخدم العملة نفسها أو لم تُحدّد عملتها. اختر فرعًا واحدًا أو صحّح عملات الفروع في الإعدادات؛ أعداد الطلبات والكميات متاحة.' : 'Amounts cannot be combined: selected branches use different or missing currencies. Select one branch or correct branch currency settings; counts and quantities remain available.'}
       </p>}
       {!canReadSnapshot && <p className="text-xs text-ui-muted">
         {isAr ? 'لا تملك صلاحية عرض ملخص المبيعات. اطلب من مدير النظام منحك صلاحية التقارير أو لوحة المبيعات للفروع المطلوبة.' : 'You do not have permission to view the sales overview. Ask your administrator for reporting or sales dashboard access to the needed branches.'}
       </p>}
-      {error && <p role="alert" className="rounded-lg border border-ui-danger/30 bg-ui-danger-soft p-3 text-xs text-ui-danger">{error}</p>}
+      {error && <p role="alert" className="rounded-[18px] border border-ui-danger/30 bg-ui-danger-soft p-3 text-xs text-ui-danger">{error}</p>}
       <div role="group" aria-label={isAr ? 'اختيار التحليل' : 'Choose analysis'} className="flex flex-wrap gap-2">
         <button type="button" aria-pressed={!activePanel} onClick={() => setFocusedPanel(null)}
-          className="rounded-lg border border-ui-border px-3 py-2 text-xs font-bold aria-pressed:bg-ui-primary-soft">
+          className="rounded-full border border-ui-border bg-ui-surface px-3.5 py-1.5 text-xs font-semibold text-ui-muted transition aria-pressed:border-ui-text aria-pressed:bg-ui-text aria-pressed:text-ui-surface">
           {isAr ? 'كل التحليلات' : 'All analyses'}
         </button>
         {panels.map((panel) => (
           <button type="button" key={panel.id} aria-pressed={activePanel?.id === panel.id} onClick={() => setFocusedPanel(panel.id)}
-            className="rounded-lg border border-ui-border px-3 py-2 text-xs font-bold aria-pressed:bg-ui-primary-soft">
+            className="rounded-full border border-ui-border bg-ui-surface px-3.5 py-1.5 text-xs font-semibold text-ui-muted transition aria-pressed:border-ui-text aria-pressed:bg-ui-text aria-pressed:text-ui-surface">
             {isAr ? panel.ar : panel.en}
           </button>
         ))}
       </div>
-      <div className={`grid gap-3 ${activePanel ? '' : 'md:grid-cols-2'}`}>
+      <div className={`grid gap-4 ${activePanel ? '' : 'md:grid-cols-2'}`}>
         {displayedPanels.map((panel) => {
           const Icon = panel.icon;
           return (
             <div key={panel.id} data-testid={`report-shortcut-${panel.id}`}
-              className="min-w-0 rounded-2xl border border-ui-border bg-ui-surface p-4 shadow-ui-sm">
+              className="min-w-0 rounded-[22px] border border-ui-border bg-ui-surface p-5 shadow-ui">
               <div className="flex items-center justify-between gap-2">
-                <h3 className="inline-flex min-w-0 items-center gap-2 text-sm font-black text-ui-text">
+                <h3 className="inline-flex min-w-0 items-center gap-2 text-sm font-bold text-ui-text">
                   <Icon className="h-5 w-5 shrink-0 text-ui-primary" />
                   {isAr ? panel.ar : panel.en}
                 </h3>
                 {panel.id === 'time' && can('history.unlimited') && (
                   <button type="button" aria-pressed={showComparison} onClick={() => setCompare((value) => !value)}
-                    className="ms-auto rounded-lg border border-ui-border px-3 py-2 text-xs font-bold aria-pressed:bg-ui-primary-soft">
+                    className="ms-auto rounded-full border border-ui-border px-3 py-1.5 text-xs font-semibold aria-pressed:border-ui-primary aria-pressed:bg-ui-primary-soft aria-pressed:text-ui-primary">
                     {isAr ? 'مقارنة بالفترة السابقة' : 'Compare previous period'}
                   </button>
                 )}
                 <button type="button" aria-label={isAr ? 'تحديد نوع التقرير من هذه اللوحة' : 'Select this report type'}
                   onClick={() => onSelectReport(panel.report)}
-                  className="shrink-0 rounded-lg p-2 text-ui-primary hover:bg-ui-primary-soft">
+                  className="shrink-0 rounded-full p-2 text-ui-primary hover:bg-ui-primary-soft">
                   <Check className="h-4 w-4" />
                 </button>
               </div>
-              <div className="mt-4 min-h-44 rounded-xl bg-ui-page-alt/40 py-2">
+              <div className="mt-4 min-h-44 rounded-[16px] bg-ui-page-alt/60 py-2">
                 {chart(panel.id)}
               </div>
               {current && <p className="mt-2 inline-flex items-center gap-1 text-[11px] text-ui-muted">

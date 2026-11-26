@@ -1,7 +1,7 @@
 import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import type { CreateProductInput } from '@/api/domains/catalog';
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { Plus, Edit2, Trash2, Download, Upload, Barcode as BarcodeIcon, QrCode, Move, SlidersHorizontal } from 'lucide-react';
+import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
+import { Plus, Edit2, Trash2, Download, Upload, Barcode as BarcodeIcon, QrCode, Move, SlidersHorizontal, Package, CheckCircle2, Layers, Tag, LayoutGrid, List } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -11,6 +11,8 @@ import { DesignSearch } from '@/components/design/DesignSearch';
 import { DesignPanel } from '@/components/design/DesignPanel';
 import { DesignPagination } from '@/components/design/DesignPagination';
 import { DataTable, type Column } from '@/components/DataTable';
+import { StatCard } from '@/components/PageHeader';
+import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { Input, Select, Textarea } from '@/components/Input';
 import { Modal } from '@/components/Modal';
@@ -84,6 +86,8 @@ export function ProductsPage() {
   const [ingredientsModalOpen, setIngredientsModalOpen] = useState(false);
   const [editSection, setEditSection] = useState<'basic' | 'components' | 'units'>('basic');
   const [catalogToolsOpen, setCatalogToolsOpen] = useState(false);
+  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
+  const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [editing, setEditing] = useState<Product | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [barcodeModal, setBarcodeModal] = useState<Product | null>(null);
@@ -622,12 +626,183 @@ export function ProductsPage() {
     {!manufacturedInventoryUnits.length && <p className="text-xs text-ui-muted">{lang === 'ar' ? 'لا توجد مصنّعات نشطة متاحة للفرع الحالي.' : 'No active manufactured groups available for this branch.'}</p>}
   </div>;
 
+  const displayedProducts = useMemo(
+    () => categoryFilter === 'all' ? filtered : filtered.filter((p) => (p.category_id || 'uncategorized') === categoryFilter),
+    [filtered, categoryFilter],
+  );
+  const activeCount = useMemo(() => filtered.filter((p) => p.is_active).length, [filtered]);
+  const manufacturedCount = useMemo(() => filtered.filter((p) => p.product_type === 'manufactured').length, [filtered]);
+
   return (
     <DesignSurface testId="products-page">
       {record.id && <RecordFocus onClear={record.clear} />}
-      <DesignPageHeader title={itemLabel} actions={<>{can('products.import') && <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} data-testid="products-import" />}{can('products.import') && <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} data-testid="products-import-button"><Upload className="w-4 h-4" /> {t('importExcel')}</Button>}{can('products.export') && <Button variant="outline" size="sm" onClick={handleExport} data-testid="products-export"><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}<Button variant="outline" size="sm" onClick={() => setCatalogToolsOpen(true)} data-testid="products-tools"><SlidersHorizontal className="w-4 h-4" /> {lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'}</Button>{can('products.create') && <Button size="sm" onClick={openAdd} data-testid="products-add"><Plus className="w-4 h-4" /> {t('add')}</Button>}</>} />
-      <DesignPanel testId="products-search-panel"><DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="products-search" /></DesignPanel>
-      <DesignPanel testId="products-table-panel"><DataTable columns={columns} data={filtered} loading={loading} emptyMessage={t('noData')} onRowClick={can('products.edit') ? openEdit : undefined} /><DesignPagination loaded={products.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} /></DesignPanel>
+      <DesignPageHeader
+        title={itemLabel}
+        subtitle={lang === 'ar' ? 'إدارة الأصناف والأسعار والتصنيفات والمكونات' : 'Manage finished goods, pricing, categories and compositions'}
+        actions={<>{can('products.import') && <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} data-testid="products-import" />}{can('products.import') && <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} data-testid="products-import-button"><Upload className="w-4 h-4" /> {t('importExcel')}</Button>}{can('products.export') && <Button variant="outline" size="sm" onClick={handleExport} data-testid="products-export"><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}<Button variant="outline" size="sm" onClick={() => setCatalogToolsOpen(true)} data-testid="products-tools"><SlidersHorizontal className="w-4 h-4" /> {lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'}</Button>{can('products.create') && <Button size="sm" onClick={openAdd} data-testid="products-add"><Plus className="w-4 h-4" /> {t('add')}</Button>}</>}
+      />
+      <section className="grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+        <StatCard
+          title={lang === 'ar' ? 'الأصناف المعروضة' : 'Catalog SKUs'}
+          value={formatNumber(filtered.length, 0)}
+          icon={<Package className="h-4 w-4" />}
+          color="brand"
+          trend={lang === 'ar' ? `${categories.length} تصنيف` : `${categories.length} categories`}
+        />
+        <StatCard
+          title={lang === 'ar' ? 'الأصناف النشطة' : 'Active items'}
+          value={formatNumber(activeCount, 0)}
+          icon={<CheckCircle2 className="h-4 w-4" />}
+          color="green"
+        />
+        <StatCard
+          title={lang === 'ar' ? 'أصناف بمكونات' : 'With components'}
+          value={formatNumber(manufacturedCount, 0)}
+          icon={<Layers className="h-4 w-4" />}
+          color="blue"
+        />
+        <StatCard
+          title={lang === 'ar' ? 'التصنيفات' : 'Categories'}
+          value={formatNumber(categories.length, 0)}
+          icon={<Tag className="h-4 w-4" />}
+          color="amber"
+        />
+      </section>
+      <DesignPanel testId="products-search-panel" bodyClassName="p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="flex max-w-full flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setCategoryFilter('all')}
+              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-all ${categoryFilter === 'all' ? 'border-ui-text bg-ui-text text-ui-surface shadow-ui-sm' : 'border-ui-border bg-ui-surface text-ui-muted hover:border-ui-border-strong hover:text-ui-text'}`}
+            >
+              <span>{lang === 'ar' ? 'الكل' : 'All'}</span>
+              <span className="text-[11px] opacity-75 tabular-nums">{filtered.length}</span>
+            </button>
+            {categories.map((cat) => {
+              const active = categoryFilter === cat.id;
+              return (
+                <button
+                  key={cat.id}
+                  type="button"
+                  onClick={() => setCategoryFilter(cat.id)}
+                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-all ${active ? 'border-ui-text bg-ui-text text-ui-surface shadow-ui-sm' : 'border-ui-border bg-ui-surface text-ui-muted hover:border-ui-border-strong hover:text-ui-text'}`}
+                >
+                  <span>{cat.name}</span>
+                </button>
+              );
+            })}
+          </div>
+          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
+            <DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="products-search" className="w-full sm:w-64" />
+            <div className="inline-flex items-center gap-1 rounded-full border border-ui-border bg-ui-page-alt p-1" role="group" aria-label={lang === 'ar' ? 'طريقة العرض' : 'View mode'}>
+              <button
+                type="button"
+                onClick={() => setViewMode('grid')}
+                aria-pressed={viewMode === 'grid'}
+                title={lang === 'ar' ? 'عرض الشبكة' : 'Grid view'}
+                className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'grid' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode('list')}
+                aria-pressed={viewMode === 'list'}
+                title={lang === 'ar' ? 'عرض الجدول' : 'List view'}
+                className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'list' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </DesignPanel>
+      <DesignPanel testId="products-table-panel" bodyClassName="p-4 sm:p-5">
+        {viewMode === 'grid' ? (
+          loading ? (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, idx) => (
+                <div key={idx} className="h-72 animate-pulse rounded-[20px] border border-ui-border bg-ui-page-alt" />
+              ))}
+            </div>
+          ) : displayedProducts.length === 0 ? (
+            <div className="rounded-[20px] border border-dashed border-ui-border bg-ui-page-alt/60 py-14 text-center text-sm text-ui-muted">
+              {t('noData')}
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+              {displayedProducts.map((p) => {
+                const cost = p.product_type === 'manufactured' ? (liveProductCosts[p.id] ?? p.cost_price) : p.cost_price;
+                const catName = productCategoryName(p);
+                return (
+                  <article
+                    key={p.id}
+                    onClick={can('products.edit') ? () => openEdit(p) : undefined}
+                    className={`premier-refresh-subcard group overflow-hidden p-4 ${can('products.edit') ? 'cursor-pointer' : ''}`}
+                  >
+                    <div className="relative mb-3.5 flex h-44 w-full items-center justify-center overflow-hidden rounded-[16px] bg-[#e9ede8] dark:bg-ui-surface">
+                      {p.image_url ? (
+                        <ProductImage
+                          src={p.image_url}
+                          name={p.name}
+                          category={catName}
+                          className="h-full w-full"
+                          imgClassName="h-full w-full object-cover"
+                          positionX={p.image_position_x}
+                          positionY={p.image_position_y}
+                          zoom={p.image_zoom}
+                        />
+                      ) : (
+                        <Package className="h-10 w-10 text-ui-subtle/60" />
+                      )}
+                      <div className="absolute start-2.5 top-2.5 flex flex-wrap gap-1.5">
+                        <Badge variant={p.is_active ? 'success' : 'default'} size="sm">
+                          {p.is_active ? t('active') : t('inactive')}
+                        </Badge>
+                        {p.product_type === 'manufactured' && (
+                          <Badge variant="primary" size="sm">
+                            {lang === 'ar' ? 'بمكونات' : 'Composed'}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <h3 className="truncate text-[15px] font-semibold text-ui-text group-hover:text-ui-primary">{p.name}</h3>
+                        <p className="mt-0.5 truncate text-xs text-ui-muted">{[p.sku || p.barcode, branchLabel(p.branch_id)].filter(Boolean).join(' · ') || '—'}</p>
+                      </div>
+                      {catName && <Badge variant="info" size="sm" className="shrink-0">{catName}</Badge>}
+                    </div>
+
+                    <div className="mt-3.5 grid grid-cols-2 gap-3 border-t border-ui-border pt-3">
+                      <div>
+                        <p className="text-[11px] font-medium text-ui-subtle">{t('salePrice')}</p>
+                        <p className="mt-0.5 text-base font-bold text-ui-primary tabular-nums">{formatCurrency(p.sale_price, currency, lang)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[11px] font-medium text-ui-subtle">{t('costPrice')}</p>
+                        <p className="mt-0.5 text-sm font-semibold text-ui-text tabular-nums">{formatCurrency(cost, currency, lang)}</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-end gap-1 border-t border-ui-border pt-2.5" onClick={(e) => e.stopPropagation()}>
+                      <button type="button" onClick={() => showBarcode(p)} className="ui-icon-action" title={t('barcode')}><BarcodeIcon className="h-4 w-4" /></button>
+                      <button type="button" onClick={() => showQR(p)} className="ui-icon-action" title={t('generateQR')}><QrCode className="h-4 w-4" /></button>
+                      {can('products.edit') && <button type="button" onClick={() => openEdit(p)} className="ui-icon-action ui-icon-action-info" title={t('edit')}><Edit2 className="h-4 w-4" /></button>}
+                      {can('products.delete') && <button type="button" onClick={() => setDeleteId(p.id)} className="ui-icon-action ui-icon-action-danger" title={t('delete')}><Trash2 className="h-4 w-4" /></button>}
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+          )
+        ) : (
+          <DataTable columns={columns} data={displayedProducts} loading={loading} emptyMessage={t('noData')} onRowClick={can('products.edit') ? openEdit : undefined} />
+        )}
+        <DesignPagination loaded={products.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
+      </DesignPanel>
       <Modal open={quickModalOpen} onClose={() => setQuickModalOpen(false)}
         title={editing ? (lang === 'ar' ? 'تعديل المنتج' : 'Edit product') : (lang === 'ar' ? 'منتج جديد' : 'New product')} size="md">
         <div className="space-y-4" data-testid="product-quick-editor">

@@ -277,19 +277,19 @@ export function ApprovalInbox({ ar }: { ar: boolean }) {
             setApprovalOpen((v) => !v);
             setAlertsOpen(false);
           }}
-          className="relative rounded-xl p-2 text-ui-muted transition-colors hover:bg-ui-page-alt hover:text-ui-text"
+          className="relative flex h-9 w-9 items-center justify-center rounded-full border border-ui-border bg-ui-page-alt text-ui-muted transition-colors hover:border-ui-border-strong hover:text-ui-text"
           aria-label={ar ? 'طلبات الموافقة' : 'Approval requests'}
         >
-          <Bell className="h-5 w-5" />
+          <Bell className="h-4 w-4" />
           {items.length > 0 && (
-            <span data-testid="approval-inbox-count" className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ui-danger px-1 text-[9px] font-bold text-ui-primary-fg">
+            <span data-testid="approval-inbox-count" className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ui-danger px-1 text-[9px] font-bold text-white">
               {items.length}
             </span>
           )}
         </button>
 
         {approvalOpen && (
-          <div data-testid="approval-inbox-panel" className="absolute end-0 top-full z-[80] mt-2 w-[min(92vw,390px)] overflow-hidden rounded-xl border border-ui-border bg-ui-surface shadow-ui-lg">
+          <div data-testid="approval-inbox-panel" className="absolute end-0 top-full z-[80] mt-2 w-[min(92vw,390px)] overflow-hidden rounded-[22px] border border-ui-border bg-ui-surface shadow-ui-xl">
             <div className="border-b border-ui-border px-4 py-3">
               <p className="font-semibold text-ui-text">{ar ? 'طلبات الموافقة' : 'Approval requests'}</p>
               <p className="text-xs text-ui-muted">{ar ? 'الطلبات المعلقة التي تحتاج قرارًا' : 'Pending requests that need a decision'}</p>
@@ -347,19 +347,19 @@ export function ApprovalInbox({ ar }: { ar: boolean }) {
             setAlertsOpen((v) => !v);
             setApprovalOpen(false);
           }}
-          className="relative rounded-xl p-2 text-ui-muted transition-colors hover:bg-ui-page-alt hover:text-ui-text"
+          className="relative flex h-9 w-9 items-center justify-center rounded-full border border-ui-border bg-ui-page-alt text-ui-muted transition-colors hover:border-ui-border-strong hover:text-ui-text"
           aria-label={ar ? 'إشعارات النظام' : 'System notifications'}
         >
-          <AlertTriangle className="h-5 w-5" />
+          <AlertTriangle className="h-4 w-4" />
           {unreadVisibleAlertKeys.length > 0 && (
-            <span data-testid="system-alerts-count" className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ui-warning px-1 text-[9px] font-bold text-ui-primary-fg">
+            <span data-testid="system-alerts-count" className="absolute -end-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-ui-warning px-1 text-[9px] font-bold text-white">
               {unreadVisibleAlertKeys.length}
             </span>
           )}
         </button>
 
         {alertsOpen && (
-          <div data-testid="system-alerts-panel" className="absolute end-0 top-full z-[80] mt-2 w-[min(92vw,390px)] overflow-hidden rounded-xl border border-ui-border bg-ui-surface shadow-ui-lg">
+          <div data-testid="system-alerts-panel" className="absolute end-0 top-full z-[80] mt-2 w-[min(92vw,390px)] overflow-hidden rounded-[22px] border border-ui-border bg-ui-surface shadow-ui-xl">
             <div className="flex items-start justify-between gap-3 border-b border-ui-border px-4 py-3">
               <div>
                 <p className="font-semibold text-ui-text">{ar ? 'إشعارات النظام' : 'System notifications'}</p>

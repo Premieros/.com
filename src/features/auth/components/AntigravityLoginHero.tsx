@@ -77,7 +77,7 @@ export function AntigravityLoginHero({ isAr }: Props) {
                   ['--pixel-y' as string]: pixel.dy + 'px',
                 }} />
               ))}
-              <span className="premier-pixel-wordmark">premier<span style={{ color: '#8054F6' }}>.</span>os</span>
+              <span className="premier-pixel-wordmark">premier<span style={{ color: '#ffa77a' }}>.</span>os</span>
             </div>
             <div className="premier-showcase-panels">
               {showcase.map((screen, index) => (

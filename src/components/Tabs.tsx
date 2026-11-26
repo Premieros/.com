@@ -33,7 +33,7 @@ interface TabListProps {
 
 export function TabList({ children, className = '' }: TabListProps) {
   return (
-    <div role="tablist" className={`flex gap-1 border-b border-ui-border ${className}`}>
+    <div role="tablist" className={`inline-flex max-w-full flex-wrap gap-1 rounded-full border border-ui-border bg-ui-page-alt p-1 ${className}`}>
       {children}
     </div>
   );
@@ -55,12 +55,11 @@ export function TabTrigger({ value, children, className = '' }: TabTriggerProps)
       type="button"
       aria-selected={isActive}
       onClick={() => ctx.setActive(value)}
-      className={`relative whitespace-nowrap px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-ring ${
-        isActive ? 'text-ui-primary' : 'text-ui-muted hover:text-ui-text'
+      className={`relative whitespace-nowrap rounded-full px-4 py-1.5 text-[13px] font-semibold transition-all duration-150 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ui-ring ${
+        isActive ? 'bg-ui-text text-ui-surface shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'
       } ${className}`}
     >
       {children}
-      {isActive && <span className="absolute inset-x-0 bottom-0 h-0.5 rounded-full bg-ui-primary" />}
     </button>
   );
 }
