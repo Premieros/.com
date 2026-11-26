@@ -774,3 +774,48 @@ body:has(.bunker-customer[data-bunker-theme="light"]){background:#eee6d9!importa
 }
 .customer-cart-dock strong { margin-inline-start: auto; }
 .bunker-customer .customer-cart-dock { background: #ead3aa; color: #20160e; }
+
+/* The QR ordering workspace expands with the viewport. */
+.customer-order-menu .customer-product-image {
+  aspect-ratio: 4 / 3;
+}
+.customer-order-menu .customer-categories button {
+  scroll-margin-inline: 12px;
+}
+
+@media (min-width: 760px) {
+  .customer-app.customer-order-menu {
+    width: calc(100% - 48px);
+    max-width: 1120px;
+    padding: 24px 28px 36px;
+  }
+  .customer-order-menu .customer-header { margin-bottom: 12px; }
+  .customer-order-menu .customer-category-navigation { padding: 8px 0; }
+  .customer-order-menu .customer-products {
+    grid-template-columns: repeat(auto-fit, minmax(195px, 1fr));
+    gap: 16px;
+  }
+  .customer-order-menu .customer-product { max-width: 340px; }
+  .customer-order-menu .customer-product-image .customer-image-content {
+    max-width: 100%;
+    max-height: 100%;
+  }
+  .customer-order-menu .customer-bottom.customer-glass-nav {
+    position: sticky;
+    width: min(100%, 448px);
+    left: auto;
+    bottom: 12px;
+    transform: none;
+    margin: 18px auto 0;
+  }
+  .customer-order-menu .customer-cart-dock {
+    bottom: calc(100px + env(safe-area-inset-bottom));
+  }
+  .customer-order-menu .customer-detail-copy,
+  .customer-order-menu .customer-detail-image,
+  .customer-order-menu .customer-cart,
+  .customer-order-menu .customer-visit {
+    max-width: 680px;
+    margin-inline: auto;
+  }
+}

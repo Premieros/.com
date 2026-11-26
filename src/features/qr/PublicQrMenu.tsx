@@ -260,7 +260,7 @@ export function PublicQrMenu({ token, identity: initialIdentity, session, onClos
     setDetail(null); setReceipt('');
   }
   function changeQuantity(id: string, value: number) { setCart(c => ({ ...c, [id]: { ...c[id], quantity: Math.max(0, Math.min(99, Math.trunc(value) || 0)) } })); }
-  return <main dir={isBunker ? "ltr" : "rtl"} data-bunker-theme={isBunker ? bunkerMode : undefined} className={`customer-app${page === 'home' && count > 0 && !detail ? ' customer-has-cart-dock' : ''}${isBunker ? " bunker-customer" : ""}`}>
+  return <main dir={isBunker ? "ltr" : "rtl"} data-bunker-theme={isBunker ? bunkerMode : undefined} className={`customer-app customer-order-menu${page === 'home' && count > 0 && !detail ? ' customer-has-cart-dock' : ''}${isBunker ? " bunker-customer" : ""}`}>
     <CustomerSupportLink token={token} />
     {detail ? <>
       <header className="customer-detail-header"><button aria-label={isBunker ? "Back to menu" : "العودة للمنيو"} onClick={() => setDetail(null)}><ArrowRight size={22} /></button><h1>{isBunker ? "Item details" : "تفاصيل الصنف"}</h1><button aria-label={isBunker ? 'Add to favorites' : 'إضافة للمفضلة'} aria-pressed={favorites.includes(detail.id)} onClick={() => setFavorites(f => f.includes(detail.id) ? f.filter(id => id !== detail.id) : [...f, detail.id])}><Heart size={22} fill={favorites.includes(detail.id) ? '#ff8a35' : 'none'} /></button></header>
