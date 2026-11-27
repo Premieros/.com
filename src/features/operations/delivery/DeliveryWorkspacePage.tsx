@@ -106,7 +106,11 @@ function DeliveryWorkspace({ branch }: { branch: string }) {
         } else setError('تعذّر تحديث الطلب. تأكد من اختيار طيار أو خدمة نشطة ومن حالة الطلب.');
         return;
       }
-      setOrder(null); setNotice('تم تحديث حالة التوصيل.'); refresh();
+      setOrder(null);
+      setNotice(order.dispatch_status === 'delivered' && !history
+        ? 'تم تسجيل التسليم. لعرض الطلب مجددًا، فعّل «آخر 30 يومًا».'
+        : 'تم تحديث حالة التوصيل.');
+      refresh();
     } catch {
       setError('تعذّر تأكيد التحديث. حدّث القائمة قبل إعادة المحاولة.');
     } finally {
