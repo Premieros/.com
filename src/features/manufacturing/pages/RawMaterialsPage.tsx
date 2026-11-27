@@ -1,3 +1,4 @@
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useState } from 'react';
 import { Plus, Edit2, Boxes, Layers, Trash2 } from 'lucide-react';
@@ -47,11 +48,14 @@ export function RawMaterialsPage() {
   const branchFilter = useBranchFilter();
 
   const [tab, setTab] = useState<Tab>('materials');
+  const [search, setSearch] = useState('');
+  const searchTerm = useDebouncedValue(search, 250);
   const { rows: materials, loading: materialsLoading, error, total, hasMore, loadMore, loadingMore, refresh: reloadMaterials } = usePaginatedRows<RawMaterial>({
     table: 'raw_materials',
     select: '*',
     order: { column: 'name', ascending: true },
     branch_id: branchFilter,
+    search: { term: searchTerm, columns: ["name","code","category"] },
     pageSize: 100,
   });
   const [inventory, setInventory] = useState<RawMaterialInventory[]>([]);
@@ -59,7 +63,6 @@ export function RawMaterialsPage() {
   const [units, setUnits] = useState<Unit[]>([]);
   const [branches, setBranches] = useState<Branch[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
   const [stockBranch, setStockBranch] = useState(branchFilter || '');
 
   const [form, setForm] = useState<MaterialForm>(EMPTY_FORM);

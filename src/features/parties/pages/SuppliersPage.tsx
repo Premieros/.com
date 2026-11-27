@@ -1,3 +1,4 @@
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -46,6 +47,8 @@ export function SuppliersPage() {
   const { guidedContext, completePrerequisiteAndReturn } = useGuidedWorkflow();
   const canViewSuppliers = can('suppliers.view');
   const canViewStatement = can('purchases.view') || can('accounts.view');
+  const [search, setSearch] = useState('');
+  const searchTerm = useDebouncedValue(search, 250);
   const { rows: items, loading, total, hasMore, loadMore, loadingMore, refresh: reloadSuppliers, fetchAll: fetchAllSuppliers } = usePaginatedRows<Supplier>({
     table: 'suppliers',
     filters: record.id ? [{ column: 'id', value: record.id }] : undefined,
@@ -53,9 +56,9 @@ export function SuppliersPage() {
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
     enabled: canViewSuppliers,
+    search: { term: searchTerm, columns: ["name","phone"] },
     pageSize: 100,
   });
-  const [search, setSearch] = useState('');
   const [supplierView, setSupplierView] = useState<'all' | 'outstanding'>('all');
   const [sortBy, setSortBy] = useState<'recent' | 'name' | 'balance'>('recent');
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');

@@ -1,3 +1,4 @@
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { CustomerSupportInbox } from '@/features/support/CustomerSupportInbox';
@@ -96,6 +97,8 @@ export function CustomersPage() {
   const branchScope = useBranchScope();
   const { runtime } = useOrganizationModules();
   const customerLabel = runtime.terminology.customer[lang === 'ar' ? 'ar' : 'en'];
+  const [search, setSearch] = useState('');
+  const searchTerm = useDebouncedValue(search, 250);
   const { rows: items, loading, total, hasMore, loadMore, loadingMore, refresh: reloadCustomers, fetchAll: fetchAllCustomers } = usePaginatedRows<Customer>({
     table: 'customers',
     filters: record.id ? [{ column: 'id', value: record.id }] : undefined,
@@ -103,10 +106,10 @@ export function CustomersPage() {
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
     enabled: can('customers.view'),
+    search: { term: record.id ? '' : searchTerm, columns: ["name","phone"] },
     pageSize: 100,
   });
   const [supportOpen, setSupportOpen] = useState(false);
-  const [search, setSearch] = useState('');
   const [customerView, setCustomerView] = useState<'all' | 'registered' | 'qr' | 'outstanding'>('all');
   const [qrGuests, setQrGuests] = useState<QrCustomerHistory[]>([]);
   const [qrLoading, setQrLoading] = useState(false);

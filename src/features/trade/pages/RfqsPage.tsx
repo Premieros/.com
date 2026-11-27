@@ -1,3 +1,4 @@
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useState } from 'react';
 import { Plus, Trash2, Eye, Send, X, BadgeCheck, Scale, Check } from 'lucide-react';
@@ -62,19 +63,21 @@ export function RfqsPage() {
   const { branches } = useBranches();
   const { effectiveSettings } = useSettings();
   const currency = effectiveSettings(branchFilter)?.currency || 'EGP';
+  const [search, setSearch] = useState('');
+  const searchTerm = useDebouncedValue(search, 250);
   const { rows: items, loading, error, refresh } = usePaginatedRows<RfqRow>({
     table: 'rfqs',
     select: '*',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
     or: history.minIso ? `created_at.gte.${history.minIso},status.in.(draft,sent,received)` : undefined,
+    search: { term: searchTerm, columns: ["rfq_number"] },
     pageSize: 100,
   });
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
   const [requests, setRequests] = useState<PurchaseRequestRow[]>([]);
-  const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [quoteModal, setQuoteModal] = useState<RfqRow | null>(null);
   const [compareModal, setCompareModal] = useState<RfqRow | null>(null);
