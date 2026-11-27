@@ -409,8 +409,6 @@ export function resolveBusinessRuntime(
   const defaultRuntime = BUSINESS_RUNTIME_PROFILES[key];
 
   const capabilities = new Set(profile?.capabilities || preset.capabilities);
-  // Saved restaurant profiles can predate stock counts. Access still requires inventory and role permissions.
-  if (preset.key === 'restaurant') capabilities.add('stock_counts');
   const runtimeFields = profile?.runtime_fields || defaultRuntime.fields;
   const recordTypes = profile?.record_types || defaultRuntime.records;
 

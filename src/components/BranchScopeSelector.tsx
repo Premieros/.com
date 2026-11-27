@@ -25,15 +25,14 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
     });
     return () => { mounted = false; };
   }, [superAdmin]);
-  const orgBranches = scope.organizationBranches;
   const groups = useMemo(() => {
-    const grouped = new Map<string, typeof orgBranches>();
-    for (const branch of orgBranches) {
+    const grouped = new Map<string, typeof scope.organizationBranches>();
+    for (const branch of scope.organizationBranches) {
       const key = branch.organization_id || 'unassigned';
       grouped.set(key, [...(grouped.get(key) || []), branch]);
     }
     return [...grouped.entries()];
-  }, [orgBranches]);
+  }, [scope.organizationBranches]);
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -151,25 +150,25 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
   }
 
   return (
-    <div ref={ref} className="relative min-w-0">
+    <div ref={ref} className="relative">
       <button
         data-testid="branch-scope-indicator"
         type="button"
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        className={`flex w-full min-w-0 items-center gap-1.5 rounded-full border border-ui-border bg-ui-page-alt px-3 py-1.5 text-xs font-semibold text-ui-text transition hover:border-ui-border-strong hover:bg-ui-surface-raised ${
+        className={`flex items-center gap-2 rounded-xl border border-ui-border bg-ui-surface px-3 py-1.5 text-xs font-semibold text-ui-text transition hover:bg-ui-page-alt ${
           compact ? 'max-w-[210px]' : 'max-w-[260px]'
         }`}
       >
-        {scope.isAggregate ? <Layers3 className="h-3.5 w-3.5 shrink-0 text-ui-primary" /> : <Building2 className="h-3.5 w-3.5 shrink-0 text-ui-primary" />}
-        <span className="min-w-0 flex-1 truncate text-start">{label}</span>
+        {scope.isAggregate ? <Layers3 className="h-4 w-4 shrink-0 text-ui-primary" /> : <Building2 className="h-4 w-4 shrink-0 text-ui-primary" />}
+        <span className="truncate">{label}</span>
         <ChevronDown className={`h-3.5 w-3.5 shrink-0 text-ui-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
 
       {open && (
         <div
           data-testid="branch-scope-menu"
-          className="absolute end-0 top-full z-50 mt-2 w-[min(300px,calc(100vw-24px))] overflow-hidden rounded-[22px] border border-ui-border bg-ui-surface shadow-ui-xl"
+          className="absolute end-0 top-full z-50 mt-1.5 w-[min(300px,calc(100vw-24px))] overflow-hidden rounded-xl border border-ui-border bg-ui-surface shadow-ui-lg"
         >
           <div className="border-b border-ui-border p-2">
             <button
@@ -203,19 +202,20 @@ export function BranchScopeSelector({ compact = false, mobile = false }: Props) 
                 {branches.map((branch) => {
               const selected = scope.selectedBranchSet.has(branch.id);
               return (
-                <div key={branch.id} className="flex items-center gap-1">
-                  <input type="checkbox" className="ms-2 h-4 w-4 shrink-0" checked={selected}
-                    aria-label={ar ? `إدراج ${branch.name} في العرض المجمّع` : `Include ${branch.name} in combined view`}
-                    onChange={() => scope.toggleBranch(branch.id)} />
                 <button
+                  key={branch.id}
                   type="button"
                   data-testid={`branch-scope-option-${branch.id}`}
-                  onClick={() => { scope.selectOnlyBranch(branch.id); setOpen(false); }}
-                  className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2.5 py-1.5 text-start text-xs text-ui-text transition hover:bg-ui-page-alt"
+                  onClick={() => scope.toggleBranch(branch.id)}
+                  className="flex w-full items-center gap-3 rounded-lg px-2.5 py-1.5 text-start text-xs text-ui-text transition hover:bg-ui-page-alt"
                 >
+                  <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border ${
+                    selected ? 'border-ui-primary bg-ui-primary text-ui-primary-fg' : 'border-ui-border'
+                  }`}>
+                    {selected && <Check className="h-3.5 w-3.5" />}
+                  </span>
                   <span className="truncate font-bold">{lang === 'ar' ? branch.name : branch.name_en || branch.name}</span>
                 </button>
-                </div>
               );
                 })}
               </div>

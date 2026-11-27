@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Search, X, UtensilsCrossed, Banknote, Play, Trash2, ListOrdered, Car, Bike, User } from 'lucide-react';
+import { ScrollableCardStrip } from '@/components/ScrollableCardStrip';
 import { useLanguage } from '@/context/LanguageContext';
 import { formatCurrency } from '@/lib/format';
 import type { Customer, DiningTable, Order, OrderItem } from '@/lib/types';
@@ -122,25 +123,27 @@ export function ActiveOrdersDrawer({
         </div>
 
         <div className="px-3 py-2.5 space-y-2 border-b border-ui-border flex-shrink-0">
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-0.5">
-            {filterChips.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setCategory(c.id)}
-                className={`whitespace-nowrap flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
-                  category === c.id
-                    ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm'
-                    : 'bg-ui-page-alt text-ui-muted hover:bg-ui-page-alt'
-                }`}
-              >
-                {c.icon}
-                {c.label}
-                {counts[c.id] > 0 && category !== c.id && (
-                  <span className={`px-1 rounded-full text-[9px] ${category === c.id ? 'bg-ui-primary-fg/25' : 'bg-ui-border'}`}>{counts[c.id]}</span>
-                )}
-              </button>
-            ))}
-          </div>
+          <ScrollableCardStrip testId="active-orders-category-strip" className="pb-0.5">
+            <div className="flex items-center gap-1.5">
+              {filterChips.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setCategory(c.id)}
+                  className={`whitespace-nowrap flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold transition-all ${
+                    category === c.id
+                      ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm'
+                      : 'bg-ui-page-alt text-ui-muted hover:bg-ui-page-alt'
+                  }`}
+                >
+                  {c.icon}
+                  {c.label}
+                  {counts[c.id] > 0 && category !== c.id && (
+                    <span className={`px-1 rounded-full text-[9px] ${category === c.id ? 'bg-ui-primary-fg/25' : 'bg-ui-border'}`}>{counts[c.id]}</span>
+                  )}
+                </button>
+              ))}
+            </div>
+          </ScrollableCardStrip>
           <div className="relative">
             <Search className="absolute top-1/2 -translate-y-1/2 start-3 w-4 h-4 text-ui-subtle" />
             <input

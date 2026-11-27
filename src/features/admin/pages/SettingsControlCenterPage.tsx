@@ -1,8 +1,3 @@
-import { useBranchScope } from '@/lib/branchScope';
-import { WebsitePhotosSettings } from '@/features/qr/WebsitePhotosSettings';
-import { WebsiteTextSettings } from '@/features/qr/WebsiteTextSettings';
-import { WebsiteSocialSettings } from '@/features/qr/WebsiteSocialSettings';
-import { CustomerOrderSettings } from '@/features/qr/CustomerOrderSettings';
 import { useEffect, useState, useCallback } from 'react';
 import {
   Palette,
@@ -23,7 +18,7 @@ import {
   Landmark,
   Smartphone,
 } from 'lucide-react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import { supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useTheme } from '@/context/ThemeContext';
@@ -37,11 +32,9 @@ import { Input, Select, Textarea } from '@/components/Input';
 import { logAudit } from '@/lib/audit';
 import { findUiTheme, UI_THEMES } from '@/lib/themes';
 import type { BranchSettings } from '@/lib/types';
-import { useCan } from '@/lib/permissions';
-import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
 import { APP_ROUTES } from '@/core/navigation/routes';
 
-type SettingsTab = 'website_social' | 'customer_orders' | 'branch_profile' | 'tax' | 'business_day' | 'inventory' | 'payments' | 'branch_staff' | 'appearance' | 'language';
+type SettingsTab = 'branch_profile' | 'tax' | 'business_day' | 'inventory' | 'payments' | 'branch_staff' | 'appearance' | 'language';
 
 interface UserRow {
   id: string;
@@ -53,78 +46,26 @@ interface UserRow {
 
 export function SettingsControlCenterPage() {
   const { user } = useAuth();
-  const [searchParams] = useSearchParams();
   const { t, lang, setLang, languageLocked, lockLanguagePreference, unlockLanguagePreference } = useLanguage();
-  const { theme, setTheme, uiTheme, setUiTheme, accent, setAccent } = useTheme();
+  const { theme, setTheme, setUiTheme } = useTheme();
   const { settings, branchSettingsMap, saveBranchSettings } = useSettings();
   const { branches } = useBranches();
   const { show } = useToast();
-  const can = useCan();
-  const { canAccessPath } = useOrganizationModules();
   const isAr = lang === 'ar';
 
   const isSuperAdmin = user?.role === 'super_admin';
-  const canViewBranchStaff = isSuperAdmin || can('users.view');
-  const canOpenIntegrations = can('settings.manage') && canAccessPath(APP_ROUTES.integrations);
 
   const [active, setActive] = useState<SettingsTab>('branch_profile');
   const [saving, setSaving] = useState(false);
-  const [customerTheme, setCustomerTheme] = useState<'light' | 'dark'>('dark');
-  const [themeSaving, setThemeSaving] = useState(false);
-  const [themeMessage, setThemeMessage] = useState('');
-
 
   const myBranchId = user?.branch_id || (branches[0]?.id ?? '');
-  const { actionBranchId } = useBranchScope();
-  const [selectedBranchId, setSelectedBranchId] = useState('');
+  const [selectedBranchId, setSelectedBranchId] = useState<string>(myBranchId);
   const [branchForm, setBranchForm] = useState<Partial<BranchSettings>>({});
 
   const [branchStaff, setBranchStaff] = useState<UserRow[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
 
-  const targetBranchId = isSuperAdmin
-    ? branches.find(branch => branch.id === selectedBranchId)?.id
-      || branches.find(branch => branch.id === actionBranchId)?.id
-      || ''
-    : myBranchId;
-  useEffect(() => {
-    if (searchParams.get('section') !== 'website_social') return;
-    const requestedBranch = searchParams.get('website_branch');
-    if (requestedBranch && branches.some(branch => branch.id === requestedBranch) &&
-        (isSuperAdmin || requestedBranch === myBranchId)) setSelectedBranchId(requestedBranch);
-    setActive('website_social');
-  }, [searchParams, branches, isSuperAdmin, myBranchId]);
-  useEffect(() => {
-    let alive = true;
-    setThemeMessage('');
-    if (!targetBranchId) return;
-    void supabase.rpc('branch_website_theme_settings', { p_branch: targetBranchId })
-      .then(({ data, error }) => {
-        if (!alive) return;
-        if (error) setThemeMessage(isAr ? 'تعذر تحميل مظهر موقع الفرع' : 'Could not load branch website theme');
-        else if (data === 'dark' || data === 'light') setCustomerTheme(data);
-      });
-    return () => { alive = false; };
-  }, [targetBranchId, isAr]);
-
-  const publishBranchTheme = async (mode: 'light' | 'dark') => {
-    if (!targetBranchId) return;
-    setThemeSaving(true); setThemeMessage('');
-    const { error } = await supabase.rpc('branch_website_theme_save', { p_branch: targetBranchId, p_mode: mode });
-    setThemeSaving(false);
-    if (error) {
-      setThemeMessage(isAr ? 'تغير مظهر النظام على جهازك، لكن تعذر نشر المظهر لموقع الفرع: ' + error.message : 'App mode changed locally, but customer theme could not be published: ' + error.message);
-    } else {
-      setCustomerTheme(mode);
-      setThemeMessage(isAr ? 'تم تحديث مظهر النظام ونشر المظهر على موقع الفرع وصفحة الطلبات.' : 'App theme changed and branch customer theme published.');
-    }
-  };
-
-  const changeThemeMode = (mode: 'light' | 'dark') => {
-    setTheme(mode);
-    void publishBranchTheme(mode);
-  };
-
+  const targetBranchId = selectedBranchId || myBranchId;
   useEffect(() => {
     if (targetBranchId) {
       const row = branchSettingsMap[targetBranchId] || null;
@@ -137,11 +78,11 @@ export function SettingsControlCenterPage() {
         tax_enabled: row?.tax_enabled ?? null,
         currency: row?.currency ?? '',
         low_stock_threshold: row?.low_stock_threshold ?? null,
-        allow_negative_stock: row?.allow_negative_stock ?? undefined,
+        allow_negative_stock: row?.allow_negative_stock,
         business_day_mode: row?.business_day_mode ?? 'fixed_time',
-        business_day_start: row?.business_day_start ?? '10:00',
-        business_day_end: row?.business_day_end ?? '02:00',
-        auto_close_shift_at_day_end: row?.auto_close_shift_at_day_end ?? true,
+        business_day_start: row?.business_day_start ?? '00:00',
+        business_day_end: row?.business_day_end ?? '00:00',
+        auto_close_shift_at_day_end: row?.auto_close_shift_at_day_end ?? false,
         manual_transfer_enabled: row?.manual_transfer_enabled ?? false,
         instapay_handle: row?.instapay_handle ?? '',
         bank_transfer_details: row?.bank_transfer_details ?? '',
@@ -164,14 +105,14 @@ export function SettingsControlCenterPage() {
   }, [targetBranchId]);
 
   useEffect(() => {
-    if (active === 'branch_staff' && canViewBranchStaff) void loadBranchStaff();
-  }, [active, canViewBranchStaff, loadBranchStaff]);
+    if (active === 'branch_staff') void loadBranchStaff();
+  }, [active, loadBranchStaff]);
 
   const pickTheme = (key: string) => {
     const p = findUiTheme(key);
     if (!p) return;
     setUiTheme(key);
-    void publishBranchTheme(p.mode);
+    setTheme(p.mode);
   };
 
   const saveBranchSpecific = async () => {
@@ -188,7 +129,7 @@ export function SettingsControlCenterPage() {
         branchForm.low_stock_threshold != null && !Number.isNaN(branchForm.low_stock_threshold)
           ? branchForm.low_stock_threshold
           : null,
-      ...(active === 'inventory' ? { allow_negative_stock: branchForm.allow_negative_stock ?? null } : {}),
+      allow_negative_stock: branchForm.allow_negative_stock,
       business_day_mode: branchForm.business_day_mode || 'fixed_time',
       business_day_start: branchForm.business_day_start || '00:00',
       business_day_end: branchForm.business_day_end || '00:00',
@@ -208,14 +149,12 @@ export function SettingsControlCenterPage() {
   };
 
   const SECTIONS: { key: SettingsTab; label: string; icon: React.ReactNode }[] = [
-    { key: 'website_social', label: isAr ? 'الموقع وروابط التواصل' : 'Website & Social Links', icon: <Smartphone className="w-4 h-4" /> },
-    { key: 'customer_orders', label: isAr ? 'طلبات العملاء والمنيو' : 'Customer Orders & Menu', icon: <Smartphone className="w-4 h-4" /> },
     { key: 'branch_profile', label: isAr ? 'بيانات الفرع والطباعة' : 'Branch Profile & Receipts', icon: <Store className="w-4 h-4" /> },
     { key: 'tax', label: isAr ? 'الضريبة' : 'Tax', icon: <Percent className="w-4 h-4" /> },
     { key: 'business_day', label: isAr ? 'اليوم المالي والشفتات' : 'Business Day & Shifts', icon: <CalendarClock className="w-4 h-4" /> },
     { key: 'inventory', label: isAr ? 'المخزون والبيع بالسالب' : 'Inventory & Negative Stock', icon: <Boxes className="w-4 h-4" /> },
     { key: 'payments', label: isAr ? 'InstaPay والتحويل البنكي' : 'InstaPay & Bank Transfer', icon: <Landmark className="w-4 h-4" /> },
-    ...(canViewBranchStaff ? [{ key: 'branch_staff' as const, label: isAr ? 'طاقم عمل الفرع' : 'Branch Staff', icon: <Users className="w-4 h-4" /> }] : []),
+    { key: 'branch_staff', label: isAr ? 'طاقم عمل الفرع' : 'Branch Staff', icon: <Users className="w-4 h-4" /> },
     { key: 'appearance', label: isAr ? 'المظهر والثيم' : 'Appearance & Theme', icon: <Palette className="w-4 h-4" /> },
     { key: 'language', label: isAr ? 'اللغة والتوطين' : 'Language', icon: <Languages className="w-4 h-4" /> },
   ];
@@ -254,7 +193,7 @@ export function SettingsControlCenterPage() {
         actions={branches.length > 1 ? (
           <div className="w-52 shrink-0">
             <Select
-              value={targetBranchId}
+              value={selectedBranchId}
               onChange={(e) => setSelectedBranchId(e.target.value)}
               aria-label={isAr ? 'الفرع النشط للإعدادات' : 'Settings branch'}
             >
@@ -267,19 +206,6 @@ export function SettingsControlCenterPage() {
           </div>
         ) : undefined}
       />
-
-      {canOpenIntegrations && (
-        <Link
-          to={APP_ROUTES.integrations}
-          data-testid="settings-integrations-link"
-          className="flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-brand-500/30 bg-brand-600/5 p-4 text-sm font-bold text-ui-text hover:bg-brand-600/10"
-        >
-          <span className="flex items-center gap-2"><Smartphone className="h-5 w-5 text-brand-600" />
-            {isAr ? 'التكاملات والربط — الضرائب المصرية والسعودية وتطبيقات التوصيل' : 'Integrations Hub — Egypt, Saudi Arabia and delivery apps'}
-          </span>
-          <span className="text-brand-600">{isAr ? 'فتح الشاشة' : 'Open'}</span>
-        </Link>
-      )}
 
       <div className="grid grid-cols-1 gap-4 md:grid-cols-4 md:gap-6">
         <div data-testid="settings-section-rail" className="flex gap-2 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden md:col-span-1 md:block md:space-y-1 md:overflow-visible md:pb-0">
@@ -300,8 +226,6 @@ export function SettingsControlCenterPage() {
         </div>
 
         <div className="md:col-span-3 space-y-6">
-          {active === 'website_social' && <><WebsiteTextSettings key={`text-${targetBranchId}`} branchId={targetBranchId} /><WebsitePhotosSettings key={`photos-${targetBranchId}`} branchId={targetBranchId} /><WebsiteSocialSettings key={targetBranchId} branchId={targetBranchId} /></>}
-          {active === 'customer_orders' && <CustomerOrderSettings key={targetBranchId} branchId={targetBranchId} />}
           {active === 'branch_profile' && (
             <Card className="space-y-6 p-4 sm:p-6">
               <div>
@@ -473,8 +397,8 @@ export function SettingsControlCenterPage() {
                     </span>
                     <span className="mt-1 block text-sm text-ui-muted">
                       {isAr
-                        ? 'عند نهاية اليوم حسب توقيت الفرع تُغلق الوردية مع بقاء الطلبات المفتوحة والمعلقة كما هي. عند تحصيلها لاحقًا يجب فتح وردية جديدة؛ لا يتم تسجيل إيراد تلقائي.'
-                        : 'At the configured branch cutoff, the shift closes while open/held orders remain unchanged. A new shift must be opened before later payment; no sale is posted automatically.'}
+                        ? 'يعمل فقط إذا لم توجد أي طلبات مفتوحة أو معلقة. إذا وُجدت طلبات، يبقى الشفت مفتوحًا حتى يغلقها المستخدم.'
+                        : 'Runs only when no open or held orders remain. Otherwise the shift stays open until the user resolves all orders.'}
                     </span>
                   </span>
                 </label>
@@ -636,14 +560,6 @@ export function SettingsControlCenterPage() {
                   </button>
                 </div>
               </div>
-
-              {(branchForm.allow_negative_stock ?? undefined) !== (branchSettingsMap[targetBranchId]?.allow_negative_stock ?? undefined) && (
-                <p role="status" className="rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-ui-text">
-                  {isAr
-                    ? '⚠️ تغيير سياسة البيع بالسالب لم يُحفظ بعد. اضغط «حفظ إعدادات المخزون» بالأسفل ليطبّق على الفرع.'
-                    : '⚠️ The stock policy change is not saved yet. Press “Save Inventory Settings” below to apply it to this branch.'}
-                </p>
-              )}
 
               <div className="pt-4 border-t border-ui-border grid gap-4 sm:grid-cols-2">
                 <Input
@@ -826,7 +742,7 @@ export function SettingsControlCenterPage() {
           )}
 
           {active === 'appearance' && (
-            <Card className="space-y-6 p-5 sm:p-6">
+            <Card className="space-y-6 p-4 sm:p-6">
               <div>
                 <h2 className="text-lg font-bold text-ui-text">{isAr ? 'المظهر وسمات الواجهة' : 'Appearance & Themes'}</h2>
                 <p className="text-xs text-ui-subtle">{isAr ? 'اختر السمة واللون المفضل لواجهة الاستخدام' : 'Select your preferred visual style and theme mode'}</p>
@@ -834,97 +750,35 @@ export function SettingsControlCenterPage() {
 
               <div>
                 <p className="text-xs font-bold text-ui-text mb-2">{isAr ? 'وضع الإضاءة:' : 'Theme Mode:'}</p>
-                <p className="mb-3 text-xs text-ui-muted">{isAr ? 'اختيارك يغيّر واجهة Premier على هذا الجهاز، وينشر نفس الوضع لموقع الفرع المحدد وصفحة طلبات عملائه.' : 'Changing mode updates Premier on this device and publishes the selected branch website and customer ordering theme.'}</p>
-                <div className="grid max-w-md grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => changeThemeMode('light')}
-                    className={`group rounded-[20px] border p-3 text-start transition-all ${theme === 'light' ? 'border-ui-primary ring-2 ring-ui-primary/25 bg-ui-page-alt' : 'border-ui-border bg-ui-surface hover:border-ui-border-strong'}`}
+                <div className="flex gap-2">
+                  <Button
+                    variant={theme === 'light' ? 'primary' : 'outline'}
+                    size="sm"
+                    onClick={() => setTheme('light')}
                   >
-                    <div className="mb-2.5 h-16 rounded-[12px] border border-[#dfe3dd] bg-[#eef0ec] p-2">
-                      <div className="mb-1.5 h-2.5 w-14 rounded-full bg-[#fcfdfc]" />
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <div className="h-7 rounded-md bg-[#fcfdfc]" />
-                        <div className="h-7 rounded-md bg-[#fcfdfc]" />
-                        <div className="h-7 rounded-md bg-[#a8481c]/20" />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between text-xs font-bold text-ui-text">
-                      <span>{isAr ? 'الوضع النهاري (Light)' : 'Light'}</span>
-                      {theme === 'light' && <span className="h-2 w-2 rounded-full bg-ui-primary" />}
-                    </div>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => changeThemeMode('dark')}
-                    className={`group rounded-[20px] border p-3 text-start transition-all ${theme === 'dark' ? 'border-ui-primary ring-2 ring-ui-primary/25 bg-ui-page-alt' : 'border-ui-border bg-ui-surface hover:border-ui-border-strong'}`}
+                    {isAr ? 'الوضع النهاري (Light)' : 'Light'}
+                  </Button>
+                  <Button
+                    variant={theme === 'dark' ? 'primary' : 'outline'}
+                    size="sm"
+                    onClick={() => setTheme('dark')}
                   >
-                    <div className="mb-2.5 h-16 rounded-[12px] border border-[#28302c] bg-[#0f1412] p-2">
-                      <div className="mb-1.5 h-2.5 w-14 rounded-full bg-[#171d1a]" />
-                      <div className="grid grid-cols-3 gap-1.5">
-                        <div className="h-7 rounded-md bg-[#171d1a]" />
-                        <div className="h-7 rounded-md bg-[#171d1a]" />
-                        <div className="h-7 rounded-md bg-[#ffa77a]/30" />
-                      </div>
-                    </div>
-                    <div className="flex items-center justify-between text-xs font-bold text-ui-text">
-                      <span>{isAr ? 'الوضع الليلي (Dark)' : 'Dark'}</span>
-                      {theme === 'dark' && <span className="h-2 w-2 rounded-full bg-ui-primary" />}
-                    </div>
-                  </button>
+                    {isAr ? 'الوضع الليلي (Dark)' : 'Dark'}
+                  </Button>
                 </div>
-                <p role="status" className="mt-3 text-xs text-ui-muted">
-                  {isAr ? 'مظهر عملاء الفرع المحفوظ: ' : 'Published customer theme: '}
-                  <strong className="text-ui-text">{customerTheme === 'dark' ? 'Dark' : 'Light'}</strong>
-                  {themeSaving ? (isAr ? ' · جارٍ النشر…' : ' · Publishing…') : ''}
-                </p>
-                {themeMessage && <p role="status" className="mt-2 text-xs text-ui-muted">{themeMessage}</p>}
               </div>
 
               <div>
-                <p className="text-xs font-bold text-ui-text mb-2">{isAr ? 'لون التمييز السريع (Premier Accents):' : 'Accent colour:'}</p>
-                <div className="mb-5 flex flex-wrap items-center gap-3">
-                  {([
-                    { accent: 'copper', color: '#a8481c', ar: 'نحاسي', en: 'Copper' },
-                    { accent: 'cobalt', color: '#2747c4', ar: 'كوبالت', en: 'Cobalt' },
-                    { accent: 'ocean', color: '#16627a', ar: 'محيطي', en: 'Ocean' },
-                    { accent: 'pine', color: '#17704b', ar: 'صنوبري', en: 'Pine' },
-                    { accent: 'graphite', color: '#2c2c33', ar: 'جرافيت', en: 'Graphite' },
-                  ] as const).map((swatch) => {
-                    const isActive = accent === swatch.accent;
-                    return (
-                      <button
-                        key={swatch.accent}
-                        type="button"
-                        onClick={() => setAccent(swatch.accent)}
-                        className={`inline-flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                          isActive ? 'border-ui-text bg-ui-text text-ui-surface shadow-ui-sm' : 'border-ui-border bg-ui-page-alt text-ui-text hover:border-ui-border-strong'
-                        }`}
-                      >
-                        <span className="h-3.5 w-3.5 rounded-full border border-white/30" style={{ backgroundColor: swatch.color }} aria-hidden="true" />
-                        <span>{isAr ? swatch.ar : swatch.en}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="text-xs font-bold text-ui-text mb-2">{isAr ? 'سمات الواجهة والألوان:' : 'Curated Themes & Accents:'}</p>
-                <div className="grid gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+                <p className="text-xs font-bold text-ui-text mb-2">{isAr ? 'سمات الواجهة المصممة بعناية:' : 'Curated Themes:'}</p>
+                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
                   {UI_THEMES.map((th) => (
                     <button
                       key={th.key}
-                      type="button"
                       onClick={() => pickTheme(th.key)}
-                      className={`flex items-center justify-between gap-2 rounded-[16px] border px-3.5 py-3 text-start transition hover:border-ui-primary/50 hover:bg-ui-surface ${uiTheme === th.key ? 'border-ui-primary bg-ui-surface ring-1 ring-ui-primary/30' : 'border-ui-border bg-ui-page-alt'}`}
+                      className="p-3 rounded-xl border border-ui-border bg-ui-page hover:border-brand-500/50 flex items-center justify-between text-start transition"
                     >
-                      <span className="flex min-w-0 items-center gap-2.5">
-                        <span
-                          className="h-4 w-4 shrink-0 rounded-full border border-black/10"
-                          style={{ backgroundColor: th.swatch || '#a8481c' }}
-                          aria-hidden="true"
-                        />
-                        <span className="truncate text-xs font-bold text-ui-text">{isAr ? th.ar : th.en}</span>
-                      </span>
-                      <span className="shrink-0 rounded-full bg-ui-surface px-2 py-0.5 text-[10px] font-semibold text-ui-subtle">
+                      <span className="text-xs font-bold text-ui-text">{isAr ? th.ar : th.en}</span>
+                      <span className="text-[10px] text-ui-subtle px-1.5 py-0.5 rounded bg-ui-surface">
                         {th.mode}
                       </span>
                     </button>

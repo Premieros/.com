@@ -1,6 +1,6 @@
 export interface PagedResult<T> {
   data: T[] | null;
-  error: { message?: string; code?: string; details?: string; hint?: string } | null;
+  error: { message?: string } | null;
 }
 
 export interface RangePageQuery<T> {
@@ -19,12 +19,7 @@ export async function fetchAllReportRows<T>(
   const rows: T[] = [];
   for (let from = 0; ; from += pageSize) {
     const { data, error } = await query.range(from, from + pageSize - 1);
-    if (error) {
-      // Preserve structured PostgREST errors for precise, actionable report diagnostics.
-      const failure = new Error(error.message || 'REPORT_PAGE_LOAD_FAILED') as Error & { code?: string };
-      failure.code = error.code;
-      throw failure;
-    }
+    if (error) throw new Error(error.message || 'REPORT_PAGE_LOAD_FAILED');
     const page = data || [];
     rows.push(...page);
     if (page.length < pageSize) break;

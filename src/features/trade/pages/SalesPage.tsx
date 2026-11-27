@@ -1,27 +1,23 @@
-import { useEffect, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Trash2, FileText, Edit2, RotateCcw, Eye, Printer, RefreshCw, CalendarDays, Filter, ReceiptText, Wallet, Banknote } from 'lucide-react';
+import { useState } from 'react';
+import { Trash2, FileText, Edit2, RotateCcw, Eye, Printer } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
-import { DesignSurface, DesignPageHeader, DesignPanel, DesignPagination } from '@/components/design';
+import { DesignSurface, DesignPageHeader, DesignSearch, DesignPanel, DesignPagination } from '@/components/design';
 import { DataTable, type Column } from '@/components/DataTable';
-import { StatCard } from '@/components/PageHeader';
 import { Button } from '@/components/Button';
 import { Select, Textarea } from '@/components/Input';
 import { Modal } from '@/components/Modal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { BranchBadge } from '@/components/BranchBadge';
-import { formatFinancialCurrency, formatCurrency, formatDateTime } from '@/lib/format';
+import { formatCurrency, formatDateTime } from '@/lib/format';
 import { logAudit } from '@/lib/audit';
 import { useBranchFilter } from '@/lib/useBranchFilter';
 import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { mergeEffectiveSettings, useSettings } from '@/context/SettingsContext';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
-import { useDebouncedValue } from '@/hooks/useDebouncedValue';
-import { localSaleDayBounds } from '../saleDateFilters';
 import { useBranches } from '@/hooks/useBranches';
 import type { BranchSettings, Customer, Settings } from '@/lib/types';
 import {
@@ -32,8 +28,6 @@ import {
   type ReceiptData,
 } from '@/features/pos/utils/printing';
 
-const SALE_ORDER_TYPES = ['dine_in', 'takeaway', 'delivery', 'drive_thru', 'quick'] as const;
-
 interface SaleRow {
   id: string;
   invoice_number: string;
@@ -41,7 +35,6 @@ interface SaleRow {
   subtotal: number;
   discount_amount: number;
   tax_amount: number;
-  delivery_fee_amount?: number;
   total: number;
   paid_amount: number;
   refunded_amount: number;
@@ -61,50 +54,25 @@ interface SaleRow {
 
 export function SalesPage() {
   const { t, lang } = useLanguage();
-  const [searchParams] = useSearchParams();
-  const requestedSaleId = searchParams.get('saleId');
-  const [sourceLookup, setSourceLookup] = useState<'idle' | 'loading' | 'found' | 'unavailable'>('idle');
   const { show } = useToast();
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
   const can = useCan();
-  const canViewSales = can('sales.view');
-  const [search, setSearch] = useState('');
-  const [searchAllInvoices, setSearchAllInvoices] = useState(false);
-  const debouncedInvoiceSearch = useDebouncedValue(searchAllInvoices ? search : '', 250);
-  const [displayStatus, setDisplayStatus] = useState<'all' | 'today' | 'completed' | 'returned' | 'other'>('all');
-  const [displayDate, setDisplayDate] = useState('');
-  const [displayOrderType, setDisplayOrderType] = useState('');
-  const [filterDraft, setFilterDraft] = useState({ date: '', orderType: '' });
-  const now = new Date();
-  const today = [now.getFullYear(), String(now.getMonth() + 1).padStart(2, '0'),
-    String(now.getDate()).padStart(2, '0')].join('-');
-  const dateBounds = localSaleDayBounds(displayDate || (displayStatus === 'today' ? today : ''));
   const { rows: items, loading, error, total, hasMore, loadMore, loadingMore, refresh: reloadSales } = usePaginatedRows<SaleRow>({
     table: 'sales',
-    select: 'id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, delivery_fee_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))',
+    select: 'id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
-    enabled: canViewSales && !branchScope.loading && branchScope.selectedBranchIds.length > 0,
-    createdAtIdKeyset: true,
-    filters: [
-      { column: 'is_archived', value: false },
-      ...(displayOrderType ? [{ column: 'order_type', value: displayOrderType }] : []),
-      ...(['completed', 'returned'].includes(displayStatus) ? [{ column: 'status', value: displayStatus }] : []),
-    ],
-    exclude: displayStatus === 'other' ? { column: 'status', values: ['completed', 'returned'] } : undefined,
-    min: dateBounds ? { column: 'created_at', value: dateBounds.start } : undefined,
-    maxExclusive: dateBounds ? { column: 'created_at', value: dateBounds.end } : undefined,
-    search: searchAllInvoices ? { term: debouncedInvoiceSearch, columns: ['invoice_number'] } : undefined,
+    filters: [{ column: 'is_archived', value: false }],
     pageSize: 100,
   });
-  const [showViewFilters, setShowViewFilters] = useState(false);
+  const [search, setSearch] = useState('');
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [deleteSelectedConfirm, setDeleteSelectedConfirm] = useState(false);
   const { effectiveSettings } = useSettings();
   const { branches } = useBranches();
-  const currency = effectiveSettings(branchScope.selectedBranchIds.length === 1 ? branchScope.selectedBranchIds[0] : branchFilter)?.currency || 'EGP';
+  const currency = effectiveSettings(branchFilter)?.currency || 'EGP';
   const [viewSale, setViewSale] = useState<SaleRow | null>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [customersBranchId, setCustomersBranchId] = useState('');
@@ -143,14 +111,15 @@ export function SalesPage() {
     setCustomersBranchId(branchId);
   }
 
-  // Status/date filter the full authorized history before paging.
-  // Customer/order text remains a loaded-page search in legacy mode.
-  const filtered = searchAllInvoices || !search.trim() ? items : items.filter((i) => {
-    const term = search.trim().toLowerCase();
-    return i.invoice_number?.toLowerCase().includes(term) ||
-      i.source_order?.order_number?.toLowerCase().includes(term) ||
-      i.customer?.name?.toLowerCase().includes(term) ||
-      i.status?.toLowerCase().includes(term);
+  const filtered = items.filter((i) => {
+    if (!search) return true;
+    const s = search.toLowerCase();
+    return (
+      i.invoice_number?.toLowerCase().includes(s) ||
+      i.source_order?.order_number?.toLowerCase().includes(s) ||
+      i.customer?.name?.toLowerCase().includes(s) ||
+      i.status?.toLowerCase().includes(s)
+    );
   });
 
   const branchNameForSale = (sale: SaleRow) =>
@@ -225,7 +194,6 @@ export function SalesPage() {
       subtotal: Number(sale.subtotal || 0),
       discount: Number(sale.discount_amount || 0),
       tax: Number(sale.tax_amount || 0),
-      deliveryFee: Number(sale.delivery_fee_amount || 0),
       total: Number(sale.total || 0),
       paid: Number(sale.paid_amount || 0),
       change: Math.max(0, Number(sale.paid_amount || 0) - Number(sale.total || 0)),
@@ -307,57 +275,6 @@ export function SalesPage() {
       notes: sale.notes || '',
     });
   };
-
-  // Follow only exact sale IDs from report rows. The same sale detail projection,
-  // RLS and permitted branch scope used by this page apply to direct URLs.
-  // Do not allow an arbitrary URL to override a tenant's branch selection.
-  useEffect(() => {
-    if (!requestedSaleId) {
-      setSourceLookup('idle');
-      return;
-    }
-    setViewSale(null);
-    if (branchScope.loading) return;
-    if (!/^[\\da-f]{8}-[\\da-f]{4}-[1-8][\\da-f]{3}-[89ab][\\da-f]{3}-[\\da-f]{12}$/i.test(requestedSaleId)
-        || !canViewSales || branchScope.selectedBranchIds.length === 0) {
-      setSourceLookup('unavailable');
-      return;
-    }
-    let cancelled = false;
-    setSourceLookup('loading');
-    (async () => {
-      const { data, error: lookupError } = await supabase.from('sales')
-        .select('id, invoice_number, source_order_id, subtotal, discount_amount, tax_amount, delivery_fee_amount, total, paid_amount, refunded_amount, payment_method, status, notes, created_at, customer_id, branch_id, order_type, guest_count, is_archived, customer:customers(name), source_order:orders!sales_source_order_id_fkey(order_number), sale_items(id, product_id, unit_name, quantity, unit_price, discount_amount, refunded_quantity, refunded_amount, total, product:products(name))')
-        .eq('id', requestedSaleId)
-        .in('branch_id', branchScope.selectedBranchIds)
-        .eq('is_archived', false)
-        .maybeSingle();
-      if (cancelled) return;
-      if (lookupError || !data) {
-        setSourceLookup('unavailable');
-        return;
-      }
-      // PostgREST runtime resolves these many-to-one joins to objects.
-      // Generated relationship typing may describe arrays; normalize both forms.
-      const mapped = data as unknown as SaleRow;
-      const sale: SaleRow = {
-        ...mapped,
-        customer: Array.isArray(mapped.customer) ? (mapped.customer[0] ?? null) : mapped.customer,
-        source_order: Array.isArray(mapped.source_order) ? (mapped.source_order[0] ?? null) : mapped.source_order,
-      };
-      setViewSale(sale);
-      setEditForm({
-        customer_id: sale.customer_id || '',
-        payment_method: sale.payment_method,
-        status: sale.status,
-        notes: sale.notes || '',
-      });
-      setSourceLookup('found');
-    })();
-    return () => { cancelled = true; };
-    // Branch scope identity and permission control source resolution.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [requestedSaleId, branchScope.scopeKey, branchScope.loading, canViewSales]);
 
   const openRefund = (sale: SaleRow) => {
     setRefundSale(sale);
@@ -560,24 +477,12 @@ export function SalesPage() {
     }
 
     if (canEditSaleMetadata) {
-      // Invoice lifecycle changes must go through authoritative refund/payment RPCs,
-      // never the general-purpose metadata editor.
       const { error } = await supabase.from('sales').update({
         customer_id: editForm.customer_id || null,
+        status: editForm.status,
         notes: editForm.notes || null,
       }).eq('id', viewSale.id);
-      if (error) {
-        if (paymentChanged) {
-          show(isAr
-            ? 'تم تغيير طريقة الدفع بالفعل، لكن تعذر حفظ العميل والملاحظات. أعد فتح الفاتورة للتحقق.'
-            : 'Payment method changed, but customer/notes could not be saved. Reopen the invoice to verify.', 'error');
-          setViewSale(null);
-          reloadSales();
-        } else {
-          show(error.message, 'error');
-        }
-        return;
-      }
+      if (error) { show(error.message, 'error'); return; }
     }
 
     await logAudit('update', 'sales', viewSale.id, paymentChanged ? { payment_method: editForm.payment_method } : undefined);
@@ -635,24 +540,32 @@ export function SalesPage() {
   const PAYMENT_LABELS: Record<string, string> = { cash: t('cash'), card: t('card'), transfer: t('transfer'), credit: t('credit') };
 
   const columns: Column<SaleRow>[] = [
-    { key: 'invoice_number', header: isAr ? 'رقم الفاتورة' : 'Invoice', className: 'w-[14%]', mobilePriority: true, render: (r) => (
-      <div className="flex items-center gap-1.5 min-w-0">
-        <FileText className="h-4 w-4 shrink-0 text-brand-500" />
-        <div className="min-w-0">
-          <div className="font-bold text-ui-text break-words" dir="auto">{r.invoice_number}</div>
+    { key: 'invoice_number', header: t('invoiceNumber'), render: (r) => (
+      <div className="flex items-start gap-2">
+        <FileText className="mt-0.5 w-4 h-4 text-brand-500" />
+        <div>
+          <div className="font-medium text-ui-text">{r.invoice_number}</div>
           {r.source_order?.order_number && (
-            <div className="text-xs font-medium text-ui-subtle break-words">
-              {isAr ? 'طلب' : 'Order'}: {r.source_order.order_number}
+            <div className="text-[11px] font-bold text-ui-subtle">
+              {isAr ? 'الطلب' : 'Order'}: {r.source_order.order_number}
             </div>
           )}
         </div>
       </div>
     )},
+    { key: 'created_at', header: t('date'), render: (r) => <span className="text-sm text-ui-subtle">{formatDateTime(r.created_at, lang)}</span> },
+    { key: 'customer', header: t('customer'), render: (r) => r.customer?.name || '-' },
     { key: 'branch', header: t('branch'), render: (r) => <BranchBadge name={branches.find((b) => b.id === r.branch_id)?.name || '-'} /> },
-    { key: 'customer', header: t('customer'), className: 'w-[13%]', render: (r) => <span className="block max-w-60 truncate font-medium" title={r.customer?.name || ''}>{r.customer?.name || '-'}</span> },
+    { key: 'total', header: t('total'), render: (r) => <span className="font-semibold text-ui-text">{formatCurrency(r.total, currency, lang)}</span> },
+    { key: 'paid_amount', header: isAr ? 'المدفوع' : 'Paid', render: (r) => formatCurrency(r.paid_amount, currency, lang) },
+    { key: 'payment_method', header: isAr ? 'طريقة الدفع' : 'Payment', render: (r) => (
+      <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-ui-page-alt text-ui-muted">
+        {PAYMENT_LABELS[r.payment_method] || r.payment_method}
+      </span>
+    )},
     { key: 'status', header: t('status'), render: (r) => (
-      <div className="flex items-center gap-1.5 break-words">
-        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
+      <div className="flex items-center gap-1.5">
+        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
           r.status === 'completed' ? 'bg-ui-success-soft text-ui-success' :
           r.status === 'returned' ? 'bg-ui-danger-soft text-ui-danger' :
           'bg-ui-warning-soft text-ui-warning'
@@ -660,23 +573,14 @@ export function SalesPage() {
           {r.status}
         </span>
         {r.refunded_amount > 0 && r.status !== 'returned' && (
-          <span className="rounded-full bg-ui-warning-soft px-2 py-1 text-xs font-medium text-ui-warning">
-            {isAr ? 'مرتجع جزئي' : 'Partial refund'}
+          <span className="px-2 py-0.5 rounded-full text-xs font-medium bg-ui-warning-soft text-ui-warning">
+            {isAr ? `مرتجع ${formatCurrency(r.refunded_amount, currency, lang)}` : `Refunded ${formatCurrency(r.refunded_amount, currency, lang)}`}
           </span>
         )}
       </div>
     )},
-    { key: 'order_type', header: isAr ? 'المصدر' : 'Source', render: (r) => <span className="text-ui-muted">{orderTypeLabelForSale(r.order_type) || '-'}</span> },
-    { key: 'total', header: t('total'), className: 'break-words text-end tabular-nums', mobilePriority: true, render: (r) => <span className="font-bold text-ui-text">{formatFinancialCurrency(r.total, currency, lang)}</span> },
-    { key: 'paid_amount', header: isAr ? 'المدفوع' : 'Paid', className: 'break-words text-end tabular-nums', render: (r) => formatFinancialCurrency(r.paid_amount, currency, lang) },
-    { key: 'payment_method', header: isAr ? 'طريقة الدفع' : 'Payment', render: (r) => (
-      <span className="break-words rounded-full bg-ui-page-alt px-2.5 py-1 text-xs font-medium text-ui-muted">
-        {PAYMENT_LABELS[r.payment_method] || r.payment_method}
-      </span>
-    )},
-    { key: 'created_at', header: isAr ? 'التاريخ والوقت' : 'Created at', className: 'w-[14%] break-words', render: (r) => <span className="text-sm text-ui-subtle tabular-nums">{formatDateTime(r.created_at, lang)}</span> },
-    { key: 'actions', header: t('actions'), className: 'w-[15%]', render: (r) => (
-      <div className="flex flex-wrap gap-1" onClick={(e) => e.stopPropagation()}>
+    { key: 'actions', header: t('actions'), render: (r) => (
+      <div className="flex gap-1" onClick={(e) => e.stopPropagation()}>
         {canPreviewReceipt && (
           <button
             onClick={() => void previewSaleReceipt(r)}
@@ -720,36 +624,6 @@ export function SalesPage() {
     <DesignSurface testId="sales-page">
       <DesignPageHeader title={t('salesInvoices')} actions={
         <>
-          <input
-            data-testid="sales-search"
-            aria-label={searchAllInvoices ? (isAr ? 'بحث في كل أرقام الفواتير المسموح بها' : 'Search all authorized invoice numbers') : (isAr ? 'بحث في الفواتير المحمّلة' : 'Search loaded invoices')}
-            type="search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-            placeholder={searchAllInvoices ? (isAr ? 'رقم الفاتورة في كل السجلات...' : 'Invoice number across all records...') : (isAr ? 'بحث في الفواتير المحمّلة...' : 'Search loaded invoices...')}
-            className="h-9 w-32 min-w-0 rounded-full border border-ui-border bg-ui-surface-raised px-3.5 text-xs text-ui-text outline-none focus:border-ui-primary sm:w-52"
-          />
-          <label className="inline-flex items-center gap-1.5 text-xs font-medium text-ui-muted">
-            <input type="checkbox" data-testid="sales-global-invoice-search" checked={searchAllInvoices}
-              onChange={(event) => { setSearchAllInvoices(event.target.checked); setSearch(''); }}
-              className="accent-brand-600" />
-            {isAr ? 'كل أرقام الفواتير' : 'All invoice numbers'}
-          </label>
-          <Button variant="outline" size="sm"
-            onClick={() => {
-              setFilterDraft({ date: displayDate, orderType: displayOrderType });
-              setShowViewFilters(true);
-            }}
-            data-testid="sales-toggle-filters"
-            aria-haspopup="dialog"
-            aria-expanded={showViewFilters}
-          >
-            <Filter className="h-4 w-4" />
-            {isAr ? 'تصفية' : 'Filters'}
-          </Button>
-          <Button variant="outline" size="sm" onClick={() => void reloadSales()} data-testid="sales-view-refresh">
-            <RefreshCw className="h-4 w-4" /> <span className="hidden sm:inline">{isAr ? 'تحديث' : 'Refresh'}</span>
-          </Button>
           {selectedIds.size > 0 && (
             <Button variant="danger" size="sm" onClick={() => setDeleteSelectedConfirm(true)} data-testid="sales-delete-selected">
               <Trash2 className="w-4 h-4" /> {t('deleteSelected')} ({selectedIds.size})
@@ -758,137 +632,15 @@ export function SalesPage() {
         </>
       } />
 
-      {(() => {
-        const netTotal = filtered.reduce((sum, r) => sum + Number(r.total || 0), 0);
-        const paidTotal = filtered.reduce((sum, r) => sum + Number(r.paid_amount || 0), 0);
-        const refundedTotal = filtered.reduce((sum, r) => sum + Number(r.refunded_amount || 0), 0);
-        return (
-          <section className="premier-refresh-stagger grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
-            <StatCard
-              title={isAr ? 'الفواتير المعروضة' : 'Loaded invoices'}
-              value={String(filtered.length)}
-              icon={<ReceiptText className="h-4 w-4" />}
-              color="brand"
-            />
-            <StatCard
-              title={isAr ? 'إجمالي الفواتير' : 'Total amount'}
-              value={formatFinancialCurrency(netTotal, currency, lang)}
-              icon={<Wallet className="h-4 w-4" />}
-              color="green"
-            />
-            <StatCard
-              title={isAr ? 'إجمالي المحصل' : 'Collected'}
-              value={formatFinancialCurrency(paidTotal, currency, lang)}
-              icon={<Banknote className="h-4 w-4" />}
-              color="blue"
-            />
-            <StatCard
-              title={isAr ? 'المرتجعات' : 'Refunded'}
-              value={formatFinancialCurrency(refundedTotal, currency, lang)}
-              icon={<RotateCcw className="h-4 w-4" />}
-              color="amber"
-            />
-          </section>
-        );
-      })()}
+      <DesignPanel testId="sales-search-panel">
+        <DesignSearch value={search} onChange={setSearch} label={t('search')}
+          placeholder={isAr ? 'بحث برقم الفاتورة أو رقم الطلب أو اسم العميل...' : 'Search by invoice number, order number or customer...'} testId="sales-search" />
+      </DesignPanel>
 
-      {requestedSaleId && (
-        <div role={sourceLookup === 'unavailable' ? 'alert' : 'status'}
-          className="mb-3 rounded-xl border border-ui-border bg-ui-page-alt px-4 py-3 text-xs text-ui-muted"
-          data-testid="source-sale-lookup">
-          {sourceLookup === 'loading'
-            ? (isAr ? 'جارٍ فتح الفاتورة الأصلية من الفرع المصرح به...' : 'Opening original sale from your authorized branch...')
-            : sourceLookup === 'unavailable'
-              ? (isAr ? 'الفاتورة غير متاحة في نطاق فروعك أو صلاحياتك الحالية.' : 'This sale is unavailable within your current permissions and branch scope.')
-              : sourceLookup === 'found'
-                ? (isAr ? 'تم تحميل الفاتورة الأصلية وفق الصلاحيات الحالية.' : 'Original sale loaded within your current permissions.')
-                : null}
-        </div>
-      )}
-      {(displayDate || displayOrderType) && (
-        <div className="flex flex-wrap items-center gap-2 text-xs text-ui-muted" data-testid="sales-applied-filters">
-          {displayDate && <span dir="ltr" className="rounded-lg bg-ui-page-alt px-3 py-1.5">{displayDate}</span>}
-          {displayOrderType && <span className="rounded-lg bg-ui-page-alt px-3 py-1.5">{orderTypeLabelForSale(displayOrderType)}</span>}
-        </div>
-      )}
-      {showViewFilters && (
-        <Modal manageFocus open={showViewFilters} title={isAr ? 'فلاتر الفواتير' : 'Invoice filters'}
-          onClose={() => setShowViewFilters(false)}>
-          <form data-testid="sales-expanded-filters" className="space-y-4" onSubmit={(event) => {
-            event.preventDefault();
-            setDisplayDate(filterDraft.date);
-            setDisplayOrderType(filterDraft.orderType);
-            if (filterDraft.date && displayStatus === 'today') setDisplayStatus('all');
-            setShowViewFilters(false);
-          }}>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted" htmlFor="sales-view-date">
-                <span>{isAr ? 'تاريخ الإنشاء (توقيت الجهاز)' : 'Creation date (device time)'}</span>
-                <span className="inline-flex h-9 items-center gap-2 rounded-lg border border-ui-border bg-ui-surface px-3">
-                  <CalendarDays className="h-4 w-4 text-ui-subtle" />
-                  <input id="sales-view-date" data-testid="sales-view-date" type="date"
-                    className="min-w-0 bg-transparent text-sm text-ui-text"
-                    value={filterDraft.date} onChange={(event) => setFilterDraft({ ...filterDraft, date: event.target.value })} />
-                </span>
-              </label>
-              <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted">
-                {isAr ? 'نوع الطلب' : 'Order type'}
-                <select value={filterDraft.orderType} onChange={(event) => setFilterDraft({ ...filterDraft, orderType: event.target.value })}
-                  className="h-9 rounded-lg border border-ui-border bg-ui-surface px-3 text-sm text-ui-text">
-                  <option value="">{isAr ? 'كل الأنواع' : 'All types'}</option>
-                  {SALE_ORDER_TYPES.map((type) => <option value={type} key={type}>{orderTypeLabelForSale(type)}</option>)}
-                </select>
-              </label>
-            </div>
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button type="button" variant="outline" size="sm" onClick={() => setFilterDraft({ date: '', orderType: '' })}>
-                {isAr ? 'مسح التصفية' : 'Clear filters'}
-              </Button>
-              <Button type="submit" size="sm">{isAr ? 'تطبيق' : 'Apply'}</Button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      <DesignPanel testId="sales-table-panel" bodyClassName="p-0">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ui-border px-4 py-3.5 sm:px-5">
-          <div className="flex max-w-full items-center gap-1.5 overflow-x-auto" role="group" aria-label={isAr ? 'عرض الفواتير حسب الحالة' : 'Invoice display filter'}>
-            {([
-              ['all', isAr ? 'الكل' : 'All'],
-              ['today', isAr ? 'اليوم (تقويمي)' : 'Today (calendar)'],
-              ['completed', isAr ? 'مكتملة' : 'Completed'],
-              ['returned', isAr ? 'مرتجعة' : 'Returned'],
-              ['other', isAr ? 'أخرى' : 'Other'],
-            ] as const).map(([key, label]) => (
-              <button key={key} type="button" data-testid={`sales-view-tab-${key}`}
-                aria-pressed={displayStatus === key}
-                onClick={() => { setDisplayStatus(key); if (key === 'today') setDisplayDate(''); }}
-                className={`shrink-0 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition ${
-                  displayStatus === key
-                    ? 'border-ui-text bg-ui-text text-ui-surface shadow-ui-sm'
-                    : 'border-ui-border bg-ui-surface text-ui-muted hover:border-ui-border-strong hover:text-ui-text'
-                }`}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <span className="shrink-0 text-xs font-medium text-ui-subtle" data-testid="sales-view-count">
-            {searchAllInvoices ? (isAr ? 'بحث شامل برقم الفاتورة فقط · ' : 'All invoice numbers only · ') : ''}
-            {isAr ? `المعروض: ${filtered.length} من ${items.length} محمّلة من النتائج المطابقة` : `Showing ${filtered.length} of ${items.length} loaded matching records`}
-          </span>
-        </div>
-        <div className="min-w-0 px-3 py-3 sm:px-4 sales-invoices-layout">
-          <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')}
-            onRowClick={openViewSale} showCheckbox selectedIds={selectedIds} onSelectionChange={setSelectedIds}
-            tableId="sales-invoices-layout" fitColumns
-            columnTotals={branchScope.selectedBranchIds.length === 1 ? [
-              { key: 'total', label: isAr ? 'إجمالي الفواتير المعروضة' : 'Visible invoices total', value: (row) => Number(row.total), format: (sum) => formatFinancialCurrency(sum, currency, lang) },
-              { key: 'paid_amount', label: isAr ? 'إجمالي المدفوع المعروض' : 'Visible paid total', value: (row) => Number(row.paid_amount), format: (sum) => formatFinancialCurrency(sum, currency, lang) },
-            ] : undefined} />
-        </div>
-        <div className="border-t border-ui-border px-4 py-3">
-          <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
-        </div>
+      <DesignPanel testId="sales-table-panel">
+        <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')}
+          onRowClick={openViewSale} showCheckbox selectedIds={selectedIds} onSelectionChange={setSelectedIds} />
+        <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
       </DesignPanel>
 
       {/* Sale Detail / Edit Modal */}
@@ -945,9 +697,11 @@ export function SalesPage() {
                 <option value="transfer">{t('transfer')}</option>
                 <option value="credit" disabled>{t('credit')}</option>
               </Select>
-              <div className="text-sm text-ui-muted">
-                {isAr ? 'حالة الفاتورة تُعدّل فقط عبر إجراءات الدفع والمرتجع المعتمدة.' : 'Invoice status is managed by the authorized payment and refund workflows.'}
-              </div>
+              <Select label={t('status')} value={editForm.status} disabled={!canEditSaleMetadata} onChange={(e) => setEditForm({ ...editForm, status: e.target.value })}>
+                <option value="completed">{isAr ? 'مكتملة' : 'Completed'}</option>
+                <option value="pending">{isAr ? 'قيد الانتظار' : 'Pending'}</option>
+                <option value="returned">{isAr ? 'مرتجعة' : 'Returned'}</option>
+              </Select>
               <div />
             </div>
             <Textarea label={t('notes')} value={editForm.notes} disabled={!canEditSaleMetadata} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} rows={2} />

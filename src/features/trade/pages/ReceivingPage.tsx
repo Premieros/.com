@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { PackageOpen, Save, History, Trophy } from 'lucide-react';
 import * as api from '@/api';
@@ -53,7 +53,6 @@ export function ReceivingPage() {
   const [receiveModal, setReceiveModal] = useState<PurchaseBackorderRow | null>(null);
   const [lines, setLines] = useState<ReceivingLine[]>([]);
   const [saving, setSaving] = useState(false);
-  const receiptLock = useRef(false);
 
   const branchName = useCallback((branchId: string | null | undefined) => branches.find((b) => b.id === branchId)?.name || '-', [branches]);
 
@@ -150,8 +149,7 @@ export function ReceivingPage() {
   const updateQty = (i: number, qty: string) => setLines(lines.map((l, idx) => idx === i ? { ...l, qty } : l));
 
   const saveReceipt = async () => {
-    if (!receiveModal || receiptLock.current || !can('purchases.receiving')) return;
-    if (lines.some(line => line.qty.trim() !== '' && (!Number.isFinite(Number(line.qty)) || Number(line.qty) < 0))) { show(lang === 'ar' ? 'كمية الاستلام غير صالحة.' : 'Invalid receipt quantity.', 'error'); return; }
+    if (!receiveModal || saving) return;
 
     const overRemaining = lines.find((l) => {
       const qty = parseFloat(l.qty);
@@ -172,7 +170,6 @@ export function ReceivingPage() {
       .map((l): ReceiveLineInput => ({ purchase_item_id: l.purchase_item_id, quantity_received: parseFloat(l.qty) }));
     if (items.length === 0) { show(t('required') + ': ' + t('receiveItems'), 'error'); return; }
 
-    receiptLock.current = true;
     setSaving(true);
     try {
       const { data, error: err } = await api.procurement.receivePurchaseOrder({
@@ -203,11 +200,7 @@ export function ReceivingPage() {
         ? 'تعذر التأكد من نتيجة الاستلام بسبب الاتصال. راجع سندات الاستلام قبل إعادة الإرسال لتجنب التكرار.'
         : 'Could not confirm the receipt outcome due to a connection error. Check saved receipts before submitting again to avoid duplicates.',
       'error');
-      setReceiveModal(null);
-      loadBackorders();
-      loadReceipts();
     } finally {
-      receiptLock.current = false;
       setSaving(false);
     }
   };

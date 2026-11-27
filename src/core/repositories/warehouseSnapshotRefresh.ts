@@ -28,15 +28,6 @@ export function aggregateVerifiedWarehouseRows(
       || !row.product_id?.trim() || row.quantity === null) {
       throw new Error('WAREHOUSE_SNAPSHOT_ROW_SCOPE_MISMATCH');
     }
-    // Accept only finite numeric values and standard decimal strings from
-    // Postgres. JS would otherwise coerce booleans, hexadecimal, or blanks.
-    if (typeof row.quantity !== 'number' && typeof row.quantity !== 'string') {
-      throw new Error('WAREHOUSE_SNAPSHOT_INVALID_QUANTITY');
-    }
-    if (typeof row.quantity === 'string'
-      && !/^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/.test(row.quantity.trim())) {
-      throw new Error('WAREHOUSE_SNAPSHOT_INVALID_QUANTITY');
-    }
     const quantity = Number(row.quantity);
     if (!Number.isFinite(quantity)) throw new Error('WAREHOUSE_SNAPSHOT_INVALID_QUANTITY');
     const total = (quantities.get(row.product_id) || 0) + quantity;

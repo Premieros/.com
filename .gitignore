@@ -36,3 +36,11 @@ test-results
 # Supabase temp
 .temp/
 supabase/.temp/
+
+# Electron release artifacts
+release/
+branch-hub/release/
+electron/release/
+*.exe
+*.asar
+*.blockmap

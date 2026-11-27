@@ -6,5 +6,3 @@ export { DesignPagination } from './DesignPagination';
 export { DesignLoadingState, DesignEmptyState, DesignErrorState } from './DesignStates';
 export { CenterTile, CenterGrid } from './CenterTile';
 export type { CenterTileItem } from './CenterTile';
-export { WorkspaceSparkline, WorkspaceMeter, WorkspaceDonut, WorkspaceLiveDot } from './WorkspaceIndicators';
-export type { IndicatorTone } from './WorkspaceIndicators';

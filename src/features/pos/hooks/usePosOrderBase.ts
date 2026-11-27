@@ -10,14 +10,12 @@ import type { CartItem, Customer, DiningTable, Order, OrderItem, OrderType, Prod
 import { ORDER_TYPE_KEY } from '../utils/orderTypes';
 import { resolveOrderBindingForSave } from '../utils/orderBinding';
 import { cartLineKey, cartToItems, orderItemLineKey, orderItemsToCart } from '../utils/cart';
-import { applyItemTransferToCart } from '../utils/itemTransfer';
 import { APPROVED_FIXED_THERMAL_WIDTH_MM, buildReceiptFixedTemplate, buildReceiptHtml, buildReceiptThermalText, enqueueAutomaticReceiptPrint, buildKitchenTicketHtml, openPrintWindow, ReceiptPrintApprovalError, type ReceiptData } from '../utils/printing';
 import { fetchOrderForWorkspace } from '../services/posOrders';
-import { qrError } from '@/features/qr/service';
 import { sendOrderToKitchen } from '../services/kitchen';
 import { enqueueCloudOpenOrderPrint } from '../services/cloudPrint';
 import { processSaleForOrder, nextInvoiceNumber, fetchBranchWarehouseId, createSaleOperationKey, type ProcessSalePayload } from '../services/payment';
-import type { KitchenSendItem, KitchenStationDispatchSummary, PosItemTransferResult } from '../types';
+import type { KitchenSendItem, KitchenStationDispatchSummary } from '../types';
 
 export interface ActiveShiftInfo {
   id: string;
@@ -76,18 +74,14 @@ export function usePosOrder(input: UsePosOrderInput) {
   const [tableId, setTableId] = useState<string | null>(null);
   const [guestCount, setGuestCount] = useState<number | null>(null);
   const [activeOrderId, setActiveOrderId] = useState<string | null>(orderId);
-  const transferScopeRef = useRef({ orderId: activeOrderId, branchId });
-  transferScopeRef.current = { orderId: activeOrderId, branchId };
   const [activeOrderNumber, setActiveOrderNumber] = useState<string | null>(null);
   const [activeTable, setActiveTable] = useState<DiningTable | null>(null);
   const [checkoutOpen, setCheckoutOpen] = useState(false);
   const [completing, setCompleting] = useState(false);
   // Synchronous lock: React state alone does not block same-tick double submits.
   const mutationLockRef = useRef(false);
-  const qrRevision = useRef(0);
   const pendingCheckoutRef = useRef<{ fingerprint: string; payload: ProcessSalePayload } | null>(null);
-  const [settledOrderId, setSettledOrderId] = useState<string | null>(null);
-  const orderLoading = !!orderId && settledOrderId !== orderId;
+  const [orderLoading, setOrderLoading] = useState(false);
   const [kitchenSending, setKitchenSending] = useState(false);
   const [kitchenSentItems, setKitchenSentItems] = useState<KitchenSendItem[]>([]);
   const [kitchenDispatch, setKitchenDispatch] = useState<KitchenStationDispatchSummary | null>(null);
@@ -119,20 +113,22 @@ export function usePosOrder(input: UsePosOrderInput) {
   }, [effSettings?.pos_default_payment_method]);
 
   useEffect(() => {
-    setSettledOrderId(null);
-    setActiveOrderId(null);
-    setActiveOrderNumber(null);
-    qrRevision.current = 0;
+    setActiveOrderId(orderId);
     setActiveTable(null);
     setCart(EMPTY_CART);
     setCustomerId('');
     setDiscountAmount(0);
-    setTableId(null);
-    setGuestCount(null);
-    setOrderType('takeaway');
-    setOrderNotes('');
-    if (!orderId) return;
+    if (!orderId) {
+      setActiveOrderNumber(null);
+      setTableId(null);
+      setGuestCount(null);
+      setOrderType('takeaway');
+      setCart(EMPTY_CART);
+      setOrderNotes('');
+      return;
+    }
     let cancelled = false;
+    setOrderLoading(true);
     fetchOrderForWorkspace(orderId)
       .then(({ order, items, products: orderProducts, table }) => {
         if (cancelled) return;
@@ -141,11 +137,10 @@ export function usePosOrder(input: UsePosOrderInput) {
           show(isAr ? 'لا يمكن استئناف طلب منتهي' : 'Cannot resume a completed order', 'error');
           setActiveOrderId(null);
           setActiveOrderNumber(null);
-          setSettledOrderId(orderId);
+          setOrderLoading(false);
           return;
         }
         setOrderType(order.order_type as OrderType);
-        qrRevision.current = Number(order.qr_revision || 0);
         setTableId(order.table_id);
         setActiveTable(table);
         setCustomerId(order.customer_id || '');
@@ -166,12 +161,12 @@ export function usePosOrder(input: UsePosOrderInput) {
         const cartItems = orderItemsToCart(items, orderProducts);
         if (cartItems.length > 0) setCart(cartItems);
         show(t('orderResumed'), 'success');
-        setSettledOrderId(orderId);
+        setOrderLoading(false);
       })
       .catch((error: unknown) => {
         if (cancelled) return;
         setCart(EMPTY_CART);
-        setSettledOrderId(orderId);
+        setOrderLoading(false);
         show(error instanceof Error ? error.message : 'ORDER_LOAD_FAILED', 'error');
       });
     return () => { cancelled = true; };
@@ -375,7 +370,6 @@ export function usePosOrder(input: UsePosOrderInput) {
   }, [isAr, performDetach]);
 
   const resumeTableOrder = useCallback((order: Order, items: OrderItem[], orderProducts: Product[], table: DiningTable) => {
-    qrRevision.current = Number(order.qr_revision || 0);
     setActiveOrderId(order.id);
     setActiveOrderNumber(order.order_number);
     setOrderType(order.order_type as OrderType);
@@ -387,28 +381,6 @@ export function usePosOrder(input: UsePosOrderInput) {
     const cartItems = orderItemsToCart(items, orderProducts);
     setCart(cartItems);
   }, []);
-
-  const applyItemsTransfer = useCallback((result: PosItemTransferResult): boolean => {
-    const scope = transferScopeRef.current;
-    const snapshot = result.snapshot;
-    const source = snapshot?.orders.find((order) => order.id === result.source_order_id);
-    if (!result.success || !snapshot || !source || scope.orderId !== source.id || scope.branchId !== source.branch_id) return false;
-    setCart((current) => applyItemTransferToCart(current, result));
-    const sourceTable = snapshot.tables.find((table) => table.id === source.table_id);
-    if (sourceTable) setActiveTable(sourceTable);
-    setDiscountAmount(Number(source.discount_amount || 0));
-    setDiscountType('amount');
-    setPaidAmount(0);
-    setCheckoutOpen(false);
-    // Authoritative kitchen send rows must replace any old session-only deltas.
-    setKitchenSentItems([]);
-    setKitchenDispatch(null);
-    if (source.status !== 'open' && source.status !== 'held') {
-      setActiveOrderId(null);
-      setActiveOrderNumber(null);
-    }
-    return true;
-  }, [setCart]);
 
   const startTableOrder = useCallback((table: DiningTable, guests = 2) => {
     setCart(EMPTY_CART);
@@ -422,6 +394,47 @@ export function usePosOrder(input: UsePosOrderInput) {
     setDiscountAmount(0);
     setPaidAmount(0);
   }, []);
+
+  const transferOrderToTable = useCallback(async (targetOrderId: string, fromTableId: string, toTableId: string): Promise<boolean> => {
+    try {
+      const { error: ordErr } = await supabase
+        .from('orders')
+        .update({ table_id: toTableId, updated_at: new Date().toISOString() })
+        .eq('id', targetOrderId);
+
+      if (ordErr) {
+        show(ordErr.message, 'error');
+        return false;
+      }
+
+      await supabase
+        .from('dining_tables')
+        .update({ status: 'vacant', updated_at: new Date().toISOString() })
+        .eq('id', fromTableId);
+
+      await supabase
+        .from('dining_tables')
+        .update({ status: 'occupied', updated_at: new Date().toISOString() })
+        .eq('id', toTableId);
+
+      const { data: newTable } = await supabase
+        .from('dining_tables')
+        .select('*')
+        .eq('id', toTableId)
+        .maybeSingle();
+
+      if (activeOrderId === targetOrderId) {
+        setTableId(toTableId);
+        setActiveTable((newTable as DiningTable) || null);
+      }
+
+      show(isAr ? 'تم تحويل الطلب إلى الطاولة الجديدة بنجاح' : 'Order transferred successfully', 'success');
+      return true;
+    } catch (err) {
+      show(err instanceof Error ? err.message : 'Transfer failed', 'error');
+      return false;
+    }
+  }, [activeOrderId, isAr, show]);
 
   const transferOrderItemToTable = useCallback(async (lineKey: string, targetTableId: string): Promise<boolean> => {
     if (!activeOrderId || !activeTable) return false;
@@ -601,7 +614,6 @@ export function usePosOrder(input: UsePosOrderInput) {
 
     if (activeOrderId) {
       const { data, error } = await api.floorPlan.updateOrder({
-        p_qr_revision: qrRevision.current,
         p_order_id: activeOrderId,
         p_order_type: binding.orderType,
         p_table_id: binding.tableId,
@@ -616,13 +628,12 @@ export function usePosOrder(input: UsePosOrderInput) {
         p_total: total,
         p_status: status,
       });
-      if (error) { show(error.message.includes('QR_') ? qrError(error) : error.message, 'error'); return { ok: false, orderId: null, orderNumber: null }; }
+      if (error) { show(error.message, 'error'); return { ok: false, orderId: null, orderNumber: null }; }
       const r = data as RpcResult | null;
       if (!r?.success) { show(r?.detail || r?.error || t('error'), 'error'); return { ok: false, orderId: null, orderNumber: null }; }
       return { ok: true, orderId: activeOrderId, orderNumber: activeOrderNumber };
     }
 
-    qrRevision.current = 0;
     const { data, error } = await api.floorPlan.createOrder({
       p_branch_id: branchId,
       p_order_type: binding.orderType,
@@ -662,10 +673,10 @@ export function usePosOrder(input: UsePosOrderInput) {
         if (!ok) return false;
         if (newId) {
           const heldRes = await api.floorPlan.setOrderStatus({ p_order_id: newId, p_status: 'held' });
-          setActiveOrderId(newId);
-          setActiveOrderNumber(newNum);
           if (heldRes.error || !(heldRes.data as RpcResult | null)?.success) {
             show(t('orderHeld') + ': ' + (heldRes.error?.message || (heldRes.data as RpcResult | null)?.detail || (heldRes.data as RpcResult | null)?.error || ''), 'error');
+            setActiveOrderId(newId);
+            setActiveOrderNumber(newNum);
             return false;
           }
         }
@@ -772,10 +783,6 @@ export function usePosOrder(input: UsePosOrderInput) {
     if (mutationLockRef.current || cart.length === 0 || completing) return false;
     if (!branchId) { show(t('selectBranchFirst'), 'error'); return false; }
     if (!activeShift) { show(t('shiftRequired'), 'error'); return false; }
-    if (paymentMethod !== 'credit' && total > 0 && paidAmount <= 0) {
-      show(isAr ? 'أدخل مبلغ التحصيل قبل تأكيد البيع.' : 'Enter a payment amount before confirming the sale.', 'error');
-      return false;
-    }
     if (paymentMethod === 'credit') {
       const creditCustomer = customers.find((customer) =>
         customer.id === customerId
@@ -826,7 +833,7 @@ export function usePosOrder(input: UsePosOrderInput) {
       const warehouseId = previousAttempt?.payload.p_warehouse_id ?? await fetchBranchWarehouseId(branchId, activeOrderId);
       const invoiceNumber = previousAttempt?.payload.p_invoice_number ?? await nextInvoiceNumber();
       const itemsPayload = cartToItems(cart);
-      const paidAmountToUse = paymentMethod === 'credit' ? 0 : paidAmount;
+      const paidAmountToUse = paymentMethod === 'credit' ? 0 : paidAmount || total;
       const binding = resolveOrderBindingForSave({
         activeOrderId,
         orderType,
@@ -1000,7 +1007,6 @@ export function usePosOrder(input: UsePosOrderInput) {
   const closeReceipt = useCallback(() => setReceiptSaleId(null), []);
 
   const resetWorkspace = useCallback(() => {
-    qrRevision.current = 0;
     setCart(EMPTY_CART);
     setCustomerId('');
     setOrderNotes('');
@@ -1032,14 +1038,13 @@ export function usePosOrder(input: UsePosOrderInput) {
     checkoutOpen, setCheckoutOpen,
     completing, orderLoading, kitchenSending, kitchenSentItems, kitchenDispatch,
     mutationLockRef,
-    qrRevision,
     lastReceipt, receiptSaleId, closeReceipt,
     subtotal, discountValue, taxAmount, total, change,
     effCurrency,
     addToCart, updateQty, setQty, removeFromCart, clearCart, setItemDiscount, replaceCartLine,
     switchOrderType, holdOrder, sendToKitchen, printKitchenTicket, completeSale, printReceipt,
     detachTable, detachOrder, resetWorkspace,
-    resumeTableOrder, startTableOrder, transferOrderItemToTable, applyItemsTransfer, voidSentItem,
+    resumeTableOrder, startTableOrder, transferOrderToTable, transferOrderItemToTable, voidSentItem,
   };
 }
 

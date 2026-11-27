@@ -9,12 +9,8 @@ import { useOrganizationModules } from '@/core/modules/OrganizationModulesContex
 import { moduleForPath, moduleForRoute, type OrganizationModuleKey } from '@/core/modules/module.config';
 import { PageLoadFallback } from '@/components/PageProgressLoader';
 
-const DeliveryWorkspacePage = lazy(() => import('../features/operations/delivery/DeliveryWorkspacePage'));
 const LoginPage = lazy(() => import('../features/auth/pages/LoginPage').then(m => ({ default: m.LoginPage })));
 const RegisterPage = lazy(() => import('../features/auth/pages/RegisterPage').then(m => ({ default: m.RegisterPage })));
-const PublicSupportPage = lazy(() => import('../features/support/PublicSupportPage').then(m => ({ default: m.PublicSupportPage })));
-const BranchWebsiteContactEditor = lazy(() => import('../features/support/BranchWebsiteContactEditor').then(m => ({ default: m.BranchWebsiteContactEditor })));
-const WebsiteEditorBridgePage = lazy(() => import('../features/qr/WebsiteEditorBridgePage').then(m => ({ default: m.WebsiteEditorBridgePage })));
 const DashboardPage = lazy(() => import('../features/dashboard/pages/DashboardEnhancedPage').then(m => ({ default: m.DashboardEnhancedPage })));
 const V2GatewayPage = lazy(() => import('../v2/pages/V2GatewayPage').then(m => ({ default: m.V2GatewayPage })));
 const OperationsCenterPage = lazy(() => import('../features/operations/pages/OperationsCenterPage').then(m => ({ default: m.OperationsCenterPage })));
@@ -24,9 +20,6 @@ const PeopleCenterPage = lazy(() => import('../features/parties/pages/PeopleCent
 const FinanceCenterPage = lazy(() => import('../features/accounting/pages/FinanceCenterPage').then(m => ({ default: m.FinanceCenterPage })));
 const AdministrationCenterPage = lazy(() => import('../features/admin/pages/AdministrationCenterPage').then(m => ({ default: m.AdministrationCenterPage })));
 const PosWorkspacePage = lazy(() => import('../features/pos/pages/PosWorkspacePage').then(m => ({ default: m.PosWorkspacePage })));
-const OrderBoardPage = lazy(() => import('../features/pos/pages/OrderBoardPage').then(m => ({ default: m.OrderBoardPage })));
-const StockHealthPage = lazy(() => import('../features/inventory/pages/StockHealthPage').then(m => ({ default: m.StockHealthPage })));
-const OrderHoursPage = lazy(() => import('../features/reporting/pages/OrderHoursPage').then(m => ({ default: m.OrderHoursPage })));
 const ActiveOrdersPage = lazy(() => import('../features/pos/pages/ActiveOrdersPage').then(m => ({ default: m.ActiveOrdersPage })));
 const ProductsPage = lazy(() => import('../features/catalog/pages/ProductsPage').then(m => ({ default: m.ProductsPage })));
 const PricingPage = lazy(() => import('../features/catalog/pages/PricingPage').then(m => ({ default: m.PricingPage })));
@@ -62,10 +55,6 @@ const ExpensesPage = lazy(() => import('../features/trade/pages/ExpensesPage').t
 const SalesPage = lazy(() => import('../features/trade/pages/SalesPage').then(m => ({ default: m.SalesPage })));
 const ShiftsPage = lazy(() => import('../features/trade/pages/ShiftsPage').then(m => ({ default: m.ShiftsPage })));
 const ReportsCenterPage = lazy(() => import('../features/reporting/pages/ReportsCenterPage').then(m => ({ default: m.ReportsCenterPage })));
-const ReportFullPage = lazy(() => import('../features/reporting/pages/ReportFullPage').then(m => ({ default: m.ReportFullPage })));
-const ConsumptionReportPage = lazy(() => import('../features/reporting/pages/ConsumptionReportPage').then(m => ({ default: m.ConsumptionReportPage })));
-const MonthCloseReviewPage = lazy(() => import('../features/reporting/pages/MonthCloseReviewPage').then(m => ({ default: m.MonthCloseReviewPage })));
-const PeriodCloseDocumentsPage = lazy(() => import('../features/reporting/pages/PeriodCloseDocumentsPage').then(m => ({ default: m.PeriodCloseDocumentsPage })));
 const AccountsPage = lazy(() => import('../features/accounting/pages/AccountsPage').then(m => ({ default: m.AccountsPage })));
 const OpeningBalancesPage = lazy(() => import('../features/accounting/pages/OpeningBalancesPage').then(m => ({ default: m.OpeningBalancesPage })));
 const EmployeeReceivablesPage = lazy(() => import('../features/accounting/pages/EmployeeReceivablesPage').then(m => ({ default: m.EmployeeReceivablesPage })));
@@ -78,41 +67,14 @@ const PermissionsPage = lazy(() => import('../features/admin/pages/PermissionsPa
 const ApprovalCenterPage = lazy(() => import('../features/admin/pages/ApprovalCenterPage').then(m => ({ default: m.ApprovalCenterPage })));
 const AuditLogPage = lazy(() => import('../features/reporting/pages/AuditLogPage').then(m => ({ default: m.AuditLogPage })));
 const SettingsControlCenterPage = lazy(() => import('../features/admin/pages/SettingsControlCenterPage').then(m => ({ default: m.SettingsControlCenterPage })));
-const IntegrationsHubPage = lazy(() => import('../features/integrations/pages/IntegrationsHubPage').then(m => ({ default: m.IntegrationsHubPage })));
 const SuperAdminConsolePage = lazy(() => import('../features/admin/pages/SuperAdminConsolePage').then(m => ({ default: m.SuperAdminConsolePage })));
 const SystemHealthPage = lazy(() => import('../features/admin/pages/SystemHealthPage').then(m => ({ default: m.SystemHealthPage })));
 const ImportExportCenterPage = lazy(() => import('../features/import-export/pages/ImportExportCenterPage').then(m => ({ default: m.ImportExportCenterPage })));
+const CustomerOrderPage = lazy(() => import('../features/customer/pages/CustomerOrderPage').then(m => ({ default: m.CustomerOrderPage })));
+const CustomerTrackPage = lazy(() => import('../features/customer/pages/CustomerTrackPage').then(m => ({ default: m.CustomerTrackPage })));
 
 function PageLoader() {
   return <PageLoadFallback />;
-}
-
-/**
- * Lazy page modules may still need a network fetch on first entry. Keep the
- * authenticated app chrome mounted instead of replacing the entire screen.
- * No stale/sensitive records are shown until the scoped query resolves.
- */
-function RouteContentFallback() {
-  return (
-    <section role="status" aria-label="Loading page content" data-testid="route-content-loading"
-      className="min-w-0 space-y-3" aria-busy="true">
-      <div className="flex min-h-12 items-center justify-between gap-4">
-        <div className="h-6 w-40 animate-pulse rounded-lg bg-ui-page-alt" />
-        <div className="h-9 w-36 animate-pulse rounded-lg bg-ui-page-alt" />
-      </div>
-      <div className="overflow-hidden rounded-xl border border-ui-border bg-ui-surface">
-        <div className="h-12 animate-pulse border-b border-ui-border bg-ui-page-alt/70" />
-        {Array.from({ length: 7 }, (_, index) => (
-          <div key={index} className="flex h-14 items-center gap-6 border-b border-ui-border px-5 last:border-b-0"
-            aria-hidden="true">
-            <div className="h-3 w-1/4 animate-pulse rounded bg-ui-page-alt" />
-            <div className="h-3 w-1/3 animate-pulse rounded bg-ui-page-alt" />
-            <div className="h-3 w-1/5 animate-pulse rounded bg-ui-page-alt" />
-          </div>
-        ))}
-      </div>
-    </section>
-  );
 }
 
 function NoAccessPage() {
@@ -161,7 +123,7 @@ function ProtectedRoute({ children, permission, permissionsAny, fullscreen, supe
   if (permission && !can(permission)) return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
   if (permissionsAny && !permissionsAny.some((candidate) => can(candidate))) return landingRoute ? <Navigate to={landingRoute} replace /> : <NoAccessPage />;
   if (fullscreen) return <>{children}</>;
-  return <Layout><Suspense fallback={<RouteContentFallback />}>{children}</Suspense></Layout>;
+  return <Layout>{children}</Layout>;
 }
 
 function PublicRoute({ children }: { children: ReactNode }) {
@@ -190,11 +152,11 @@ export function AppRoutes() {
   return (
     <Suspense fallback={<PageLoader />}>
       <Routes>
+        <Route path={APP_ROUTES.customerOrder} element={<CustomerOrderPage />} />
+        <Route path={APP_ROUTES.customerTrack} element={<CustomerTrackPage />} />
+        <Route path={`${APP_ROUTES.customerTrack}/:orderId`} element={<CustomerTrackPage />} />
         <Route path={APP_ROUTES.login} element={<PublicRoute><LoginPage /></PublicRoute>} />
         <Route path={APP_ROUTES.register} element={<PublicRoute><RegisterPage /></PublicRoute>} />
-        <Route path="/website-editor" element={<WebsiteEditorBridgePage />} />
-        <Route path="/customer-support/:branchId" element={<PublicSupportPage />} />
-        <Route path="/website-contact/:branchId" element={<ProtectedRoute permissionsAny={["website.edit", "settings.manage"]} fullscreen><BranchWebsiteContactEditor /></ProtectedRoute>} />
         <Route path={APP_ROUTES.frontendV2} element={<ProtectedRoute fullscreen><V2GatewayPage /></ProtectedRoute>} />
         <Route path={`${APP_ROUTES.frontendV2}/pos`} element={<ProtectedRoute permission="pos.view" fullscreen><Navigate to={APP_ROUTES.pos} replace /></ProtectedRoute>} />
         <Route path={`${APP_ROUTES.frontendV2}/shifts`} element={<ProtectedRoute permission="shifts.view" fullscreen><Navigate to={APP_ROUTES.shifts} replace /></ProtectedRoute>} />
@@ -208,9 +170,8 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.manufacturingCenter} element={<Navigate to={APP_ROUTES.inventoryUnits} replace />} />
         <Route path={APP_ROUTES.pos} element={<ProtectedRoute permission="pos.view" fullscreen><PosWorkspacePage /></ProtectedRoute>} />
         <Route path={`${APP_ROUTES.pos}/:orderId`} element={<ProtectedRoute permission="pos.view" fullscreen><PosWorkspacePage /></ProtectedRoute>} />
-        <Route path={APP_ROUTES.delivery} element={<ProtectedRoute permission="pos.view"><DeliveryWorkspacePage /></ProtectedRoute>} />
+        <Route path={APP_ROUTES.delivery} element={<ProtectedRoute permission="pos.view" fullscreen><Navigate to={APP_ROUTES.pos} replace state={{ startStep: 'delivery' }} /></ProtectedRoute>} />
         <Route path={APP_ROUTES.driveThru} element={<ProtectedRoute permission="pos.view" fullscreen><Navigate to={APP_ROUTES.pos} replace state={{ startStep: 'car' }} /></ProtectedRoute>} />
-        <Route path={APP_ROUTES.orderBoard} element={<ProtectedRoute permission="floor_plan.view"><OrderBoardPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.floorPlan} element={<ProtectedRoute permission="floor_plan.view"><ActiveOrdersPage /></ProtectedRoute>} />
         <Route path="/kitchen" element={<ProtectedRoute permission="pos.kds_view"><Navigate to={APP_ROUTES.kitchenDisplay} replace /></ProtectedRoute>} />
         <Route path="/tables" element={<ProtectedRoute permission="floor_plan.view"><Navigate to={APP_ROUTES.floorPlan} replace /></ProtectedRoute>} />
@@ -225,7 +186,6 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.wasteCenter} element={<ProtectedRoute permission="waste.view"><WasteCenterPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.kitchenDisplay} element={<ProtectedRoute permission="pos.kds_view"><KitchenDisplayPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.kitchenStations} element={<ProtectedRoute permission="settings.manage"><KitchenStationsPage /></ProtectedRoute>} />
-        <Route path={APP_ROUTES.stockHealth} element={<ProtectedRoute permission="inventory.view"><StockHealthPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.stockBalances} element={<ProtectedRoute permission="inventory.view"><StockBalancesPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.inventory} element={<ProtectedRoute permission="inventory.view"><InventoryPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.warehouses} element={<ProtectedRoute permission="warehouses.view"><WarehousesPage /></ProtectedRoute>} />
@@ -251,12 +211,7 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.expenses} element={<ProtectedRoute permission="expenses.view"><ExpensesPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.sales} element={<ProtectedRoute permission="sales.view"><SalesPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.shifts} element={<ProtectedRoute permission="shifts.view"><ShiftsPage /></ProtectedRoute>} />
-        <Route path={APP_ROUTES.orderHours} element={<ProtectedRoute permission="reports.view"><OrderHoursPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.reports} element={<ProtectedRoute permissionsAny={["reports.view", "reports.financial"]}><ReportsCenterPage /></ProtectedRoute>} />
-        <Route path="/reports/view" element={<ProtectedRoute permissionsAny={["reports.view", "reports.financial"]}><ReportFullPage /></ProtectedRoute>} />
-        <Route path="/reports/consumption" element={<ProtectedRoute permission="reports.view"><ConsumptionReportPage /></ProtectedRoute>} />
-        <Route path="/reports/month-review" element={<ProtectedRoute permission="reports.view"><MonthCloseReviewPage /></ProtectedRoute>} />
-        <Route path="/reports/period-documents" element={<ProtectedRoute permission="reports.view"><PeriodCloseDocumentsPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.financialReports} element={<ProtectedRoute permission="reports.financial"><ReportsCenterPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.accounting} element={<ProtectedRoute permission="reports.financial"><Navigate to={APP_ROUTES.financialReports} replace /></ProtectedRoute>} />
         <Route path={APP_ROUTES.accounts} element={<ProtectedRoute permission="accounts.view"><AccountsPage /></ProtectedRoute>} />
@@ -272,7 +227,6 @@ export function AppRoutes() {
         <Route path={APP_ROUTES.approvals} element={<ProtectedRoute permission="approvals.review"><ApprovalCenterPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.auditLog} element={<ProtectedRoute permission="audit.view"><AuditLogPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.settings} element={<ProtectedRoute permission="settings.manage"><SettingsControlCenterPage /></ProtectedRoute>} />
-        <Route path={APP_ROUTES.integrations} element={<ProtectedRoute permission="settings.manage"><IntegrationsHubPage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.superAdmin} element={<ProtectedRoute superAdminOnly><SuperAdminConsolePage /></ProtectedRoute>} />
         <Route path={APP_ROUTES.basicSettings} element={<ProtectedRoute permission="settings.manage"><Navigate to={APP_ROUTES.settings} replace /></ProtectedRoute>} />
         <Route path={APP_ROUTES.systemHealth} element={<ProtectedRoute permission="settings.manage"><SystemHealthPage /></ProtectedRoute>} />

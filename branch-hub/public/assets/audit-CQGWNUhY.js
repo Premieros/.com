@@ -1,0 +1,1 @@
+import{J as l}from"./index-DT0DAaE3.js";async function s(i,n,u,o){try{const{data:{session:a}}=await l.auth.getSession(),t=(a==null?void 0:a.user)??null;await l.from("audit_log").insert({user_id:(t==null?void 0:t.id)||null,user_email:(t==null?void 0:t.email)||null,action:i,entity:n,entity_id:u||null,details:o||null})}catch{}}export{s as l};

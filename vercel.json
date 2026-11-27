@@ -2,21 +2,7 @@
   "framework": "vite",
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
-  "headers": [
-    {
-      "source": "/_website-photo/:path*",
-      "headers": [{ "key": "x-vercel-enable-rewrite-caching", "value": "0" }]
-    }
-  ],
   "rewrites": [
-    {
-      "source": "/_website-photo/save",
-      "destination": "https://hvqlkapynjfjikqithvd.supabase.co/rest/v1/rpc/branch_website_photo_save_one"
-    },
-    {
-      "source": "/_website-photo/upload/:branch([0-9a-f-]{36})/:slot([a-zA-Z0-9]+)/:file([0-9a-f-]{36}\\.(?:jpg|png|webp))",
-      "destination": "https://hvqlkapynjfjikqithvd.supabase.co/storage/v1/object/branch-website-photos/:branch/:slot/:file"
-    },
     {
       "source": "/(.*)",
       "destination": "/index.html"

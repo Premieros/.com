@@ -1,4 +1,3 @@
-import { createPortal } from 'react-dom';
 import { type ReactNode, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
@@ -8,7 +7,6 @@ interface ModalProps {
   onClose: () => void;
   title: string;
   children: ReactNode;
-  manageFocus?: boolean;
   size?: 'sm' | 'md' | 'lg' | 'xl' | '2xl';
 }
 
@@ -20,7 +18,7 @@ const sizes = {
   '2xl': 'sm:max-w-6xl',
 };
 
-export function Modal({ open, isOpen, onClose, title, children, size = 'md', manageFocus = false }: ModalProps) {
+export function Modal({ open, isOpen, onClose, title, children, size = 'md' }: ModalProps) {
   const isModalOpen = open ?? isOpen ?? false;
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -37,47 +35,15 @@ export function Modal({ open, isOpen, onClose, title, children, size = 'md', man
     }
   }, [isModalOpen, onClose]);
 
-  useEffect(() => {
-    const panel = modalRef.current;
-    if (!isModalOpen || !manageFocus || !panel) return;
-    const trigger = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    panel.focus();
-
-    const keepFocusInside = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab') return;
-      const controls = [...panel.querySelectorAll<HTMLElement>(
-        'a[href], button, input, select, textarea, [tabindex]',
-      )].filter((element) => element.tabIndex >= 0 && !element.matches(':disabled') && element.getClientRects().length > 0);
-      const first = controls[0];
-      const last = controls[controls.length - 1];
-      if (!first || !last) {
-        event.preventDefault();
-        return;
-      }
-      const focused = document.activeElement;
-      const atBoundary = focused === panel || !panel.contains(focused) || focused === (event.shiftKey ? first : last);
-      if (atBoundary) {
-        event.preventDefault();
-        (event.shiftKey ? last : first).focus();
-      }
-    };
-    document.addEventListener('keydown', keepFocusInside);
-    return () => {
-      document.removeEventListener('keydown', keepFocusInside);
-      if (trigger?.isConnected) trigger.focus();
-    };
-  }, [isModalOpen, manageFocus]);
-
   if (!isModalOpen) return null;
 
-  return createPortal(
+  return (
     <div data-testid="modal-root" className="fixed inset-0 z-[70] flex items-end justify-center p-0 animate-fade-in sm:items-center sm:p-4">
       <div data-testid="modal-backdrop" className="absolute inset-0 bg-ui-text/40 backdrop-blur-md" onClick={onClose} aria-hidden="true" />
       <div
         ref={modalRef}
         data-testid="modal-panel"
-        className={`relative flex h-[min(92dvh,760px)] max-h-[92dvh] w-full flex-col rounded-t-[26px] border border-ui-border bg-ui-surface shadow-ui-xl animate-scale-in sm:h-auto sm:max-h-[90dvh] sm:rounded-[26px] ${sizes[size]}`}
-        tabIndex={manageFocus ? -1 : undefined}
+        className={`relative flex h-[min(92dvh,760px)] max-h-[92dvh] w-full flex-col rounded-t-2xl liquid-glass-card shadow-2xl animate-scale-in sm:h-auto sm:max-h-[90dvh] sm:rounded-ui-xl ${sizes[size]}`}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -96,7 +62,6 @@ export function Modal({ open, isOpen, onClose, title, children, size = 'md', man
           {children}
         </div>
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }

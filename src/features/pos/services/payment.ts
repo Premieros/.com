@@ -4,7 +4,6 @@ import { SettingsRepository, InventoryRepository } from '@/core/repositories';
 import { saveVerifiedSaleWarehouse } from '@/core/offline/warehouseBinding';
 import type { RpcResult, OrderType } from '@/lib/types';
 import type { ItemPayload } from '../utils/cart';
-import { hasValidOfflineSaleItems } from '../utils/offlineSaleItemGuard';
 import { cacheConfirmedSaleMovements } from './saleConfirmationCache';
 
 export interface ProcessSalePayload {
@@ -124,41 +123,9 @@ export function createSaleOperationKey(): string {
   return `sale:${createOfflineToken()}`;
 }
 
-async function queueOfflineSale(p: ProcessSalePayload, allowNegative: boolean, startedOffline: boolean, expectedOwnerId: string): Promise<string> {
-  // Revalidate at the durable write boundary: connectivity can change after
-  // processSaleForOrder's initial offline check while settings load.
-  if (!hasValidOfflineSaleItems(p.p_items)) throw new Error('OFFLINE_SALE_INVALID_ITEMS');
+async function queueOfflineSale(p: ProcessSalePayload): Promise<string> {
   if (!p.p_shift_id) throw new Error('SHIFT_REQUIRED_OFFLINE');
   if (!p.p_warehouse_id?.trim()) throw new Error('WAREHOUSE_REQUIRED_OFFLINE_CAPTURE');
-  // Approvals require online server verification. Never persist these methods
-  // as a plain offline sale, even when connectivity drops after preflight.
-  if (p.p_payment_method === 'instapay' || p.p_payment_method === 'bank_transfer') {
-    throw new Error('MANUAL_PAYMENT_REQUIRES_ONLINE_APPROVAL');
-  }
-
-  // If the connection dropped AFTER the initial preflight, its branch-wide
-  // stock check cannot justify an offline sale in this pinned warehouse.
-  // Check the exact warehouse before any durable outbox insertion.
-  if (!allowNegative && !startedOffline) {
-    const requested = new Map<string, number>();
-    for (const item of p.p_items) {
-      requested.set(item.product_id, (requested.get(item.product_id) || 0) + item.quantity);
-    }
-    for (const [productId, quantity] of requested) {
-      let stock;
-      try {
-        stock = await InventoryRepository.getWarehouseAvailableStock(
-          productId, p.p_branch_id, p.p_warehouse_id,
-        );
-      } catch {
-        throw new Error('OFFLINE_WAREHOUSE_STOCK_UNVERIFIED');
-      }
-      if (stock.status !== 'known') {
-        throw new Error('OFFLINE_WAREHOUSE_STOCK_UNVERIFIED: ' + stock.reason);
-      }
-      if (quantity > stock.quantity) throw new Error('INSUFFICIENT_STOCK');
-    }
-  }
 
   // getSession() reads the persisted local Supabase session and therefore works
   // while offline. Never accept a financially relevant outbox row without a
@@ -167,7 +134,6 @@ async function queueOfflineSale(p: ProcessSalePayload, allowNegative: boolean, s
   const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
   const originatingUserId = sessionData.session?.user?.id || null;
   if (sessionError || !originatingUserId) throw new Error('AUTH_REQUIRED_OFFLINE');
-  if (originatingUserId !== expectedOwnerId) throw new Error('OFFLINE_SALE_OWNER_CHANGED');
 
   const id = `offline_sale_${createOfflineToken()}`;
   const operationKey = p.p_client_operation_key?.trim() || id;
@@ -290,36 +256,13 @@ export async function getManualPaymentApprovalStatus(requestId: string): Promise
 }
 
 export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ result: ProcessSaleResult | null; error: string | null }> {
-  // Online sales must use the server's branch-specific setting. IndexedDB can
-  // contain an older value even after the manager enabled negative stock.
-  // Offline capture intentionally falls back to the last cached branch setting.
+  // Authoritative Business Logic Check: Negative Stock Policy
+  // If negative stock is disabled, check effective available stock (accounting for unsynced local outbox sales)
+  const branchSettings = await SettingsRepository.getBranchSettings(p.p_branch_id);
+  const globalSettings = await SettingsRepository.getGlobalSettings();
+  const allowNegative = branchSettings?.allow_negative_stock ?? globalSettings?.allow_negative_stock ?? false;
+
   const explicitlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
-  // Capture the owner before reading any cache, not only at durable enqueue.
-  const { data: initialSession, error: initialSessionError } = await supabase.auth.getSession();
-  const expectedOwnerId = initialSession.session?.user?.id;
-  if (initialSessionError || !expectedOwnerId) return { result: null, error: 'AUTH_REQUIRED' };
-  let allowNegative = false;
-  if (explicitlyOffline) {
-    const branchSettings = await SettingsRepository.getBranchSettings(p.p_branch_id, expectedOwnerId);
-    const globalSettings = await SettingsRepository.getGlobalSettings(expectedOwnerId);
-    allowNegative = branchSettings?.allow_negative_stock ?? globalSettings?.allow_negative_stock ?? false;
-  } else {
-    const { data: serverAllowsNegative, error: policyError } = await supabase.rpc(
-      'pos_branch_negative_stock_policy', { p_branch_id: p.p_branch_id },
-    );
-    if (policyError) {
-      // Don't misreport an unknown policy as "negative stock disabled".
-      // Failing closed also prevents a stale offline cache from loosening policy.
-      return { result: null, error: `STOCK_POLICY_UNAVAILABLE: ${policyError.message}` };
-    }
-    allowNegative = serverAllowsNegative === true;
-  }
-  if (explicitlyOffline && (p.p_payment_method === 'instapay' || p.p_payment_method === 'bank_transfer')) {
-    return { result: null, error: 'MANUAL_PAYMENT_REQUIRES_ONLINE_APPROVAL' };
-  }
-  if (explicitlyOffline && !hasValidOfflineSaleItems(p.p_items)) {
-    return { result: null, error: 'OFFLINE_SALE_INVALID_ITEMS' };
-  }
   if (explicitlyOffline && !p.p_warehouse_id?.trim()) {
     return { result: null, error: 'WAREHOUSE_REQUIRED_OFFLINE_CAPTURE' };
   }
@@ -360,9 +303,6 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   }
 
   const splitPayments = consumeArmedSplitTender();
-  if (splitPayments && (p.p_payment_method === 'instapay' || p.p_payment_method === 'bank_transfer')) {
-    return { result: null, error: 'SPLIT_MANUAL_PAYMENT_UNSUPPORTED' };
-  }
 
   // Split tender is intentionally online-only. It must never degrade into an
   // offline queue because that could produce partial financial truth.
@@ -373,11 +313,8 @@ export async function processSaleForOrder(p: ProcessSalePayload): Promise<{ resu
   // Explicit offline sales are accepted only into the authoritative IndexedDB
   // outbox. They are pending reconciliation, not a server-confirmed payment.
   if (!splitPayments && typeof navigator !== 'undefined' && !navigator.onLine) {
-    if (p.p_payment_method === 'instapay' || p.p_payment_method === 'bank_transfer') {
-      return { result: null, error: 'MANUAL_PAYMENT_REQUIRES_ONLINE_APPROVAL' };
-    }
     try {
-      const queuedId = await queueOfflineSale(p, allowNegative, explicitlyOffline, expectedOwnerId);
+      const queuedId = await queueOfflineSale(p);
       return {
         result: {
           success: true,

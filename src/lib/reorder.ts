@@ -41,10 +41,7 @@ export function suggestProductReorderQty(a: {
 export function suggestRawReorderQty(row: { quantity: number; min_stock: number }): number {
   const onHand = Number(row.quantity) || 0;
   const minStock = Number(row.min_stock) || 0;
-  // A negative balance is an actual deficit even when no minimum stock is set.
-  // First recover the deficit to zero (or to the configured minimum), rather
-  // than suggesting a single unit for an arbitrarily large negative balance.
-  let qty = Math.max(minStock - onHand, 0);
+  let qty = minStock > 0 ? Math.max(minStock - onHand, 0) : 0;
   if (qty <= 0 && onHand <= 0) qty = 1;
   return qty;
 }

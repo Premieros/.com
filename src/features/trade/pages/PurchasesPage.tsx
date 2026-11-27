@@ -1,5 +1,5 @@
-import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useState, useMemo } from 'react';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { Plus, Trash2, Eye, Download, Send, Check, X, PackageOpen, RotateCcw, Edit2 } from 'lucide-react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '@/api';
@@ -11,14 +11,13 @@ import { useBranchScope } from '@/lib/branchScope';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useToast } from '@/components/Toast';
 import { purchaseReturnFailureMessage } from '@/features/trade/utils/purchaseReturnErrors';
-import { convertPurchaseLineUnit } from '../services/purchasePriceUnits';
 import { DesignSurface, DesignPageHeader, DesignSearch, DesignPanel, DesignPagination } from '@/components/design';
 import { DataTable, type Column } from '@/components/DataTable';
 import { Button } from '@/components/Button';
 import { Select } from '@/components/Input';
 import { Modal } from '@/components/Modal';
 import { BranchBadge } from '@/components/BranchBadge';
-import { formatFinancialCurrency, formatCurrency, formatDate, generateInvoiceNumber } from '@/lib/format';
+import { formatCurrency, formatDate, generateInvoiceNumber } from '@/lib/format';
 import { exportToExcel } from '@/lib/excel';
 import { logAudit } from '@/lib/audit';
 import { useCan } from '@/lib/permissions';
@@ -51,12 +50,15 @@ export function PurchasesPage() {
   const { show } = useToast();
   const can = useCan();
   const navigate = useNavigate();
+  const [search, setSearch] = useState('');
+  const searchTerm = useDebouncedValue(search, 250);
   const { rows: items, loading, error, total, hasMore, loadMore, loadingMore, refresh: reloadPurchases, fetchAll: fetchAllPurchases } = usePaginatedRows<Purchase>({
     table: 'purchases',
-    select: '*, supplier:suppliers(*)',
+    select: '*, supplier:suppliers(*), search_supplier:suppliers()',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
     or: history.minIso ? `created_at.gte.${history.minIso},status.in.(draft,submitted,approved,partial)` : undefined,
+    search: { term: searchTerm, columns: ["invoice_number"], relations: {"search_supplier":["name"]} },
     pageSize: 100,
   });
   const { effectiveSettings } = useSettings();
@@ -67,13 +69,12 @@ export function PurchasesPage() {
     interceptDbError,
     startGuidance,
   } = useOperationalGuard();
-  const currency = effectiveSettings(branchScope.selectedBranchIds.length === 1 ? branchScope.selectedBranchIds[0] : branchFilter)?.currency || 'EGP';
+  const currency = effectiveSettings(branchFilter)?.currency || 'EGP';
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [rawUnits, setRawUnits] = useState<InlineRawUnit[]>([]);
-  const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
   const [viewModal, setViewModal] = useState<Purchase | null>(null);
@@ -141,29 +142,27 @@ export function PurchasesPage() {
   const subtotal = useMemo(() => lineItems.reduce((s, i) => s + i.quantity * i.unit_cost, 0), [lineItems]);
 
   const openAdd = () => {
-    const targetBranchId = branchFilter || user?.branch_id || branches[0]?.id || '';
-    const targetSupplier = suppliers.find((supplier) => supplier.branch_id === targetBranchId);
-    const targetWarehouse = warehouses.find((warehouse) => warehouse.branch_id === targetBranchId);
-    const draft = {
-      supplier_id: targetSupplier?.id || '',
-      warehouse_id: targetWarehouse?.id || '',
-      branch_id: targetBranchId,
-      payment_method: 'cash',
-      notes: '',
-    } satisfies typeof form;
-    const draftLines = [{ ...EMPTY_LINE }];
     const allowed = guardPurchase({
       warehousesCount: warehouses.length,
       suppliersCount: suppliers.length,
       productsCount: products.length,
       rawMaterialsCount: rawMaterials.length,
-      formData: { form: draft, lineItems: draftLines },
+      formData: { form, lineItems },
     });
     if (!allowed) return;
 
     setEditingPurchase(null);
-    setForm(draft);
-    setLineItems(draftLines);
+    const targetBranchId = branchFilter || user?.branch_id || branches[0]?.id || '';
+    const targetSupplier = suppliers.find((supplier) => supplier.branch_id === targetBranchId);
+    const targetWarehouse = warehouses.find((warehouse) => warehouse.branch_id === targetBranchId);
+    setForm({
+      supplier_id: targetSupplier?.id || '',
+      warehouse_id: targetWarehouse?.id || '',
+      branch_id: targetBranchId,
+      payment_method: 'cash',
+      notes: '',
+    });
+    setLineItems([{ ...EMPTY_LINE }]);
     setModalOpen(true);
   };
 
@@ -204,20 +203,6 @@ export function PurchasesPage() {
 
   const addLine = () => setLineItems([...lineItems, { ...EMPTY_LINE }]);
   const updateLine = (i: number, field: keyof PurchaseFormItem, value: string | number) => setLineItems(lineItems.map((l, idx) => idx === i ? { ...l, [field]: value } : l));
-  const changePurchaseUnit = (index: number, nextUnit: string) => {
-    const line = lineItems[index];
-    if (!line || line.line_type !== 'raw') return;
-    const converted = convertPurchaseLineUnit(line, nextUnit);
-    if (!converted) {
-      show(lang === 'ar'
-        ? 'لا يمكن تحويل هذه الوحدة تلقائيًا. اختر وحدة متوافقة مع الخامة أو راجع الوحدة والسعر قبل الحفظ.'
-        : 'This unit cannot be converted automatically. Choose a compatible unit or review the unit and price before saving.',
-      'error');
-      return;
-    }
-    setLineItems(current => current.map((item, idx) => idx === index && item === line
-      ? { ...item, ...converted } : item));
-  };
   const removeLine = (i: number) => setLineItems(lineItems.filter((_, idx) => idx !== i));
 
   const rawUnitName = (id: string) => {
@@ -651,15 +636,11 @@ export function PurchasesPage() {
         />
       )}
 
-      <WorkspaceControls><div data-testid="purchases-search-panel">
+      <DesignPanel testId="purchases-search-panel" className="ui-accent-purchase">
         <DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} testId="purchases-search" />
-      </div></WorkspaceControls>
+      </DesignPanel>
       <DesignPanel testId="purchases-table-panel" className="ui-accent-purchase">
-        <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} onRowClick={viewPurchase}
-          columnTotals={branchScope.selectedBranchIds.length === 1 ? [
-            { key: 'total', label: lang === 'ar' ? 'إجمالي المشتريات المعروضة' : 'Visible purchases total', value: (row) => Number(row.total), format: (sum) => formatFinancialCurrency(sum, currency, lang) },
-            { key: 'supplier_outstanding', label: lang === 'ar' ? 'إجمالي المستحق للموردين' : 'Visible supplier outstanding', value: (row) => supplierOutstanding(row.total, row.paid_amount, row.returned_amount), format: (sum) => formatFinancialCurrency(sum, currency, lang) },
-          ] : undefined} />
+        <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} onRowClick={viewPurchase} />
         <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
       </DesignPanel>
 
@@ -750,7 +731,7 @@ export function PurchasesPage() {
                   {l.line_type === 'raw' ? (
                     <select
                       value={l.unit_name}
-                      onChange={(e) => changePurchaseUnit(i, e.target.value)}
+                      onChange={(e) => updateLine(i, 'unit_name', e.target.value)}
                       className="col-span-2 rounded-md border border-ui-border bg-ui-surface px-2 py-1.5 text-sm"
                       title={`${lang === 'ar' ? 'وحدة الشراء' : 'Purchase unit'} · ${lang === 'ar' ? 'وحدة التخزين' : 'Stock unit'}: ${rawUnitName(l.raw_material_id)}`}
                     >
@@ -759,8 +740,8 @@ export function PurchasesPage() {
                   ) : (
                     <input value={l.unit_name} onChange={(e) => updateLine(i, 'unit_name', e.target.value)} className="col-span-2 rounded-md border border-ui-border bg-ui-surface px-2 py-1.5 text-sm" placeholder={lang === 'ar' ? 'الوحدة' : 'Unit'} />
                   )}
-                  <input type="number" placeholder={t('quantity')} step="any" min="0" value={l.quantity || ''} onChange={(e) => updateLine(i, 'quantity', parseFloat(e.target.value) || 0)} className="col-span-1 rounded-md border border-ui-border bg-ui-surface px-2 py-1.5 text-sm" />
-                  <input type="number" placeholder={t('cost')} step="any" min="0" value={l.unit_cost || ''} onChange={(e) => updateLine(i, 'unit_cost', parseFloat(e.target.value) || 0)} className="col-span-2 rounded-md border border-ui-border bg-ui-surface px-2 py-1.5 text-sm" />
+                  <input type="number" placeholder={t('quantity')} value={l.quantity || ''} onChange={(e) => updateLine(i, 'quantity', parseFloat(e.target.value) || 0)} className="col-span-1 rounded-md border border-ui-border bg-ui-surface px-2 py-1.5 text-sm" />
+                  <input type="number" placeholder={t('cost')} step="0.01" value={l.unit_cost || ''} onChange={(e) => updateLine(i, 'unit_cost', parseFloat(e.target.value) || 0)} className="col-span-2 rounded-md border border-ui-border bg-ui-surface px-2 py-1.5 text-sm" />
                   <span className="col-span-1 text-sm text-ui-muted text-end">{formatCurrency(l.quantity * l.unit_cost, currency, lang)}</span>
                   <button onClick={() => removeLine(i)} className="col-span-1 p-1.5 text-ui-danger hover:bg-ui-danger-soft rounded-md"><Trash2 className="w-4 h-4" /></button>
                 </div>
@@ -768,11 +749,6 @@ export function PurchasesPage() {
             </div>
           </div>
 
-          <p className="text-xs text-ui-muted" data-testid="purchase-unit-conversion-hint">
-            {lang === 'ar'
-              ? 'عند تغيير وحدة شراء الخامة (كيلو/جرام أو لتر/مل)، يتم تعديل الكمية وسعر الوحدة معًا مع الحفاظ على قيمة البند. الوحدات غير المتوافقة لا تتحول تلقائيًا.'
-              : 'Changing raw-material purchase units (kg/g or L/mL) adjusts quantity and unit price together while preserving the line total. Incompatible units are not converted automatically.'}
-          </p>
           <div className="flex justify-between items-center pt-2 border-t border-ui-border">
             <span className="text-lg font-bold">{t('total')}: {formatCurrency(subtotal, currency, lang)}</span>
             <div className="flex gap-2">

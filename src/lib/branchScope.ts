@@ -121,12 +121,6 @@ export function useBranchScope() {
     });
   };
 
-  const selectOnlyBranch = (branchId: string) => {
-    if (!organizationBranchIds.includes(branchId)) return;
-    write({ mode: 'selected', selectedIds: [branchId] });
-    setActiveBranchId(branchId);
-  };
-
   const toggleBranch = (branchId: string) => {
     if (!organizationBranchIds.includes(branchId)) return;
     const base = stored.mode === 'all' ? organizationBranchIds : selectedBranchIds;
@@ -159,7 +153,6 @@ export function useBranchScope() {
     setAllBranches,
     setSelectedBranchIds,
     toggleBranch,
-    selectOnlyBranch,
     setActionBranchId,
     includesBranch: (branchId: string | null | undefined) => !!branchId && selectedBranchSet.has(branchId),
     scopeKey: selectedBranchIds.slice().sort().join(','),

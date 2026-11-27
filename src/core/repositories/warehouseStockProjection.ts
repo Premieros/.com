@@ -39,8 +39,8 @@ export function projectWarehouseStock(input: {
   const now = input.now ?? Date.now();
   const maxAgeMs = input.maxAgeMs ?? DEFAULT_WAREHOUSE_SNAPSHOT_MAX_AGE_MS;
   const timestamp = Date.parse(snapshot.lastSyncedAt);
-  const serverQuantity = snapshot.serverQuantity;
-  if (!Number.isFinite(timestamp) || typeof serverQuantity !== 'number' || !Number.isFinite(serverQuantity)
+  const serverQuantity = Number(snapshot.serverQuantity);
+  if (!Number.isFinite(timestamp) || !Number.isFinite(serverQuantity)
     || !Number.isFinite(maxAgeMs) || maxAgeMs < 0
     || timestamp > now + 5 * 60 * 1000 || now - timestamp > maxAgeMs) {
     return { status: 'unknown', reason: 'WAREHOUSE_STOCK_SNAPSHOT_STALE' };
@@ -48,9 +48,7 @@ export function projectWarehouseStock(input: {
 
   const productMovements = movements.filter(m =>
     !m.synced && m.branchId === branchId && m.productId === productId);
-  if (productMovements.some(m =>
-    typeof m.warehouseId !== 'string' || !m.warehouseId.trim()
-    || typeof m.quantityDelta !== 'number' || !Number.isFinite(m.quantityDelta))) {
+  if (productMovements.some(m => !m.warehouseId)) {
     return { status: 'unknown', reason: 'UNSCOPED_LOCAL_MOVEMENT' };
   }
 
@@ -59,17 +57,12 @@ export function projectWarehouseStock(input: {
   for (const sale of candidateSales) {
     const lines = sale.payload?.p_items;
     if (!Array.isArray(lines)) return { status: 'unknown', reason: 'UNSCOPED_QUEUED_SALE' };
-    const productLines = lines.filter(line =>
-      line && typeof line === 'object'
-      && (line as { product_id?: unknown }).product_id === productId);
-    if (productLines.length === 0) continue;
-    // A corrupt queued quantity must not disappear from reservations while
-    // the UI reports the warehouse's remaining stock as known.
-    if (productLines.some(line => {
-      const raw = (line as { quantity?: unknown }).quantity;
-      return typeof raw !== 'number' || !Number.isFinite(raw) || raw <= 0;
-    }) || typeof sale.payload.p_warehouse_id !== 'string'
-      || !sale.payload.p_warehouse_id.trim()) {
+    const hasProduct = lines.some(line => {
+      if (!line || typeof line !== 'object') return false;
+      const item = line as { product_id?: unknown; quantity?: unknown };
+      return item.product_id === productId && Number(item.quantity) > 0;
+    });
+    if (hasProduct && !String(sale.payload.p_warehouse_id || '').trim()) {
       return { status: 'unknown', reason: 'UNSCOPED_QUEUED_SALE' };
     }
   }

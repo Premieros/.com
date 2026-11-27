@@ -30,7 +30,7 @@ export function DesignSearch({ value, onChange, placeholder, label, testId = 'de
         placeholder={placeholder}
         aria-label={label || placeholder}
         data-testid={testId}
-        className="w-full rounded-full border border-ui-border bg-ui-surface-raised ps-10 pe-4 py-2.5 text-sm text-ui-text placeholder-ui-subtle shadow-ui-sm focus:outline-none focus:border-ui-border-strong focus:ring-2 focus:ring-ui-ring"
+        className="w-full rounded-ui border border-ui-border bg-ui-surface-raised ps-10 pe-4 py-2.5 text-sm text-ui-text placeholder-ui-subtle shadow-ui-sm focus:outline-none focus:border-ui-border-strong focus:ring-2 focus:ring-ui-ring"
       />
     </div>
   );

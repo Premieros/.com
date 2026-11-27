@@ -54,7 +54,7 @@ export function AntigravityLoginHero({ isAr }: Props) {
         {!reduceMotion && (
           <video
             className={'premier-motion-video ' + (videoReady ? 'premier-motion-video-ready' : '')}
-            src={`${import.meta.env.BASE_URL}auth/premier-login-motion.mp4`}
+            src="/auth/premier-login-motion.mp4"
             autoPlay
             muted
             loop
@@ -77,12 +77,12 @@ export function AntigravityLoginHero({ isAr }: Props) {
                   ['--pixel-y' as string]: pixel.dy + 'px',
                 }} />
               ))}
-              <span className="premier-pixel-wordmark">premier<span style={{ color: '#ffa77a' }}>.</span>os</span>
+              <span className="premier-pixel-wordmark">premier<span style={{ color: '#8054F6' }}>.</span>os</span>
             </div>
             <div className="premier-showcase-panels">
               {showcase.map((screen, index) => (
                 <div key={screen.src} className={'premier-showcase-card ' + (active === index ? 'is-active' : '')}>
-                  <img src={`${import.meta.env.BASE_URL}${screen.src.slice(1)}`} alt="" decoding="async" loading={index === 0 ? 'eager' : 'lazy'} />
+                  <img src={screen.src} alt="" decoding="async" loading={index === 0 ? 'eager' : 'lazy'} />
                   <span>{isAr ? screen.ar : screen.en}</span>
                 </div>
               ))}

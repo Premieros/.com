@@ -1,16 +1,10 @@
-import { readBranchBatches } from '../readBranchBatches';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
-import { ResponsiveContainer, BarChart as RechartsBarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { Download, TrendingUp, ShoppingCart, Receipt, Package, BarChart3, CreditCard, Users, List, Layers, AlertTriangle, FileDown, Printer, UserCheck, RotateCcw, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Download, TrendingUp, ShoppingCart, Receipt, Package, BarChart3, CreditCard, Users, List, Layers, AlertTriangle, FileDown, Printer, UserCheck, RotateCcw, Trash2 } from 'lucide-react';
 import { costing, reporting, supabase } from '@/api';
-import { useAuth } from '@/context/AuthContext';
-import { stashReportReturnView, takeReportReturnView } from '../reportReturnView';
 import { useLanguage } from '@/context/LanguageContext';
-import { useTableViewport } from '@/components/useTableViewport';
 import { PageHeader, Card } from '@/components/PageHeader';
 import { Button } from '@/components/Button';
-import { Modal } from '@/components/Modal';
 import { formatFinancialCurrency, formatDate, formatPercent, todayISO } from '@/lib/format';
 import { reportDateRangeUtc } from '@/lib/businessTime';
 import { exportToExcelAdvanced } from '@/lib/excel';
@@ -20,11 +14,6 @@ import { useBranchScope } from '@/lib/branchScope';
 import { useCan } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { useColumnPreferences } from '../useColumnPreferences';
-import { orderReportColumns, projectReportColumns } from '../reportColumnLayout';
-import { reportSummaryPresentation } from '../reportSummaryPresentation';
-import { filterAndSortReportRows, paginateReportRows, type ReportSortDirection } from '../reportTablePresentation';
-import { linkSourceSale, sourceSaleId } from '../reportSourceLinks';
-import { APP_ROUTES } from '@/core/navigation/routes';
 import { ColumnPicker } from '../ColumnPicker';
 import { useCustomReports } from '../useCustomReports';
 import { getReportExcelProfile } from '../reportExcelProfiles';
@@ -33,7 +22,6 @@ import type { SavedReportConfig } from '../useCustomReports';
 import { CustomReportBar } from '../CustomReportBar';
 import { ReportFilterBar } from '../ReportFilterBar';
 import { loadExpenseCategoryOptions, loadReportFilterOptions } from '../services/reportFilterOptions';
-import { classifyReportFailure, describeReportFailure, type ReportFailure } from '../reportFailure';
 import { loadExpenseReportRows, loadPurchaseReportRows, loadSalesReportRows } from '../services/reportCoreLoaders';
 import { loadCashierPerformanceRows, loadDetailedInvoiceRows, loadReturnRows, loadSalesByEmployeeRows } from '../services/reportSalesLoaders';
 import { loadComponentConsumptionRows, loadInventoryBatchRows, loadLowStockSources, loadSalesByProductItems, loadTopConsumedComponentRows, loadTopConsumedProductItems, loadWasteRows } from '../services/reportInventoryLoaders';
@@ -61,24 +49,12 @@ import {
 type FinancialReportType = 'trial_balance' | 'ledger' | 'treasury_statement' | 'inventory_movement' | 'income' | 'balance_sheet' | 'ar_aging' | 'ap_aging' | 'aging_summary' | 'cash_flow' | 'party_statement';
 type PeriodKey = 'custom' | 'today' | 'yesterday' | 'last7' | 'last30' | 'this_month' | 'last_month' | 'this_year';
 
-export interface ReportsPageActions {
-  canExport: boolean;
-  canPrint: boolean;
-  canSave: boolean;
-  exportExcel: () => void;
-  print: () => void;
-  save: () => void;
-}
 interface ReportsPageProps {
   controlledReportType?: ReportType;
   onReportTypeChange?: (type: ReportType) => void;
-  controlledFrom?: string;
-  controlledTo?: string;
-  onActionsReady?: (actions: ReportsPageActions | null) => void;
-  standalone?: boolean;
 }
 
-export function ReportsPage({ controlledReportType, onReportTypeChange, controlledFrom, controlledTo, onActionsReady, standalone = false }: ReportsPageProps = {}) {
+export function ReportsPage({ controlledReportType, onReportTypeChange }: ReportsPageProps = {}) {
   /* REPORT-BRANCH-AUDIT-2026 */
   const { t, lang } = useLanguage();
   const can = useCan();
@@ -87,45 +63,17 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
   const reportBranchIds = branchScope.selectedBranchIds;
-  const { user } = useAuth();
-  const location = useLocation();
-  const [params] = useSearchParams();
-  const returnKey = `${user?.id ?? ''}:${branchScope.scopeKey}:${location.key}:${controlledReportType ?? ''}`;
-  const [restored] = useState(() => standalone && user?.id ? takeReportReturnView(returnKey) : undefined);
-  const [reportType, setReportType] = useState<ReportType>(controlledReportType || 'sales');
-  const [from, setFrom] = useState(() => restored?.from || controlledFrom || history.minDate || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
-  const [to, setTo] = useState(() => restored?.to || controlledTo || todayISO());
+  const [reportType, setReportType] = useState<ReportType>('sales');
+  const [from, setFrom] = useState(() => history.minDate || new Date(Date.now() - 30 * 86400000).toISOString().slice(0, 10));
+  const [to, setTo] = useState(todayISO());
   const [period, setPeriod] = useState<PeriodKey>('custom');
   const [data, setData] = useState<Record<string, unknown>[]>([]);
-  const [tableSearch, setTableSearch] = useState(restored?.search ?? '');
-  const [tableSort, setTableSort] = useState<string | null>(restored?.sort ?? null);
-  const [tableSortDirection, setTableSortDirection] = useState<ReportSortDirection>(restored?.sortDirection ?? 'asc');
-  const [tablePage, setTablePage] = useState(restored?.page ?? 1);
-  const [tablePageSize, setTablePageSize] = useState(restored?.pageSize ?? 25);
-  const presentedRows = useMemo(
-    () => filterAndSortReportRows(data, tableSearch, tableSort, tableSortDirection),
-    [data, tableSearch, tableSort, tableSortDirection],
-  );
-  const pagedRows = useMemo(
-    () => paginateReportRows(presentedRows, tablePage, tablePageSize),
-    [presentedRows, tablePage, tablePageSize],
-  );
-  const [chartData, setChartData] = useState<{ name: string; value: number }[]>([]);
+  const [, setChartData] = useState<{ name: string; value: number }[]>([]);
   const [summary, setSummary] = useState({ total: 0, count: 0 });
   const [loading, setLoading] = useState(false);
   const [reportError, setReportError] = useState(false);
-  const [reportFailure, setReportFailure] = useState<ReportFailure | null>(null);
-  const [filters, setFilters] = useState<ReportFilters>(() => {
-    if (restored) return restored.filters;
-    const orderType = params.get('order_type');
-    return standalone && orderType && [...ORDER_TYPE_OPTIONS, 'car', 'quick', 'other'].includes(orderType)
-      && REPORT_FILTER_DIMS[reportType].includes('order_type') ? { order_type: orderType } : {};
-  });
-  const appliedReport = useRef({ from, to, filters });
-  const initialScroll = useRef(restored?.scrollY);
+  const [filters, setFilters] = useState<ReportFilters>({});
   const [filtersDirty, setFiltersDirty] = useState(false);
-  const [detailFiltersOpen, setDetailFiltersOpen] = useState(false);
-  const filtersBeforeEditing = useRef<{ from: string; to: string; period: PeriodKey; filters: ReportFilters; dirty: boolean } | null>(null);
   const [queryVersion, setQueryVersion] = useState(0);
   const [options, setOptions] = useState<{
     warehouses: { id: string; name: string }[];
@@ -152,19 +100,6 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     }
   }, [controlledReportType, onReportTypeChange]);
 
-  const latestReportActions = useRef<Pick<ReportsPageActions, 'exportExcel' | 'print' | 'save'>>({
-    exportExcel: () => undefined, print: () => undefined, save: () => undefined,
-  });
-  const lastControlledRange = useRef({ from: controlledFrom, to: controlledTo });
-  useEffect(() => {
-    if (!controlledFrom || !controlledTo) return;
-    if (lastControlledRange.current.from === controlledFrom && lastControlledRange.current.to === controlledTo) return;
-    lastControlledRange.current = { from: controlledFrom, to: controlledTo };
-    setFrom(controlledFrom);
-    setTo(controlledTo);
-    setQueryVersion((version) => version + 1);
-  }, [controlledFrom, controlledTo]);
-
   const effectiveBranchFilter = reportBranchIds.length === 1 ? reportBranchIds[0] : null;
   const { branches } = useBranches();
   const reportBranchSet = new Set(reportBranchIds);
@@ -180,8 +115,8 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     [branchColumn]: branchNameById(branchId),
   });
   const { effectiveSettings } = useSettings();
-  const currency = effectiveSettings(effectiveBranchFilter || branchFilter)?.currency || 'EGP';
-  const { visibleColumns, toggleColumn, showAllColumns, restoreVisibleColumns, columnOrder, moveColumn, resetColumnOrder } = useColumnPreferences(reportType);
+  const currency = effectiveSettings(branchFilter)?.currency || 'EGP';
+  const { visibleColumns, toggleColumn, showAllColumns } = useColumnPreferences(reportType);
   const { savedReports, saveReport, deleteReport } = useCustomReports();
   const reportBranchLabel = reportBranchIds.length === 1
     ? branchNameById(reportBranchIds[0])
@@ -224,35 +159,12 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
 
   const handleRestoreCustomReport = (config: SavedReportConfig) => {
     handleReportTypeSelect(config.reportType);
-    restoreVisibleColumns(config.reportType, config.visibleColumns);
     setFilters(config.filters || {});
-    filtersBeforeEditing.current = null;
-    setDetailFiltersOpen(false);
     setFiltersDirty(false);
     setQueryVersion((version) => version + 1);
   };
 
-  const closeDetailFilters = () => {
-    const saved = filtersBeforeEditing.current;
-    if (saved) {
-      setFrom(saved.from);
-      setTo(saved.to);
-      setPeriod(saved.period);
-      setFilters(saved.filters);
-      setFiltersDirty(saved.dirty);
-    }
-    filtersBeforeEditing.current = null;
-    setDetailFiltersOpen(false);
-  };
-
-  const openDetailFilters = () => {
-    filtersBeforeEditing.current = { from, to, period, filters, dirty: filtersDirty };
-    setDetailFiltersOpen(true);
-  };
-
   const runReport = () => {
-    filtersBeforeEditing.current = null;
-    setDetailFiltersOpen(false);
     setFiltersDirty(false);
     setQueryVersion((version) => version + 1);
   };
@@ -314,7 +226,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     })();
 
     return () => { cancelled = true; };
-  }, [reportType, branchScope.scopeKey, reportBranchIds]);
+  }, [reportType, branchScope.scopeKey]);
 
   useEffect(() => {
     if (reportType !== 'expenses' || reportBranchIds.length === 0) return;
@@ -322,20 +234,18 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
       const unique = await loadExpenseCategoryOptions(reportBranchIds);
       setOptions((prev) => ({ ...prev, expenseCategories: unique }));
     })();
-  }, [reportType, branchScope.scopeKey, reportBranchIds]);
+  }, [reportType, branchScope.scopeKey]);
 
   useEffect(() => {
     void loadReport();
     // Date/filter edits are intentionally applied only when the user presses
     // "Run report". This avoids repeated report queries while configuring filters.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [reportType, branchScope.scopeKey, branches, history.unlimited, queryVersion, reportBranchIds]);
+  }, [reportType, branchScope.scopeKey, branches, history.unlimited, queryVersion]);
 
   async function loadReport() {
-    appliedReport.current = { from, to, filters };
     setLoading(true);
     setReportError(false);
-    setReportFailure(null);
     try {
       const allowed = history.clampRange(from, to);
       if (allowed.from !== from) setFrom(allowed.from);
@@ -354,7 +264,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
           const net = netSaleAmount(sale);
           const cashier = sale.cashier as { full_name?: string; email?: string } | null;
           const warehouse = sale.warehouse as { name?: string } | null;
-          return linkSourceSale(withBranch(sale.branch_id, {
+          return withBranch(sale.branch_id, {
             [lang === 'ar' ? 'الفاتورة' : 'Invoice']: sale.invoice_number,
             [lang === 'ar' ? 'التاريخ' : 'Date']: formatDate(sale.created_at as string, lang),
             [lang === 'ar' ? 'العميل' : 'Customer']: (sale.customer as { name?: string })?.name || '',
@@ -370,7 +280,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
             [lang === 'ar' ? 'المدفوع' : 'Paid']: Number(sale.paid_amount || 0),
             [lang === 'ar' ? 'المرتجع' : 'Refunded']: Number(sale.refunded_amount || 0),
             [lang === 'ar' ? 'صافي التحصيل' : 'Net Collection']: net,
-          }), sale.id);
+          });
         });
         setData(rows);
         setChartData(sales.slice(0, 10).map((sale: Record<string, unknown>) => ({ name: String(sale.invoice_number), value: netSaleAmount(sale) })));
@@ -415,10 +325,10 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         setSummary({ total: expenses.reduce((sum: number, expense: Record<string, unknown>) => sum + Number(expense.amount || 0), 0), count: expenses.length });
       } else if (reportType === 'profit') {
         const targetBranches = reportBranches;
-        const results = await readBranchBatches(targetBranches, async (branch) => {
+        const results = await Promise.all(targetBranches.map(async (branch) => {
           const result = await reporting.getIncomeStatement({ p_branch_id: branch.id, p_from_date: from, p_to_date: to });
           return { branch, statement: requireFinancialReport(result, 'income', branch.id) };
-        });
+        }));
         const rows = results.map(({ branch, statement }) => withBranch(branch.id, {
           [lang === 'ar' ? 'الفترة' : 'Period']: `${from} - ${to}`,
           [lang === 'ar' ? 'صافي الإيراد' : 'Net Revenue']: Number(statement?.net_revenue || 0),
@@ -488,7 +398,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         setSummary({ total: rows.reduce((sum, row) => sum + Number(row[lang === 'ar' ? 'الكمية' : 'Quantity'] || 0), 0), count: rows.length });
       } else if (reportType === 'sales_by_payment') {
         const targetBranchIds = reportBranchIds;
-        const results = await readBranchBatches(targetBranchIds, (branchId) => reporting.getSalesByPaymentReport({
+        const results = await Promise.all(targetBranchIds.map((branchId) => reporting.getSalesByPaymentReport({
           p_branch_id: branchId,
           p_from: fromTs,
           p_to: toExclusiveTs,
@@ -497,7 +407,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
           p_warehouse_id: filters.warehouse || null,
           p_cashier_id: filters.cashier || null,
           p_status: filters.status || null,
-        }));
+        })));
         const methodLabels: Record<string, string> = {
           cash: t('cash'),
           card: t('card'),
@@ -627,7 +537,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         const rows = sales.map((sale: Record<string, unknown>) => {
           const customer = sale.customer as { name?: string } | null;
           const cashier = sale.cashier as { full_name?: string } | null;
-          return linkSourceSale(withBranch(sale.branch_id, {
+          return withBranch(sale.branch_id, {
             [lang === 'ar' ? 'رقم الفاتورة' : 'Invoice']: sale.invoice_number,
             [lang === 'ar' ? 'التاريخ' : 'Date']: formatDate(sale.created_at as string, lang),
             [lang === 'ar' ? 'العميل' : 'Customer']: customer?.name || '-',
@@ -638,7 +548,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
             [lang === 'ar' ? 'صافي الفاتورة' : 'Net Total']: netSaleAmount(sale),
             [lang === 'ar' ? 'صافي المدفوع' : 'Net Paid']: netSalePayment(sale),
             [lang === 'ar' ? 'الحالة' : 'Status']: sale.status,
-          }), sale.id);
+          });
         });
         setData(rows);
         setChartData([]);
@@ -865,25 +775,25 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
           const customer = sale.customer as { name?: string } | null;
           const cashier = sale.cashier as { full_name?: string } | null;
           const refunded = Number(sale.refunded_amount || 0) || Number(sale.total || 0);
-          return linkSourceSale(withBranch(sale.branch_id, {
+          return withBranch(sale.branch_id, {
             [lang === 'ar' ? 'رقم الفاتورة' : 'Invoice']: sale.invoice_number,
             [lang === 'ar' ? 'التاريخ' : 'Date']: formatDate(sale.created_at as string, lang),
             [lang === 'ar' ? 'العميل' : 'Customer']: customer?.name || '-',
             [lang === 'ar' ? 'أمين الصندوق' : 'Cashier']: cashier?.full_name || '-',
             [lang === 'ar' ? 'المبلغ المرتجع' : 'Refunded Amount']: refunded,
             [lang === 'ar' ? 'الحالة' : 'Status']: statusLabels[String(sale.status)] || sale.status,
-          }), sale.id);
+          });
         });
         setData(rows);
         setChartData([]);
         setSummary({ total: rows.reduce((sum, row) => sum + Number(row[lang === 'ar' ? 'المبلغ المرتجع' : 'Refunded Amount'] || 0), 0), count: rows.length });
       } else if (reportType === 'financial_reconciliation') {
         const targetBranchIds = reportBranchIds;
-        const results = await readBranchBatches(targetBranchIds, (branchId) => reporting.getFinancialReconciliationReport({
+        const results = await Promise.all(targetBranchIds.map((branchId) => reporting.getFinancialReconciliationReport({
           p_branch_id: branchId,
           p_from: fromTs,
           p_to: toExclusiveTs,
-        }));
+        })));
         const reconciliationRows: Record<string, unknown>[] = [];
         let totalNetSales = 0;
         let mismatchCount = 0;
@@ -926,7 +836,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         setSummary({ total: totalNetSales, count: mismatchCount });
       } else if (reportType === 'daily_closing_range') {
         const targetBranches = reportBranches;
-        const results = await readBranchBatches(targetBranches, async (branch) => {
+        const results = await Promise.all(targetBranches.map(async (branch) => {
           const result = await reporting.getDayClosingRangeReport({
             p_branch_id: branch.id,
             p_from_date: allowed.from,
@@ -938,7 +848,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
             branchId: branch.id,
             rows: Array.isArray(payload.rows) ? payload.rows as Record<string, unknown>[] : [],
           };
-        });
+        }));
         const rows = results.flatMap(({ branchId, rows: dayRows }) => dayRows.map((row) => withBranch(branchId, {
           [lang === 'ar' ? 'اليوم' : 'Business Date']: String(row.business_date || ''),
           [lang === 'ar' ? 'إجمالي المبيعات' : 'Gross Sales']: Number(row.gross_sales || 0),
@@ -970,7 +880,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         });
       } else if (reportType === 'raw_material_consumption') {
         const targetBranches = reportBranches;
-        const results = await readBranchBatches(targetBranches, async (branch) => {
+        const results = await Promise.all(targetBranches.map(async (branch) => {
           const result = await reporting.getRawMaterialConsumptionReport({
             p_branch_id: branch.id,
             p_from_date: allowed.from,
@@ -978,7 +888,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
           });
           if (result.error) throw result.error;
           return { branchId: branch.id, rows: Array.isArray(result.data) ? result.data as Record<string, unknown>[] : [] };
-        });
+        }));
         const rows = results.flatMap(({ branchId, rows: rawRows }) => rawRows.map((row) => withBranch(branchId, {
           [lang === 'ar' ? 'الخامة' : 'Raw Material']: row.raw_material_name || '-',
           [lang === 'ar' ? 'الكود' : 'Code']: row.raw_material_code || '',
@@ -1042,7 +952,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         });
       } else if (reportType === 'raw_material_financial') {
         const targetBranches = reportBranches;
-        const results = await readBranchBatches(targetBranches, async (branch) => {
+        const results = await Promise.all(targetBranches.map(async (branch) => {
           const result = await reporting.getRawMaterialFinancialReport({
             p_branch_id: branch.id,
             p_from_date: allowed.from,
@@ -1055,7 +965,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
             summary: (payload.summary || {}) as Record<string, unknown>,
             rows: Array.isArray(payload.rows) ? payload.rows as Record<string, unknown>[] : [],
           };
-        });
+        }));
         const rows = results.flatMap(({ branchId, summary: financial, rows: rawRows }) => {
           const summaryRow = withBranch(branchId, {
             [lang === 'ar' ? 'الخامة' : 'Raw Material']: lang === 'ar' ? 'إجمالي الفترة' : 'Period Total',
@@ -1089,7 +999,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         });
       } else if (reportType === 'sales_component_reconciliation') {
         const targetBranches = reportBranches;
-        const results = await readBranchBatches(targetBranches, async (branch) => {
+        const results = await Promise.all(targetBranches.map(async (branch) => {
           const result = await reporting.getSalesComponentReconciliationReport({
             p_branch_id: branch.id,
             p_from_date: allowed.from,
@@ -1102,7 +1012,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
             summary: (payload.summary || {}) as Record<string, unknown>,
             rows: Array.isArray(payload.rows) ? payload.rows as Record<string, unknown>[] : [],
           };
-        });
+        }));
         const rows = results.flatMap(({ branchId, summary: reconciliation, rows: rawRows }) => {
           const summaryRow = withBranch(branchId, {
             [lang === 'ar' ? 'الخامة' : 'Raw Material']: lang === 'ar' ? 'إجمالي الفترة' : 'Period Total',
@@ -1170,11 +1080,8 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         setChartData(rows.slice(0, 10).map((row) => ({ name: String(row[lang === 'ar' ? 'المنتج' : 'Product']), value: Number(row[lang === 'ar' ? 'التكلفة الإجمالية' : 'Total Cost']) })));
         setSummary({ total: rows.reduce((sum, row) => sum + Number(row[lang === 'ar' ? 'التكلفة الإجمالية' : 'Total Cost'] || 0), 0), count: rows.length });
       }
-    } catch (cause) {
+    } catch {
       // Never expose prior-branch data or misleading partial financial totals.
-      const failure = classifyReportFailure(cause, reportBranchIds);
-      setReportFailure(failure);
-      if (import.meta.env.DEV) console.warn('[ReportsPage] Failed to load report', { type: reportType, kind: failure.kind, code: failure.code });
       setData([]);
       setChartData([]);
       setSummary({ total: 0, count: 0 });
@@ -1184,32 +1091,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     }
   }
 
-  useEffect(() => {
-    if (loading || !data.length || initialScroll.current === undefined) return;
-    const position = initialScroll.current;
-    initialScroll.current = undefined;
-    const frame = requestAnimationFrame(() => window.scrollTo(0, position));
-    return () => cancelAnimationFrame(frame);
-  }, [loading, data.length]);
-
-  const openSourceSale = (saleId: string) => {
-    if (standalone && user?.id) {
-      stashReportReturnView(returnKey, {
-        ...appliedReport.current, search: tableSearch, sort: tableSort, sortDirection: tableSortDirection,
-        page: tablePage, pageSize: tablePageSize, scrollY: window.scrollY,
-      });
-    }
-    navigate(`${APP_ROUTES.sales}?saleId=${encodeURIComponent(saleId)}`);
-  };
-
-  const changeSort = (column: string) => {
-    setTableSortDirection((previous) => tableSort === column ? (previous === 'asc' ? 'desc' : 'asc') : 'asc');
-    setTableSort(column);
-    setTablePage(1);
-  };
-
   const handleExportExcel = () => {
-    if (loading || reportError || columns.length === 0) return;
     const excelProfile = getReportExcelProfile(reportType, lang as 'ar' | 'en');
     const totalRow = reportType === 'financial_reconciliation'
       ? {
@@ -1221,24 +1103,21 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         [lang === 'ar' ? 'عدد السجلات' : 'Record Count']: summary.count,
       };
     void exportToExcelAdvanced({
-      data: projectReportColumns(presentedRows, columns),
+      data,
       filename: `report_${reportType}_${from}_${to}`,
       sheetName: (reportTypes.find((row) => row.key === reportType)?.label ?? reportType).slice(0, 31),
       title: reportTypes.find((row) => row.key === reportType)?.label ?? reportType,
       subtitle: `${reportBranchLabel} — ${from} — ${to}`,
-      totalRow: tableSearch.trim() ? undefined : totalRow,
+      totalRow,
       currencyColumns: moneyKeys,
       integerColumns: excelProfile.integerColumns,
-      columns,
+      columns: excelProfile.columns,
       columnWidths: excelProfile.columnWidths,
       sourceNote: excelProfile.sourceNote,
       lang,
     });
   };
-  const handleExportCSV = () => {
-    if (loading || reportError || columns.length === 0) return;
-    downloadCSV(projectReportColumns(presentedRows, columns), `report_${reportType}_${from}_${to}`);
-  };
+  const handleExportCSV = () => { downloadCSV(data, `report_${reportType}_${from}_${to}`); };
 
   const reportTypes: { key: ReportType; label: string; icon: React.ReactNode }[] = [
     { key: 'sales', label: t('salesReport'), icon: <TrendingUp className="w-4 h-4" /> },
@@ -1319,9 +1198,8 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     lang === 'ar' ? 'فرق القيمة' : 'Value Difference',
   ];
 
-  const summaryPresentation = reportSummaryPresentation(reportType, lang === 'ar' ? 'ar' : 'en');
   const showDate = DATE_DRIVEN_REPORTS.has(reportType);
-  const allColumns = orderReportColumns(data.length > 0 ? Object.keys(data[0]) : [], columnOrder);
+  const allColumns = data.length > 0 ? Object.keys(data[0]) : [];
   const columns = visibleColumns ? allColumns.filter((column) => visibleColumns.includes(column)) : allColumns;
   const hiddenCount = visibleColumns ? allColumns.length - columns.length : 0;
   const reportMobilePrimaryColumns = columns.slice(0, 4);
@@ -1356,7 +1234,7 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
   const filterOptions = (dim: ReportFilterKey): { value: string; label: string }[] => {
     const name = (value: string, english: string | null) => (lang === 'ar' ? value : (english || value));
     switch (dim) {
-      case 'order_type': return [...ORDER_TYPE_OPTIONS, 'car', 'quick', 'other'].map((value) => ({ value, label: orderTypeLabels[value] || value }));
+      case 'order_type': return ORDER_TYPE_OPTIONS.map((value) => ({ value, label: orderTypeLabels[value] || value }));
       case 'payment_method': return PAYMENT_METHOD_OPTIONS.map((value) => ({ value, label: paymentMethodLabels[value] || value }));
       case 'status': return SALE_STATUS_OPTIONS.map((value) => ({ value, label: statusLabels[value] || value }));
       case 'warehouse': return options.warehouses.map((warehouse) => ({ value: warehouse.id, label: warehouse.name }));
@@ -1372,44 +1250,10 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     }
   };
 
-  // Aggregate only columns whose values are additive across report rows.
-  const reportRowsRef = useTableViewport(!loading && presentedRows.length > 0);
-  const nonAdditiveMoneyColumns = new Set([
-    'متوسط الفاتورة', 'Avg Invoice', 'Avg Order', 'سعر البيع', 'Sale Price', 'الهامش', 'Margin',
-    'تكلفة الوحدة', 'Unit Cost', 'تكلفة الوحدة الحالية FIFO', 'Current FIFO Unit Cost',
-    'آخر تكلفة معتمدة', 'Latest Authoritative Cost', 'تكلفة الوحدة للمقارنة', 'Comparison Unit Cost',
-  ]);
-  const totalsByColumn = new Map(columns.flatMap((key) => {
-    if (reportBranchIds.length !== 1 || !moneyKeys.includes(key) || nonAdditiveMoneyColumns.has(key)) return [];
-    const values = presentedRows.map((row) => row[key]);
-    if (!values.length || !values.every((value): value is number => typeof value === 'number' && Number.isFinite(value))) return [];
-    return [[key, values.reduce((sum, value) => sum + value, 0)] as const];
-  }));
-  const reportTotalLabel = lang === 'ar' ? 'إجمالي النتائج المعروضة' : 'Filtered results total';
-
-  const renderReportCell = (row: Record<string, unknown>, key: string) => {
-    const value = row[key];
-    const display = typeof value === 'number' && moneyKeys.includes(key)
-      ? formatFinancialCurrency(value, currency, lang)
-      : String(value ?? '');
-    const saleId = sourceSaleId(row);
-    const isInvoice = key === 'الفاتورة' || key === 'رقم الفاتورة' || key === 'Invoice';
-    if (!saleId || !isInvoice || !can('sales.view')) return display;
-    return (
-      <button type="button"
-        className="font-semibold text-ui-primary underline-offset-2 hover:underline focus-visible:underline"
-        onClick={() => openSourceSale(saleId)}
-        aria-label={lang === 'ar' ? `عرض مصدر الفاتورة ${display}` : `Open source sale ${display}`}>
-        {display}
-      </button>
-    );
-  };
-
   const handlePrint = () => {
-    if (loading || reportError || columns.length === 0) return;
     const reportLabel = reportTypes.find((row) => row.key === reportType)?.label ?? reportType;
-    const headers = columns;
-    const rows = presentedRows.map((row) => headers.map((header) => {
+    const headers = data.length > 0 ? Object.keys(data[0]) : [];
+    const rows = data.map((row) => headers.map((header) => {
       const value = row[header];
       if (typeof value === 'number' && moneyKeys.includes(header)) return formatFinancialCurrency(value, currency, lang);
       return String(value ?? '');
@@ -1417,30 +1261,38 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
     openPrintWindow({ title: reportLabel, subtitle: `${reportBranchLabel} — ${from} - ${to}`, headers, rows, lang: lang as 'ar' | 'en' });
   };
 
-  latestReportActions.current = {
-    exportExcel: handleExportExcel,
-    print: handlePrint,
-    save: handleSaveCustomReport,
-  };
-  const canExportHeader = !loading && !reportError && can('reports.export');
-  const canPrintHeader = !loading && !reportError && can('reports.print');
-  useEffect(() => {
-    if (!onActionsReady) return;
-    const canExport = canExportHeader;
-    const canPrint = canPrintHeader;
-    const canSave = !loading && !reportError;
-    const controls: ReportsPageActions = {
-      canExport, canPrint, canSave,
-      exportExcel: () => { if (canExport) latestReportActions.current.exportExcel(); },
-      print: () => { if (canPrint) latestReportActions.current.print(); },
-      save: () => { if (canSave) latestReportActions.current.save(); },
-    };
-    onActionsReady(controls);
-    return () => onActionsReady(null);
-  }, [onActionsReady, loading, reportError, canExportHeader, canPrintHeader]);
+  return (
+    <div>
+      <PageHeader title={t('reports')} actions={
+        <div className="flex flex-wrap gap-2">
+          <ColumnPicker
+            columns={data.length > 0 ? Object.keys(data[0]) : []}
+            visibleColumns={visibleColumns}
+            onToggle={toggleColumn}
+            onShowAll={showAllColumns}
+            lang={lang}
+            hiddenCount={hiddenCount}
+          />
+          {can('reports.export') && <Button variant="outline" size="sm" disabled={loading || reportError} onClick={handleExportExcel}><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}
+          {can('reports.export') && <Button variant="outline" size="sm" disabled={loading || reportError} onClick={handleExportCSV}><FileDown className="w-4 h-4" /> {t('exportCsv')}</Button>}
+          {can('reports.print') && <Button variant="outline" size="sm" disabled={loading || reportError} onClick={handlePrint}><Printer className="w-4 h-4" /> {t('print')}</Button>}
+        </div>
+      } />
 
-  const filterPanel = (
-    <div data-testid="detail-filters-popup" className="space-y-2">
+      {!history.unlimited && (
+        <div className="mb-3 rounded-xl border border-ui-warning/30 bg-ui-warning-soft px-4 py-3 text-sm text-ui-warning">
+          {lang === 'ar'
+            ? 'نطاق العرض محدود حسب الصلاحية: آخر 7 أيام تظهر كاملة، وما قبلها يخضع لسياسة العرض التاريخي. الإجماليات والتصدير تشمل فقط البيانات المسموح لك برؤيتها.'
+            : 'Visibility is permission-limited: the last 7 days are complete, while older history follows the historical visibility policy. Totals and exports include only data you are allowed to see.'}
+        </div>
+      )}
+
+      {reportError && !loading && (
+        <div role="alert" data-testid="reports-incomplete-error" className="mb-3 rounded-xl border border-ui-danger/30 bg-ui-danger-soft px-4 py-3 text-sm text-ui-danger">
+          {lang === 'ar' ? 'تعذر تحميل التقرير بالكامل لجميع الفروع المحددة. تم إخفاء البيانات الناقصة وإيقاف التصدير. حاول تشغيل التقرير مرة أخرى.' : 'The report could not be loaded completely for all selected branches. Incomplete data is hidden and export is disabled. Please run the report again.'}
+        </div>
+      )}
+
       <CustomReportBar
         savedReports={savedReports}
         currentReportType={reportType}
@@ -1478,182 +1330,34 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
         count={summary.count}
         currency={currency}
         lang={lang}
-        totalLabel={summaryPresentation.totalLabel}
-        countLabel={summaryPresentation.countLabel}
-        totalIsQuantity={summaryPresentation.totalIsQuantity}
-        summaryNote={summaryPresentation.note}
         financialTypes={canFinancial ? financialTypes : []}
         canFinancial={canFinancial}
         onFinancialSelect={(key) => navigate(`/financial-reports?view=${key}&from=${from}&to=${to}`)}
-        reportTypes={standalone ? reportTypes.filter((item) => item.key === reportType) : reportTypes}
-        onReportTypeChange={standalone ? undefined : handleReportTypeSelect}
+        reportTypes={reportTypes}
+        onReportTypeChange={handleReportTypeSelect}
         onRunReport={runReport}
         loading={loading}
         pendingChanges={filtersDirty}
       />
-    </div>
-  );
-
-  return (
-    <div>
-      <PageHeader title={t('reports')} actions={
-        <div className="flex flex-wrap gap-2">
-          <ColumnPicker
-            columns={allColumns}
-            visibleColumns={visibleColumns}
-            onToggle={(key) => toggleColumn(key, allColumns)}
-            onShowAll={showAllColumns}
-            onMove={(key, direction) => moveColumn(key, direction, allColumns)}
-            onResetOrder={resetColumnOrder}
-            lang={lang}
-            hiddenCount={hiddenCount}
-          />
-          {can('reports.export') && <Button variant="outline" size="sm" disabled={loading || reportError || columns.length === 0} onClick={handleExportExcel}><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}
-          {can('reports.export') && <Button variant="outline" size="sm" disabled={loading || reportError || columns.length === 0} onClick={handleExportCSV}><FileDown className="w-4 h-4" /> {t('exportCsv')}</Button>}
-          {can('reports.print') && <Button variant="outline" size="sm" disabled={loading || reportError || columns.length === 0} onClick={handlePrint}><Printer className="w-4 h-4" /> {t('print')}</Button>}
-        </div>
-      } />
-
-      {data.length > 0 && columns.length === 0 && (
-        <p role="status" className="mb-3 rounded-xl border border-ui-warning/30 bg-ui-warning-soft px-3 py-2 text-sm text-ui-warning">
-          {lang === 'ar'
-            ? 'لا توجد أعمدة ظاهرة. اختر عمودًا واحدًا على الأقل من قائمة الأعمدة لعرض النتائج أو تصديرها.'
-            : 'No columns are visible. Select at least one column to display or export results.'}
-        </p>
-      )}
-
-      {!history.unlimited && (
-        <div className="mb-3 rounded-xl border border-ui-warning/30 bg-ui-warning-soft px-4 py-3 text-sm text-ui-warning">
-          {lang === 'ar'
-            ? 'نطاق العرض محدود حسب الصلاحية: آخر 7 أيام تظهر كاملة، وما قبلها يخضع لسياسة العرض التاريخي. الإجماليات والتصدير تشمل فقط البيانات المسموح لك برؤيتها.'
-            : 'Visibility is permission-limited: the last 7 days are complete, while older history follows the historical visibility policy. Totals and exports include only data you are allowed to see.'}
-        </div>
-      )}
-
-      {reportError && !loading && (
-        <div role="alert" data-testid="reports-incomplete-error" className="mb-3 rounded-xl border border-ui-danger/30 bg-ui-danger-soft px-4 py-3 text-sm text-ui-danger">
-          <div className="space-y-2">
-            <p className="font-bold">{describeReportFailure(reportFailure, lang === 'ar' ? 'ar' : 'en').title}</p>
-            <p className="text-xs leading-relaxed">{describeReportFailure(reportFailure, lang === 'ar' ? 'ar' : 'en').action}</p>
-            {reportFailure?.branchId && <p className="text-xs">
-              {lang === 'ar' ? 'الفرع الذي تعذّر تحميل بياناته: ' : 'Branch whose data could not be loaded: '}
-              <strong>{branchNameById(reportFailure.branchId)}</strong>
-            </p>}
-            <p className="text-xs">{lang === 'ar' ? 'لن نعرض إجماليًا غير مكتمل حتى تتوفر نتائج جميع الفروع المختارة.' : 'No incomplete grand total will be shown while selected branches are missing.'}</p>
-            <button type="button" onClick={() => setQueryVersion((v) => v + 1)}
-              data-testid="retry-failed-report"
-              className="rounded-lg border border-current px-3 py-1.5 text-xs font-bold">
-              {lang === 'ar' ? 'إعادة تحميل التقرير' : 'Retry report'}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {standalone && (
-        <div className="mb-3 flex flex-wrap items-center gap-2">
-          <button type="button" data-testid="toggle-detail-filters"
-            aria-haspopup="dialog" aria-expanded={detailFiltersOpen} onClick={openDetailFilters}
-            className="inline-flex items-center gap-2 rounded-lg border border-ui-border bg-ui-surface px-3 py-2 text-xs font-bold text-ui-text">
-            <SlidersHorizontal className="h-4 w-4" />
-            {lang === 'ar' ? 'الفلاتر والتخصيص' : 'Filters & customization'}
-          </button>
-          {showDate && <span dir="ltr" className="rounded-lg bg-ui-page-alt px-3 py-1.5 text-xs text-ui-muted">
-            {filtersBeforeEditing.current?.from ?? from} — {filtersBeforeEditing.current?.to ?? to}
-          </span>}
-          {REPORT_FILTER_DIMS[reportType].map((dim) => {
-            const value = (filtersBeforeEditing.current?.filters ?? filters)[dim];
-            if (!value) return null;
-            const label = filterOptions(dim).find((option) => option.value === value)?.label ?? value;
-            return (
-              <span key={dim} className="rounded-lg bg-ui-page-alt px-3 py-1.5 text-xs text-ui-muted">
-                {filterLabel(dim)} · {label}
-              </span>
-            );
-          })}
-        </div>
-      )}
-      {standalone ? (
-        <Modal manageFocus open={detailFiltersOpen} onClose={closeDetailFilters}
-          title={lang === 'ar' ? 'فلاتر التقرير' : 'Report filters'} size="xl">
-          {filterPanel}
-        </Modal>
-      ) : filterPanel}
-
-      {/* Reuse the existing report loader's series; never compute a second
-          financial truth from a partial table/page or unrelated SQL. */}
-      {['sales_by_payment', 'sales_by_product', 'sales_by_employee', 'cashier_performance'].includes(reportType)
-        && !loading && !reportError && chartData.length > 0 && (
-        <details className="mb-3 rounded-xl border border-ui-border bg-ui-surface p-3 shadow-ui-sm" aria-label={lang === 'ar' ? 'رسم بياني للتقرير' : 'Report chart'} data-testid="premier-report-chart">
-          <summary className="cursor-pointer text-sm font-semibold">{lang === 'ar' ? 'عرض الرسم البياني' : 'Show report chart'}</summary>
-          <div className="mb-3 mt-3">
-            <h3 className="text-sm font-bold text-ui-text">{lang === 'ar' ? 'تحليل بصري من نفس بيانات التقرير' : 'Chart from the same report source'}</h3>
-            <p className="mt-1 text-xs text-ui-muted">{lang === 'ar'
-              ? 'يعرض السجلات/التجميعات التي يعيدها مصدر التقرير الحالي فقط، وليس إجماليًا مستقلًا.'
-              : 'Displays the records or groups returned by this report source, not an independent total.'}</p>
-          </div>
-          <div className="h-60 w-full" dir="ltr">
-            <ResponsiveContainer width="100%" height="100%">
-              <RechartsBarChart data={chartData.slice(0, 12)} margin={{ top: 8, right: 8, left: 0, bottom: 16 }}>
-                <CartesianGrid strokeDasharray="3 3" opacity={0.25} />
-                <XAxis dataKey="name" interval={0} tick={{ fontSize: 10 }} tickFormatter={(value: string) => String(value).slice(0, 12)} />
-                <YAxis tick={{ fontSize: 10 }} width={48} />
-                <Tooltip formatter={(value: number) => [value.toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US'), lang === 'ar' ? 'القيمة' : 'Value']} />
-                <Bar dataKey="value" fill="var(--ui-primary, #2563eb)" radius={[4, 4, 0, 0]} />
-              </RechartsBarChart>
-            </ResponsiveContainer>
-          </div>
-        </details>
-      )}
 
       <Card className="p-4 border-ui-border bg-ui-surface shadow-ui">
-        <div className="mb-3 flex flex-wrap items-end justify-between gap-3 border-b border-ui-border pb-3" data-testid="report-table-controls">
-          <label className="flex min-w-0 flex-1 flex-col gap-1 text-xs font-semibold text-ui-muted sm:max-w-md">
-            {lang === 'ar' ? 'بحث داخل نتائج التقرير' : 'Search report results'}
-            <input type="search" value={tableSearch}
-              onChange={(event) => { setTableSearch(event.target.value); setTablePage(1); }}
-              placeholder={lang === 'ar' ? 'ابحث عن فاتورة أو صنف أو مبلغ...' : 'Search invoice, item or amount...'}
-              className="h-10 min-w-0 rounded-lg border border-ui-border bg-ui-page-alt px-3 text-sm text-ui-text focus-visible:ring-2 focus-visible:ring-ui-ring"
-              data-testid="report-table-search" />
-          </label>
-          <label className="flex flex-col gap-1 text-xs font-semibold text-ui-muted">
-            {lang === 'ar' ? 'صفوف الصفحة' : 'Rows per page'}
-            <select value={tablePageSize}
-              onChange={(event) => { setTablePageSize(Number(event.target.value)); setTablePage(1); }}
-              className="h-10 rounded-lg border border-ui-border bg-ui-page-alt px-3 text-sm text-ui-text"
-              data-testid="report-table-page-size">
-              {[10, 25, 50, 100].map((size) => <option key={size} value={size}>{size}</option>)}
-            </select>
-          </label>
-          <p className="w-full text-xs text-ui-muted">
-            {lang === 'ar'
-              ? `عرض ${pagedRows.first}–${pagedRows.last} من ${pagedRows.total} نتيجة محمّلة ومصرّح بها. الإجمالي المالي بالأعلى من مصدر التقرير ولا يتغير ببحث الجدول.`
-              : `Showing ${pagedRows.first}–${pagedRows.last} of ${pagedRows.total} loaded authorized rows. Financial total above comes from the report source and is unaffected by table search.`}
-            {tableSearch.trim() && (lang === 'ar'
-              ? ' التصدير والطباعة يشملان نتائج البحث فقط، دون إجمالي مالي غير متطابق.'
-              : ' Export and print include searched rows only, without an unmatched financial total.')}
-          </p>
-        </div>
         {loading ? (
           <div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" /></div>
-        ) : presentedRows.length === 0 ? (
-          <div className="text-center py-12 text-ui-subtle text-sm">{data.length > 0
-            ? (lang === 'ar' ? 'لا توجد نتائج مطابقة للبحث' : 'No matching rows')
-            : reportError
-              ? (lang === 'ar' ? 'فشل تحميل التقرير — راجع رسالة الخطأ بالأعلى.' : 'Report failed — see the error above.')
-              : (lang === 'ar' ? `لا توجد سجلات فعلية لهذا التقرير في الفترة ${from} إلى ${to} ونطاق الفروع الحالي. جرّب توسيع الفترة أو تغيير الفرع.` : `No records exist for this report from ${from} to ${to} within the current branch scope. Try another period or branch.`)}</div>
+        ) : data.length === 0 ? (
+          <div className="text-center py-12 text-ui-subtle text-sm">{t('noData')}</div>
         ) : (
-          <div ref={reportRowsRef}>
-            <div data-testid="reports-mobile-results" data-table-viewport="" className="space-y-2 overflow-y-auto overscroll-contain sm:hidden">
-              {pagedRows.rows.map((row, index) => (
+          <div>
+            <div data-testid="reports-mobile-results" className="space-y-2 sm:hidden">
+              {data.map((row, index) => (
                 <article key={index} className="rounded-xl border border-ui-border bg-ui-surface p-3 shadow-ui-sm">
                   <dl className="divide-y divide-ui-border">
                     {reportMobilePrimaryColumns.map((key) => {
-
+                      const value = row[key];
                       return (
                         <div key={key} className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-3 py-2 first:pt-0 last:pb-0">
                           <dt className="break-words text-xs font-semibold text-ui-muted">{key}</dt>
                           <dd className="break-words text-sm text-ui-text">
-                            {renderReportCell(row, key)}
+                            {typeof value === 'number' && moneyKeys.includes(key) ? formatFinancialCurrency(value, currency, lang) : String(value ?? '')}
                           </dd>
                         </div>
                       );
@@ -1666,12 +1370,12 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
                       </summary>
                       <dl className="divide-y divide-ui-border border-t border-ui-border px-3">
                         {reportMobileSecondaryColumns.map((key) => {
-
+                          const value = row[key];
                           return (
                             <div key={key} className="grid grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)] gap-3 py-2">
                               <dt className="break-words text-xs font-semibold text-ui-muted">{key}</dt>
                               <dd className="break-words text-sm text-ui-text">
-                                {renderReportCell(row, key)}
+                                {typeof value === 'number' && moneyKeys.includes(key) ? formatFinancialCurrency(value, currency, lang) : String(value ?? '')}
                               </dd>
                             </div>
                           );
@@ -1683,71 +1387,29 @@ export function ReportsPage({ controlledReportType, onReportTypeChange, controll
               ))}
             </div>
 
-            <div data-table-viewport="" className="hidden overflow-auto overscroll-contain sm:block">
+            <div className="hidden overflow-x-auto sm:block">
               <table className="w-full min-w-max text-sm" data-testid="report-results-table">
                 <thead className="sticky top-0 z-10 bg-ui-page-alt">
                   <tr className="border-b border-ui-border">
-                    {columns.map((key, columnIndex) => (
-                      <th key={key} scope="col" aria-sort={tableSort === key ? (tableSortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-                        className={`px-3 py-2 text-start text-xs font-bold text-ui-muted ${columnIndex === 0 ? 'sticky start-0 z-10 min-w-[190px] bg-ui-page-alt' : 'whitespace-nowrap'}`}>
-                        <button type="button" onClick={() => changeSort(key)}
-                          className="inline-flex items-center gap-1 hover:text-ui-primary"
-                          aria-label={lang === 'ar' ? `ترتيب حسب ${key}` : `Sort by ${key}`}>
-                          {key}<span aria-hidden="true">{tableSort === key ? (tableSortDirection === 'asc' ? ' ▲' : ' ▼') : ' ⇅'}</span>
-                        </button>
-                      </th>
-                    ))}
+                    {columns.map((key, columnIndex) => <th key={key} scope="col" className={`px-3 py-2 text-start text-xs font-bold text-ui-muted ${columnIndex === 0 ? 'min-w-[190px]' : 'whitespace-nowrap'}`}>{key}</th>)}
                   </tr>
                 </thead>
                 <tbody>
-                  {pagedRows.rows.map((row, index) => (
+                  {data.map((row, index) => (
                     <tr key={index} className="border-b border-ui-border/60 hover:bg-ui-page-alt">
                       {columns.map((key, columnIndex) => {
-
+                        const value = row[key];
                         return (
-                          <td key={columnIndex} data-primary={columnIndex === 0} className={`px-3 py-2.5 text-ui-text ${columnIndex === 0 ? 'sticky start-0 bg-ui-surface font-semibold' : 'tabular-nums'}`}>
-                            {renderReportCell(row, key)}
+                          <td key={columnIndex} data-primary={columnIndex === 0} className={`px-3 py-2.5 text-ui-text ${columnIndex === 0 ? 'font-semibold' : 'tabular-nums'}`}>
+                            {typeof value === 'number' && moneyKeys.includes(key) ? formatFinancialCurrency(value, currency, lang) : String(value ?? '')}
                           </td>
                         );
                       })}
                     </tr>
                   ))}
                 </tbody>
-                {totalsByColumn.size > 0 && (
-                  <tfoot className="sticky bottom-0 z-[5] border-t-2 border-ui-border bg-ui-page-alt">
-                    <tr>
-                      {columns.map((key, index) => (
-                        <td key={key} className={`whitespace-nowrap px-3 py-2 font-bold tabular-nums ${index === 0 ? 'sticky start-0 bg-ui-page-alt' : ''}`}>
-                          {totalsByColumn.has(key) ? formatFinancialCurrency(totalsByColumn.get(key), currency, lang) : index === 0 ? reportTotalLabel : null}
-                        </td>
-                      ))}
-                    </tr>
-                  </tfoot>
-                )}
               </table>
             </div>
-            {totalsByColumn.size > 0 && (
-              <dl className="mt-2 space-y-1 border-t border-ui-border px-2 py-2 text-xs sm:hidden" aria-label={reportTotalLabel}>
-                {[...totalsByColumn].map(([key, value]) => (
-                  <div key={key} className="flex justify-between gap-2"><dt>{key}</dt><dd className="font-bold">{formatFinancialCurrency(value, currency, lang)}</dd></div>
-                ))}
-              </dl>
-            )}
-            {pagedRows.totalPages > 1 && (
-              <nav className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-ui-border pt-3 text-xs text-ui-muted" aria-label={lang === 'ar' ? 'صفحات نتائج التقرير' : 'Report result pages'} data-testid="report-table-pagination">
-                <span>{lang === 'ar' ? `الصفحة ${pagedRows.page} من ${pagedRows.totalPages}` : `Page ${pagedRows.page} of ${pagedRows.totalPages}`}</span>
-                <div className="flex items-center gap-2">
-                  <button type="button" disabled={pagedRows.page <= 1} onClick={() => setTablePage(pagedRows.page - 1)}
-                    className="rounded-lg border border-ui-border px-3 py-2 text-ui-text disabled:cursor-not-allowed disabled:opacity-40">
-                    {lang === 'ar' ? 'السابق' : 'Previous'}
-                  </button>
-                  <button type="button" disabled={pagedRows.page >= pagedRows.totalPages} onClick={() => setTablePage(pagedRows.page + 1)}
-                    className="rounded-lg border border-ui-border px-3 py-2 text-ui-text disabled:cursor-not-allowed disabled:opacity-40">
-                    {lang === 'ar' ? 'التالي' : 'Next'}
-                  </button>
-                </div>
-              </nav>
-            )}
           </div>
         )}
       </Card>

@@ -1,5 +1,4 @@
-import { WorkspaceControls } from '@/components/WorkspaceToolbar';
-import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, Edit2, Trash2, ChefHat, Calculator, Package } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
@@ -43,9 +42,6 @@ interface RecipeMutationResult {
   detail?: string;
 }
 
-import { includePendingComponent, validComponentRows, positiveRecipeYield, recipeUnitCost } from '@/features/catalog/productCompositionDraft';
-import { invalidatePosCatalogCache } from '@/core/offline/invalidatePosCatalogCache';
-
 const EMPTY_ITEM: ItemForm = { raw_material_id: '', quantity: 1, wastage_percent: 0 };
 
 export function RecipesPage() {
@@ -74,11 +70,6 @@ export function RecipesPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [units, setUnits] = useState<Unit[]>([]);
   const [metaError, setMetaError] = useState<string | null>(null);
-  const [loadedLinksProduct, setLoadedLinksProduct] = useState<string | null>(null);
-  const [loadedMaterialsBranch, setLoadedMaterialsBranch] = useState<string | null>(null);
-  const materialRequest = useRef(0);
-  const [saving, setSaving] = useState(false);
-  const saveLock = useRef(false);
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editing, setEditing] = useState<Recipe | null>(null);
@@ -111,8 +102,6 @@ export function RecipesPage() {
   }, [branchFilter]);
 
   const loadMaterialsForBranch = useCallback(async (branchId: string) => {
-    const request = ++materialRequest.current;
-    setLoadedMaterialsBranch(null);
     if (!branchId) {
       setMaterials([]);
       setMaterialCosts({});
@@ -124,9 +113,8 @@ export function RecipesPage() {
       supabase.from('raw_material_inventory').select('raw_material_id,avg_cost').eq('branch_id', branchId),
       supabase.from('inventory_units').select('id,name,branch_id,cost_price').eq('branch_id', branchId).eq('unit_type', 'manufactured').eq('is_active', true).order('name'),
     ]);
-    if (request !== materialRequest.current) return;
-    if (materialsRes.error || manufacturedRes.error || inventoryRes.error) {
-      setMetaError(materialsRes.error?.message || manufacturedRes.error?.message || inventoryRes.error?.message || 'Failed to load recipe components');
+    if (materialsRes.error || manufacturedRes.error) {
+      setMetaError(materialsRes.error?.message || manufacturedRes.error?.message || 'Failed to load recipe components');
       setMaterials([]);
       setMaterialCosts({});
       setManufacturedUnits([]);
@@ -146,16 +134,12 @@ export function RecipesPage() {
       if (!(material.id in nextCosts)) nextCosts[material.id] = Number(material.default_cost || 0);
     }
     setMaterialCosts(nextCosts);
-    setLoadedMaterialsBranch(branchId);
   }, []);
 
   useEffect(() => { void loadMeta(); }, [loadMeta]);
   useEffect(() => { void loadMaterialsForBranch(form.branch_id); }, [form.branch_id, loadMaterialsForBranch]);
 
   useEffect(() => {
-    setLoadedLinksProduct(null);
-    setManufacturedItems([]);
-    setManufacturedUnitSel('');
     if (!modalOpen || !form.product_id) {
       setManufacturedItems([]);
       return;
@@ -174,10 +158,9 @@ export function RecipesPage() {
       }
       setManufacturedItems(((data || []) as { unit_id: string; quantity: number }[]).map((row) => ({
         unit_id: row.unit_id,
-        quantity: Number(row.quantity),
+        quantity: Number(row.quantity) || 1,
       })));
-      setLoadedLinksProduct(form.product_id);
-    })().catch(error => { if (!cancelled) setMetaError(error instanceof Error ? error.message : String(error)); });
+    })();
     return () => { cancelled = true; };
   }, [modalOpen, form.product_id]);
 
@@ -227,17 +210,17 @@ export function RecipesPage() {
     (unit) => !manufacturedItems.some((item) => item.unit_id === unit.id),
   );
   const addManufacturedLine = () => {
-    if (!manufacturedUnitSel || loadedLinksProduct !== form.product_id || !Number.isFinite(manufacturedUnitQty) || manufacturedUnitQty <= 0 || manufacturedItems.some(row => row.unit_id === manufacturedUnitSel)) return;
+    if (!manufacturedUnitSel) return;
     setManufacturedItems((current) => [
       ...current,
-      { unit_id: manufacturedUnitSel, quantity: manufacturedUnitQty },
+      { unit_id: manufacturedUnitSel, quantity: manufacturedUnitQty > 0 ? manufacturedUnitQty : 1 },
     ]);
     setManufacturedUnitSel('');
     setManufacturedUnitQty(1);
   };
   const updateManufacturedQty = (index: number, quantity: number) => {
     setManufacturedItems((current) => current.map((item, i) => i === index
-      ? { ...item, quantity }
+      ? { ...item, quantity: quantity > 0 ? quantity : 1 }
       : item));
   };
   const removeManufacturedLine = (index: number) => {
@@ -245,22 +228,14 @@ export function RecipesPage() {
   };
 
   const save = async () => {
-    if (saveLock.current || !can('recipes.manage')) return;
-    if (!form.product_id || !form.branch_id || loadedLinksProduct !== form.product_id || loadedMaterialsBranch !== form.branch_id || !products.some(product => product.id === form.product_id && product.branch_id === form.branch_id) || !Number.isFinite(form.yield_quantity) || form.yield_quantity <= 0) { show(isAr ? 'تحقق من المنتج والفرع واكتمال تحميل المكونات وكمية الإنتاج.' : 'Check the product, branch, loaded components and yield.', 'error'); return; }
-    const validItems = items.filter(it => it.raw_material_id);
-    let validManufacturedItems = manufacturedItems;
-    try {
-      validManufacturedItems = includePendingComponent(manufacturedItems, manufacturedUnitSel, manufacturedUnitQty, row => row.unit_id, (id, quantity) => ({ unit_id: id, quantity }));
-    } catch { show(isAr ? 'تحقق من المصنّع والكمية.' : 'Check the manufactured component and quantity.', 'error'); return; }
-    if (!validComponentRows(validItems, row => row.raw_material_id) || !validComponentRows(validManufacturedItems, row => row.unit_id) || validItems.some(row => !Number.isFinite(row.wastage_percent) || row.wastage_percent < 0 || !materials.some(material => material.id === row.raw_material_id && material.branch_id === form.branch_id && material.unit_id)) || validManufacturedItems.some(row => !manufacturedUnits.some(unit => unit.id === row.unit_id && unit.branch_id === form.branch_id))) { show(isAr ? 'تحقق من الكميات وعدم تكرار المكونات وانتمائها للفرع.' : 'Check quantities, duplicate components and branch ownership.', 'error'); return; }
+    if (!form.product_id || !form.branch_id) { show(t('required'), 'error'); return; }
+    const validItems = items.filter((it) => it.raw_material_id && Number(it.quantity) > 0);
+    const validManufacturedItems = manufacturedItems.filter((it) => it.unit_id && Number(it.quantity) > 0);
     if (validItems.length === 0 && validManufacturedItems.length === 0) {
       show(t('required') + ': ' + t('recipeItems'), 'error');
       return;
     }
 
-    saveLock.current = true;
-    setSaving(true);
-    try {
     const payload = { product_id: form.product_id, branch_id: form.branch_id, name: form.name.trim() || null, yield_quantity: Number(form.yield_quantity) || 1, notes: form.notes.trim() || null, is_active: form.is_active };
     const itemRows: RecipeItemInput[] = validItems.map((it) => ({ raw_material_id: it.raw_material_id, quantity: Number(it.quantity), wastage_percent: Number(it.wastage_percent) || 0 }));
 
@@ -298,12 +273,9 @@ export function RecipesPage() {
       return;
     }
 
-    await invalidatePosCatalogCache();
     show(t('saveSuccess'), 'success');
     setModalOpen(false);
     reloadRecipes();
-    } catch (error) { show(error instanceof Error ? error.message : String(error), 'error'); }
-    finally { saveLock.current = false; setSaving(false); }
   };
 
   const remove = async () => {
@@ -327,8 +299,8 @@ export function RecipesPage() {
       return sum + Number(unit?.cost_price || 0) * Number(item.quantity || 0);
     }, 0);
     const totalComponentCost = rawCost + manufacturedCost;
-    const yieldQty = positiveRecipeYield(Number(form.yield_quantity));
-    const costPerUnit = recipeUnitCost(rawCost, manufacturedCost, yieldQty);
+    const yieldQty = Math.max(1, Number(form.yield_quantity || 1));
+    const costPerUnit = totalComponentCost / yieldQty;
     const selectedProduct = products.find((product) => product.id === form.product_id);
     const sellPrice = Number(selectedProduct?.sale_price || 0);
     const foodCostRatio = sellPrice > 0 ? (costPerUnit / sellPrice) * 100 : 0;
@@ -346,7 +318,7 @@ export function RecipesPage() {
   return (
     <DesignSurface testId="recipes-page">
       <DesignPageHeader title={t('recipes')} subtitle={isAr ? 'تعريف الخامات ومجموعات المكونات المرتبطة بكل منتج' : 'Define raw materials and component groups linked to each product'} actions={can('recipes.manage') ? <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4" /> {t('addRecipe')}</Button> : undefined} />
-      <WorkspaceControls><DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} /></WorkspaceControls>
+      <DesignPanel><DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} /></DesignPanel>
       <DesignPanel>
         <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} />
         <DesignPagination loaded={recipes.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
@@ -362,14 +334,14 @@ export function RecipesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <Select label={t('product')} value={form.product_id} onChange={(e) => setForm({ ...form, product_id: e.target.value })} disabled={!!editing || products.length === 0}>
               <option value="" disabled>{t('selectProduct')}</option>
-              {products.filter(product => product.branch_id === form.branch_id).map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
+              {products.map((product) => <option key={product.id} value={product.id}>{product.name}</option>)}
             </Select>
-            <Select label={t('branch')} value={form.branch_id} onChange={(e) => { setForm({ ...form, branch_id: e.target.value, product_id: '' }); setItems([{ ...EMPTY_ITEM }]); setManufacturedItems([]); setManufacturedUnitSel(''); }} disabled={!!branchFilter || !!editing || saving}>
+            <Select label={t('branch')} value={form.branch_id} onChange={(e) => setForm({ ...form, branch_id: e.target.value })} disabled={!!branchFilter || !!editing}>
               <option value="" disabled>{t('branch')}</option>
               {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
             </Select>
             <Input label={t('name')} value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
-            <Input label={t('yieldQuantity')} type="number" min="0.0001" step="0.0001" value={form.yield_quantity} onChange={(e) => setForm({ ...form, yield_quantity: parseFloat(e.target.value) || 0 })} />
+            <Input label={t('yieldQuantity')} type="number" min="0.0001" step="0.0001" value={form.yield_quantity} onChange={(e) => setForm({ ...form, yield_quantity: parseFloat(e.target.value) || 1 })} />
           </div>
 
           <div>
@@ -419,7 +391,7 @@ export function RecipesPage() {
                       <p className="text-sm font-medium text-ui-text">{unit?.name || item.unit_id}</p>
                       <p className="text-xs text-ui-subtle">{isAr ? 'مجموعة مكونات' : 'Component group'}</p>
                     </div>
-                    <Input label={t('quantity')} type="number" min="0.0001" step="0.0001" value={item.quantity} onChange={(e) => updateManufacturedQty(index, parseFloat(e.target.value) || 0)} />
+                    <Input label={t('quantity')} type="number" min="0.0001" step="0.0001" value={item.quantity} onChange={(e) => updateManufacturedQty(index, parseFloat(e.target.value) || 1)} />
                     <button type="button" onClick={() => removeManufacturedLine(index)} className="p-2 rounded-lg text-ui-danger hover:bg-ui-danger-soft"><Trash2 className="w-4 h-4" /></button>
                   </div>
                 );
@@ -430,8 +402,8 @@ export function RecipesPage() {
                 <option value="">--</option>
                 {availableManufacturedUnits.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
               </Select>
-              <Input label={t('quantity')} type="number" min="0.0001" step="0.0001" value={manufacturedUnitQty} onChange={(e) => setManufacturedUnitQty(parseFloat(e.target.value) || 0)} />
-              <Button type="button" variant="outline" size="sm" onClick={addManufacturedLine} disabled={!manufacturedUnitSel || loadedLinksProduct !== form.product_id || loadedMaterialsBranch !== form.branch_id || manufacturedUnitQty <= 0 || saving}><Plus className="w-4 h-4" /> {t('add')}</Button>
+              <Input label={t('quantity')} type="number" min="0.0001" step="0.0001" value={manufacturedUnitQty} onChange={(e) => setManufacturedUnitQty(parseFloat(e.target.value) || 1)} />
+              <Button type="button" variant="outline" size="sm" onClick={addManufacturedLine} disabled={!manufacturedUnitSel}><Plus className="w-4 h-4" /> {t('add')}</Button>
             </div>
           </div>
 
@@ -447,7 +419,7 @@ export function RecipesPage() {
 
           <div className="sticky bottom-0 -mx-4 sm:-mx-6 px-4 sm:px-6 py-3 bg-ui-surface/95 backdrop-blur border-t border-ui-border flex justify-end gap-2">
             <Button variant="secondary" onClick={() => setModalOpen(false)}>{t('cancel')}</Button>
-            <Button onClick={save} disabled={saving || !form.product_id || loadedLinksProduct !== form.product_id || loadedMaterialsBranch !== form.branch_id}>{t('save')}</Button>
+            <Button onClick={save} disabled={products.length === 0}>{t('save')}</Button>
           </div>
         </div>
       </Modal>

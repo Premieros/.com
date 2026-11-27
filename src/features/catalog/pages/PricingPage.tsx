@@ -1,4 +1,3 @@
-import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useMemo, useState } from 'react';
 import { BadgeDollarSign, Boxes, Package, RefreshCw, Save } from 'lucide-react';
 import { costing, supabase } from '@/api';
@@ -325,7 +324,7 @@ export function PricingPage() {
         ))}
       </div>
 
-      <WorkspaceControls><div data-testid="pricing-search-panel">
+      <DesignPanel testId="pricing-search-panel">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <DesignSearch
             value={search}
@@ -339,7 +338,7 @@ export function PricingPage() {
             {ar ? `${currentCount} عنصر` : `${currentCount} items`}
           </div>
         </div>
-      </div></WorkspaceControls>
+      </DesignPanel>
 
       <DesignPanel testId="pricing-table-panel">
         {!branchId ? (

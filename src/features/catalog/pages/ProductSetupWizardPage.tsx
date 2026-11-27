@@ -1,9 +1,8 @@
-import { useEffect, useMemo, useState, useRef } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Check, ChevronLeft, ChevronRight, PackagePlus, Plus, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/api';
 import * as api from '@/api';
-import type { CreateProductInput } from '@/api/domains/catalog';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
 import { DesignSurface, DesignPageHeader, DesignPanel } from '@/components/design';
@@ -12,10 +11,7 @@ import { Input, Select } from '@/components/Input';
 import { useBranchFilter } from '@/lib/useBranchFilter';
 import { useBranches } from '@/hooks/useBranches';
 import { useCan } from '@/lib/permissions';
-import { formatFinancialCurrency, generateBarcode } from '@/lib/format';
-import { useSettings } from '@/context/SettingsContext';
-import { estimateRawRecipeDefaultCost } from '../recipeDefaultCostPreview';
-import { recipeCostBreakdown } from '../recipeCostBreakdown';
+import { generateBarcode } from '@/lib/format';
 import { useGuidedWorkflow } from '@/core/guard';
 import { invalidatePosCatalogCache } from '@/core/offline/invalidatePosCatalogCache';
 import { BusinessAttributesFields } from '@/features/shared/BusinessAttributesFields';
@@ -41,7 +37,6 @@ export function ProductSetupWizardPage() {
   const { show } = useToast();
   const branchFilter = useBranchFilter();
   const { branches } = useBranches();
-  const { effectiveSettings } = useSettings();
   const can = useCan();
   const { runtime } = useOrganizationModules();
   const { guidedContext, completePrerequisiteAndReturn } = useGuidedWorkflow();
@@ -53,7 +48,6 @@ export function ProductSetupWizardPage() {
 
   const [step, setStep] = useState(1);
   const [saving, setSaving] = useState(false);
-  const saveLock = useRef(false);
   const [loadingComponents, setLoadingComponents] = useState(false);
   const [categories, setCategories] = useState<Category[]>([]);
   const [manufacturedItems, setManufacturedItems] = useState<InventoryUnit[]>([]);
@@ -78,15 +72,6 @@ export function ProductSetupWizardPage() {
   const selectedManufacturedIds = useMemo(() => new Set(manufacturedComponents.map((row) => row.unit_id).filter(Boolean)), [manufacturedComponents]);
   const selectedRawIds = useMemo(() => new Set(rawComponents.map((row) => row.raw_material_id).filter(Boolean)), [rawComponents]);
   const totalComponentCount = manufacturedComponents.length + rawComponents.length;
-  const rawCostEstimate = useMemo(() => estimateRawRecipeDefaultCost(
-    rawComponents, rawMaterials, manufacturedComponents.length,
-  ), [rawComponents, rawMaterials, manufacturedComponents.length]);
-  const currency = effectiveSettings(branchId || null)?.currency || 'EGP';
-  const costBreakdown = useMemo(() => recipeCostBreakdown(
-    rawComponents, rawMaterials, manufacturedComponents.length, form.sale_price,
-  ), [rawComponents, rawMaterials, manufacturedComponents.length, form.sale_price]);
-
-
   const wizardSteps = useMemo(() => [
     { step: 1, label: isAr ? `بيانات ${itemLabel}` : itemLabel },
     ...(supportsComponentGroups ? [{ step: 2, label: isAr ? 'مجموعات المكونات' : 'Component groups' }] : []),
@@ -172,13 +157,13 @@ export function ProductSetupWizardPage() {
   };
   const removeRawComponent = (index: number) => setRawComponents((prev) => prev.filter((_, i) => i !== index));
 
-  const validateStep = (validationStep = step) => {
-    if (validationStep === 1 && (!form.name.trim() || !branchId)) {
+  const validateStep = () => {
+    if (step === 1 && (!form.name.trim() || !branchId)) {
       show(isAr ? 'أكمل اسم المنتج والفرع' : 'Complete the product name and branch', 'error');
       return false;
     }
-    if (validationStep === 2 && supportsComponentGroups) {
-      if (manufacturedComponents.some((row) => !row.unit_id || !Number.isFinite(row.quantity) || row.quantity <= 0)) {
+    if (step === 2 && supportsComponentGroups) {
+      if (manufacturedComponents.some((row) => !row.unit_id || row.quantity <= 0)) {
         show(isAr ? 'اختر مجموعة المكونات وحدد كمية صحيحة' : 'Select each component group and enter a valid quantity', 'error');
         return false;
       }
@@ -191,8 +176,8 @@ export function ProductSetupWizardPage() {
         return false;
       }
     }
-    if (validationStep === 3 && supportsRawComposition) {
-      if (rawComponents.some((row) => !row.raw_material_id || !Number.isFinite(row.quantity) || row.quantity <= 0 || !Number.isFinite(row.wastage_percent) || row.wastage_percent < 0)) {
+    if (step === 3 && supportsRawComposition) {
+      if (rawComponents.some((row) => !row.raw_material_id || row.quantity <= 0 || row.wastage_percent < 0)) {
         show(isAr ? 'اختر الخامة وحدد كمية صحيحة' : 'Select each raw material and enter a valid quantity', 'error');
         return false;
       }
@@ -213,19 +198,18 @@ export function ProductSetupWizardPage() {
   };
 
   const save = async () => {
-    if (!can('products.create') || saveLock.current || loadingComponents || !branchId) return;
-    if (!wizardSteps.every(({ step: validationStep }) => validateStep(validationStep))) return;
+    if (!can('products.create') || saving || !branchId) return;
+    if (!validateStep()) return;
     if (supportsRawComposition && rawComponents.length > 0 && !can('recipes.manage')) {
       show(isAr ? 'لا تملك صلاحية إدارة الخامات المباشرة للمنتج.' : 'You do not have permission to manage direct product raw materials.', 'error');
       return;
     }
 
-    saveLock.current = true;
     setSaving(true);
     let createdProductId: string | null = null;
     try {
       const derivedProductType: 'ready' | 'manufactured' = supportsComposition && (rawComponents.length > 0 || manufacturedComponents.length > 0) ? 'manufactured' : 'ready';
-      const createInput: CreateProductInput = {
+      const { data, error: productError } = await api.catalog.createProduct({
         p_name: form.name.trim(),
         p_name_en: form.name_en.trim() || null,
         p_barcode: form.barcode || null,
@@ -240,14 +224,28 @@ export function ProductSetupWizardPage() {
         p_unit_links: supportsComponentGroups && manufacturedComponents.length > 0
           ? manufacturedComponents.map((row) => ({ unit_id: row.unit_id, quantity: Number(row.quantity) }))
           : null,
-      };
-      const directItems = supportsRawComposition ? rawComponents.map(row => ({ raw_material_id: row.raw_material_id, quantity: Number(row.quantity), wastage_percent: Number(row.wastage_percent ?? 0) })) : [];
-      const { data, error: productError } = await api.catalog.createProductOperational({ p_product: { ...createInput, p_business_attributes: businessAttributes }, p_items: directItems });
-      if (productError || !data?.success || !data.product_id) throw productError || new Error(data?.error || 'PRODUCT_CREATE_FAILED');
-      createdProductId = data.product_id;
-      if (directItems.length > 0) {
-        const persisted = await api.catalog.getProductDirectRawComponents(createdProductId, branchId);
-        if (persisted.items.length !== directItems.length || directItems.some(row => !persisted.items.some(item => item.raw_material_id === row.raw_material_id && Math.abs(Number(item.quantity) - row.quantity) < 0.000001 && Math.abs(Number(item.wastage_percent ?? 0) - row.wastage_percent) < 0.000001))) throw new Error('PRODUCT_RAW_COMPONENTS_NOT_SAVED');
+      });
+      if (productError || !data || data.success === false) throw productError || new Error(data?.error || 'error');
+      createdProductId = data.product_id ?? null;
+      if (!createdProductId) throw new Error(data?.error || 'error');
+
+      const { error: attributesError } = await supabase
+        .from('products')
+        .update({ business_attributes: businessAttributes })
+        .eq('id', createdProductId);
+      if (attributesError) throw attributesError;
+
+      if (supportsRawComposition && rawComponents.length > 0) {
+        await api.catalog.saveProductDirectRawComponents({
+          product_id: createdProductId,
+          branch_id: branchId,
+          product_name: form.name.trim(),
+          items: rawComponents.map((row) => ({
+            raw_material_id: row.raw_material_id,
+            quantity: Number(row.quantity),
+            wastage_percent: Number(row.wastage_percent) || 0,
+          })),
+        });
       }
 
       await invalidatePosCatalogCache();
@@ -259,14 +257,10 @@ export function ProductSetupWizardPage() {
       }
     } catch (error) {
       if (createdProductId) {
-        // Never delete a committed product or retry creation on a partial follow-up failure.
-        show(isAr ? 'تم إنشاء المنتج، لكن لم تكتمل إحدى خطوات الحفظ. افتحه من قائمة المنتجات للمراجعة.' : 'Product created, but a follow-up save was incomplete. Reopen from the product list to review.', 'error');
-        navigate('/products');
-      } else {
-        show(error instanceof Error ? error.message : String(error), 'error');
+        await supabase.from('products').delete().eq('id', createdProductId);
       }
+      show(error instanceof Error ? error.message : String(error), 'error');
     } finally {
-      saveLock.current = false;
       setSaving(false);
     }
   };
@@ -404,43 +398,6 @@ export function ProductSetupWizardPage() {
                 </div>}
               </div>
             </div>
-            {supportsComposition && <section data-testid="product-raw-cost-preview"
-              className="rounded-xl border border-ui-border bg-ui-page-alt p-4 space-y-2">
-              <h3 className="font-semibold">{isAr ? 'معاينة تكلفة الخامات الافتراضية' : 'Configured raw-cost preview'}</h3>
-              <p className="text-lg font-bold text-ui-text">{formatFinancialCurrency(rawCostEstimate.subtotal, currency, lang)}</p>
-              <p role="note" className="text-xs text-ui-muted">
-                {isAr
-                  ? 'مجموع تكلفة الخامات المباشرة بكمياتها وهالكها من سعر الخامة الافتراضي المسجل. ليست FIFO أو تكلفة وصفة نهائية ولا تُحفظ كمصروف.'
-                  : 'Direct raw quantities and waste using configured default material costs only. Not FIFO, final recipe cost or a posted expense.'}
-              </p>
-              {costBreakdown.lines.length > 0 && <div className="overflow-x-auto rounded-lg border border-ui-border">
-                <table className="w-full min-w-[550px] text-xs">
-                  <thead className="bg-ui-surface"><tr>
-                    {(isAr ? ['الخامة', 'كمية مع الهالك', 'تكلفة الوحدة الافتراضية', 'التكلفة'] :
-                      ['Material', 'Qty incl. waste', 'Configured unit cost', 'Extended cost'])
-                      .map(label => <th key={label} className="px-2 py-2 text-start">{label}</th>)}
-                  </tr></thead>
-                  <tbody>{costBreakdown.lines.map((line, index) => <tr key={index} className="border-t border-ui-border">
-                    <td className="px-2 py-2">{rawMaterials.find(item => item.id === line.rawMaterialId)?.name || (isAr ? 'خامة غير مختارة' : 'Unselected material')}</td>
-                    <td className="px-2 py-2 tabular-nums">{line.effectiveQuantity === null ? '—' : line.effectiveQuantity.toLocaleString(lang, { maximumFractionDigits: 4 })}</td>
-                    <td className="px-2 py-2">{line.unitCost === null ? '—' : formatFinancialCurrency(line.unitCost, currency, lang)}</td>
-                    <td className="px-2 py-2 font-semibold">{line.extendedCost === null ? (isAr ? 'غير مكتملة' : 'Incomplete') : formatFinancialCurrency(line.extendedCost, currency, lang)}</td>
-                  </tr>)}</tbody>
-                </table>
-              </div>}
-              {costBreakdown.complete && costBreakdown.projectedCostRatio !== null && (
-                <p className="text-sm font-semibold text-ui-text" data-testid="recipe-expected-margin">
-                  {isAr ? 'نسبة تكلفة الخامات إلى البيع' : 'Raw cost / sale price'}: {costBreakdown.projectedCostRatio.toFixed(1)}%
-                  {' · '}
-                  {isAr ? 'الهامش المتوقع قبل المصروفات' : 'Projected margin before expenses'}: {costBreakdown.projectedGrossMargin?.toFixed(1)}%
-                </p>
-              )}
-              {!rawCostEstimate.complete && <p role="status" className="text-xs font-semibold text-ui-warning">
-                {isAr
-                  ? `التقدير غير مكتمل: ${rawCostEstimate.missingPrices} خامة بلا سعر صالح أو بيانات ناقصة${rawCostEstimate.includesGroups ? '؛ تكلفة مجموعات المكونات غير مشمولة' : ''}.`
-                  : `Incomplete estimate: ${rawCostEstimate.missingPrices} unpriced/invalid raw lines${rawCostEstimate.includesGroups ? '; component group costs excluded' : ''}.`}
-              </p>}
-            </section>}
             <p className="text-sm text-ui-subtle">{supportsComposition
               ? (isAr ? `سيتم ربط ${totalComponentCount} مكوّن بـ ${itemLabel}.` : `${totalComponentCount} existing components will be linked to the ${itemLabel}.`)
               : (isAr ? `سيتم حفظ ${itemLabel} بدون دورة تصنيع أو مكونات غير مطلوبة لهذا النشاط.` : `The ${itemLabel} will be saved without manufacturing composition that this business does not use.`)}</p>

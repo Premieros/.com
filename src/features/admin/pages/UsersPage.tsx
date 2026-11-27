@@ -1,5 +1,3 @@
-import { useBranchScope } from '@/lib/branchScope';
-import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useMemo, useState } from 'react';
 import { Edit2, Plus, Shield, Trash2 } from 'lucide-react';
 import { supabase } from '@/api';
@@ -37,7 +35,6 @@ export function UsersPage() {
   const canManageBranches = can('users.branches.manage');
   const canOpenUserEditor = canManageUsers || canManageBranches;
   const isPlatformAdmin = me?.role === 'super_admin';
-  const { actionBranchId } = useBranchScope();
   const { branches, loading: branchesLoading } = useBranches();
   const allowedBranchScope = useMemo(
     () => isPlatformAdmin ? undefined : branches.map((branch) => `branch_id.eq.${branch.id}`).join(','),
@@ -90,7 +87,7 @@ export function UsersPage() {
 
   const openAdd = () => {
     if (!canCreateUsers) return;
-    const defaultBranchId = branches.find((branch) => branch.id === actionBranchId)?.id || (branches.length === 1 ? branches[0].id : '');
+    const defaultBranchId = branches.find((b) => b.id === me?.branch_id)?.id || branches[0]?.id || '';
     setAddForm({ full_name: '', username: '', email: '', password: '', role: 'cashier', branch_id: defaultBranchId, is_active: true });
     setBranchAccessIds(defaultBranchId ? [defaultBranchId] : []);
     setAddModal(true);
@@ -291,9 +288,9 @@ export function UsersPage() {
       <DesignPageHeader title={t('users')} actions={
         canCreateUsers ? <Button size="sm" onClick={openAdd} data-testid="users-add"><Plus className="w-4 h-4" /> {t('addUser')}</Button> : undefined
       } />
-      <WorkspaceControls><div data-testid="users-search-panel">
+      <DesignPanel testId="users-search-panel" className="ui-accent-system">
         <DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="users-search" />
-      </div></WorkspaceControls>
+      </DesignPanel>
       <DesignPanel testId="users-table-panel" className="ui-accent-system">
         <DataTable columns={columns} data={filtered} loading={loading} emptyMessage={t('noData')} />
         <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
@@ -345,7 +342,7 @@ export function UsersPage() {
           <Select label={t('branch')} value={addForm.branch_id} onChange={(e) => {
             const branchId = e.target.value;
             setAddForm({ ...addForm, branch_id: branchId });
-            setBranchAccessIds(branchId ? [branchId] : []);
+            setBranchAccessIds((ids) => ensurePrimaryBranch(ids, branchId));
           }}>
             <option value="">--</option>
             {branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}

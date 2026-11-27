@@ -1,5 +1,4 @@
-import { WorkspaceControls } from '@/components/WorkspaceToolbar';
-import { useEffect, useState } from 'react';
+﻿import { useEffect, useState } from 'react';
 import { Download, Pencil, Plus, RotateCcw, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
@@ -15,7 +14,7 @@ import { DataTable, type Column } from '@/components/DataTable';
 import { Button } from '@/components/Button';
 import { Input, Select, Textarea } from '@/components/Input';
 import { Modal } from '@/components/Modal';
-import { formatFinancialCurrency, formatCurrency, formatDate, todayISO } from '@/lib/format';
+import { formatCurrency, formatDate, todayISO } from '@/lib/format';
 import { exportToExcel } from '@/lib/excel';
 import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
@@ -69,7 +68,7 @@ export function ExpensesPage() {
   });
   const { effectiveSettings } = useSettings();
   const { branches } = useBranches();
-  const currency = effectiveSettings(branchScope.selectedBranchIds.length === 1 ? branchScope.selectedBranchIds[0] : branchFilter)?.currency || 'EGP';
+  const currency = effectiveSettings(branchFilter)?.currency || 'EGP';
   const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
@@ -123,7 +122,6 @@ export function ExpensesPage() {
       return;
     }
     let cancelled = false;
-    setActiveShiftId(null);
     void Promise.all([
       supabase.from('chart_of_accounts').select('id,code,name,name_en').eq('branch_id', effectiveBranchId).eq('account_type', 'expense').eq('is_active', true).order('code'),
       supabase.from('treasury_accounts').select('id,account_name,account_type').eq('branch_id', effectiveBranchId).eq('is_active', true).order('account_type'),
@@ -370,17 +368,16 @@ export function ExpensesPage() {
           )}
         </>
       } />
-      <WorkspaceControls><div data-testid="expenses-search-panel">
+      <DesignPanel testId="expenses-search-panel">
         <DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} testId="expenses-search" />
-      </div></WorkspaceControls>
+      </DesignPanel>
       <DesignPanel testId="expenses-table-panel">
         <div className="mb-3 rounded-lg border border-ui-border bg-ui-page-alt p-3 text-sm text-ui-text">
           {isAr
             ? 'كل سجلات المصروفات ظاهرة هنا، بما فيها السجلات المعكوسة/الملغاة. السجل المعكوس يظهر مشطوبًا وحالته وسبب العكس واضحان؛ التقارير المالية الفعالة تعتمد السجلات المرحلة فقط.'
             : 'All expense records are shown, including reversed/voided rows. Reversed rows are struck through with status and reason visible; active financial reporting uses posted records only.'}
         </div>
-        <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')}
-          columnTotals={branchScope.selectedBranchIds.length === 1 ? [{ key: 'amount', label: t('amount'), value: (row) => Number(row.amount), format: (sum) => formatFinancialCurrency(sum, currency, lang) }] : undefined} />
+        <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} />
         <DesignPagination loaded={items.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
       </DesignPanel>
 
@@ -434,12 +431,9 @@ export function ExpensesPage() {
           {editingExpense && (
             <Textarea label={isAr ? 'سبب التعديل' : 'Edit reason'} value={editReason} onChange={(e) => setEditReason(e.target.value)} rows={2} required />
           )}
-          {!activeShiftId && <p role="status" className="rounded-lg border border-ui-warning/30 bg-ui-warning-soft p-3 text-sm text-ui-text">
-            {isAr ? 'افتح وردية في الفرع المحدد قبل حفظ المصروف.' : 'Open a shift in the selected branch before saving the expense.'}
-          </p>}
           <div className="flex justify-end gap-2">
             <Button variant="secondary" onClick={() => { setModalOpen(false); setEditingExpense(null); }}>{t('cancel')}</Button>
-            <Button onClick={save} disabled={!activeShiftId || !effectiveBranchId}>{t('save')}</Button>
+            <Button onClick={save}>{t('save')}</Button>
           </div>
         </div>
       </Modal>

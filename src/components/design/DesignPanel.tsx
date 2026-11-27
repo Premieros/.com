@@ -30,7 +30,7 @@ export function DesignPanel({
   return (
     <Card className={className}>
       {hasHeader ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-ui-border px-4 py-3">
+        <div className="flex flex-col gap-3 border-b border-ui-border p-5 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex min-w-0 items-center gap-3">
             {icon ? <span className="shrink-0">{icon}</span> : null}
             <div className="min-w-0">
@@ -38,7 +38,7 @@ export function DesignPanel({
               {description ? <p className="mt-1 text-xs font-medium leading-5 text-ui-muted">{description}</p> : null}
             </div>
           </div>
-          {actions ? <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">{actions}</div> : null}
+          {actions ? <div className="flex flex-wrap items-center gap-2">{actions}</div> : null}
         </div>
       ) : null}
       <div data-testid={testId} className={clsx(bodyClassName ?? 'p-4')}>

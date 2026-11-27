@@ -1,5 +1,5 @@
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
 import {
   AlertTriangle, ArrowDown, ArrowUp, ArrowUpRight, BarChart3, CreditCard,
   RefreshCw, Wallet, ReceiptText,
@@ -12,7 +12,7 @@ import { useBranchFilter } from '@/lib/useBranchFilter';
 import { useBranchScope } from '@/lib/branchScope';
 import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
-import { useCan, type Permission } from '@/lib/permissions';
+import { useCan } from '@/lib/permissions';
 import { useHistoryAccess } from '@/lib/useHistoryAccess';
 import { formatFinancialCurrency, formatNumber, formatPercent } from '@/lib/format';
 import {
@@ -24,17 +24,9 @@ import { loadDashboardPaymentAggregates } from '../services/dashboardPayments';
 import { loadDashboardSalesSnapshot, type DashboardSalesSnapshot } from '../services/dashboardSnapshot';
 import { DashboardStandbyBar } from '../components/DashboardStandbyBar';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
-import { DashboardBreakdown } from '../components/DashboardBreakdown';
-import { Modal } from '@/components/Modal';
-import { WorkspaceLiveDot, WorkspaceMeter, WorkspaceSparkline } from '@/components/design/WorkspaceIndicators';
-import { businessDateISO } from '@/lib/businessTime';
-import { REPORT_REGISTRY } from '@/features/reporting/reportRegistry';
-import type { ReportType } from '@/features/reporting/reportFilters';
-import { businessReportAllowed } from '@/core/organizations/businessRuntime';
 import { APP_ROUTES } from '@/core/navigation/routes';
 
 type Range = 'today' | 'week' | 'month' | 'year';
-type AnalysisMetric = 'sales' | 'orders' | 'payments';
 type RelatedName = { name?: string | null; name_en?: string | null; low_stock_threshold?: number | null };
 type Sale = {
   id: string;
@@ -50,7 +42,7 @@ type Sale = {
   discount_amount: number | null;
   branch?: RelatedName | RelatedName[] | null;
 };
-type StockAlert = { key: string; itemId: string; name: string; quantity: number; threshold: number };
+type StockAlert = { key: string; name: string; quantity: number; threshold: number };
 type RawStockMaster = { id: string; branch_id: string | null; name: string; min_stock: number | null; is_active: boolean | null };
 type RawStockBalance = { raw_material_id: string; branch_id: string | null; quantity: number | null };
 type UnitStockMaster = { id: string; branch_id: string | null; name: string; min_stock: number | null; low_stock_threshold: number | null; is_active: boolean | null };
@@ -125,7 +117,6 @@ function buildStockAlerts(
       const key = `${row.branch_id || ''}:${row.id}`;
       return {
         key: `raw:${key}`,
-        itemId: row.id,
         name: row.name,
         quantity: rawQty.get(key) || 0,
         threshold: Number(row.min_stock ?? defaultThreshold),
@@ -138,7 +129,6 @@ function buildStockAlerts(
       const key = `${row.branch_id || ''}:${row.id}`;
       return {
         key: `unit:${key}`,
-        itemId: row.id,
         name: row.name,
         quantity: unitQty.get(key) || 0,
         threshold: Number(row.low_stock_threshold ?? row.min_stock ?? defaultThreshold),
@@ -179,51 +169,25 @@ function periodWindow(range: Range) {
 }
 
 function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
-  return <section className={`rounded-[22px] border border-ui-border bg-ui-surface p-5 shadow-ui ${className}`}>{children}</section>;
+  return <section className={`ui-accent-card ui-accent-primary rounded-3xl border border-ui-border bg-ui-surface p-5 shadow-ui ${className}`}>{children}</section>;
 }
 
 function Empty({ ar }: { ar: boolean }) {
   return <div className="flex min-h-[120px] items-center justify-center text-sm text-ui-subtle">{ar ? 'لا توجد بيانات فعلية للفترة المحددة' : 'No actual data for the selected period'}</div>;
 }
 
-function Metric({ testId, icon: Icon, title, value, display, previous, href, ar, detail, selected, onSelect, sparkValues }: {
-  testId: string; icon: typeof Wallet; title: string; value: number; display: string; previous: number; href?: string; ar: boolean; detail?: ReactNode; selected?: boolean; onSelect?: () => void; sparkValues?: number[];
+function Metric({ testId, icon: Icon, title, value, display, previous, href, ar, detail }: {
+  testId: string; icon: typeof Wallet; title: string; value: number; display: string; previous: number; href?: string; ar: boolean; detail?: ReactNode;
 }) {
   const change = previous > 0 ? ((value - previous) / previous) * 100 : null;
   const positive = (change ?? 0) >= 0;
   const content = <>
-    <div className="flex items-center justify-between gap-2">
-      <div className="flex min-w-0 items-center gap-2.5">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-ui-primary-soft text-ui-primary">
-          <Icon className="h-4 w-4" />
-        </div>
-        <p className="truncate text-[13px] font-semibold text-ui-muted">{title}</p>
-      </div>
-      {href && <ArrowUpRight className="h-4 w-4 shrink-0 text-ui-subtle transition group-hover:text-ui-primary" />}
-    </div>
-    <div className="mt-4 flex flex-wrap items-end justify-between gap-2">
-      <p className="min-w-0 truncate text-[26px] font-bold leading-none tracking-[-0.025em] text-ui-text tabular-nums">{display}</p>
-      {sparkValues && sparkValues.some((v) => v > 0) && (
-        <WorkspaceSparkline values={sparkValues.slice(-12)} tone={positive ? 'primary' : 'danger'} width={68} height={22} />
-      )}
-    </div>
+    <div className="flex items-start justify-between"><div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-ui-primary-soft text-ui-primary"><Icon className="h-5 w-5" /></div>{href && <ArrowUpRight className="h-4 w-4 text-ui-subtle" />}</div>
+    <p className="mt-5 text-sm font-semibold text-ui-muted">{title}</p><p className="mt-1 text-3xl font-extrabold tracking-tight text-ui-text tabular-nums">{display}</p>
     {detail && <div className="mt-2 text-xs font-semibold text-ui-muted">{detail}</div>}
-    <div className="mt-auto flex flex-wrap items-center gap-2 pt-3 text-xs">
-      {change === null ? <span className="text-ui-subtle">—</span> : (
-        <span className={`inline-flex items-center gap-0.5 rounded-full px-2 py-0.5 text-[11px] font-bold ${positive ? 'bg-ui-success-soft text-ui-success' : 'bg-ui-danger-soft text-ui-danger'}`}>
-          {positive ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}{formatPercent(Math.abs(change), 1)}
-        </span>
-      )}
-      <span className="text-ui-subtle">{ar ? 'مقارنة بالفترة السابقة' : 'vs previous period'}</span>
-    </div>
+    <div className="mt-2 flex items-center gap-2 text-xs">{change === null ? <span className="text-ui-subtle">—</span> : <span className={`inline-flex items-center gap-0.5 font-bold ${positive ? 'text-ui-success' : 'text-ui-danger'}`}>{positive ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}{formatPercent(Math.abs(change), 1)}</span>}<span className="text-ui-subtle">{ar ? 'مقارنة بالفترة السابقة' : 'vs previous period'}</span></div>
   </>;
-  const className = `flex h-full min-w-0 flex-col overflow-hidden rounded-[22px] border border-ui-border bg-ui-surface p-5 shadow-ui transition-all ${href ? 'group hover:-translate-y-0.5 hover:shadow-ui-lg' : ''}`;
-  if (onSelect) return (
-    <button type="button" data-testid={testId} aria-pressed={selected} onClick={onSelect}
-      className={`${className} text-start transition-colors hover:border-ui-primary/50 focus-visible:outline-2 focus-visible:outline-ui-ring ${selected ? 'border-ui-primary ring-2 ring-ui-primary/25' : ''}`}>
-      {content}
-    </button>
-  );
+  const className = `ui-accent-card ui-accent-primary rounded-3xl border border-ui-border bg-ui-surface p-5 shadow-ui ${href ? 'group transition hover:-translate-y-0.5 hover:shadow-ui-lg' : ''}`;
   if (!href) return <div data-testid={testId} className={className}>{content}</div>;
   return <Link data-testid={testId} to={href} className={className}>{content}</Link>;
 }
@@ -234,10 +198,7 @@ export function DashboardDataPage() {
   const history = useHistoryAccess();
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
-  const readBranchIds = useMemo(
-    () => branchScope.selectedBranchIds.length ? branchScope.selectedBranchIds : (branchFilter ? [branchFilter] : []),
-    [branchScope.selectedBranchIds, branchFilter],
-  );
+  const readBranchIds = branchScope.selectedBranchIds.length ? branchScope.selectedBranchIds : (branchFilter ? [branchFilter] : []);
   const { effectiveSettings } = useSettings();
   const { branches } = useBranches();
   const { organizationId, runtime, canAccessModule, canAccessPath } = useOrganizationModules();
@@ -255,46 +216,11 @@ export function DashboardDataPage() {
   const canViewExpenses = can('expenses.view') && canAccessModule('expenses') && dashboardSections.has('expenses');
   const canViewKds = can('pos.kds_view') && canAccessPath(APP_ROUTES.kitchenDisplay);
   const canViewFinancial = can('reports.financial') && canAccessModule('accounting') && dashboardSections.has('finance');
-  const canViewBusinessRecords = can('customers.view') && dashboardSections.has('business_records') && runtime.recordTypes.length > 0;
-  const canViewAudit = can('audit.view') && canAccessModule('audit_logs') && canAccessPath(APP_ROUTES.auditLog);
-  const canViewSettings = can('settings.manage') && canAccessPath(APP_ROUTES.settings);
-  const canViewTreasury = can('accounts.view') && canAccessModule('accounting') && canAccessPath(APP_ROUTES.treasury);
-  const quickActionPermitted = (route: string): boolean => {
-    if (route === APP_ROUTES.pos) return can('pos.view');
-    if (route === APP_ROUTES.floorPlan) return canViewFloorPlan;
-    if (route === APP_ROUTES.kitchenDisplay) return canViewKds;
-    if (route === APP_ROUTES.purchases) return canViewPurchases;
-    if (route === APP_ROUTES.products) return can('products.view');
-    if (route === APP_ROUTES.customers) return can('customers.view');
-    if (route === APP_ROUTES.accounts) return can('accounts.view') && canAccessModule('accounting');
-    if (route === APP_ROUTES.sales) return can('sales.view');
-    if (route === APP_ROUTES.inventory) return can('inventory.view');
-    return true;
-  };
-  const visibleQuickActions = runtime.dashboard.quickActions.filter((action) =>
-    (!action.module || canAccessModule(action.module))
-    && (!action.capability || runtime.capabilities.has(action.capability))
-    && canAccessPath(action.route)
-    && quickActionPermitted(action.route),
-  );
-  const quickRoutes = new Set(visibleQuickActions.map((action) => action.route));
-  const [params, setParams] = useSearchParams();
-  const requestedRange = params.get('range');
-  const range = (Object.keys(rangeLabels) as Range[]).find((key) => key === requestedRange)
-    ?? (history.unlimited ? 'month' : 'week');
-  const requestedMetric = params.get('metric');
-  const metric: AnalysisMetric = requestedMetric === 'orders' || requestedMetric === 'payments' ? requestedMetric : 'sales';
-  const compare = params.get('compare') === '1';
-  const groupByWeek = range === 'month' && params.get('group') === 'week';
-  const [expanded, setExpanded] = useState(false);
-  const requestId = useRef(0);
-  const lastSalesScope = useRef<string>();
-  const updateView = (key: string, value: string) => {
-    const next = new URLSearchParams(params);
-    if (value) next.set(key, value);
-    else next.delete(key);
-    setParams(next);
-  };
+  const canViewBusinessRecords = dashboardSections.has('business_records') && runtime.recordTypes.length > 0;
+  const canViewAudit = can('audit.view') && canAccessModule('audit_logs');
+  const canViewSettings = can('settings.manage');
+  const canViewTreasury = can('accounts.view') && canAccessModule('accounting');
+  const [range, setRange] = useState<Range>(() => history.unlimited ? 'month' : 'week');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -316,20 +242,15 @@ export function DashboardDataPage() {
   const money = useCallback((value: number) => formatFinancialCurrency(value, settings?.currency || 'EGP', lang), [settings?.currency, lang]);
 
   const load = useCallback(async () => {
-    const id = ++requestId.current;
-    const scope = `${branchScope.scopeKey}:${range}`;
-    if (!canViewSales || lastSalesScope.current !== scope) {
+    setRefreshing(true);
+    setError(null);
+    if (!canViewSales) {
       setSnapshot(null);
       setSales([]);
       setPreviousSales([]);
       setPaymentAggregates([]);
       setPreviousPaymentAggregates([]);
       setItems([]);
-    }
-    setRefreshing(true);
-    setError(null);
-    if (!canViewSales) {
-      lastSalesScope.current = undefined;
       setLoading(false);
       setRefreshing(false);
       return;
@@ -349,7 +270,6 @@ export function DashboardDataPage() {
         timezone: 'Africa/Cairo',
       });
     } catch {
-      if (requestId.current !== id) return;
       // Keep the last successful dashboard instead of turning a slow/failed
       // snapshot into a burst of raw sales, sale-items and payment queries.
       setError(ar ? 'تعذر تحديث ملخص المبيعات. أعد المحاولة.' : 'Sales summary could not refresh. Please retry.');
@@ -358,9 +278,7 @@ export function DashboardDataPage() {
       return;
     }
 
-    if (requestId.current !== id) return;
     if (boundedSnapshot) {
-      lastSalesScope.current = scope;
       setSnapshot(boundedSnapshot);
       setSales([]);
       setPreviousSales([]);
@@ -383,7 +301,6 @@ export function DashboardDataPage() {
     }
 
     const [currentResult, previousResult] = await Promise.all([currentQuery, previousQuery]);
-    if (requestId.current !== id) return;
     const currentRows = currentResult.error ? [] : ((currentResult.data || []) as unknown as Sale[]);
     const previousRows = previousResult.error ? [] : ((previousResult.data || []) as unknown as Sale[]);
     setSales(currentRows);
@@ -415,7 +332,6 @@ export function DashboardDataPage() {
     }
 
     const [paymentResults, itemResult] = await Promise.all([paymentPromise, itemPromise]);
-    if (requestId.current !== id) return;
     const currentPaymentResult = paymentResults[0];
     const previousPaymentResult = paymentResults[1];
     setPaymentAggregates(currentPaymentResult.status === 'fulfilled' ? currentPaymentResult.value : []);
@@ -424,20 +340,14 @@ export function DashboardDataPage() {
       setError(ar ? 'تعذر تحميل تفاصيل طرق الدفع. أعد المحاولة.' : 'Payment-method details could not be loaded. Please retry.');
     }
     setItems(itemResult.error ? [] : ((itemResult.data || []) as unknown as SaleItem[]));
-    if (!currentResult.error) lastSalesScope.current = scope;
 
     setLoading(false);
     setRefreshing(false);
-  }, [ar, branchFilter, branchScope.scopeKey, range, canViewSales, readBranchIds]);
+  }, [ar, branchFilter, branchScope.scopeKey, range, canViewSales]);
+
+  useEffect(() => { void load(); }, [load]);
 
   useEffect(() => {
-    setLoading(true);
-    void load();
-    return () => { requestId.current += 1; };
-  }, [load]);
-
-  useEffect(() => {
-    let cancelled = false;
     void (async () => {
       const now = new Date();
       let rawMasterQuery = canViewInventory ? supabase.from('raw_materials').select('id,branch_id,name,min_stock,is_active').eq('is_active', true) : null;
@@ -456,7 +366,6 @@ export function DashboardDataPage() {
         unitMasterQuery ?? Promise.resolve({ data: [], error: null }),
         unitBatchQuery ?? Promise.resolve({ data: [], error: null }),
       ]);
-      if (cancelled) return;
       const stockQueryFailed = !canViewInventory || Boolean(rawMastersResult.error || rawBalancesResult.error || unitMastersResult.error || unitBatchesResult.error);
       const alerts = stockQueryFailed ? [] : buildStockAlerts(
         (rawMastersResult.data || []) as RawStockMaster[],
@@ -474,14 +383,12 @@ export function DashboardDataPage() {
       const statements = canViewFinancial
         ? await Promise.all(targetBranches.map((branch) => reporting.getIncomeStatement({ p_branch_id: branch.id, p_from_date: from, p_to_date: to })))
         : [];
-      if (cancelled) return;
       const validStatements = statements.filter((result) => !result.error && result.data);
       const expenses = canViewFinancial && targetBranches.length && validStatements.length === targetBranches.length ? validStatements.reduce((sum, result) => sum + Number(result.data?.expenses || 0), 0) : null;
       const profit = canViewFinancial && targetBranches.length && validStatements.length === targetBranches.length ? validStatements.reduce((sum, result) => sum + Number(result.data?.net_income || 0), 0) : null;
       setQuickStats({ expenses, profit, lowStockCount });
     })();
-    return () => { cancelled = true; };
-  }, [readBranchIds, branches, settings?.low_stock_threshold, canViewInventory, canViewFinancial]);
+  }, [branchFilter, branchScope.scopeKey, branches, settings?.low_stock_threshold, canViewInventory, canViewFinancial]);
 
   useEffect(() => {
     let cancelled = false;
@@ -550,7 +457,7 @@ export function DashboardDataPage() {
     return () => { cancelled = true; };
   }, [
     branchFilter, branchScope.scopeKey, range,
-    canViewPos, canViewPurchases, canViewExpenses, canViewBusinessRecords, organizationId, readBranchIds,
+    canViewPos, canViewPurchases, canViewExpenses, canViewBusinessRecords, organizationId,
   ]);
 
   const current = useMemo(() => {
@@ -575,13 +482,7 @@ export function DashboardDataPage() {
       discounts: previousSales.reduce((sum, sale) => sum + Number(sale.discount_amount || 0), 0),
     };
   }, [previousSales, previousPaymentAggregates, snapshot]);
-  const paymentRows = useMemo(() => {
-    const totals = new Map<string, number>();
-    for (const { method, total } of paymentAggregates) {
-      totals.set(method, (totals.get(method) ?? 0) + total);
-    }
-    return [...totals].sort((a, b) => b[1] - a[1]);
-  }, [paymentAggregates]);
+  const paymentRows = useMemo(() => paymentAggregates.slice(0, 5), [paymentAggregates]);
   const orderRows = useMemo(() => {
     if (snapshot) return snapshot.orderTypes.map((row) => [row.key, row.count] as [string, number]);
     const map = new Map<string, number>();
@@ -646,286 +547,72 @@ export function DashboardDataPage() {
     });
   }, [ar, previousSales, range, sales, snapshot]);
 
-  const displayedChart = useMemo(() => {
-    if (!groupByWeek) return chart;
-    const points: Point[] = [];
-    for (let start = 0; start < chart.length; start += 7) {
-      const week = chart.slice(start, start + 7);
-      points.push({
-        label: `${week[0].label} – ${week[week.length - 1].label}`,
-        sales: week.reduce((total, point) => total + point.sales, 0),
-        previous: week.reduce((total, point) => total + point.previous, 0),
-      });
-    }
-    return points;
-  }, [chart, groupByWeek]);
-
   const quick = (value: number | null, formatter: (value: number) => string) => value === null ? '—' : formatter(value);
   const recent = snapshot ? snapshot.recentSales : sales.slice(0, 5);
 
-  const period = periodWindow(range);
-  const dates = history.clampRange(businessDateISO(period.start), businessDateISO(period.end));
-  const canCompare = history.unlimited;
-  const reportLink = (type: ReportType, orderType?: string) => {
-    const report = REPORT_REGISTRY.find((entry) => entry.key === type);
-    if (!canViewReports || !canAccessPath(APP_ROUTES.reportView) || !report
-      || !report.permissions.every((permission) => can(permission as Permission))
-      || !businessReportAllowed(runtime, type, report.category)) return undefined;
-    return `${APP_ROUTES.reportView}?${new URLSearchParams({ type, from: dates.from, to: dates.to, ...(orderType ? { order_type: orderType } : {}) }).toString()}`;
-  };
-  const analysis = {
-    sales: { title: ar ? 'حركة صافي المبيعات' : 'Net sales performance', href: reportLink('sales') },
-    orders: { title: ar ? 'الطلبات حسب النوع' : 'Orders by type', href: reportLink('detailed_invoices') },
-    payments: { title: ar ? 'صافي المدفوعات حسب الطريقة' : 'Net payments by method', href: reportLink('sales_by_payment') },
-  }[metric];
-  const orderBreakdown = orderRows.map(([key, value]) => ({
-    key, label: orderLabels[key]?.[ar ? 0 : 1] || key, value,
-    href: key === 'other' ? undefined : reportLink('detailed_invoices', key),
-  }));
-  const paymentBreakdown = paymentRows.map(([key, value]) => ({ key, label: paymentLabels[key]?.[ar ? 0 : 1] || key, value }));
-  const renderAnalysis = (large: boolean) => metric === 'sales' ? (
-    <div className={`min-w-0 text-ui-primary ${large ? 'h-[min(55vh,24rem)]' : 'h-72'}`} dir="ltr">
-      {current.orders > 0 || (compare && canCompare && previous.orders > 0) ? (
-        <Suspense fallback={<div className="flex h-full items-center justify-center"><RefreshCw className="h-5 w-5 animate-spin" /></div>}>
-          <DashboardSalesChart data={displayedChart} formatValue={money} compare={compare && canCompare}
-            labels={{ current: ar ? 'الفترة الحالية' : 'Current period', previous: ar ? 'الفترة السابقة' : 'Previous period' }} />
-        </Suspense>
-      ) : <Empty ar={ar} />}
-    </div>
-  ) : (
-    <div className="mt-4">
-      {(metric === 'orders' ? orderBreakdown.length : paymentBreakdown.length) ? (
-        <DashboardBreakdown rows={metric === 'orders' ? orderBreakdown : paymentBreakdown}
-          formatValue={metric === 'orders' ? (value) => formatNumber(value, 0) : money} />
-      ) : <Empty ar={ar} />}
-    </div>
-  );
-
-  return <div dir={ar ? 'rtl' : 'ltr'} className="min-h-[calc(100vh-64px)] w-full min-w-0 bg-transparent py-2 sm:py-3" data-testid="dashboard-surface"><div className="w-full min-w-0 space-y-5">
+  return <div dir={ar ? 'rtl' : 'ltr'} className="min-h-[calc(100vh-64px)] w-full min-w-0 bg-ui-page py-3 sm:py-4" data-testid="dashboard-surface"><div className="w-full min-w-0 space-y-5">
     <DashboardStandbyBar canCreateSale={canCreateSale} />
 
-    <section className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-      <div>
-        <div className="mb-2 inline-flex items-center gap-2 rounded-full border border-ui-border bg-ui-surface px-3 py-1 text-xs font-medium text-ui-muted shadow-ui-sm">
-          <WorkspaceLiveDot tone="success" />
-          <span>{new Date().toLocaleDateString(ar ? 'ar-EG' : 'en-US', { weekday: 'long', month: 'short', day: 'numeric' })}</span>
-        </div>
-        <h1 className="sr-only">
-          {ar ? `لوحة ${runtime.title.ar}` : `${runtime.title.en} Dashboard`}
-        </h1>
-        {(runtime.description.ar || runtime.description.en) && (
-          <p className="sr-only">{ar ? runtime.description.ar : runtime.description.en}</p>
-        )}
-        {((canCreateSale && !quickRoutes.has(APP_ROUTES.pos)) || (can('sales.view') && canAccessPath(APP_ROUTES.sales) && !quickRoutes.has(APP_ROUTES.sales))) && (
-          <div className="mt-3.5 flex flex-wrap items-center gap-2">
-            {canCreateSale && !quickRoutes.has(APP_ROUTES.pos) && (
-              <Link
-                to={APP_ROUTES.pos}
-                className="inline-flex items-center gap-1.5 rounded-full bg-ui-primary px-4 py-2 text-xs font-semibold text-ui-primary-fg shadow-ui-sm transition hover:bg-ui-primary-hover"
-              >
-                <ShoppingCart className="h-3.5 w-3.5" />
-                <span>{ar ? 'طلب جديد' : 'New order'}</span>
-              </Link>
-            )}
-            {can('sales.view') && canAccessPath(APP_ROUTES.sales) && !quickRoutes.has(APP_ROUTES.sales) && (
-              <Link
-                to={APP_ROUTES.sales}
-                className="inline-flex items-center gap-1.5 rounded-full border border-ui-border bg-ui-surface px-4 py-2 text-xs font-semibold text-ui-text shadow-ui-sm transition hover:border-ui-border-strong hover:bg-ui-page-alt"
-              >
-                <ReceiptText className="h-3.5 w-3.5 text-ui-primary" />
-                <span>{ar ? 'سجل الفواتير' : 'View invoices'}</span>
-              </Link>
-            )}
-          </div>
-        )}
-      </div>
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="inline-flex flex-wrap items-center gap-1 rounded-full border border-ui-border bg-ui-surface p-1 shadow-ui-sm">
-          {(Object.keys(rangeLabels) as Range[]).map((item) => (
-            <button
-              key={item}
-              type="button"
-              aria-pressed={range === item}
-              onClick={() => updateView('range', item)}
-              className={`rounded-full px-3.5 py-1.5 text-[13px] font-semibold transition-all ${range === item ? 'bg-ui-text text-ui-surface shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
-            >
-              {rangeLabels[item][ar ? 0 : 1]}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={() => void load()}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-ui-border bg-ui-surface text-ui-muted shadow-ui-sm transition hover:border-ui-border-strong hover:text-ui-text"
-          aria-label={ar ? 'تحديث' : 'Refresh'}
-        >
-          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-        </button>
-      </div>
-    </section>
+    <section className="rounded-[32px] bg-gradient-to-br from-[#24114f] via-[#4b20a9] to-[#6d35df] p-6 text-white shadow-ui-lg"><div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between"><div><div className="flex items-center gap-2 text-white/80"><BarChart3 className="h-4 w-4" /><span className="text-xs font-bold uppercase tracking-[0.18em]">Premier Control</span></div><h2 className="mt-2 text-3xl font-black">{ar ? `لوحة ${runtime.title.ar}` : `${runtime.title.en} Dashboard`}</h2><p className="mt-1 text-sm text-white/70">{ar ? runtime.description.ar : runtime.description.en}</p></div><div className="flex flex-wrap gap-2">{(Object.keys(rangeLabels) as Range[]).map((item) => <button key={item} onClick={() => setRange(item)} className={`rounded-xl px-4 py-2 text-sm font-bold ${range === item ? 'bg-white text-ui-primary' : 'bg-white/10 text-white'}`}>{rangeLabels[item][ar ? 0 : 1]}</button>)}<button onClick={() => void load()} className="rounded-xl bg-white/10 p-2" aria-label={ar ? 'تحديث' : 'Refresh'}><RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} /></button></div></div></section>
 
-    {visibleQuickActions.length > 0 && (
-      <section data-testid="business-runtime-quick-actions" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {visibleQuickActions.map((action) => (
+    <section data-testid="business-runtime-quick-actions" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      {runtime.dashboard.quickActions
+        .filter((action) =>
+          (!action.module || canAccessModule(action.module))
+          && (!action.capability || runtime.capabilities.has(action.capability))
+          && canAccessPath(action.route),
+        )
+        .map((action) => (
           <Link
             key={action.id}
             to={action.route}
-            className="flex items-center justify-between gap-2 rounded-[18px] border border-ui-border bg-ui-surface px-4 py-3.5 text-sm font-semibold text-ui-text shadow-ui-sm transition hover:-translate-y-0.5 hover:border-ui-primary/40 hover:shadow-ui"
+            className="rounded-2xl border border-ui-border bg-ui-surface p-4 text-sm font-extrabold text-ui-text shadow-ui-sm transition hover:-translate-y-0.5 hover:border-ui-primary/30 hover:shadow-ui-md"
           >
-            <span>{ar ? action.ar : action.en}</span>
-            <span className="grid h-7 w-7 place-items-center rounded-full bg-ui-primary-soft text-xs font-bold text-ui-primary">→</span>
+            <span className="text-ui-primary">→</span>{' '}
+            {ar ? action.ar : action.en}
           </Link>
         ))}
-      </section>
-    )}
+    </section>
 
-    {error && <div className="rounded-[20px] border border-ui-danger/30 bg-ui-danger-soft p-4 text-sm font-bold text-ui-danger">{error}</div>}
+    {error && <div className="rounded-2xl border border-ui-danger/30 bg-ui-danger-soft p-4 text-sm font-bold text-ui-danger">{error}</div>}
 
-    {(canViewFinancial || canViewInventory) && <Card><div className="mb-4"><h2 className="text-lg font-bold text-ui-text">{ar ? `ملخص ${rangeLabels[range][0]}` : `${rangeLabels[range][1]} summary`}</h2><p className="text-xs text-ui-subtle">{ar ? 'المبيعات صافية بعد المرتجعات، والربح من قائمة الدخل المحاسبية' : 'Sales are net of refunds; profit comes from the accounting income statement'}</p></div><div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-      {canViewFinancial && <div className="min-w-0 rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="truncate text-xs font-medium text-ui-muted">{ar ? 'المصروفات المحاسبية' : 'Accounting expenses'}</p><p className="mt-2 truncate text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.expenses, money)}</p></div>}
-      {canViewFinancial && <div className="min-w-0 rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="truncate text-xs font-medium text-ui-muted">{ar ? 'صافي الربح المحاسبي' : 'Accounting net profit'}</p><p className="mt-2 truncate text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.profit, money)}</p></div>}
-      {canViewInventory && <div className="min-w-0 rounded-[18px] border border-ui-border bg-ui-page-alt p-4"><p className="truncate text-xs font-medium text-ui-muted">{ar ? 'تنبيهات المخزون' : 'Low stock alerts'}</p><p className="mt-2 truncate text-xl font-bold text-ui-text tabular-nums">{quick(quickStats.lowStockCount, (value) => formatNumber(value, 0))}</p></div>}
+    {(canViewSales || canViewFinancial || canViewInventory) && <Card><div className="mb-4"><h2 className="text-lg font-black text-ui-text">{ar ? `ملخص ${rangeLabels[range][0]}` : `${rangeLabels[range][1]} summary`}</h2><p className="text-xs text-ui-subtle">{ar ? 'المبيعات صافية بعد المرتجعات، والربح من قائمة الدخل المحاسبية' : 'Sales are net of refunds; profit comes from the accounting income statement'}</p></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {canViewFinancial && <div className="ui-accent-top ui-accent-finance rounded-2xl border border-ui-border bg-ui-surface p-4"><p className="text-xs text-ui-subtle">{ar ? 'المصروفات المحاسبية' : 'Accounting expenses'}</p><p className="mt-2 text-xl font-black text-ui-text">{quick(quickStats.expenses, money)}</p></div>}
+      {canViewFinancial && <div className="ui-accent-top ui-accent-inventory rounded-2xl border border-ui-border bg-ui-surface p-4"><p className="text-xs text-ui-subtle">{ar ? 'صافي الربح المحاسبي' : 'Accounting net profit'}</p><p className="mt-2 text-xl font-black text-ui-text">{quick(quickStats.profit, money)}</p></div>}
+      {canViewInventory && <div className="ui-accent-top ui-accent-inventory rounded-2xl border border-ui-border bg-ui-surface p-4"><p className="text-xs text-ui-subtle">{ar ? 'تنبيهات المخزون' : 'Low stock alerts'}</p><p className="mt-2 text-xl font-black text-ui-text">{quick(quickStats.lowStockCount, (value) => formatNumber(value, 0))}</p></div>}
     </div></Card>}
 
     {loading ? <div className="flex h-64 items-center justify-center rounded-3xl border border-ui-border bg-ui-surface"><RefreshCw className="h-7 w-7 animate-spin text-ui-primary" /></div> : <>
-      <section data-testid="dashboard-permission-kpis" className="premier-refresh-stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section data-testid="dashboard-permission-kpis" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {canViewPos && <Metric testId="kpi-open-order-value" icon={Wallet} title={ar ? 'قيمة الطلبات المفتوحة' : 'Open order value'} value={ops.openOrderValue} display={money(ops.openOrderValue)} previous={0} href={canViewFloorPlan ? '/floor-plan' : undefined} ar={ar} />}
-        {canViewSales && <Metric testId="kpi-net-sales" icon={BarChart3} title={ar ? 'صافي المبيعات' : 'Net sales'} value={current.sales} display={money(current.sales)} previous={canCompare ? previous.sales : 0} selected={metric === 'sales'} onSelect={() => updateView('metric', '')} sparkValues={chart.map((p) => p.sales)} ar={ar} />}
-        {canViewSales && <Metric testId="kpi-orders" icon={ReceiptText} title={ar ? 'إجمالي الطلبات' : 'Total orders'} value={current.orders} display={formatNumber(current.orders, 0)} previous={canCompare ? previous.orders : 0} selected={metric === 'orders'} onSelect={() => updateView('metric', 'orders')} ar={ar} />}
-        {canViewSales && <Metric testId="kpi-average-order" icon={Calculator} title={ar ? 'متوسط قيمة الطلب' : 'Average order'} value={current.orders ? current.sales / current.orders : 0} display={money(current.orders ? current.sales / current.orders : 0)} previous={canCompare && previous.orders ? previous.sales / previous.orders : 0} href={reportLink('sales')} ar={ar} />}
-        {canViewSales && <Metric testId="kpi-net-payments" icon={CreditCard} title={ar ? 'صافي المدفوعات' : 'Net payments'} value={current.payments} display={money(current.payments)} previous={canCompare ? previous.payments : 0} selected={metric === 'payments'} onSelect={() => updateView('metric', 'payments')} ar={ar} />}
-        {canViewSales && <Metric testId="kpi-discounts" icon={Calculator} title={ar ? 'الخصومات' : 'Discounts'} value={current.discounts} display={money(current.discounts)} previous={canCompare ? previous.discounts : 0} href={reportLink('sales')} ar={ar} />}
-        {canViewSales && <Metric testId="kpi-returns" icon={ReceiptText} title={ar ? 'المرتجعات' : 'Returns'} value={current.returns} display={money(current.returns)} previous={canCompare ? previous.returns : 0} href={reportLink('returns')} ar={ar} />}
+        {canViewSales && <Metric testId="kpi-orders" icon={ReceiptText} title={ar ? 'إجمالي الطلبات' : 'Total orders'} value={current.orders} display={formatNumber(current.orders, 0)} previous={previous.orders} href={canViewReports ? '/reports?reportType=detailed_invoices' : undefined} ar={ar} />}
+        {canViewSales && <Metric testId="kpi-average-order" icon={Calculator} title={ar ? 'متوسط قيمة الطلب' : 'Average order'} value={current.orders ? current.sales / current.orders : 0} display={money(current.orders ? current.sales / current.orders : 0)} previous={previous.orders ? previous.sales / previous.orders : 0} href={canViewReports ? '/reports?reportType=sales' : undefined} ar={ar} />}
+        {canViewSales && <Metric testId="kpi-net-payments" icon={CreditCard} title={ar ? 'صافي المدفوعات' : 'Net payments'} value={current.payments} display={money(current.payments)} previous={previous.payments} href={canViewReports ? '/reports?reportType=sales_by_payment' : undefined} ar={ar} />}
+        {canViewSales && <Metric testId="kpi-discounts" icon={Calculator} title={ar ? 'الخصومات' : 'Discounts'} value={current.discounts} display={money(current.discounts)} previous={previous.discounts} href={canViewReports ? '/reports?reportType=sales' : undefined} ar={ar} />}
+        {canViewSales && <Metric testId="kpi-returns" icon={ReceiptText} title={ar ? 'المرتجعات' : 'Returns'} value={current.returns} display={money(current.returns)} previous={previous.returns} href={canViewReports ? '/reports?reportType=returns' : undefined} ar={ar} />}
         {canViewPurchases && <Metric testId="kpi-purchases" icon={ShoppingCart} title={ar ? 'المشتريات' : 'Purchases'} value={ops.purchases} display={money(ops.purchases)} previous={0} href="/purchases" ar={ar} />}
         {canViewExpenses && <Metric testId="kpi-expenses" icon={Wallet} title={ar ? 'المصروفات' : 'Expenses'} value={ops.expenses} display={money(ops.expenses)} previous={0} href="/expenses" ar={ar} />}
         {canViewBusinessRecords && <Metric testId="kpi-business-records" icon={ReceiptText} title={runtime.navigation.menuLabels['business-records']?.[ar ? 'ar' : 'en'] || (ar ? 'سجلات النشاط' : 'Business records')} value={ops.businessRecords} display={formatNumber(ops.businessRecords, 0)} previous={0} href={APP_ROUTES.businessRecords} ar={ar} />}
       </section>
 
-      {canViewSales && (
-        <div className="grid gap-5 xl:grid-cols-[1.65fr_1fr]">
-          <Card>
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <h2 aria-live="polite" className="text-lg font-bold text-ui-text">{analysis.title}</h2>
-              <div className="flex flex-wrap items-center gap-2 text-xs font-semibold">
-                {metric === 'sales' && range === 'month' && (
-                  <div role="group" aria-label={ar ? 'تجميع الرسم' : 'Chart grouping'} className="flex rounded-full border border-ui-border bg-ui-page-alt p-0.5">
-                    <button type="button" aria-pressed={!groupByWeek} onClick={() => updateView('group', '')}
-                      className="rounded-full px-3 py-1.5 aria-pressed:bg-ui-surface aria-pressed:text-ui-text aria-pressed:shadow-ui-sm">
-                      {ar ? 'يومي' : 'Daily'}
-                    </button>
-                    <button type="button" aria-pressed={groupByWeek} onClick={() => updateView('group', 'week')}
-                      className="rounded-full px-3 py-1.5 aria-pressed:bg-ui-surface aria-pressed:text-ui-text aria-pressed:shadow-ui-sm">
-                      {ar ? 'أسبوعي' : 'Weekly'}
-                    </button>
-                  </div>
-                )}
-                {metric === 'sales' && canCompare && (
-                  <button type="button" aria-pressed={compare} onClick={() => updateView('compare', compare ? '' : '1')}
-                    className="rounded-full border border-ui-border px-3 py-1.5 aria-pressed:border-ui-primary aria-pressed:bg-ui-primary-soft aria-pressed:text-ui-primary">
-                    {ar ? 'مقارنة بالفترة السابقة' : 'Compare previous period'}
-                  </button>
-                )}
-                <button type="button" onClick={() => setExpanded(true)} className="rounded-full border border-ui-border px-3 py-1.5 hover:bg-ui-page-alt">
-                  {ar ? 'توسيع العرض' : 'Expand view'}
-                </button>
-                {analysis.href && <Link to={analysis.href} className="rounded-full bg-ui-primary-soft px-3 py-1.5 text-ui-primary hover:bg-ui-primary hover:text-ui-primary-fg">{ar ? 'فتح التقرير' : 'Open report'}</Link>}
-              </div>
-            </div>
-            <div aria-hidden={expanded}>{renderAnalysis(false)}</div>
-            <Modal manageFocus open={expanded} onClose={() => setExpanded(false)} title={analysis.title} size="xl">
-              {expanded && renderAnalysis(true)}
-            </Modal>
-          </Card>
+      {canViewReports && canViewSales && <section className="grid gap-5 xl:grid-cols-[minmax(0,1.7fr)_minmax(320px,0.8fr)]"><Card><h2 className="text-lg font-black text-ui-text">{ar ? 'حركة صافي المبيعات' : 'Net sales performance'}</h2><div className="mt-4 h-72">{current.orders > 0 ? <Suspense fallback={<div className="flex h-full items-center justify-center"><RefreshCw className="h-5 w-5 animate-spin text-ui-primary" /></div>}><DashboardSalesChart data={chart} formatValue={money} /></Suspense> : <Empty ar={ar} />}</div></Card>
+      <div className="grid gap-5"><Card><h2 className="font-black text-ui-text">{ar ? 'أنواع الطلبات' : 'Order types'}</h2><div className="mt-3 space-y-3">{orderRows.length ? orderRows.map(([key, count]) => <div key={key} className="flex justify-between text-sm"><span className="text-ui-muted">{orderLabels[key]?.[ar ? 0 : 1] || key}</span><b className="text-ui-text">{formatNumber(count, 0)}</b></div>) : <Empty ar={ar} />}</div></Card>
+      <Card><h2 className="font-black text-ui-text">{ar ? 'طرق الدفع' : 'Payment methods'}</h2><div className="mt-3 space-y-3">{paymentRows.length ? paymentRows.map((row) => <div key={`${row.branchId}-${row.method}`} className="flex justify-between gap-3 text-sm"><span className="text-ui-muted">{paymentLabels[row.method]?.[ar ? 0 : 1] || row.method}</span><b className="text-ui-text">{money(row.total)}</b></div>) : <Empty ar={ar} />}</div></Card></div></section>}
 
-          <Card className="flex flex-col justify-between">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="text-lg font-bold text-ui-text">{ar ? 'نظرة التحصيل والمبيعات' : 'Sales & collection'}</h2>
-              <span className="rounded-full bg-ui-page-alt px-2.5 py-1 text-[11px] font-semibold text-ui-muted">
-                {rangeLabels[range][ar ? 0 : 1]}
-              </span>
-            </div>
-            {(() => {
-              const ratio = current.sales > 0 ? Math.min(100, Math.max(0, (current.payments / current.sales) * 100)) : 0;
-              const ticks = 36;
-              const filled = Math.round((ratio / 100) * ticks);
-              return (
-                <div className="my-4 flex flex-col items-center">
-                  <svg viewBox="0 0 220 124" className="w-full max-w-[240px]" aria-label={formatPercent(ratio, 1)}>
-                    {Array.from({ length: ticks }).map((_, idx) => {
-                      const angle = Math.PI - (idx / (ticks - 1)) * Math.PI;
-                      const r1 = 78;
-                      const r2 = 96;
-                      const x1 = 110 + Math.cos(angle) * r1;
-                      const y1 = 110 - Math.sin(angle) * r1;
-                      const x2 = 110 + Math.cos(angle) * r2;
-                      const y2 = 110 - Math.sin(angle) * r2;
-                      return (
-                        <line
-                          key={idx}
-                          x1={x1}
-                          y1={y1}
-                          x2={x2}
-                          y2={y2}
-                          stroke={idx < filled ? 'rgb(var(--ui-primary))' : 'rgb(var(--ui-border-strong))'}
-                          strokeWidth="3"
-                          strokeLinecap="round"
-                          opacity={idx < filled ? 1 : 0.45}
-                        />
-                      );
-                    })}
-                    <text
-                      x="110"
-                      y="102"
-                      textAnchor="middle"
-                      fill="rgb(var(--ui-text))"
-                      style={{ fontSize: '26px', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}
-                    >
-                      {formatPercent(ratio, 1)}
-                    </text>
-                  </svg>
-                  <p className="mt-1 text-center text-xs font-medium text-ui-muted">{ar ? 'نسبة المحصل من صافي المبيعات' : 'Collected of net sales'}</p>
-                </div>
-              );
-            })()}
-            <div className="grid grid-cols-2 gap-3 border-t border-ui-border pt-4">
-              <div>
-                <p className="text-xs text-ui-muted">{ar ? 'عدد الطلبات' : 'Orders'}</p>
-                <p className="mt-1 text-lg font-bold text-ui-text tabular-nums">{formatNumber(current.orders, 0)}</p>
-              </div>
-              <div>
-                <p className="text-xs text-ui-muted">{ar ? 'صافي المبيعات' : 'Net sales'}</p>
-                <p className="mt-1 text-lg font-bold text-ui-text tabular-nums">{money(current.sales)}</p>
-              </div>
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {canViewSales && <section className="grid gap-5 xl:grid-cols-3">{can('branches.manage') && <Card><h2 className="mb-3 font-bold text-ui-text">{ar ? 'الفروع حسب صافي المبيعات' : 'Branches by net sales'}</h2>{branchRows.length ? (() => {
-        const maxSales = Math.max(1, ...branchRows.map(([, r]) => r.sales));
-        return branchRows.map(([name, row]) => (
-          <div key={name} className="mb-3 last:mb-0">
-            <div className="mb-1 flex justify-between gap-3 text-sm">
-              <span className="font-semibold text-ui-text">{name}</span>
-              <span className="text-ui-muted tabular-nums">{formatNumber(row.orders, 0)} · {money(row.sales)}</span>
-            </div>
-            <WorkspaceMeter value={row.sales} max={maxSales} tone="primary" height="sm" />
-          </div>
-        ));
-      })() : <Empty ar={ar} />}</Card>}
+      {canViewSales && <section className="grid gap-5 xl:grid-cols-3">{can('branches.manage') && <Card><h2 className="mb-3 font-black text-ui-text">{ar ? 'الفروع حسب صافي المبيعات' : 'Branches by net sales'}</h2>{branchRows.length ? branchRows.map(([name, row]) => <div key={name} className="mb-3 flex justify-between gap-3 text-sm"><span className="font-semibold text-ui-text">{name}</span><span className="text-ui-muted">{formatNumber(row.orders, 0)} · {money(row.sales)}</span></div>) : <Empty ar={ar} />}</Card>}
       <Card><h2 className="mb-3 font-black text-ui-text">{ar ? 'أكثر الأصناف مبيعًا' : 'Top selling items'}</h2>{productRows.length ? productRows.map(([name, qty]) => <div key={name} className="mb-3 flex justify-between gap-3 text-sm"><span className="font-semibold text-ui-text">{name}</span><span className="text-ui-muted">{formatNumber(qty, 2)}</span></div>) : <Empty ar={ar} />}</Card>
       <Card><h2 className="mb-3 font-black text-ui-text">{ar ? 'أحدث الطلبات' : 'Recent orders'}</h2>{recent.length ? recent.map((sale) => <div key={sale.id} className="mb-3 flex justify-between gap-3 text-sm"><span className="font-semibold text-ui-text">{sale.invoice_number || '—'}</span><span className="text-ui-muted">{money(netSaleAmount(sale))}</span></div>) : <Empty ar={ar} />}</Card></section>}
 
-      {((canViewKds && !quickRoutes.has(APP_ROUTES.kitchenDisplay)) || (canViewTreasury && !quickRoutes.has(APP_ROUTES.treasury)) || (canViewAudit && !quickRoutes.has(APP_ROUTES.auditLog)) || (canViewSettings && !quickRoutes.has(APP_ROUTES.settings))) && (
+      {(canViewKds || canViewTreasury || canViewAudit || canViewSettings) && (
         <section data-testid="dashboard-permission-shortcuts" className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {canViewKds && !quickRoutes.has(APP_ROUTES.kitchenDisplay) && <Link to={APP_ROUTES.kitchenDisplay} className="ui-accent-card ui-accent-system rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><ChefHat className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'شاشة المطبخ' : 'Kitchen display'}</Link>}
-          {canViewTreasury && !quickRoutes.has(APP_ROUTES.treasury) && <Link to={APP_ROUTES.treasury} className="ui-accent-card ui-accent-finance rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><Landmark className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'الخزينة' : 'Treasury'}</Link>}
-          {canViewAudit && !quickRoutes.has(APP_ROUTES.auditLog) && <Link to={APP_ROUTES.auditLog} className="ui-accent-card ui-accent-neutral rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><HistoryIcon className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'سجل العمليات' : 'Audit log'}</Link>}
-          {canViewSettings && !quickRoutes.has(APP_ROUTES.settings) && <Link to={APP_ROUTES.settings} className="ui-accent-card ui-accent-system rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><Settings className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'الإعدادات' : 'Settings'}</Link>}
+          {canViewKds && <Link to="/kitchen-display" className="ui-accent-card ui-accent-system rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><ChefHat className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'شاشة المطبخ' : 'Kitchen display'}</Link>}
+          {canViewTreasury && <Link to="/treasury" className="ui-accent-card ui-accent-finance rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><Landmark className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'الخزينة' : 'Treasury'}</Link>}
+          {canViewAudit && <Link to="/audit-log" className="ui-accent-card ui-accent-neutral rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><HistoryIcon className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'سجل العمليات' : 'Audit log'}</Link>}
+          {canViewSettings && <Link to="/settings" className="ui-accent-card ui-accent-system rounded-2xl border border-ui-border bg-ui-surface p-4 font-extrabold text-ui-text shadow-ui-sm"><Settings className="mb-2 h-5 w-5 text-ui-primary" />{ar ? 'الإعدادات' : 'Settings'}</Link>}
         </section>
       )}
 
-      {canViewInventory && lowStock.length > 0 && <Card className="ui-accent-alert border-ui-warning/30"><div className="mb-3 flex items-center gap-2 font-black text-ui-warning"><AlertTriangle className="h-5 w-5" />{ar ? 'تنبيه المخزون المنخفض' : 'Low stock alert'}</div><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">{lowStock.map((row) => <Link key={row.key} to={canAccessPath(APP_ROUTES.stockBalances) ? `${APP_ROUTES.stockBalances}?record=${row.itemId}` : APP_ROUTES.inventory} className="rounded-xl bg-ui-page-alt p-3"><p className="truncate text-sm font-bold text-ui-text">{row.name || '—'}</p><p className="mt-1 text-xs text-ui-warning">{formatNumber(row.quantity, 3)} / {formatNumber(row.threshold, 3)}</p></Link>)}</div></Card>}
+      {canViewInventory && lowStock.length > 0 && <Card className="ui-accent-alert border-ui-warning/30"><div className="mb-3 flex items-center gap-2 font-black text-ui-warning"><AlertTriangle className="h-5 w-5" />{ar ? 'تنبيه المخزون المنخفض' : 'Low stock alert'}</div><div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">{lowStock.map((row) => <Link key={row.key} to="/inventory" className="rounded-xl bg-ui-page-alt p-3"><p className="truncate text-sm font-bold text-ui-text">{row.name || '—'}</p><p className="mt-1 text-xs text-ui-warning">{formatNumber(row.quantity, 3)} / {formatNumber(row.threshold, 3)}</p></Link>)}</div></Card>}
     </>}
   </div></div>;
 }

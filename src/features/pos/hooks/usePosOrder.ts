@@ -1,15 +1,13 @@
 import { useMemo, useState, useCallback, useEffect, useRef } from 'react';
 import { supabase } from '@/api';
 import * as api from '@/api';
-import { userFacingErrorMessage } from '@/lib/userFacingError';
 import { useLanguage } from '@/context/LanguageContext';
 import { useToast } from '@/components/Toast';
 import { cartToItems, type ItemPayload } from '../utils/cart';
 import { nextInvoiceNumber, processSaleForOrder, fetchBranchWarehouseId, createSaleOperationKey, type ProcessSalePayload } from '../services/payment';
 import { getPinnedSaleWarehouse } from '@/core/offline/warehouseBinding';
 import { refreshVerifiedWarehouseStock } from '@/core/repositories/warehouseSnapshotRefresh';
-import type { OrderSettlementPreview } from '../services/settlementPreview';
-import { useScopedSettlementPreview } from './useScopedSettlementPreview';
+import { fetchOrderSettlementPreview, type OrderSettlementPreview } from '../services/settlementPreview';
 import { APPROVED_FIXED_THERMAL_WIDTH_MM, buildReceiptFixedTemplate, buildReceiptHtml, buildReceiptThermalText, enqueueAutomaticReceiptPrint, openPrintWindow, type ReceiptData } from '../utils/printing';
 import { enqueueCloudOpenOrderPrint } from '../services/cloudPrint';
 import { ORDER_TYPE_KEY } from '../utils/orderTypes';
@@ -33,11 +31,12 @@ export type { ActiveShiftInfo, UsePosOrderInput } from './usePosOrderBase';
  */
 export function usePosOrder(input: UsePosOrderInput) {
   const allowNegative = input.effSettings?.allow_negative_stock === true;
-  const rawShortageOnly = useMemo(
-    () => Object.fromEntries(input.products.map(product => [product.id, allowNegative])),
-    [input.products, allowNegative],
-  );
-  const base = usePosOrderBase({ ...input, rawShortageOnly });
+  const sellThroughInput = useMemo<UsePosOrderInput>(() => ({
+    ...input,
+    rawShortageOnly: Object.fromEntries(input.products.map((product) => [product.id, allowNegative])),
+  }), [input, allowNegative]);
+
+  const base = usePosOrderBase(sellThroughInput);
   const { t, lang } = useLanguage();
   const isAr = lang === 'ar';
   const { show } = useToast();
@@ -48,7 +47,7 @@ export function usePosOrder(input: UsePosOrderInput) {
   // Never mint a fresh key merely because a local IndexedDB response was lost.
   const pendingOfflineOperationKeyRef = useRef<string | null>(null);
   const pendingLinkedCheckoutRef = useRef<{ orderId: string; branchId: string; payload: ProcessSalePayload; preview: OrderSettlementPreview } | null>(null);
-  const { preview: settlementPreview, load: loadScopedSettlementPreview, clear: clearSettlementPreview, isCurrent: isCurrentSettlementPreview } = useScopedSettlementPreview(base.activeOrderId, input.branchId);
+  const [settlementPreview, setSettlementPreview] = useState<OrderSettlementPreview | null>(null);
   const [settlementReceipt, setSettlementReceipt] = useState<ReceiptData | null>(null);
   const [settlementReceiptSaleId, setSettlementReceiptSaleId] = useState<string | null>(null);
 
@@ -109,7 +108,6 @@ export function usePosOrder(input: UsePosOrderInput) {
     subtotal: preview.subtotal,
     discount: preview.discount_amount,
     tax: preview.tax_amount,
-    deliveryFee: preview.delivery_fee_amount,
     total: preview.total,
     paid,
     change: Math.max(paid - preview.total, 0),
@@ -154,7 +152,6 @@ export function usePosOrder(input: UsePosOrderInput) {
       activeTableId: base.activeTable?.id ?? null,
     });
     const { data, error } = await api.floorPlan.updateOrder({
-      p_qr_revision: base.qrRevision.current,
       p_order_id: base.activeOrderId,
       p_order_type: binding.orderType,
       p_table_id: binding.tableId,
@@ -183,16 +180,15 @@ export function usePosOrder(input: UsePosOrderInput) {
     if (!base.activeOrderId) return null;
     if (saveSnapshot && !(await saveOpenOrderSnapshot())) return null;
 
-    const { preview, error } = await loadScopedSettlementPreview();
-    if (!preview && !error) return null; // superseded by a different order/branch
+    const { preview, error } = await fetchOrderSettlementPreview(base.activeOrderId);
     if (error || !preview?.has_payable_items) {
-      show(error === 'SETTLEMENT_PREVIEW_SCOPE_MISMATCH'
-        ? (isAr ? 'تغير الطلب أو الفرع أثناء تجهيز الحساب. أعد فتح التحصيل للطلب الحالي.' : 'Order or branch changed while preparing payment. Reopen checkout for the current order.')
-        : error === 'DELIVERY_FEE_REQUIRED' ? userFacingErrorMessage(error, lang) : (error || (isAr ? 'لا توجد أصناف مرسلة للمطبخ جاهزة للتحصيل' : 'No sent kitchen items are ready for settlement')), 'error');
+      show(error || (isAr ? 'لا توجد أصناف مرسلة للمطبخ جاهزة للتحصيل' : 'No sent kitchen items are ready for settlement'), 'error');
       return null;
     }
+
+    setSettlementPreview(preview);
     return preview;
-  }, [base.activeOrderId, isAr, lang, loadScopedSettlementPreview, saveOpenOrderSnapshot, show]);
+  }, [base.activeOrderId, isAr, saveOpenOrderSnapshot, show]);
 
   const transferOrderToTable = useCallback(async (
     targetOrderId: string,
@@ -230,7 +226,7 @@ export function usePosOrder(input: UsePosOrderInput) {
 
   const setCheckoutOpen = useCallback((open: boolean) => {
     if (!open) {
-      clearSettlementPreview();
+      setSettlementPreview(null);
       base.setCheckoutOpen(false);
       return;
     }
@@ -242,19 +238,15 @@ export function usePosOrder(input: UsePosOrderInput) {
 
     void (async () => {
       const preview = await loadSettlementPreview(false);
-      if (!preview || !isCurrentSettlementPreview(preview)) return;
+      if (!preview) return;
       base.setPaidAmount(base.paymentMethod === 'credit' ? 0 : preview.total);
       base.setCheckoutOpen(true);
     })();
-  }, [base, clearSettlementPreview, isCurrentSettlementPreview, loadSettlementPreview]);
+  }, [base, loadSettlementPreview]);
 
   const completeSale = useCallback(async (): Promise<boolean> => {
     const explicitlyOffline = typeof navigator !== 'undefined' && !navigator.onLine;
     if (settlementLockRef.current || base.mutationLockRef.current) return false;
-    if (base.paymentMethod !== 'credit' && base.total > 0 && base.paidAmount <= 0) {
-      show(isAr ? 'أدخل مبلغ التحصيل قبل تأكيد البيع.' : 'Enter a payment amount before confirming the sale.', 'error');
-      return false;
-    }
 
     if (explicitlyOffline) {
       if (base.cart.length === 0 || base.completing || offlineCompleting) return false;
@@ -283,7 +275,7 @@ export function usePosOrder(input: UsePosOrderInput) {
         const invoiceNumber = await nextInvoiceNumber();
         const operationKey = pendingOfflineOperationKeyRef.current || createSaleOperationKey();
         pendingOfflineOperationKeyRef.current = operationKey;
-        const paidAmountToUse = base.paymentMethod === 'credit' ? 0 : base.paidAmount;
+        const paidAmountToUse = base.paymentMethod === 'credit' ? 0 : base.paidAmount || base.total;
         const { result, error } = await processSaleForOrder({
           p_client_operation_key: operationKey,
           p_invoice_number: invoiceNumber,
@@ -342,12 +334,11 @@ export function usePosOrder(input: UsePosOrderInput) {
         show(isAr ? 'عملية تحصيل أخرى لم يتأكد مصيرها بعد. تحقق من الفاتورة أولًا.' : 'An earlier settlement is unresolved. Verify its invoice first.', 'error');
         return false;
       }
-      const preview = previousAttempt?.preview || await loadSettlementPreview(false);
-      if (!preview || (!previousAttempt && !isCurrentSettlementPreview(preview))) return false;
+      const preview = previousAttempt?.preview || settlementPreview || await loadSettlementPreview(false);
+      if (!preview) return false;
 
       const invoiceNumber = previousAttempt?.payload.p_invoice_number || await nextInvoiceNumber();
-      if (!previousAttempt && !isCurrentSettlementPreview(preview)) return false;
-      const paidAmountToUse = base.paymentMethod === 'credit' ? 0 : base.paidAmount;
+      const paidAmountToUse = base.paymentMethod === 'credit' ? 0 : (base.paidAmount || preview.total);
       const payload: ProcessSalePayload = previousAttempt?.payload ?? {
         p_client_operation_key: createSaleOperationKey(),
         p_invoice_number: invoiceNumber,
@@ -389,13 +380,29 @@ export function usePosOrder(input: UsePosOrderInput) {
       const receipt = buildSettlementReceipt(preview, invoiceNumber, paidAmountToUse, extended.payments || []);
       setSettlementReceipt(receipt);
       setSettlementReceiptSaleId(extended.sale_id || null);
-      clearSettlementPreview();
+      setSettlementPreview(null);
       base.setCheckoutOpen(false);
       base.setPaidAmount(0);
 
-      // The financial transaction has already committed. Clear the settled
-      // workspace before attempting an optional printer side effect so a
-      // printer failure cannot leave a paid order looking unpaid.
+      if (input.effSettings?.receipt_auto_print) {
+        const saleId = extended.sale_id || '';
+        const queued = await enqueueAutomaticReceiptPrint({
+          saleId,
+          receipt,
+          settings: input.effSettings,
+          lang,
+          isAr,
+        });
+        if (!queued.accepted) {
+          show(
+            isAr
+              ? `تم تحصيل الطلب ولكن تعذر إنشاء أمر طباعة الإيصال: ${queued.error || 'PRINT_QUEUE_FAILED'}`
+              : `Order settled, but receipt print job could not be queued: ${queued.error || 'PRINT_QUEUE_FAILED'}`,
+            'error',
+          );
+        }
+      }
+
       if (extended.order_completed) {
         base.resetWorkspace();
         show(t('saleCompleted'), 'success');
@@ -407,39 +414,12 @@ export function usePosOrder(input: UsePosOrderInput) {
           'success',
         );
       }
-
-      if (input.effSettings?.receipt_auto_print) {
-        try {
-          const queued = await enqueueAutomaticReceiptPrint({
-            saleId: extended.sale_id || '',
-            receipt,
-            settings: input.effSettings,
-            lang,
-            isAr,
-          });
-          if (!queued.accepted) {
-            show(
-              isAr
-                ? `تم تحصيل الطلب ولكن تعذر إنشاء أمر طباعة الإيصال: ${queued.error || 'PRINT_QUEUE_FAILED'}`
-                : `Order settled, but receipt print job could not be queued: ${queued.error || 'PRINT_QUEUE_FAILED'}`,
-              'warning',
-            );
-          }
-        } catch {
-          show(
-            isAr
-              ? 'تم تحصيل الطلب بنجاح، لكن تعذرت الطباعة. يمكنك إعادة طباعة الإيصال دون إعادة التحصيل.'
-              : 'Payment succeeded but receipt printing failed. Reprint the receipt without taking payment again.',
-            'warning',
-          );
-        }
-      }
       return true;
     } finally {
       settlementLockRef.current = false;
       setOfflineCompleting(false);
     }
-  }, [base, buildSettlementReceipt, clearSettlementPreview, input.activeShift?.id, input.branchId, input.effSettings, isAr, isCurrentSettlementPreview, lang, loadSettlementPreview, offlineCompleting, show, t]);
+  }, [base, buildSettlementReceipt, input.activeShift?.id, input.branchId, input.effSettings, isAr, lang, loadSettlementPreview, offlineCompleting, settlementPreview, show, t]);
 
   const printReceipt = useCallback(async () => {
     if (!input.effSettings) return;
@@ -457,7 +437,7 @@ export function usePosOrder(input: UsePosOrderInput) {
     const preview = await loadSettlementPreview(false);
     // An open order must never fall back to a receipt from an earlier
     // completed sale when its current authoritative preview is unavailable.
-    if (!preview || !isCurrentSettlementPreview(preview)) return;
+    if (!preview) return;
 
     const receipt = buildSettlementReceipt(preview, base.activeOrderNumber || `ORDER-${Date.now()}`, 0);
     receipt.isOpenOrder = true;
@@ -483,7 +463,7 @@ export function usePosOrder(input: UsePosOrderInput) {
       return;
     }
     show(isAr ? 'تم إرسال الحساب إلى محطة طباعة الكاشير.' : 'Open check queued to the cashier print station.', 'success');
-  }, [base, buildSettlementReceipt, input.effSettings, isAr, isCurrentSettlementPreview, lang, loadSettlementPreview, settlementReceipt]);
+  }, [base, buildSettlementReceipt, input.effSettings, isAr, lang, loadSettlementPreview, settlementReceipt]);
 
   const settlementTotals = base.checkoutOpen && base.activeOrderId && settlementPreview
     ? {
@@ -504,7 +484,6 @@ export function usePosOrder(input: UsePosOrderInput) {
   return {
     ...base,
     ...settlementTotals,
-    deliveryFee: settlementPreview?.delivery_fee_amount ?? 0,
     completing: base.completing || offlineCompleting,
     checkoutOpen: base.checkoutOpen,
     setCheckoutOpen,

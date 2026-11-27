@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AlertTriangle, Cloud, Coffee, Copy, Printer, Receipt, RefreshCw, Save, TestTube2, UtensilsCrossed, WalletCards } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Cloud, Coffee, Printer, Receipt, RefreshCw, Save, TestTube2, UtensilsCrossed, WalletCards } from 'lucide-react';
 import { catalog } from '@/api/domains/catalog';
 import { Button } from '@/components/Button';
 import { Select } from '@/components/Input';
@@ -22,7 +22,6 @@ import {
   type DetectedPrinter,
   type PrinterRouteConfig,
 } from '../../services/localPrintAgent';
-import { filterPrintQueueJobs, printQueueDiagnostics, printQueueJobSummary, scopeVisiblePrintQueueJobs, isStalePrintJob, type PrintQueueFilter } from '../../services/printQueueDiagnostics';
 import {
   getCloudPrintAgentBranchId,
   isCloudPrintAgentEnabled,
@@ -111,11 +110,9 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
   const [testingStation, setTestingStation] = useState<string | null>(null);
   const [testingDrawer, setTestingDrawer] = useState(false);
   const [queueJobs, setQueueJobs] = useState<CloudPrintQueueRow[]>([]);
-  const [queueJobsBranchId, setQueueJobsBranchId] = useState('');
   const [queueLoading, setQueueLoading] = useState(false);
   const [queueError, setQueueError] = useState<string | null>(null);
-  const [queueFilter, setQueueFilter] = useState<PrintQueueFilter>('pending');
-  const [queueSearch, setQueueSearch] = useState('');
+  const [queueFilter, setQueueFilter] = useState<'all' | 'pending' | 'active' | 'submitted' | 'failed'>('pending');
 
   useEffect(() => {
     if (!canManagePrinters) return;
@@ -152,90 +149,55 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
     return [CASHIER_STATION, ...dynamicStations];
   }, [branchStations, selectedBranchId, stationLoadFailed]);
 
-  // A slow response from another branch must never overwrite the selected branch's queue.
-  // Only one read per branch can run at a time, including manual refreshes.
-  const queueReadRef = useRef<{ branchId: string; token: number } | null>(null);
-  const queueTokenRef = useRef(0);
-
   const loadPrintQueue = useCallback(async () => {
     if (!canManagePrinters || !selectedBranchId) {
-      queueTokenRef.current += 1;
-      queueReadRef.current = null;
       setQueueJobs([]);
       setQueueError(null);
-      setQueueLoading(false);
       return;
     }
-    if (queueReadRef.current?.branchId === selectedBranchId) return;
-    const token = ++queueTokenRef.current;
-    queueReadRef.current = { branchId: selectedBranchId, token };
     setQueueLoading(true);
     try {
       const jobs = await listCloudPrintQueue(selectedBranchId, 150);
-      if (queueTokenRef.current !== token) return;
       setQueueJobs(jobs);
-      setQueueJobsBranchId(selectedBranchId);
       setQueueError(null);
     } catch (error) {
-      if (queueTokenRef.current !== token) return;
       setQueueJobs([]);
-      setQueueJobsBranchId('');
       setQueueError(error instanceof Error ? error.message : String(error));
     } finally {
-      if (queueTokenRef.current === token) {
-        queueReadRef.current = null;
-        setQueueLoading(false);
-      }
+      setQueueLoading(false);
     }
   }, [canManagePrinters, selectedBranchId]);
 
   useEffect(() => {
-    if (!canManagePrinters || !selectedBranchId) {
-      setQueueJobs([]);
-      setQueueError(null);
-      setQueueLoading(false);
-      return;
-    }
-    const refreshWhenVisible = () => {
-      if (!document.hidden) void loadPrintQueue();
-    };
+    if (!canManagePrinters || !selectedBranchId) return;
     void loadPrintQueue();
-    const timer = window.setInterval(refreshWhenVisible, 5000);
-    document.addEventListener('visibilitychange', refreshWhenVisible);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener('visibilitychange', refreshWhenVisible);
-      queueTokenRef.current += 1;
-      queueReadRef.current = null;
-    };
+    const timer = window.setInterval(() => void loadPrintQueue(), 5000);
+    return () => window.clearInterval(timer);
   }, [canManagePrinters, loadPrintQueue, selectedBranchId]);
 
-  const scopedQueueJobs = useMemo(() => scopeVisiblePrintQueueJobs(
-    queueJobs, queueJobsBranchId, selectedBranchId, canManagePrinters,
-  ), [queueJobs, queueJobsBranchId, selectedBranchId, canManagePrinters]);
-
   const queueCounts = useMemo(() => {
-    const counts = { pending: 0, active: 0, submitted: 0, failed: 0, stale: 0 };
-    for (const job of scopedQueueJobs) {
-      if (isStalePrintJob(job)) counts.stale += 1;
+    const counts = { pending: 0, active: 0, submitted: 0, failed: 0 };
+    for (const job of queueJobs) {
       if (job.status === 'pending') counts.pending += 1;
       else if (job.status === 'claimed' || job.status === 'printing') counts.active += 1;
       else if (job.status === 'submitted') counts.submitted += 1;
       else if (job.status === 'failed') counts.failed += 1;
     }
     return counts;
-  }, [scopedQueueJobs]);
+  }, [queueJobs]);
 
-  const visibleQueueJobs = useMemo(() => filterPrintQueueJobs(scopedQueueJobs, queueFilter, queueSearch), [queueFilter, scopedQueueJobs, queueSearch]);
+  const visibleQueueJobs = useMemo(() => queueJobs.filter((job) => {
+    if (queueFilter === 'all') return true;
+    if (queueFilter === 'active') return job.status === 'claimed' || job.status === 'printing';
+    return job.status === queueFilter;
+  }), [queueFilter, queueJobs]);
 
-  const copyQueueDiagnostics = async (job: CloudPrintQueueRow) => {
-    try {
-      await navigator.clipboard.writeText(printQueueDiagnostics(job));
-      show(isAr ? 'تم نسخ معرف التذكرة ومعلومات التشخيص.' : 'Job identifiers and diagnostics copied.', 'success');
-    } catch {
-      show(isAr ? 'تعذر النسخ؛ تحقق من أذونات الحافظة.' : 'Copy failed; check clipboard permissions.', 'error');
-    }
-  };
+  const queueJobLabel = useCallback((job: CloudPrintQueueRow) => {
+    const text = String(job.payload?.text || '');
+    const order = text.match(/طلب:\s*([^\r\n]+)/)?.[1]?.trim();
+    const table = text.match(/طاولة:\s*([^\r\n]+)/)?.[1]?.trim();
+    return { order: order || '—', table: table || '—' };
+  }, []);
 
   const loadBranchStations = useCallback(async () => {
     if (!selectedBranchId) {
@@ -438,23 +400,10 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
           ))}
         </div>
 
-        {queueCounts.stale > 0 && <div className="mt-3 rounded-xl border border-ui-warning/30 bg-ui-warning-soft p-3 text-xs text-ui-warning" role="status">{isAr ? 'توجد تذاكر طباعة نشطة منذ أكثر من 10 دقائق. تحقق من اتصال وكيل الطباعة والطابعة قبل اتخاذ إجراء؛ لا تعِد إرسال الطلب تلقائيًا.' : 'Active print jobs older than ten minutes. Check the print agent and printer before taking action; do not resend automatically.'}</div>}
         <div className="mt-3 flex flex-wrap gap-2">
-          <button type="button" onClick={() => setQueueFilter('stale')} className={`rounded-full border px-3 py-1 text-xs font-bold ${queueFilter === 'stale' ? 'border-brand-500 bg-brand-500/10' : 'border-ui-border text-ui-muted'}`}>{isAr ? 'متأخرة' : 'Stale'} ({queueCounts.stale})</button>
           <button type="button" onClick={() => setQueueFilter('all')} className={`rounded-full border px-3 py-1 text-xs font-bold ${queueFilter === 'all' ? 'border-brand-500 bg-brand-500/10 text-brand-700' : 'border-ui-border text-ui-muted'}`}>
-            {isAr ? 'الكل' : 'All'} ({scopedQueueJobs.length})
+            {isAr ? 'الكل' : 'All'} ({queueJobs.length})
           </button>
-        </div>
-
-        <div className="mt-3 flex flex-wrap items-center gap-3">
-          <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-xs font-semibold text-ui-muted">
-            {isAr ? 'بحث في التذاكر المحملة' : 'Search loaded tickets'}
-            <input type="search" value={queueSearch} onChange={(event) => setQueueSearch(event.target.value)}
-              placeholder={isAr ? 'رقم الطلب، المحطة أو معرف التذكرة' : 'Order, station, or job ID'}
-              data-testid="print-queue-search"
-              className="h-9 rounded-lg border border-ui-border bg-ui-page px-3 text-sm text-ui-text" />
-          </label>
-          <span className="text-xs text-ui-muted">{isAr ? `المعروض: ${visibleQueueJobs.length} من ${scopedQueueJobs.length} تذكرة محملة` : `Showing ${visibleQueueJobs.length} of ${scopedQueueJobs.length} loaded jobs`}</span>
         </div>
 
         {queueError ? (
@@ -475,12 +424,11 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
                 <th className="px-3 py-2 text-start">{isAr ? 'الحالة' : 'Status'}</th>
                 <th className="px-3 py-2 text-start">{isAr ? 'المحاولات' : 'Attempts'}</th>
                 <th className="px-3 py-2 text-start">{isAr ? 'آخر خطأ' : 'Last error'}</th>
-                <th className="px-3 py-2 text-start">{isAr ? 'التشخيص' : 'Diagnostics'}</th>
               </tr>
             </thead>
             <tbody>
               {visibleQueueJobs.map((job) => {
-                const label = printQueueJobSummary(job);
+                const label = queueJobLabel(job);
                 return (
                   <tr key={job.id} className="border-t border-ui-border text-ui-text">
                     <td className="whitespace-nowrap px-3 py-2">{new Date(job.created_at).toLocaleString(isAr ? 'ar-EG' : 'en-US')}</td>
@@ -492,16 +440,11 @@ export function PrinterSettingsPanel({ branchId, branchName }: PrinterSettingsPa
                     </td>
                     <td className="px-3 py-2">{job.attempts}</td>
                     <td className="max-w-[280px] truncate px-3 py-2 text-ui-muted" title={job.last_error || ''}>{job.last_error || '—'}</td>
-                    <td className="px-3 py-2"><button type="button" onClick={() => void copyQueueDiagnostics(job)}
-                      className="inline-flex items-center gap-1 rounded-lg border border-ui-border px-2 py-1 text-ui-primary"
-                      aria-label={isAr ? 'نسخ معلومات التذكرة' : 'Copy job diagnostics'}>
-                      <Copy className="h-3.5 w-3.5" />{isAr ? 'نسخ' : 'Copy'}
-                    </button></td>
                   </tr>
                 );
               })}
               {!queueLoading && visibleQueueJobs.length === 0 ? (
-                <tr><td colSpan={8} className="px-3 py-8 text-center text-ui-muted">{isAr ? 'لا توجد أوامر في هذه الحالة.' : 'No jobs in this status.'}</td></tr>
+                <tr><td colSpan={7} className="px-3 py-8 text-center text-ui-muted">{isAr ? 'لا توجد أوامر في هذه الحالة.' : 'No jobs in this status.'}</td></tr>
               ) : null}
             </tbody>
           </table>

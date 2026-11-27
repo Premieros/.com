@@ -1,0 +1,1 @@
+import{u as o,r as a}from"./index-DT0DAaE3.js";const i=7;function r(t,n,e){return{from:t||"",to:n||"",clamped:!1}}function u(){const n=o()("history.unlimited");return a.useMemo(()=>({unlimited:n,recentFullDays:i,maxDays:null,minDate:void 0,minIso:void 0,clampRange:(e,s)=>r(e,s)}),[n])}export{u};

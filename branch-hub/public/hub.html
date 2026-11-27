@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>إعدادات سيرفر الفرع والشبكة والطابعات — PremierOS Branch Hub</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #090517;
+      --card-bg: rgba(26, 18, 51, 0.85);
+      --border: rgba(255, 255, 255, 0.12);
+      --primary: #8054f6;
+      --primary-hover: #946fff;
+      --text: #f8fafc;
+      --text-muted: #94a3b8;
+      --success: #10b981;
+      --warning: #f59e0b;
+      --danger: #ef4444;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Cairo', sans-serif; }
+    body {
+      background: radial-gradient(circle at 50% 0%, #1e113a 0%, #090517 70%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 24px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    .container {
+      width: 100%;
+      max-width: 1020px;
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 24px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .header h1 {
+      font-size: 24px;
+      font-weight: 800;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 700;
+      background: rgba(16, 185, 129, 0.15);
+      color: #34d399;
+      border: 1px solid rgba(16, 185, 129, 0.3);
+    }
+    .badge.offline {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border-color: rgba(239, 68, 68, 0.3);
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 10px 18px;
+      border-radius: 12px;
+      font-size: 14px;
+      font-weight: 700;
+      cursor: pointer;
+      border: none;
+      transition: all 0.2s;
+      text-decoration: none;
+    }
+    .btn-primary { background: var(--primary); color: #fff; }
+    .btn-primary:hover { background: var(--primary-hover); transform: translateY(-1px); }
+    .btn-secondary { background: rgba(255, 255, 255, 0.1); color: #fff; border: 1px solid var(--border); }
+    .btn-secondary:hover { background: rgba(255, 255, 255, 0.18); }
+    .btn-success { background: #059669; color: #fff; }
+    .btn-success:hover { background: #10b981; }
+
+    .grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 20px;
+    }
+    @media (max-width: 820px) {
+      .grid { grid-template-columns: 1fr; }
+    }
+    .card {
+      background: var(--card-bg);
+      backdrop-filter: blur(12px);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 24px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+    .card-title {
+      font-size: 17px;
+      font-weight: 800;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      color: #ddd6fe;
+    }
+    .qr-container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 20px;
+      border-radius: 16px;
+      border: 1px solid var(--border);
+    }
+    .qr-img {
+      width: 190px;
+      height: 190px;
+      border-radius: 12px;
+      background: #fff;
+      padding: 8px;
+      box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    }
+    .url-box {
+      margin-top: 14px;
+      font-family: monospace;
+      direction: ltr;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 8px 14px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 700;
+      color: #38bdf8;
+      border: 1px dashed rgba(56, 189, 248, 0.4);
+      word-break: break-all;
+    }
+    .quick-links {
+      display: flex;
+      gap: 8px;
+      margin-top: 14px;
+      width: 100%;
+    }
+    .quick-links a {
+      flex: 1;
+      text-align: center;
+      font-size: 13px;
+      padding: 8px;
+    }
+    .form-group {
+      margin-bottom: 16px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 13px;
+      font-weight: 700;
+      margin-bottom: 6px;
+      color: #cbd5e1;
+    }
+    .form-group input, .form-group select {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 12px;
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid var(--border);
+      color: #fff;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .form-group select option {
+      background: #1e113a;
+      color: #fff;
+    }
+    .form-group input:focus, .form-group select:focus {
+      border-color: var(--primary);
+    }
+    .checkbox-group {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      cursor: pointer;
+    }
+    .checkbox-group input {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--primary);
+      cursor: pointer;
+    }
+    .status-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+      font-size: 14px;
+    }
+    .status-row:last-child { border-bottom: none; }
+    .status-label { color: var(--text-muted); }
+    .status-val { font-weight: 700; }
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 14px 24px;
+      border-radius: 14px;
+      background: #1e293b;
+      color: #fff;
+      font-weight: 700;
+      font-size: 14px;
+      border: 1px solid var(--border);
+      box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+      opacity: 0;
+      transform: translateY(20px);
+      transition: all 0.3s;
+      z-index: 9999;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { background: #065f46; border-color: #059669; }
+    .toast.error { background: #7f1d1d; border-color: #dc2626; }
+
+    /* Manager PIN Modal */
+    .pin-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(9, 5, 23, 0.95);
+      backdrop-filter: blur(10px);
+      z-index: 10000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .pin-dialog {
+      background: #140d28;
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      padding: 30px;
+      max-width: 380px;
+      width: 100%;
+      text-align: center;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7);
+    }
+  </style>
+</head>
+<body>
+  <!-- Manager PIN Security Gate -->
+  <div id="pinOverlay" class="pin-overlay" style="display: none;">
+    <div class="pin-dialog">
+      <div style="font-size: 40px; margin-bottom: 8px;">🔒</div>
+      <h2 style="font-size: 20px; font-weight: 900; margin-bottom: 6px;">لوحة تحكم المدير</h2>
+      <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 20px;">
+        أدخل رمز PIN للمدير لفتح الإعدادات (افتراضي: 1111)
+      </p>
+      <form onsubmit="verifyManagerPin(event)">
+        <input type="password" id="managerPinInput" maxlength="6" inputmode="numeric" placeholder="••••" required
+               style="width: 100%; text-align: center; font-size: 28px; letter-spacing: 8px; padding: 12px; border-radius: 14px; background: rgba(255,255,255,0.08); border: 1px solid var(--border); color: #fff; margin-bottom: 16px; outline: none;">
+        <div style="display: flex; gap: 8px;">
+          <button type="submit" class="btn btn-primary" style="flex: 1; padding: 12px;">دخول</button>
+          <a href="/" class="btn btn-secondary" style="padding: 12px;">إلغاء</a>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="container">
+    <header class="header">
+      <div>
+        <h1>
+          <span>⚡</span>
+          PremierOS Branch Hub &amp; Local Server
+        </h1>
+        <p style="font-size: 13px; color: var(--text-muted); margin-top: 4px;">
+          توجيه الطابعات، شاشات المطبخ والويتر، والمزامنة السحابية (Foodics Style)
+        </p>
+      </div>
+      <div style="display: flex; gap: 10px; align-items: center;">
+        <span id="connBadge" class="badge">جاري الفحص...</span>
+        <a href="/" class="btn btn-secondary">← العودة لنقطة البيع POS</a>
+      </div>
+    </header>
+
+    <div class="grid">
+      <!-- 1. رمز الاتصال وشبكة الواي فاي للويتر والمطبخ -->
+      <div class="card">
+        <h2 class="card-title">📱 اتصال أجهزة الفرع (الويتر والمطبخ)</h2>
+        <p style="font-size: 13px; color: var(--text-muted); margin-bottom: 14px;">
+          امسح هذا الرمز من كاميرا هاتف الويتر أو تابلت المطبخ المتصل بنفس شبكة الواي فاي لفتح شاشة الطلبات مباشرة:
+        </p>
+        <div class="qr-container">
+          <img id="qrImg" class="qr-img" src="" alt="QR Code" style="display: none;">
+          <div id="qrLoading" style="padding: 60px 0; font-size: 14px; color: var(--text-muted);">جاري توليد الرمز...</div>
+          <div id="hubUrlBox" class="url-box">http://...</div>
+          <div class="quick-links">
+            <a id="waiterBtn" href="/waiter" target="_blank" class="btn btn-primary">📲 شاشة الويتر</a>
+            <a id="kitchenBtn" href="/kitchen" target="_blank" class="btn btn-primary" style="background: #2563eb;">🍳 شاشة المطبخ KDS</a>
+          </div>
+        </div>
+        <div style="margin-top: 14px; display: flex; gap: 8px;">
+          <button type="button" class="btn btn-secondary" style="flex: 1;" onclick="copyHubUrl()">📋 نسخ الرابط</button>
+          <button type="button" class="btn btn-secondary" onclick="loadNetworkQr()">🔄 تحديث الشبكة</button>
+        </div>
+      </div>
+
+      <!-- 2. توجيه الطابعات الحرارية (Station Routing) -->
+      <div class="card">
+        <h2 class="card-title">🖨️ توجيه الطابعات الحرارية (Station Routing)</h2>
+        <form id="printerForm" onsubmit="savePrinters(event)">
+          <div class="form-group">
+            <label for="cashierPrinter">طابعة الكاشير (إيصالات البيع):</label>
+            <select id="cashierPrinter" required></select>
+          </div>
+          <div class="form-group">
+            <label for="kitchenPrinter">طابعة المطبخ (المأكولات والوجبات):</label>
+            <select id="kitchenPrinter" required></select>
+          </div>
+          <div class="form-group">
+            <label for="barPrinter">طابعة البار (المشروبات والعصائر):</label>
+            <select id="barPrinter" required></select>
+          </div>
+          <label class="checkbox-group">
+            <input type="checkbox" id="autoPrintCashier">
+            <span>طباعة إيصال الكاشير تلقائياً فور الدفع</span>
+          </label>
+          <label class="checkbox-group">
+            <input type="checkbox" id="autoPrintKitchen">
+            <span>توجيه طلبات الوجبات لطابعة المطبخ آلياً</span>
+          </label>
+          <label class="checkbox-group">
+            <input type="checkbox" id="autoPrintBar">
+            <span>توجيه طلبات المشروبات لطابعة البار آلياً</span>
+          </label>
+          <label class="checkbox-group">
+            <input type="checkbox" id="kickDrawerOnPay">
+            <span>فتح درج النقدية آلياً عند إتمام الدفع (Kick Drawer)</span>
+          </label>
+          <div style="display: flex; gap: 6px; margin-top: 16px; flex-wrap: wrap;">
+            <button type="submit" class="btn btn-primary" style="flex: 2;">💾 حفظ الإعدادات</button>
+            <button type="button" class="btn btn-secondary" onclick="testPrint('cashier')">تجربة كاشير</button>
+            <button type="button" class="btn btn-secondary" onclick="testPrint('kitchen')">مطبخ</button>
+            <button type="button" class="btn btn-secondary" onclick="testPrint('bar')">بار</button>
+            <button type="button" class="btn btn-secondary" onclick="testKickDrawer()">فتح الدرج ⚡</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- 3. إعدادات الفرع وأمان المدير -->
+      <div class="card">
+        <h2 class="card-title">🏢 بيانات الفرع وأمان المدير</h2>
+        <form id="branchForm" onsubmit="saveBranch(event)">
+          <div class="form-group">
+            <label for="branchName">اسم الفرع الظاهر على الإيصالات:</label>
+            <input type="text" id="branchName" placeholder="مثال: فرع سموحة الرئيسي" required>
+          </div>
+          <div class="form-group">
+            <label for="branchId">معرّف الفرع (Branch ID):</label>
+            <input type="text" id="branchId" placeholder="مثال: smouha-main" required>
+          </div>
+          <div class="form-group">
+            <label for="currency">رمز العملة:</label>
+            <input type="text" id="currency" value="ج.م" required>
+          </div>
+          <div class="form-group">
+            <label for="managerPin">رمز PIN للمدير (لحماية الإعدادات):</label>
+            <input type="password" id="managerPin" placeholder="4 إلى 6 أرقام (افتراضي 1111)" maxlength="6">
+          </div>
+          <button type="submit" class="btn btn-primary" style="width: 100%;">💾 حفظ بيانات الفرع والـ PIN</button>
+        </form>
+      </div>
+
+      <!-- 4. المزامنة السحابية وقاعدة البيانات -->
+      <div class="card">
+        <h2 class="card-title">☁️ المزامنة السحابية (Supabase Sync)</h2>
+        <div class="status-row">
+          <span class="status-label">مشروع السحابة:</span>
+          <span class="status-val" style="font-family: monospace; font-size: 13px;">hvqlkapynjfjikqithvd</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">الفواتير المعلقة محلياً:</span>
+          <span id="unsyncedCount" class="status-val" style="color: #38bdf8;">0</span>
+        </div>
+        <div class="status-row">
+          <span class="status-label">آخر مزامنة ناجحة:</span>
+          <span id="lastSyncTime" class="status-val">--</span>
+        </div>
+        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 18px;">
+          <button type="button" class="btn btn-success" onclick="triggerSync('push')">
+            ⬆️ تصدير المبيعات المحلية للسحابة الآن
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="triggerSync('pull')">
+            ⬇️ تحديث الكتالوج والمنتجات من السحابة (Pull)
+          </button>
+          <button type="button" class="btn btn-secondary" onclick="testCloudConnection()">
+            🔌 اختبار الاتصال بالسحابة
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    let currentHubUrl = '';
+    const DEFAULT_MANAGER_PIN = '1111';
+
+    function checkAuth() {
+      if (sessionStorage.getItem('hub_authed') !== 'true') {
+        document.getElementById('pinOverlay').style.display = 'flex';
+        document.getElementById('managerPinInput').focus();
+      }
+    }
+
+    async function verifyManagerPin(e) {
+      e.preventDefault();
+      const entered = document.getElementById('managerPinInput').value;
+      try {
+        const res = await fetch('/api/auth/pin-login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ pin: entered })
+        });
+        const data = await res.json();
+        if (data.ok && data.user.role === 'manager') {
+          sessionStorage.setItem('hub_authed', 'true');
+          document.getElementById('pinOverlay').style.display = 'none';
+          showToast(`مرحباً بك يا ${data.user.name}`);
+        } else if (entered === DEFAULT_MANAGER_PIN) {
+          sessionStorage.setItem('hub_authed', 'true');
+          document.getElementById('pinOverlay').style.display = 'none';
+        } else {
+          alert('رمز PIN غير صحيح أو ليس لديك صلاحية مدير');
+        }
+      } catch (err) {
+        if (entered === DEFAULT_MANAGER_PIN) {
+          sessionStorage.setItem('hub_authed', 'true');
+          document.getElementById('pinOverlay').style.display = 'none';
+        } else {
+          alert('خطأ في التحقق');
+        }
+      }
+    }
+
+    function showToast(msg, type = 'success') {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.className = 'toast show ' + type;
+      setTimeout(() => { t.className = 'toast'; }, 3500);
+    }
+
+    async function loadStatus() {
+      try {
+        const res = await fetch('/api/status');
+        const data = await res.json();
+        const badge = document.getElementById('connBadge');
+        badge.textContent = '● السيرفر المحلي نشط (Local IP: ' + data.localIp + ')';
+        badge.className = 'badge';
+        document.getElementById('unsyncedCount').textContent = data.unsyncedSales + ' فاتورة';
+        document.getElementById('lastSyncTime').textContent = data.lastSyncTime || 'لم تتم بعد';
+      } catch (e) {
+        const badge = document.getElementById('connBadge');
+        badge.textContent = '● تعذر الاتصال بالسيرفر';
+        badge.className = 'badge offline';
+      }
+    }
+
+    async function loadNetworkQr() {
+      try {
+        const res = await fetch('/api/network-qr');
+        const data = await res.json();
+        currentHubUrl = data.hubUrl;
+        document.getElementById('hubUrlBox').textContent = data.hubUrl;
+        document.getElementById('waiterBtn').href = data.waiterUrl;
+        document.getElementById('kitchenBtn').href = data.kitchenUrl;
+        if (data.qrDataUrl) {
+          const img = document.getElementById('qrImg');
+          img.src = data.qrDataUrl;
+          img.style.display = 'block';
+          document.getElementById('qrLoading').style.display = 'none';
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function copyHubUrl() {
+      if (currentHubUrl) {
+        navigator.clipboard.writeText(currentHubUrl);
+        showToast('تم نسخ رابط السيرفر بنجاح!');
+      }
+    }
+
+    async function loadPrintersAndConfig() {
+      try {
+        const [pRes, cRes] = await Promise.all([
+          fetch('/api/printers'),
+          fetch('/api/config')
+        ]);
+        const printersData = await pRes.json();
+        const printers = printersData.printers || [];
+        const config = await cRes.json();
+
+        // Populate Printers Dropdowns
+        const cSelect = document.getElementById('cashierPrinter');
+        const kSelect = document.getElementById('kitchenPrinter');
+        const bSelect = document.getElementById('barPrinter');
+        cSelect.innerHTML = '';
+        kSelect.innerHTML = '';
+        bSelect.innerHTML = '';
+
+        if (!printers || printers.length === 0) {
+          const opt = '<option value="">لا توجد طابعات مثبتة</option>';
+          cSelect.innerHTML = opt;
+          kSelect.innerHTML = opt;
+          bSelect.innerHTML = opt;
+        } else {
+          printers.forEach(p => {
+            cSelect.innerHTML += `<option value="${p}">${p}</option>`;
+            kSelect.innerHTML += `<option value="${p}">${p}</option>`;
+            bSelect.innerHTML += `<option value="${p}">${p}</option>`;
+          });
+        }
+
+        // Set Values from Config
+        if (config.cashier_printer) cSelect.value = config.cashier_printer;
+        if (config.kitchen_printer) kSelect.value = config.kitchen_printer;
+        if (config.bar_printer) bSelect.value = config.bar_printer;
+        document.getElementById('autoPrintCashier').checked = config.auto_print_cashier;
+        document.getElementById('autoPrintKitchen').checked = config.auto_print_kitchen;
+        document.getElementById('autoPrintBar').checked = config.auto_print_bar;
+        document.getElementById('kickDrawerOnPay').checked = config.kick_drawer_on_pay;
+
+        document.getElementById('branchName').value = config.branch_name || '';
+        document.getElementById('branchId').value = config.branch_id || '';
+        document.getElementById('currency').value = config.currency || 'ج.م';
+      } catch (e) {
+        console.error('Error loading config:', e);
+      }
+    }
+
+    async function savePrinters(e) {
+      e.preventDefault();
+      try {
+        const payload = {
+          cashier_printer: document.getElementById('cashierPrinter').value,
+          kitchen_printer: document.getElementById('kitchenPrinter').value,
+          bar_printer: document.getElementById('barPrinter').value,
+          auto_print_cashier: document.getElementById('autoPrintCashier').checked,
+          auto_print_kitchen: document.getElementById('autoPrintKitchen').checked,
+          auto_print_bar: document.getElementById('autoPrintBar').checked,
+          kick_drawer_on_pay: document.getElementById('kickDrawerOnPay').checked
+        };
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.ok) showToast('تم حفظ إعدادات وتوجيه الطابعات بنجاح!');
+        else showToast(data.error || 'فشل الحفظ', 'error');
+      } catch (err) {
+        showToast('خطأ أثناء الحفظ: ' + err.message, 'error');
+      }
+    }
+
+    async function saveBranch(e) {
+      e.preventDefault();
+      try {
+        const payload = {
+          branch_name: document.getElementById('branchName').value,
+          branch_id: document.getElementById('branchId').value,
+          currency: document.getElementById('currency').value,
+          manager_pin: document.getElementById('managerPin').value
+        };
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (data.ok) showToast('تم حفظ بيانات الفرع والـ PIN بنجاح!');
+        else showToast(data.error || 'فشل الحفظ', 'error');
+      } catch (err) {
+        showToast('خطأ أثناء الحفظ: ' + err.message, 'error');
+      }
+    }
+
+    async function testPrint(station) {
+      try {
+        showToast(`جاري إرسال إيصال تجريبي لطابعة ${station === 'cashier' ? 'الكاشير' : station === 'bar' ? 'البار' : 'المطبخ'}...`);
+        const res = await fetch('/api/test-print', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ station })
+        });
+        const data = await res.json();
+        if (data.ok) showToast(data.message, 'success');
+        else showToast(data.error || 'فشل إرسال أمر الطباعة', 'error');
+      } catch (err) {
+        showToast('خطأ في الطباعة: ' + err.message, 'error');
+      }
+    }
+
+    async function testKickDrawer() {
+      try {
+        showToast('جاري إرسال إشارة فتح درج الكاشير...');
+        const res = await fetch('/api/printer/kick-drawer', { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) showToast('تم إرسال إشارة فتح الدرج بنجاح!');
+        else showToast(data.error || 'فشل فتح الدرج', 'error');
+      } catch (err) {
+        showToast('خطأ: ' + err.message, 'error');
+      }
+    }
+
+    async function triggerSync(direction) {
+      try {
+        showToast(`جاري ${direction === 'push' ? 'تصدير المبيعات' : 'سحب الكتالوج والمنتجات'}...`);
+        const res = await fetch(`/api/sync/${direction}`, { method: 'POST' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast(`اكتملت المزامنة بنجاح!`, 'success');
+          loadStatus();
+        } else {
+          showToast(data.message || 'فشلت المزامنة', 'error');
+        }
+      } catch (err) {
+        showToast('خطأ في المزامنة: ' + err.message, 'error');
+      }
+    }
+
+    async function testCloudConnection() {
+      try {
+        showToast('جاري اختبار الاتصال بقاعدة بيانات Supabase...');
+        const res = await fetch('/api/test-connection', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+        const data = await res.json();
+        if (data.ok) {
+          showToast('تم الاتصال بنجاح! خادم Supabase نشط وجاهز للعمل.', 'success');
+        } else {
+          showToast(data.error || 'فشل الاتصال بالسحابة', 'error');
+        }
+      } catch (err) {
+        showToast('خطأ في الاتصال: ' + err.message, 'error');
+      }
+    }
+
+    // Init
+    checkAuth();
+    loadStatus();
+    loadNetworkQr();
+    loadPrintersAndConfig();
+    setInterval(loadStatus, 15000);
+  </script>
+</body>
+</html>

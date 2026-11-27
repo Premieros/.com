@@ -154,7 +154,7 @@ export function TablesPanel({ open, onClose, tables, areas, ordersByTable, kitch
                     <p className="mt-2 flex items-center gap-1 text-[11px] font-bold text-ui-muted"><Users className="h-3 w-3" /> {table.capacity}</p>
                     {order ? (
                       <div className="mt-2 space-y-0.5">
-                        <p className="truncate text-[11px] font-black text-ui-text">#{order.order_number}{(ordersByTable[table.id] || []).length > 1 ? ` · ${ordersByTable[table.id].length} ${isAr ? 'حسابات' : 'bills'}` : ''}</p>
+                        <p className="truncate text-[11px] font-black text-ui-text">#{order.order_number}</p>
                         <p className="truncate text-[12px] font-black text-ui-accent">{formatCurrency(order.total, currency, lang)}</p>
                         {operatorName && <p className="flex items-center gap-1 truncate text-[10px] font-black text-ui-text"><Users className="h-3 w-3 shrink-0" /><span className="truncate">{operatorName}</span></p>}
                       </div>
@@ -184,39 +184,6 @@ export function TablesPanel({ open, onClose, tables, areas, ordersByTable, kitch
           const tableOrders = ordersByTable[selected.id] || [];
           const order = tableOrders[0];
           const operatorName = order ? orderOperatorName(order) : null;
-          if (tableOrders.length > 1) {
-            return (
-              <div className="space-y-3" data-testid="pos-same-table-separate-bills">
-                <p className="text-xs font-bold text-ui-subtle">
-                  {isAr ? `تحتوي الطاولة على ${tableOrders.length} حسابات مستقلة. اختر حساب العميل لفتحه أو تسديده.` : `This table has ${tableOrders.length} independent guest bills. Choose which bill to open or settle.`}
-                </p>
-                {tableOrders.map((bill) => {
-                  const canPayThisBill = perms.canPay && (kitchenSendsByOrder[bill.id]?.length || 0) > 0;
-                  return (
-                    <div key={bill.id} className="rounded-xl border border-ui-border bg-ui-page-alt p-3" data-testid={`pos-table-bill-${bill.id}`}>
-                      <div className="mb-2 flex items-center justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-black text-ui-text">#{bill.order_number}</p>
-                          <p className="text-[10px] text-ui-muted">{orderOperatorName(bill) || (isAr ? 'حساب عميل مستقل' : 'Independent guest bill')}</p>
-                        </div>
-                        <span className="text-sm font-black text-ui-accent">{formatCurrency(bill.total, currency, lang)}</span>
-                      </div>
-                      <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => { setSelected(null); onClose(); onResume(bill); }}>
-                          <UtensilsCrossed className="h-4 w-4" /> {isAr ? 'فتح الحساب' : 'Open bill'}
-                        </Button>
-                        {canPayThisBill && (
-                          <Button variant="success" onClick={() => { setSelected(null); onClose(); onPay(bill); }}>
-                            <Banknote className="h-4 w-4" /> {isAr ? 'دفع هذا الحساب' : 'Pay this bill'}
-                          </Button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          }
           if (order) {
             const canPaySentOrder = perms.canPay && (kitchenSendsByOrder[order.id]?.length || 0) > 0;
             return (

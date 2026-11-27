@@ -25,7 +25,7 @@ import { usePosPermissions } from '../hooks/usePosPermissions';
 import { usePosKeyboard } from '../hooks/usePosKeyboard';
 import { cartLineKey, orderItemLineKey } from '../utils/cart';
 import { needsKitchenDispatchBeforeSettlement } from '../utils/unsentCheckoutGuard';
-import { resolveCartClearAction } from '../utils/clearCartPolicy';
+import { InventoryRepository } from '@/core/repositories/InventoryRepository';
 import { OrderStartWizard, type StartStep, type StartOrderOptions } from '../components/start/OrderStartWizard';
 import { ProductBrowser } from '../components/catalog/ProductBrowser';
 import { ProductConfigModal } from '../components/catalog/ProductConfigModal';
@@ -47,7 +47,6 @@ import { useOrganizationModules } from '@/core/modules/OrganizationModulesContex
 import { resolvePosBusinessSurface } from '../businessSurface';
 import { useCan } from '@/lib/permissions';
 import { ManualPaymentApprovalsModal } from '../components/checkout/ManualPaymentApprovalsModal';
-import { QrInbox } from '@/features/qr/QrInbox';
 
 const EMPTY_POS_STOCK_MAP: Record<string, number> = {};
 
@@ -84,8 +83,6 @@ export function PosWorkspacePage() {
   const initState = useMemo<WorkspaceState>(() => (location.state || {}) as WorkspaceState, [location.state]);
   const { cachePosData, loadCachedPosData } = useOffline();
   const [reloadKey, setReloadKey] = useState(0);
-  const clearOrderInFlightRef = useRef(false);
-  const [clearingOrder, setClearingOrder] = useState(false);
   const [products, setProducts] = useState<Product[]>([]);
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [offlineSettings, setOfflineSettings] = useState<Settings | null>(null);
@@ -162,13 +159,18 @@ export function PosWorkspacePage() {
   const refreshLiveStockMap = useCallback(async () => {
     if (!effectiveBranch) return;
     try {
-      // Prefer the authoritative signed, warehouse-scoped stock read.
-      // Branch-aggregated IndexedDB entries must never represent warehouse stock.
+      // Prefer the authoritative signed stock read contract online.
+      // The IndexedDB stock map is only an offline fallback, never an additional source to sum.
       const warehouseId = await fetchBranchWarehouseId(effectiveBranch, orderIdParam || null);
       if (!warehouseId) {
-        // Never display aggregate branch stock as if it belonged to this
-        // warehouse, even while offline. An unknown warehouse is unknown.
-        setLiveStockMap({});
+        // An unresolved online warehouse must NOT expose branch-wide cached stock
+        // as sellable warehouse availability. Offline mode keeps its own verified
+        // warehouse/outbox checks in the payment service.
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          setLiveStockMap(await InventoryRepository.getBranchStockMap(effectiveBranch));
+        } else {
+          setLiveStockMap({});
+        }
         return;
       }
       const live: Record<string, number> = {};
@@ -214,13 +216,10 @@ export function PosWorkspacePage() {
       if (online) {
         setLiveStockMap(live);
       } else {
-        // The server read failed. A branch-wide cache could include another
-        // warehouse and must not be displayed as stock for this POS.
-        setLiveStockMap({});
+        setLiveStockMap(await InventoryRepository.getBranchStockMap(effectiveBranch));
       }
     } catch {
-      // A transport or permission failure is not proof of warehouse stock.
-      setLiveStockMap({});
+      // fallback
     }
   }, [effectiveBranch, orderIdParam, products]);
 
@@ -239,7 +238,7 @@ export function PosWorkspacePage() {
     stockMap: liveStockMap,
     onInventoryChanged: () => { void refreshLiveStockMap(); },
   });
-  const canModifyCurrentOrder = !pos.orderLoading && (pos.activeOrderId ? perms.canEditOrder : perms.canCreateOrder);
+  const canModifyCurrentOrder = pos.activeOrderId ? perms.canEditOrder : perms.canCreateOrder;
 
   useEffect(() => {
     if (pos.receiptSaleId) {
@@ -311,7 +310,7 @@ export function PosWorkspacePage() {
   }, [pos.activeOrderId, hasUnsentItems, isAr, show]);
 
   const handlePay = useCallback(() => {
-    if (!perms.canPay || !shiftChecked || pos.orderLoading || pos.cart.length === 0) return;
+    if (!perms.canPay || !shiftChecked || pos.cart.length === 0) return;
     if (blockUnsentOpenOrder()) return;
     if (posSurface.customerRequired && !pos.customerId) {
       setCustomerModalOpen(true);
@@ -401,70 +400,41 @@ export function PosWorkspacePage() {
       setLoadWarning('');
       try {
         const fixedBranch = effectiveBranch;
-        let serverCatalogReceived = false;
-        setProducts([]);
-        setCategories([]);
-        setCustomers([]);
-        setDiningAreas([]);
         
         // Hydrate branch-scoped cache immediately, even while online, so resumed orders
         // can render the product catalog without waiting for the network round-trip.
+        const cachedData = await loadCachedPosData(fixedBranch || undefined);
         const cachedCatalog = offlinePosManager.getCatalogCache(fixedBranch || 'default');
-        if (cachedCatalog?.products.length && !cancelled) {
-          setProducts(cachedCatalog.products);
-          setCategories(cachedCatalog.categories);
+        const cachedProducts = cachedData.products.length > 0 ? cachedData.products : cachedCatalog?.products || [];
+        const cachedCategories = cachedData.categories.length > 0 ? cachedData.categories : cachedCatalog?.categories || [];
+
+        if (cachedProducts.length > 0 && !cancelled) {
+          setProducts(cachedProducts);
+          setCategories(cachedCategories);
+          if (cachedData.customers.length > 0) setCustomers(cachedData.customers);
+          if (cachedData.settings) setOfflineSettings(cachedData.settings);
+          if (cachedData.branches.length > 0) setOfflineBranches(cachedData.branches);
           setLoading(false);
         }
-        const cacheRead = loadCachedPosData(fixedBranch || undefined).then(cachedData => {
-          if (!cancelled && !serverCatalogReceived && cachedData.products.length > 0) {
-            setProducts(cachedData.products);
-            setCategories(cachedData.categories);
-            setCustomers(cachedData.customers);
-            if (cachedData.settings) setOfflineSettings(cachedData.settings);
-            if (cachedData.branches.length > 0) setOfflineBranches(cachedData.branches);
-            setLoading(false);
-          }
-          return cachedData;
-        }).catch(() => null);
 
         // If navigator is offline, the hydrated cache is the terminal source.
         if (typeof navigator !== 'undefined' && !navigator.onLine) {
-          const cachedData = await cacheRead;
-          if (cachedCatalog?.products.length || cachedData?.products.length) return;
+          if (cachedProducts.length > 0) return;
         }
 
         let cusq = supabase.from('customers').select('*');
         let catq = supabase.from('categories').select('*');
         let areaq = supabase.from('dining_areas').select('*');
+        const productQuery = fixedBranch
+          ? supabase.from('products').select('*').eq('branch_id', fixedBranch).eq('is_active', true)
+          : supabase.from('products').select('*').eq('is_active', true).order('name');
         if (fixedBranch) {
           cusq = cusq.eq('branch_id', fixedBranch);
           catq = catq.eq('branch_id', fixedBranch);
           areaq = areaq.eq('branch_id', fixedBranch);
         }
-        const loadCatalog = async () => {
-          const products: Product[] = [];
-          let pageSize = 120;
-          while (!cancelled) {
-            let query = supabase.from('products').select('*').eq('is_active', true);
-            if (fixedBranch) query = query.eq('branch_id', fixedBranch);
-            const { data, error } = await query.order('name').order('id')
-              .range(products.length, products.length + pageSize - 1);
-            if (error) return { data: null, error };
-            const page = (data || []) as Product[];
-            products.push(...page);
-            if (cancelled) break;
-            if (!serverCatalogReceived) {
-              serverCatalogReceived = true;
-              setProducts(products.slice());
-              setLoading(false);
-            }
-            if (page.length < pageSize) break;
-            pageSize = 500;
-          }
-          return { data: products, error: null };
-        };
         const [pRes, cRes, catRes, aRes] = await Promise.allSettled([
-          loadCatalog(),
+          productQuery,
           cusq.order('name'),
           catq.order('name'),
           areaq.order('name'),
@@ -527,13 +497,12 @@ export function PosWorkspacePage() {
 
         // Only a product-catalog failure can block POS after offline fallback.
         // Secondary customer/settings/branch/category failures degrade gracefully.
-        if (productLoadError) {
+        if (productLoadError || loadedProds.length === 0) {
           const offlineData = await loadCachedPosData(fixedBranch || undefined);
           const catalogFallback = offlinePosManager.getCatalogCache(fixedBranch || 'default');
           const fallbackProds = offlineData.products.length > 0 ? offlineData.products : catalogFallback?.products || [];
           const fallbackCats = offlineData.categories.length > 0 ? offlineData.categories : catalogFallback?.categories || [];
 
-          if (cancelled) return;
           if (fallbackProds.length > 0) {
             setProducts(fallbackProds);
             setCategories(fallbackCats);
@@ -661,74 +630,34 @@ export function PosWorkspacePage() {
     openOrderWorkspace(order.id, pay ? { pay: true } : {});
   };
 
-  const handleCancelOrder = async (orderId: string): Promise<boolean> => {
-    if (clearOrderInFlightRef.current || !perms.canCancelOrder) return false;
+  const handleCancelOrder = async (orderId: string) => {
+    if (!perms.canCancelOrder) return;
     const entered = window.prompt(
       isAr ? 'اكتب سبب إلغاء الطلب (مطلوب):' : 'Enter the cancellation reason (required):',
       '',
     );
-    if (entered === null) return false;
+    if (entered === null) return;
     const reason = entered.trim();
     if (reason.length < 3) {
       show(isAr ? 'اكتب سببًا واضحًا للإلغاء (3 أحرف على الأقل).' : 'Enter a clear cancellation reason (at least 3 characters).', 'error');
-      return false;
+      return;
     }
-    clearOrderInFlightRef.current = true;
-    setClearingOrder(true);
-    try {
-      const { data, error } = await api.floorPlan.setOrderStatus({
-        p_order_id: orderId,
-        p_status: 'cancelled',
-        p_notes: reason,
-      });
-      if (error) {
-        show(userFacingErrorMessage(error, isAr ? 'ar' : 'en'), 'error');
-        return false;
-      }
-      if (!(data as RpcResult | null)?.success) {
-        const response = data as RpcResult | null;
-        const message = response?.error === 'SENT_ORDER_CANCEL_REQUIRES_CONTROLLED_VOID'
-          ? (isAr
-            ? 'يوجد صنف أُرسل للمطبخ. استخدم إلغاء الصنف المرسل (Void) أولًا، ثم ألغِ الطلب لتحرير الطاولة.'
-            : 'This order has kitchen-sent items. Void those items through the controlled flow before cancelling the order and releasing the table.')
-          : userFacingErrorMessage(response ?? t('error'), isAr ? 'ar' : 'en');
-        show(message, 'error');
-        return false;
-      }
+
+    const { data, error } = await api.floorPlan.setOrderStatus({
+      p_order_id: orderId,
+      p_status: 'cancelled',
+      p_notes: reason,
+    });
+    if (error) show(userFacingErrorMessage(error, isAr ? 'ar' : 'en'), 'error');
+    else if (!(data as RpcResult | null)?.success) {
+      const r = data as RpcResult | null;
+      show(userFacingErrorMessage(r ?? t('error'), isAr ? 'ar' : 'en'), 'error');
+    } else {
       show(t('cancelOrder'), 'success');
       setPanel(null);
       setReloadKey((value) => value + 1);
-      if (pos.activeOrderId === orderId) {
-        pos.resetWorkspace();
-        if (orderIdParam) navigate('/pos', { replace: true });
-      }
-      return true;
-    } catch (error) {
-      show(userFacingErrorMessage(error, isAr ? 'ar' : 'en'), 'error');
-      return false;
-    } finally {
-      clearOrderInFlightRef.current = false;
-      setClearingOrder(false);
+      if (pos.activeOrderId === orderId) pos.resetWorkspace();
     }
-  };
-
-  const handleClearCart = async () => {
-    if (pos.completing || pos.kitchenSending || pos.orderLoading || clearingOrder) return;
-    const action = resolveCartClearAction(pos.activeOrderId, perms.canCancelOrder);
-    if (action === 'permission-denied') {
-      show(isAr ? 'إلغاء الطلب المحفوظ يحتاج صلاحية إلغاء الطلبات.' : 'Cancelling this saved order requires the cancel-order permission.', 'error');
-      return;
-    }
-    if (action === 'clear-local') {
-      if (!window.confirm(isAr ? 'تفريغ السلة غير المحفوظة؟' : 'Clear this unsaved cart?')) return;
-      // A table selection without a saved order must also be detached locally.
-      if (pos.tableId || pos.activeTable) pos.resetWorkspace();
-      else pos.clearCart();
-      return;
-    }
-    // Never hide a saved table order by clearing only React state.
-    // The audited server RPC updates the order and releases the table.
-    await handleCancelOrder(pos.activeOrderId!);
   };
 
   const handleBranchChange = (v: string) => {
@@ -743,14 +672,9 @@ export function PosWorkspacePage() {
 
   if (loading) {
     return (
-      <div role="status" aria-label={isAr ? 'جارٍ تحميل شاشة البيع' : 'Loading point of sale'} className="min-h-screen bg-ui-page p-4">
-        <div aria-hidden="true" className="mb-4 h-14 rounded-xl border border-ui-border bg-ui-surface" />
-        <div aria-hidden="true" className="grid gap-4 motion-safe:animate-pulse lg:grid-cols-[2fr_1fr]">
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {Array.from({ length: 6 }, (_, index) => <div key={index} className="h-24 rounded-xl border border-ui-border bg-ui-surface" />)}
-          </div>
-          <div className="h-48 rounded-xl border border-ui-border bg-ui-surface" />
-        </div>
+      <div className="h-screen flex flex-col items-center justify-center bg-ui-page gap-4">
+        <Logo variant="mark" size={56} tone="auto" />
+        <div className="animate-spin rounded-full h-10 w-10 border-2 border-ui-primary border-t-transparent" />
       </div>
     );
   }
@@ -799,6 +723,10 @@ export function PosWorkspacePage() {
     }
   };
 
+  const handleConfirmTransfer = async (orderId: string, fromTableId: string, toTableId: string) => {
+    return await pos.transferOrderToTable(orderId, fromTableId, toTableId);
+  };
+
   const handleConfirmVoid = async (lineKey: string, voidQuantity: number, reason: string) => {
     await pos.voidSentItem(lineKey, voidQuantity, reason);
   };
@@ -813,7 +741,6 @@ export function PosWorkspacePage() {
       orderType={pos.orderType}
       activeTable={pos.activeTable}
       activeOrderNumber={pos.activeOrderNumber}
-      activeOrderId={pos.activeOrderId}
       guestCount={pos.guestCount}
       onGuestCountChange={pos.setGuestCount}
       customerId={pos.customerId}
@@ -830,7 +757,6 @@ export function PosWorkspacePage() {
       subtotal={pos.subtotal}
       discountValue={pos.discountValue}
       taxAmount={pos.taxAmount}
-      deliveryFee={pos.deliveryFee}
       total={pos.total}
       change={pos.change}
       completing={pos.completing}
@@ -877,30 +803,16 @@ export function PosWorkspacePage() {
       onGuestCountChange={pos.setGuestCount}
       onDiscountTypeChange={pos.setDiscountType}
       onDiscountAmountChange={pos.setDiscountAmount}
-      onUpdateQty={(lineKey, delta) => {
-        const last = pos.cart.length === 1 && cartLineKey(pos.cart[0]) === lineKey && pos.cart[0].quantity + delta <= 0;
-        if (last && pos.activeOrderId) { void handleClearCart(); return; }
-        pos.updateQty(lineKey, delta);
-      }}
+      onUpdateQty={pos.updateQty}
       onSetQty={pos.setQty}
-      onItemsTransferred={(result) => {
-        pos.applyItemsTransfer(result);
-        if (result.snapshot) live.applyTransferSnapshot(result.snapshot);
-      }}
       onRemove={pos.removeFromCart}
-      onClear={() => void handleClearCart()}
+      onClear={pos.clearCart}
       onSetItemDiscount={pos.setItemDiscount}
       onHold={() => void pos.holdOrder()}
       onSendKitchen={() => void pos.sendToKitchen()}
       onPrint={() => { if (!blockUnsentOpenOrder()) void pos.printReceipt(); }}
       onPay={handlePay}
-      onAddItem={() => {
-        // Focusing a field behind the full-width tables landing does not open it.
-        window.dispatchEvent(new Event('pos:order-flow-started'));
-        setPanel(null);
-        setMobileOrderOpen(false);
-        requestAnimationFrame(() => barcodeRef.current?.focus());
-      }}
+      onAddItem={() => barcodeRef.current?.focus()}
       onConfigureItem={(item) => setConfigItem(item)}
       onOpenCustomerModal={() => setCustomerModalOpen(true)}
       onOpenTableModal={() => setTableModalOpen(true)}
@@ -913,7 +825,6 @@ export function PosWorkspacePage() {
         canTransferOrder: posSurface.showTables && perms.canTransferOrder,
         canSplitOrder: posSurface.showTables && perms.canSplitOrder,
       }}
-      clearingOrder={clearingOrder}
       onVoidItem={(item, sentQty) => {
         setVoidItem(item);
         setVoidSentQty(sentQty);
@@ -925,7 +836,6 @@ export function PosWorkspacePage() {
   return (
     <div data-testid="pos-workspace" className="flex h-[100dvh] flex-col overflow-hidden bg-ui-page text-ui-text">
       <PosTopBar
-        customerOrders={<QrInbox key={effectiveBranch} branchId={effectiveBranch} header workspaceOrderId={pos.activeOrderId} workspaceTableId={pos.tableId || pos.activeTable?.id} navigationBlocked={pos.cart.length > 0 || pos.orderLoading || pos.checkoutOpen} />}
         surface={posSurface}
         panel={panel}
         onPanel={(p) => {
@@ -1012,7 +922,6 @@ export function PosWorkspacePage() {
             collapsed={tablesCollapsed}
             onToggleCollapse={() => setTablesCollapsed((prev) => !prev)}
             onSelectTable={handleSidebarSelectTable}
-            onSelectOrder={(selectedOrder) => openOrderWorkspace(selectedOrder.id)}
             onTransferOrder={(ord, tb) => {
               setTransferOrder(ord);
               setTransferSourceTable(tb);
@@ -1430,15 +1339,7 @@ export function PosWorkspacePage() {
         tables={tables}
         areas={diningAreas}
         ordersByTable={ordersByTable}
-        onOrderChanged={(changedOrderId) => {
-          // A merged source order has closed; a moved order now belongs to
-          // another table. Do not let the cashier pay or edit a stale cart.
-          if (pos.activeOrderId === changedOrderId) {
-            pos.resetWorkspace();
-            setMobileOrderOpen(false);
-          }
-          setReloadKey((value) => value + 1);
-        }}
+        onConfirmTransfer={handleConfirmTransfer}
         onOperatorTransferred={() => setReloadKey((value) => value + 1)}
       />
       )}

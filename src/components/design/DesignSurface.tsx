@@ -1,5 +1,4 @@
-import { WorkspaceControls, WorkspaceToolbarTarget } from '@/components/WorkspaceToolbar';
-import { useContext, type ReactNode } from 'react';
+import type { ReactNode } from 'react';
 import clsx from 'clsx';
 import { PageHeader, type BreadcrumbItem } from '@/components/PageHeader';
 
@@ -15,7 +14,7 @@ export function DesignSurface({
   testId: string;
 }) {
   return (
-    <section data-testid={testId} className={clsx('min-w-0 space-y-2', className)}>
+    <section data-testid={testId} className={clsx('min-w-0 space-y-4', className)}>
       {children}
     </section>
   );
@@ -40,10 +39,8 @@ export function DesignPageHeader({
 }
 
 export function DesignFilterBar({ children }: { children: ReactNode }) {
-  const toolbar = useContext(WorkspaceToolbarTarget);
-  if (toolbar !== undefined) return <WorkspaceControls>{children}</WorkspaceControls>;
   return (
-    <div data-testid="design-filter-bar" className="ui-accent-card ui-accent-system flex min-h-11 min-w-0 flex-wrap items-center justify-start gap-2 rounded-[20px] border border-ui-border bg-ui-surface px-4 py-2.5 shadow-ui-sm">
+    <div data-testid="design-filter-bar" className="ui-accent-card ui-accent-system flex flex-col gap-2 rounded-xl border border-ui-border bg-ui-surface p-3 shadow-ui-sm sm:flex-row sm:flex-wrap sm:items-center">
       {children}
     </div>
   );

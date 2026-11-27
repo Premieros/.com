@@ -1,5 +1,3 @@
-import { Link } from 'react-router-dom';
-import { formatFinancialCurrency } from '@/lib/format';
 import { useEffect, useMemo, useState } from 'react';
 import { ArrowRightLeft, CheckCircle2, Search, ShoppingBag, ShieldCheck, UtensilsCrossed } from 'lucide-react';
 import { supabase } from '@/api';
@@ -18,42 +16,14 @@ interface TransferItemModalProps {
   orderItemId: string | null;
   sourceTable: DiningTable | null;
   onCompleted: (quantity: number) => void;
-  currency: string;
-  savedLine: { quantity: number; unit_price: number } | undefined;
 }
 
 type SplitTargetKind = 'quick' | 'table';
-const splitAmounts = 'subtotal,discount_amount,tax_amount';
-type BillAmounts = { subtotal: number; discount_amount: number; tax_amount: number };
-const emptyBill: BillAmounts = { subtotal: 0, discount_amount: 0, tax_amount: 0 };
-const cents = (value: number) => Math.round((value + Number.EPSILON) * 100) / 100;
 
-export function previewItemSplit(source: BillAmounts, target: BillAmounts, unitPrice: number, quantity: number) {
-  const moved = cents(unitPrice * quantity);
-  const ratio = Number(source.subtotal) > 0 ? Math.min(1, Math.max(0, unitPrice * quantity / Number(source.subtotal))) : 0;
-  const discount = cents(Number(source.discount_amount) * ratio);
-  const tax = cents(Number(source.tax_amount) * ratio);
-  const remainder = {
-    subtotal: cents(Number(source.subtotal) - moved),
-    discount_amount: cents(Math.max(0, Number(source.discount_amount) - discount)),
-    tax_amount: cents(Math.max(0, Number(source.tax_amount) - tax)),
-  };
-  const destination = {
-    subtotal: cents(Number(target.subtotal) + moved),
-    discount_amount: cents(Number(target.discount_amount) + discount),
-    tax_amount: cents(Number(target.tax_amount) + tax),
-  };
-  return [remainder, destination] as const;
-}
-
-export function TransferItemModal({ open, onClose, item, orderId, orderItemId, sourceTable, onCompleted, currency, savedLine }: TransferItemModalProps) {
+export function TransferItemModal({ open, onClose, item, orderId, orderItemId, sourceTable, onCompleted }: TransferItemModalProps) {
   const { lang } = useLanguage();
   const isAr = lang === 'ar';
   const [branchId, setBranchId] = useState('');
-  const [sourceBill, setSourceBill] = useState<(BillAmounts & { id: string }) | null>(null);
-  const [targetBill, setTargetBill] = useState<{ tableId: string; bill: BillAmounts } | null>(null);
-  const [previewError, setPreviewError] = useState(false);
-  const [targetOrderId, setTargetOrderId] = useState<string | null>(null);
   const [tables, setTables] = useState<DiningTable[]>([]);
   const [query, setQuery] = useState('');
   const [targetKind, setTargetKind] = useState<SplitTargetKind>('quick');
@@ -70,9 +40,6 @@ export function TransferItemModal({ open, onClose, item, orderId, orderItemId, s
     if (!open) return;
     setQuantity(Math.min(1, item?.quantity || 1));
     setReason('');
-    setTargetOrderId(null);
-    setSourceBill(null);
-    setTargetBill(null);
     setTargetKind('quick');
     setSelectedTableId(null);
     setPendingRequestId(null);
@@ -83,14 +50,8 @@ export function TransferItemModal({ open, onClose, item, orderId, orderItemId, s
   useEffect(() => {
     if (!open || !orderId) return;
     let cancelled = false;
-    setPreviewError(false);
-    supabase.from('orders').select(`id,branch_id,${splitAmounts}`).eq('id', orderId).maybeSingle().then(({ data, error }) => {
-      if (cancelled) return;
-      if (error || !data) setPreviewError(true);
-      else {
-        setBranchId(data.branch_id);
-        setSourceBill(data);
-      }
+    supabase.from('orders').select('branch_id').eq('id', orderId).maybeSingle().then(({ data }) => {
+      if (!cancelled) setBranchId((data as { branch_id?: string } | null)?.branch_id || sourceTable?.branch_id || '');
     });
     return () => { cancelled = true; };
   }, [open, orderId, sourceTable?.branch_id]);
@@ -118,37 +79,13 @@ export function TransferItemModal({ open, onClose, item, orderId, orderItemId, s
     return () => { cancelled = true; };
   }, [open, targetKind, branchId]);
 
-  useEffect(() => {
-    if (!open || targetKind !== 'table' || !selectedTableId || !branchId) return;
-    let cancelled = false;
-    setPreviewError(false);
-    supabase.from('orders').select(splitAmounts)
-      .eq('branch_id', branchId).eq('table_id', selectedTableId).in('status', ['open', 'held'])
-      .order('created_at').limit(1).maybeSingle().then(({ data, error }) => {
-        if (cancelled) return;
-        if (error || (!data && tables.some(table => table.id === selectedTableId && table.status === 'occupied'))) setPreviewError(true);
-        else setTargetBill({ tableId: selectedTableId, bill: data ?? emptyBill });
-      });
-    return () => { cancelled = true; };
-  }, [open, branchId, selectedTableId, targetKind, tables]);
-
-  const destination = targetKind === 'quick' ? emptyBill
-    : targetBill?.tableId === selectedTableId ? targetBill?.bill : undefined;
-  const preview = sourceBill?.id === orderId && destination && savedLine && quantity <= Number(savedLine.quantity)
-    ? previewItemSplit(sourceBill, destination, Number(savedLine.unit_price), quantity)
-    : null;
-  const leave = () => {
-    if (targetOrderId) onCompleted(quantity);
-    onClose();
-  };
-
   const targets = useMemo(() => {
     const q = query.trim().toLowerCase();
     return tables.filter((table) => table.id !== sourceTable?.id && (!q || table.name.toLowerCase().includes(q)));
   }, [tables, sourceTable?.id, query]);
 
   const perform = async () => {
-    if (!orderId || !orderItemId || !item || loading || !preview || targetOrderId) return;
+    if (!orderId || !orderItemId || !item || loading) return;
     if (quantity <= 0 || quantity > item.quantity) {
       setError(isAr ? 'حدد كمية صحيحة للفصل.' : 'Choose a valid split quantity.');
       return;
@@ -184,10 +121,10 @@ export function TransferItemModal({ open, onClose, item, orderId, orderItemId, s
       }
 
       if (data?.success) {
-        if (!data.target_order_id) { onCompleted(quantity); onClose(); return; }
-        setTargetOrderId(data.target_order_id);
+        onCompleted(quantity);
         setPendingRequestId(null);
         setPendingStatus(null);
+        onClose();
         return;
       }
 
@@ -278,17 +215,8 @@ export function TransferItemModal({ open, onClose, item, orderId, orderItemId, s
   if (!open || !item || !orderId || !orderItemId) return null;
 
   return (
-    <Modal open={open} onClose={leave} title={isAr ? 'فصل صنف من الطلب' : 'Split — Move item to another order'} size="lg">
+    <Modal open={open} onClose={onClose} title={isAr ? 'Split — فصل صنف من الطلب' : 'Split — Move item to another order'} size="lg">
       <div className="space-y-4">
-        {targetOrderId ? (
-          <div className="space-y-3">
-            <p role="status">{isAr ? 'تم فصل الصنف.' : 'Item split successfully.'}</p>
-            <Link className="inline-flex rounded-lg bg-ui-primary px-4 py-2 text-white" to={`/pos/${targetOrderId}`} state={{ branchId }} onClick={leave}>
-              {isAr ? 'فتح الطلب المستهدف' : 'Open destination order'}
-            </Link>
-            <Button variant="secondary" onClick={leave}>{isAr ? 'العودة للطلب الأصلي' : 'Back to original order'}</Button>
-          </div>
-        ) : <>
         <div className="rounded-2xl border border-ui-border bg-ui-page-alt p-3">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-ui-primary-soft text-ui-accent">
@@ -369,7 +297,7 @@ export function TransferItemModal({ open, onClose, item, orderId, orderItemId, s
                         key={table.id}
                         type="button"
                         data-testid={`split-item-target-${table.id}`}
-                        onClick={() => { if (selectedTableId !== table.id) setTargetBill(null); setSelectedTableId(table.id); setError(''); }}
+                        onClick={() => { setSelectedTableId(table.id); setError(''); }}
                         className={`rounded-xl border p-3 text-start transition ${selected ? 'border-ui-primary bg-ui-primary-soft ring-2 ring-ui-ring' : 'border-ui-border bg-ui-surface hover:border-ui-primary'}`}
                       >
                         <div className="flex items-center justify-between gap-2">
@@ -408,25 +336,6 @@ export function TransferItemModal({ open, onClose, item, orderId, orderItemId, s
           </div>
         )}
 
-        {preview ? (
-          <div className="grid gap-2 sm:grid-cols-2" aria-live="polite">
-            {preview.map((bill, index) => (
-              <div key={index} className="rounded-xl border border-ui-border p-3">
-                <p className="font-bold">{index === 0 ? (isAr ? 'الطلب الأصلي بعد الفصل' : 'Original order after split') : (isAr ? 'الطلب المستهدف بعد الفصل' : 'Destination order after split')}</p>
-                <p className="text-sm">{isAr ? 'الخصم' : 'Discount'} · {formatFinancialCurrency(bill.discount_amount, currency, lang)}</p>
-                <p className="text-sm">{isAr ? 'الضريبة' : 'Tax'} · {formatFinancialCurrency(bill.tax_amount, currency, lang)}</p>
-                <p className="font-bold">{isAr ? 'الإجمالي' : 'Total'} · {formatFinancialCurrency(Math.max(0, bill.subtotal - bill.discount_amount + bill.tax_amount), currency, lang)}</p>
-              </div>
-            ))}
-            <p className="text-xs text-ui-muted sm:col-span-2">{isAr ? 'المعاينة حسب آخر بيانات محفوظة. قد يتغير الإجمالي إذا عدّل موظف آخر أحد الطلبين.' : 'Preview uses the latest saved values. Totals may change if another operator edits either order.'}</p>
-          </div>
-        ) : (targetKind === 'quick' || selectedTableId) && (
-          <p role="status" className="text-sm text-ui-muted">
-            {previewError ? (isAr ? 'تعذر تحميل المعاينة. أغلق النافذة وافتحها مجددًا.' : 'Could not load the preview. Close and reopen this window.')
-              : (isAr ? 'جارٍ تحميل معاينة الحسابين…' : 'Loading the bill preview…')}
-          </p>
-        )}
-
         {error && <div className="rounded-xl border border-ui-danger/20 bg-ui-danger/10 p-3 text-xs font-bold text-ui-danger">{error}</div>}
 
         <div className="flex items-center justify-end gap-2 border-t border-ui-border pt-3">
@@ -434,13 +343,12 @@ export function TransferItemModal({ open, onClose, item, orderId, orderItemId, s
           <Button
             variant="primary"
             onClick={() => void perform()}
-            disabled={loading || !preview || !!pendingRequestId || (targetKind === 'table' && !selectedTableId) || reason.trim().length < 3}
+            disabled={loading || !!pendingRequestId || (targetKind === 'table' && !selectedTableId) || reason.trim().length < 3}
           >
             <ArrowRightLeft className="h-4 w-4" />
-            {pendingRequestId ? (isAr ? 'بانتظار المدير' : 'Waiting') : (isAr ? 'تنفيذ الفصل' : 'Request Split')}
+            {pendingRequestId ? (isAr ? 'بانتظار المدير' : 'Waiting') : (isAr ? 'طلب Split' : 'Request Split')}
           </Button>
         </div>
-        </>}
       </div>
     </Modal>
   );

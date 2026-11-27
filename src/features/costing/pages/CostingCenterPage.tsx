@@ -1,4 +1,3 @@
-import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, History } from 'lucide-react';
 import { supabase } from '@/api';
@@ -263,12 +262,12 @@ export function CostingCenterPage() {
 
   const stats = useMemo(() => {
     const count = filteredOverview.length;
-    const costedRows = filteredOverview.filter((r) => Number(r.actual_cost ?? r.theoretical_cost ?? r.unit_cost ?? 0) > 0);
-    const fc = costedRows.map((r) => foodCostPct(r.actual_cost ?? r.theoretical_cost ?? r.unit_cost, r.sale_price));
+    const costedRows = filteredOverview.filter((r) => Number(r.actual_cost || r.theoretical_cost || r.unit_cost || 0) > 0);
+    const fc = costedRows.map((r) => foodCostPct(r.actual_cost || r.theoretical_cost || r.unit_cost, r.sale_price));
     const avg = safeDiv(fc.reduce((s, v) => s + v, 0), fc.length);
     const worst = costedRows.reduce<CostingOverviewRow | null>((acc, r) => {
-      const v = foodCostPct(r.actual_cost ?? r.theoretical_cost ?? r.unit_cost, r.sale_price);
-      return !acc || v > foodCostPct(acc.actual_cost ?? acc.theoretical_cost ?? acc.unit_cost, acc.sale_price) ? r : acc;
+      const v = foodCostPct(r.actual_cost || r.theoretical_cost || r.unit_cost, r.sale_price);
+      return !acc || v > foodCostPct(acc.actual_cost || acc.theoretical_cost || acc.unit_cost, acc.sale_price) ? r : acc;
     }, null);
     return { count, avg, worst };
   }, [filteredOverview]);
@@ -316,7 +315,6 @@ export function CostingCenterPage() {
     if (source === 'purchase') return isAr ? 'مشتريات' : 'Purchase';
     if (source === 'stock_count') return isAr ? 'جرد' : 'Stock count';
     if (source === 'pricing') return isAr ? 'تسعير' : 'Pricing';
-    if (source === 'no_published_price') return isAr ? 'لا يوجد سعر معتمد' : 'No approved price';
     if (source === 'inventory_average') return isAr ? 'متوسط المخزون' : 'Inventory average';
     if (source === 'batch_average') return isAr ? 'متوسط الدفعات' : 'Batch average';
     return isAr ? 'تكلفة افتراضية' : 'Default cost';
@@ -339,7 +337,7 @@ export function CostingCenterPage() {
     { key: 'unitCost', header: t('unitCost'), render: (r) => money(r.unit_cost) },
     { key: 'theoretical', header: t('theoreticalCost'), render: (r) => money(r.theoretical_cost) },
     { key: 'actual', header: t('actualCost'), render: (r) => money(r.actual_cost) },
-    { key: 'margin', header: t('marginPct'), render: (r) => marginPill(marginPct(r.actual_cost ?? r.theoretical_cost ?? r.unit_cost, r.sale_price)) },
+    { key: 'margin', header: t('marginPct'), render: (r) => marginPill(marginPct(r.actual_cost || r.theoretical_cost || r.unit_cost, r.sale_price)) },
     { key: 'variance', header: t('variance'), render: (r) => !r.theoretical_cost && !r.actual_cost ? '-' : <span className="text-xs">{formatNumber(variancePct(r.actual_cost, r.theoretical_cost), 1)}%</span> },
   ];
 
@@ -489,7 +487,7 @@ export function CostingCenterPage() {
             <div className="rounded-xl border border-ui-border bg-ui-surface/60 p-4 shadow-sm"><p className="text-xs font-medium text-ui-subtle uppercase tracking-wide">{isAr ? 'أعلى تكلفة نسبة' : 'Highest cost ratio'}</p><p className="mt-1 truncate font-semibold text-ui-text">{stats.worst ? stats.worst.product_name : '-'}</p></div>
           </div>
         </DesignPanel>
-        <WorkspaceControls><div data-testid="costing-search-panel"><div className="flex flex-col sm:flex-row gap-3"><DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={t('search')} testId="costing-search" /><Select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="sm:w-44"><option value="">{t('allBranches')}</option>{visibleBranches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></div></div></WorkspaceControls>
+        <DesignPanel testId="costing-search-panel"><div className="flex flex-col sm:flex-row gap-3"><DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={t('search')} testId="costing-search" /><Select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="sm:w-44"><option value="">{t('allBranches')}</option>{visibleBranches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select></div></DesignPanel>
         <DesignPanel testId="costing-table-panel"><DataTable columns={overviewColumns} data={filteredOverview.map((r) => ({ ...r, id: r.product_id }))} loading={loading} error={error} emptyMessage={t('noData')} onRowClick={(r) => void openDetail(r.product_id)} /></DesignPanel>
       </>}
 
@@ -499,17 +497,17 @@ export function CostingCenterPage() {
             <p className="font-semibold text-ui-text">{isAr ? 'قاعدة احتساب تكلفة الخامة' : 'Raw-material costing rule'}</p>
             <p className="mt-1">
               {isAr
-                 ? 'سعر تكلفة الخامة هو آخر سعر معتمد، حتى لو كان صفرًا. عند عدم وجود سعر معتمد تُستخدم تكلفة صفر، ولا يُستبدل الصفر بمتوسط المخزون أو تكلفة الكتالوج. يظل تقييم الدفعات التاريخية منفصلًا، وما زالت تسوية FIFO التشغيلية قيد الاستكمال.'
-                 : 'Raw material costing uses the latest approved price, including zero. With no approved price, costing is zero—not inventory average or catalog cost. Historical batch valuation is separate; operational FIFO settlement remains under review.'}
+                ? 'التكلفة الفعلية تُحسب من الرصيد الموجب وFIFO الحقيقي فقط ولا تتأثر بالسالب. عند نفاد الخامة يُسعّر الرصيد السالب مؤقتًا بآخر تكلفة FIFO معروفة ويظهر منفصلًا كتقدير حتى تصل المشتريات الفعلية وتتم تسوية FIFO.'
+                : 'Actual cost uses positive stock and settled FIFO only and is never changed by negative stock. When stock is exhausted, the negative balance is temporarily valued at the last known FIFO cost and shown separately as an estimate until a real purchase settles FIFO.'}
             </p>
           </div>
         </DesignPanel>
-        <WorkspaceControls><div data-testid="raw-material-cost-search">
+        <DesignPanel testId="raw-material-cost-search">
           <div className="flex flex-col sm:flex-row gap-3">
             <DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={isAr ? 'بحث باسم الخامة أو الكود أو المرجع' : 'Search raw material, code or reference'} testId="raw-cost-search" />
             <Select value={branchId} onChange={(e) => setBranchId(e.target.value)} className="sm:w-44"><option value="">{t('allBranches')}</option>{visibleBranches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select>
           </div>
-        </div></WorkspaceControls>
+        </DesignPanel>
         <DesignPanel testId="raw-material-cost-table">
           <DataTable columns={rawCostColumns} data={filteredRawCosts.map((r) => ({ ...r, id: r.raw_material_id }))} loading={loading} error={error} emptyMessage={t('noData')} onRowClick={(r) => void openRawHistory(r)} />
         </DesignPanel>
@@ -521,7 +519,7 @@ export function CostingCenterPage() {
       </DesignPanel>}
 
       {tab === 'variance' && <>
-        <WorkspaceControls><div data-testid="cost-variance-filters">
+        <DesignPanel testId="cost-variance-filters">
           <div className="flex flex-col gap-3 sm:flex-row">
             <input type="date" value={fromDate} min={history.minDate} onChange={(e) => setFromDate(history.clampRange(e.target.value, toDate).from)} className="border border-ui-border rounded-lg px-3 py-2 bg-ui-page text-sm" />
             <input type="date" value={toDate} onChange={(e) => { const allowed = history.clampRange(fromDate, e.target.value); setFromDate(allowed.from); setToDate(allowed.to); }} className="border border-ui-border rounded-lg px-3 py-2 bg-ui-page text-sm" />
@@ -532,7 +530,7 @@ export function CostingCenterPage() {
             <Button size="sm" onClick={() => void loadVariance()} disabled={!effBranch}>{t('search')}</Button>
           </div>
           {!effBranch && <p className="mt-3 text-sm text-ui-warning">{isAr ? 'اختر فرعًا لعرض انحرافات التكلفة. يتم الحساب على مستوى الفرع لضمان دقة المخزون والمحاسبة.' : 'Select a branch to view cost variance. Calculations are branch-scoped for inventory and accounting accuracy.'}</p>}
-        </div></WorkspaceControls>
+        </DesignPanel>
 
         {effBranch && varianceSummary && <DesignPanel testId="cost-variance-summary">
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
@@ -617,8 +615,8 @@ export function CostingCenterPage() {
             <div className="rounded-ui-lg border border-ui-border bg-ui-page p-3"><p className="text-xs text-ui-subtle">{t('unitCost')}</p><p className="text-lg font-bold text-ui-text">{money(detail.unit_cost)}</p></div>
             <div className="rounded-ui-lg border border-ui-border bg-ui-page p-3"><p className="text-xs text-ui-subtle">{t('theoreticalCost')}</p><p className="text-lg font-bold text-ui-text">{money(detail.theoretical_cost)}</p></div>
             <div className="rounded-ui-lg border border-ui-border bg-ui-page p-3"><p className="text-xs text-ui-subtle">{t('actualCost')}</p><p className="text-lg font-bold text-ui-text">{money(detail.actual_cost)}</p></div>
-            <div className="rounded-ui-lg border border-ui-border bg-ui-page p-3"><p className="text-xs text-ui-subtle">{t('foodCostPct')}</p><p className="text-lg font-bold text-ui-text">{formatNumber(foodCostPct(detail.actual_cost ?? detail.theoretical_cost ?? detail.unit_cost ?? 0, detail.sale_price ?? 0), 1)}%</p></div>
-            <div className="rounded-ui-lg border border-ui-border bg-ui-page p-3"><p className="text-xs text-ui-subtle">{t('marginPct')}</p><p className="text-lg font-bold text-ui-text">{formatNumber(marginPct(detail.actual_cost ?? detail.theoretical_cost ?? detail.unit_cost ?? 0, detail.sale_price ?? 0), 1)}%</p></div>
+            <div className="rounded-ui-lg border border-ui-border bg-ui-page p-3"><p className="text-xs text-ui-subtle">{t('foodCostPct')}</p><p className="text-lg font-bold text-ui-text">{formatNumber(foodCostPct(detail.actual_cost || detail.theoretical_cost || detail.unit_cost || 0, detail.sale_price || 0), 1)}%</p></div>
+            <div className="rounded-ui-lg border border-ui-border bg-ui-page p-3"><p className="text-xs text-ui-subtle">{t('marginPct')}</p><p className="text-lg font-bold text-ui-text">{formatNumber(marginPct(detail.actual_cost || detail.theoretical_cost || detail.unit_cost || 0, detail.sale_price || 0), 1)}%</p></div>
           </div>
 
           {(detail.components?.length || 0) > 0 && <div>

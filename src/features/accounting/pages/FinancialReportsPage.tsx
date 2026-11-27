@@ -1,5 +1,3 @@
-import { WorkspaceControls } from '@/components/WorkspaceToolbar';
-import { classifyReportFailure, describeReportFailure, type ReportFailure } from '@/features/reporting/reportFailure';
 import { useEffect, useState, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Scale, BookOpen, TrendingUp, PieChart, Clock, Download, BadgeCheck, BadgeAlert, Landmark, ArrowLeftRight, Receipt, WalletCards, PackageSearch } from 'lucide-react';
@@ -32,7 +30,7 @@ type BranchScopedArAgingRow = ArAgingRow & { branch_id: string; branch_name: str
 type BranchScopedApAgingRow = ApAgingRow & { branch_id: string; branch_name: string };
 type BranchScopedCashFlowRow = CashFlowRow & { branch_id: string; branch_name: string };
 
-export function FinancialReportsPage({ hideViewPicker = false, compactFilters = false }: { hideViewPicker?: boolean; compactFilters?: boolean } = {}) {
+export function FinancialReportsPage({ hideViewPicker = false }: { hideViewPicker?: boolean } = {}) {
   const { t, lang } = useLanguage();
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
@@ -62,8 +60,6 @@ export function FinancialReportsPage({ hideViewPicker = false, compactFilters = 
   const [to, setTo] = useState(() => history.clampRange(searchParams.get('from'), searchParams.get('to') || todayISO()).to);
   const [loading, setLoading] = useState(false);
   const [reportError, setReportError] = useState(false);
-  const [reportFailure, setReportFailure] = useState<ReportFailure | null>(null);
-  const [filtersOpen, setFiltersOpen] = useState(false);
   const { effectiveSettings } = useSettings();
   const [accounts, setAccounts] = useState<ChartOfAccount[]>([]);
   const [accountId, setAccountId] = useState('');
@@ -208,7 +204,6 @@ export function FinancialReportsPage({ hideViewPicker = false, compactFilters = 
 
     setLoading(true);
     setReportError(false);
-    setReportFailure(null);
     try {
       const allowed = history.clampRange(from, to);
       if (allowed.from !== from) setFrom(allowed.from);
@@ -351,8 +346,7 @@ export function FinancialReportsPage({ hideViewPicker = false, compactFilters = 
         });
         setPartyStmt(requireFinancialReport(result, 'party_statement', effectiveBranchFilter || '') as PartyStatementResult);
       }
-    } catch (cause) {
-      setReportFailure(classifyReportFailure(cause, summaryBranchIds));
+    } catch {
       setReportError(true);
     } finally {
       setLoading(false);
@@ -591,18 +585,7 @@ export function FinancialReportsPage({ hideViewPicker = false, compactFilters = 
         </div>
       )}
 
-      <div className="relative mb-3">
-        {compactFilters && <div className="flex items-center justify-between gap-2">
-          <span className="text-xs text-ui-muted">{isAr ? 'كل تفاصيل التقرير تظهر أدناه' : 'Complete report results below'}</span>
-          <button type="button" data-testid="toggle-financial-filters" aria-expanded={filtersOpen}
-            onClick={() => setFiltersOpen((open) => !open)}
-            className="rounded-lg border border-ui-border bg-ui-surface px-3 py-2 text-xs font-bold text-ui-text">
-            {isAr ? 'الفلاتر المالية' : 'Financial filters'}
-          </button>
-        </div>}
-        {(!compactFilters || filtersOpen) && <div data-testid="financial-filters-popup"
-          className={compactFilters ? 'absolute end-0 top-full z-30 mt-2 max-h-[70vh] w-[min(90vw,680px)] overflow-y-auto rounded-xl border border-ui-border bg-ui-surface p-3 shadow-xl' : ''}>
-      <WorkspaceControls><div data-testid="financial-reports-filters">
+      <DesignPanel testId="financial-reports-filters" className="ui-accent-finance">
         <div className="flex flex-col gap-4">
           {!hideViewPicker && (
             <div className="flex flex-wrap gap-2">
@@ -659,26 +642,10 @@ export function FinancialReportsPage({ hideViewPicker = false, compactFilters = 
             )}
           </div>
         </div>
-      </div></WorkspaceControls>
-        </div>}
-      </div>
+      </DesignPanel>
 
       {reportError && !loading && (
-        <DesignPanel testId="financial-reports-error">
-          <div role="alert" className="space-y-2 rounded-xl border border-ui-danger/30 bg-ui-danger-soft p-4 text-sm text-ui-danger">
-            <p className="font-bold">{describeReportFailure(reportFailure, isAr ? 'ar' : 'en').title}</p>
-            <p>{describeReportFailure(reportFailure, isAr ? 'ar' : 'en').action}</p>
-            {reportFailure?.branchId && <p>
-              {isAr ? 'الفرع الذي تعذّر تحميل بياناته: ' : 'Branch whose data could not be loaded: '}
-              <strong>{branchName(reportFailure.branchId)}</strong>
-            </p>}
-            <p className="text-xs">{isAr ? 'لن تُعرض أو تُصدَّر مجاميع مالية غير مكتملة.' : 'Incomplete financial totals will not be shown or exported.'}</p>
-            <button type="button" onClick={() => void load()} data-testid="retry-financial-report"
-              className="rounded-lg border border-current px-3 py-1.5 text-xs font-bold">
-              {isAr ? 'إعادة تحميل التقرير' : 'Retry report'}
-            </button>
-          </div>
-        </DesignPanel>
+        <DesignPanel testId="financial-reports-error"><div role="alert" className="rounded-xl border border-ui-danger/30 bg-ui-danger-soft p-4 text-ui-danger text-sm">{isAr ? 'تعذر تحميل جميع بيانات التقرير للفروع المحددة. لن تُعرض أو تُصدَّر أرقام مالية ناقصة. أعد المحاولة.' : 'Could not load the financial report for every selected branch. Incomplete totals are hidden and cannot be exported. Please retry.'}</div></DesignPanel>
       )}
       {loading ? (
         <DesignPanel testId="financial-reports-loading"><div className="flex items-center justify-center py-12"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" /></div></DesignPanel>

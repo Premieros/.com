@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Boxes, Search } from 'lucide-react';
+import { AlertTriangle, Boxes } from 'lucide-react';
 import { supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
 import { useBranchFilter } from '@/lib/useBranchFilter';
@@ -56,8 +56,6 @@ export function RawMaterialBranchStockPanel() {
   const [selectedWarehouseId, setSelectedWarehouseId] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [search, setSearch] = useState('');
-  const [stockView, setStockView] = useState<'all' | 'available' | 'low' | 'zero'>('all');
 
   useEffect(() => {
     if (fixedBranchId) setSelectedBranchId(fixedBranchId);
@@ -162,20 +160,10 @@ export function RawMaterialBranchStockPanel() {
     () => warehouses.filter((warehouse) => !selectedBranchId || warehouse.branch_id === selectedBranchId),
     [warehouses, selectedBranchId],
   );
-  const visibleRows = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase();
-    return rows.filter((row) => {
-      if (selectedWarehouseId && row.warehouse_id !== selectedWarehouseId) return false;
-      if (query && ![row.raw_material.name, row.warehouse_name]
-        .some((name) => name.toLocaleLowerCase().includes(query))) return false;
-      const quantity = Number(row.quantity || 0);
-      const minStock = Number(row.min_stock || 0);
-      if (stockView === 'available') return quantity > 0;
-      if (stockView === 'low') return quantity > 0 && quantity <= minStock;
-      if (stockView === 'zero') return quantity <= 0;
-      return true;
-    });
-  }, [rows, selectedWarehouseId, search, stockView]);
+  const visibleRows = useMemo(
+    () => rows.filter((row) => !selectedWarehouseId || row.warehouse_id === selectedWarehouseId),
+    [rows, selectedWarehouseId],
+  );
   const showBranchColumn = !selectedBranchId && branches.length > 1;
 
   return (
@@ -184,9 +172,8 @@ export function RawMaterialBranchStockPanel() {
       testId="raw-material-branch-stock-panel"
     >
       <div className="space-y-4">
-        <div className="flex flex-wrap items-end gap-3 rounded-xl border border-ui-border bg-ui-surface p-3" data-testid="raw-stock-filters">
         {!fixedBranchId && branches.length > 1 && (
-          <div className="min-w-[180px] flex-1 sm:max-w-[240px]">
+          <div className="max-w-sm">
             <Select
               label={isAr ? 'الفرع' : 'Branch'}
               value={selectedBranchId}
@@ -198,38 +185,11 @@ export function RawMaterialBranchStockPanel() {
             </Select>
           </div>
         )}
-        <div className="min-w-[180px] flex-1 sm:max-w-[240px]">
+        <div className="max-w-sm">
           <Select label={isAr ? 'المخزن' : 'Warehouse'} value={selectedWarehouseId} onChange={(event) => setSelectedWarehouseId(event.target.value)} data-testid="raw-stock-warehouse-select">
             <option value="">{isAr ? 'كل المخازن' : 'All warehouses'}</option>
             {visibleWarehouses.map((warehouse) => <option key={warehouse.id} value={warehouse.id}>{warehouse.name}</option>)}
           </Select>
-        </div>
-          <label className="flex min-w-[200px] flex-1 flex-col gap-1 text-xs font-semibold text-ui-muted sm:max-w-[300px]">
-            {isAr ? 'بحث' : 'Search'}
-            <span className="relative block">
-              <Search aria-hidden="true" className="pointer-events-none absolute start-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ui-muted" />
-              <input type="search" value={search} onChange={(event) => setSearch(event.target.value)}
-                data-testid="raw-stock-search" placeholder={isAr ? 'بحث عن صنف أو مخزن' : 'Search item or warehouse'}
-                className="h-10 w-full rounded-lg border border-ui-border bg-ui-surface ps-9 pe-3 text-sm text-ui-text outline-none focus-visible:ring-2 focus-visible:ring-ui-ring" />
-            </span>
-          </label>
-        </div>
-        <div role="tablist" aria-label={isAr ? 'حالة المخزون' : 'Stock status'}
-          data-testid="raw-stock-status-tabs" className="flex max-w-full gap-5 overflow-x-auto border-b border-ui-border">
-          {([
-            { key: 'all', ar: 'الكل', en: 'All' },
-            { key: 'available', ar: 'متوفر', en: 'Available' },
-            { key: 'low', ar: 'منخفض', en: 'Low stock' },
-            { key: 'zero', ar: 'رصيد صفر', en: 'Zero balance' },
-          ] as const).map((tab) => (
-            <button key={tab.key} type="button" role="tab" aria-selected={stockView === tab.key}
-              onClick={() => setStockView(tab.key)}
-              className={`shrink-0 border-b-2 px-1 py-2.5 text-sm font-semibold transition-colors ${stockView === tab.key
-                ? 'border-ui-primary text-ui-text'
-                : 'border-transparent text-ui-muted hover:text-ui-text'}`}>
-              {isAr ? tab.ar : tab.en}
-            </button>
-          ))}
         </div>
 
         {branchesLoading || loading ? (
@@ -250,11 +210,11 @@ export function RawMaterialBranchStockPanel() {
         ) : (
           <>
           <p className="text-xs text-ui-muted">{isAr ? 'التكلفة المعروضة متوسط تكلفة المخزن المسجل؛ تقييم المخزون المحاسبي النهائي قد يختلف حسب سياسة التقييم.' : 'Displayed cost is the stored warehouse average; final accounting valuation may differ under the valuation policy.'}</p>
-          <div className="overflow-x-auto rounded-xl border border-ui-border bg-ui-surface shadow-ui-sm" data-testid="raw-stock-table">
+          <div className="overflow-x-auto rounded-xl border border-ui-border">
             <table className="w-full text-sm">
-              <thead className="bg-ui-surface text-ui-text">
+              <thead className="bg-ui-page-alt text-ui-muted">
                 <tr>
-                  <th className="px-4 py-4 text-start font-bold">{isAr ? 'الخامة' : 'Raw Material'}</th>
+                  <th className="px-3 py-2 text-start">{isAr ? 'الخامة' : 'Raw Material'}</th>
                   {showBranchColumn && <th className="px-3 py-2 text-start">{isAr ? 'الفرع' : 'Branch'}</th>}
                   <th className="px-3 py-2 text-start">{isAr ? 'المخزن' : 'Warehouse'}</th>
                   <th className="px-3 py-2 text-start">{isAr ? 'الوحدة' : 'Unit'}</th>
@@ -274,7 +234,7 @@ export function RawMaterialBranchStockPanel() {
                   const unit = measurementUnit?.symbol || measurementUnit?.code || measurementUnit?.name || '-';
                   const branchName = branches.find((branch) => branch.id === row.branch_id)?.name || row.branch_id;
                   return (
-                    <tr className="transition-colors hover:bg-ui-page-alt" key={`${row.branch_id}:${row.warehouse_id}:${row.raw_material_id}`} data-testid={`raw-stock-row-${row.raw_material_id}-${row.warehouse_id}`}>
+                    <tr key={`${row.branch_id}:${row.warehouse_id}:${row.raw_material_id}`} data-testid={`raw-stock-row-${row.raw_material_id}-${row.warehouse_id}`}>
                       <td className="px-3 py-2 font-semibold text-ui-text"><div>{row.raw_material.name || '-'}</div><div className="text-xs font-normal text-ui-subtle">{unit}</div></td>
                       {showBranchColumn && <td className="px-3 py-2 text-ui-muted">{branchName}</td>}
                       <td className="px-3 py-2 text-ui-muted">{row.warehouse_name}</td>

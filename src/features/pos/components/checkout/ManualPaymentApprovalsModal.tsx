@@ -76,17 +76,8 @@ export function ManualPaymentApprovalsModal({
 
   useEffect(() => {
     if (!open) return;
-    // Poll only while the approver is looking at this tab; refresh immediately
-    // on return instead of issuing background requests every five seconds.
-    const refreshWhenVisible = () => {
-      if (document.visibilityState === 'visible') void load();
-    };
-    const timer = window.setInterval(refreshWhenVisible, 15_000);
-    document.addEventListener('visibilitychange', refreshWhenVisible);
-    return () => {
-      window.clearInterval(timer);
-      document.removeEventListener('visibilitychange', refreshWhenVisible);
-    };
+    const timer = window.setInterval(() => { void load(); }, 5_000);
+    return () => window.clearInterval(timer);
   }, [load, open]);
 
   const pendingCount = useMemo(() => rows.length, [rows.length]);

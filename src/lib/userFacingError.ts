@@ -295,10 +295,6 @@ const messages: Record<string, { ar: string; en: string }> = {
     ar: 'المستودع المحدد لا يتبع الفرع الحالي.',
     en: 'The selected warehouse does not belong to the current branch.',
   },
-  DELIVERY_FEE_REQUIRED: {
-    ar: 'سجّل رسوم التوصيل أولًا. أدخل 0 إذا كان التوصيل مجانيًا.',
-    en: 'Save the delivery fee first. Enter 0 if delivery is free.',
-  },
   FULL_PAYMENT_REQUIRED_FOR_SENT_ITEMS: {
     ar: 'الأصناف المرسلة للمطبخ تحتاج سداد قيمتها بالكامل قبل إكمال الطلب.',
     en: 'Sent kitchen items must be fully paid before completing the order.',

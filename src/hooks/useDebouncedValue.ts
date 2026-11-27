@@ -1,16 +1,21 @@
 import { useEffect, useState } from 'react';
 
-/** Debounce a display search term before starting a new database query.
- * The input remains responsive while intermediate keystrokes do not trigger HTTP requests.
- * Search scope, authorization and server-side filtering remain with the calling page.
+/**
+ * Debounces a fast-changing value by the given delay in milliseconds.
+ * Used for server-side search inputs to prevent hammering the database on every keystroke.
  */
-export function useDebouncedValue<T>(value: T, delayMs = 250): T {
-  const [debounced, setDebounced] = useState(value);
+export function useDebouncedValue<T>(value: T, delay = 250): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
   useEffect(() => {
-    const handle = setTimeout(() => setDebounced(value), delayMs);
-    return () => clearTimeout(handle);
-  }, [value, delayMs]);
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
 
-  return debounced;
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [value, delay]);
+
+  return debouncedValue;
 }

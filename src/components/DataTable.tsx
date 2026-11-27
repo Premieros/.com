@@ -1,7 +1,5 @@
 import { type ChangeEvent, type ReactNode, isValidElement, useMemo, useRef, useState } from 'react';
-import { LayoutGrid, Rows3, Table2 } from 'lucide-react';
 import { downloadTemplate, exportToExcel } from '@/lib/excel';
-import { useTableViewport } from './useTableViewport';
 import { BranchBadge } from './BranchBadge';
 import { useBranchScope } from '@/lib/branchScope';
 
@@ -39,16 +37,8 @@ interface DataTableProps<T> {
   templateFilename?: string;
   onImportFile?: (file: File) => void | Promise<void>;
   importAccept?: string;
-  /** Explicit numeric totals for visible branch-scoped and filtered rows. */
-  columnTotals?: Array<{
-    key: string;
-    label: string;
-    value: (row: T) => number;
-    format: (total: number) => ReactNode;
-  }>;
-  /** Set false for embedded detail tables. */
-  internalScroll?: boolean;
-  fitColumns?: boolean;
+  /** Optional summary row rendered in the table footer */
+  footerTotals?: ReactNode | Record<string, ReactNode>;
 }
 
 type ColumnFilterState = {
@@ -111,9 +101,7 @@ export function DataTable<T extends { id?: string }>({
   templateFilename,
   onImportFile,
   importAccept = '.xlsx,.xls,.csv',
-  columnTotals,
-  internalScroll = true,
-  fitColumns = false,
+  footerTotals,
 }: DataTableProps<T>) {
   const branchScope = useBranchScope();
   const isRtl = typeof document !== 'undefined' && document.documentElement.dir === 'rtl';
@@ -153,23 +141,18 @@ export function DataTable<T extends { id?: string }>({
     return [branchColumn, ...inputColumns];
   }, [branchNameById, branchScope.branches.length, hasBranchRows, hasExplicitBranchColumn, inputColumns, isRtl]);
 
-  const selectedBranchCount = branchScope.selectedBranchIds.length;
-  const selectedBranchSet = branchScope.selectedBranchSet;
   const data = useMemo(() => {
-    if (!hasBranchRows || selectedBranchCount === 0) return inputData;
+    if (!hasBranchRows || branchScope.selectedBranchIds.length === 0) return inputData;
     return inputData.filter((row) => {
       const branchId = (row as Record<string, unknown>).branch_id;
-      return typeof branchId !== 'string' || selectedBranchSet.has(branchId);
+      return typeof branchId !== 'string' || branchScope.selectedBranchSet.has(branchId);
     });
-  }, [hasBranchRows, inputData, selectedBranchCount, selectedBranchSet]);
+  }, [branchScope.scopeKey, branchScope.selectedBranchIds.length, branchScope.selectedBranchSet, hasBranchRows, inputData]);
 
   const storageKey = tableId ? `datatable:${tableId}:hidden-columns` : null;
   const [filters, setFilters] = useState<Record<string, ColumnFilterState>>({});
   const [filterSearches, setFilterSearches] = useState<Record<string, string>>({});
   const [sortState, setSortState] = useState<SortState>(null);
-  const [openFilterKey, setOpenFilterKey] = useState<string | null>(null);
-  const [displayMode, setDisplayMode] = useState<'table' | 'cards'>('table');
-  const [density, setDensity] = useState<'comfortable' | 'compact'>('comfortable');
   const importRef = useRef<HTMLInputElement>(null);
   const [hiddenColumns, setHiddenColumns] = useState<Set<string>>(() => {
     const defaults = new Set(columns.filter((col) => col.hiddenByDefault).map((col) => col.key));
@@ -188,14 +171,12 @@ export function DataTable<T extends { id?: string }>({
         noData: 'لا توجد بيانات مطابقة', import: 'استيراد', export: 'تصدير', template: 'القالب',
         search: 'بحث', selectAll: 'تحديد الكل', blanks: '(فارغ)', sortAsc: 'فرز تصاعدي',
         sortDesc: 'فرز تنازلي', values: 'القيم', contains: 'يحتوي على', details: 'التفاصيل',
-        tableMode: 'جدول', cardsMode: 'بطاقات', compact: 'مضغوط', comfortable: 'مريح',
       }
     : {
         filter: 'Filter', columns: 'Columns', clear: 'Clear all filters', clearColumn: 'Clear column filter',
         noData: 'No matching data', import: 'Import', export: 'Export', template: 'Template',
         search: 'Search', selectAll: 'Select all', blanks: '(Blanks)', sortAsc: 'Sort ascending',
         sortDesc: 'Sort descending', values: 'Values', contains: 'Contains', details: 'Details',
-        tableMode: 'Table', cardsMode: 'Cards', compact: 'Compact', comfortable: 'Comfortable',
       };
 
   const visibleColumns = useMemo(
@@ -241,17 +222,6 @@ export function DataTable<T extends { id?: string }>({
       return sortState.direction === 'asc' ? comparison : -comparison;
     });
   }, [columns, filteredData, sortState]);
-
-  const tableViewportRef = useTableViewport(internalScroll && !loading && !error);
-  const visibleTotals = useMemo(() => (columnTotals ?? [])
-    .filter((total) => visibleColumns.some((column) => column.key === total.key))
-    .map((total) => {
-      const sum = displayData.reduce((acc, row) => {
-        const value = total.value(row);
-        return Number.isFinite(value) ? acc + value : acc;
-      }, 0);
-      return { ...total, sum };
-    }), [columnTotals, displayData, visibleColumns]);
 
   const exportColumns = useMemo(
     () => visibleColumns.filter((col) => col.key !== 'actions'),
@@ -381,34 +351,8 @@ export function DataTable<T extends { id?: string }>({
     return !!state && (!!state.query.trim() || state.selectedValues !== null);
   };
 
-  // Filter controls render outside the clipped row-scrolling viewport so
-  // their selection/sort menu stays usable when headings are sticky.
   const renderFilterMenu = (col: Column<T>, compact = false) => {
     if (!enableColumnFilters || col.filterable === false || col.key === 'actions') return null;
-    const active = isColumnFiltered(col.key);
-    return (
-      <button
-        type="button"
-        data-column-filter="true"
-        onClick={(event) => {
-          event.stopPropagation();
-          setOpenFilterKey((current) => current === col.key ? null : col.key);
-        }}
-        aria-expanded={openFilterKey === col.key}
-        aria-label={isRtl ? 'خيارات فلتر العمود' : 'Column filter options'}
-        title={`${labels.filter}: ${col.header}`}
-        className={`flex items-center justify-center rounded-md border p-1 transition-colors ${active ? 'border-ui-primary bg-ui-primary-soft text-ui-primary' : 'border-transparent text-ui-muted hover:border-ui-border hover:bg-ui-surface'}`}
-      >
-        <svg className={compact ? 'h-4 w-4' : 'h-3.5 w-3.5'} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-          <path fillRule="evenodd" d="M3.25 5.5a.75.75 0 01.75-.75h12a.75.75 0 01.53 1.28l-4.78 4.78v3.94a.75.75 0 01-.42.67l-2 1A.75.75 0 018.25 15v-4.19L3.47 6.03a.75.75 0 01-.22-.53z" clipRule="evenodd" />
-        </svg>
-      </button>
-    );
-  };
-
-  const renderOpenFilterPanel = () => {
-    const col = columns.find((candidate) => candidate.key === openFilterKey);
-    if (!col || col.filterable === false || col.key === 'actions' || hiddenColumns.has(col.key)) return null;
     const allValues = uniqueValuesByColumn[col.key] ?? [];
     const state = filters[col.key] ?? { query: '', selectedValues: null };
     const valueSearch = filterSearches[col.key] ?? '';
@@ -418,14 +362,30 @@ export function DataTable<T extends { id?: string }>({
     const selectedValues = state.selectedValues;
     const allChecked = selectedValues === null || selectedValues.length === allValues.length;
     const active = isColumnFiltered(col.key);
+
     return (
-        <div data-testid="data-table-filter-menu" className="absolute end-0 top-0 z-50 max-h-[min(75dvh,560px)] w-[min(18rem,calc(100vw-2rem))] overflow-y-auto rounded-xl border border-ui-border bg-ui-surface p-2 text-start normal-case tracking-normal shadow-xl">
-          <div className="mb-2 flex items-center justify-between gap-2 border-b border-ui-border px-1 pb-2">
-            <strong className="truncate text-xs font-bold text-ui-text">{labels.filter}: {col.header}</strong>
-            <button type="button" onClick={() => setOpenFilterKey(null)}
-              aria-label={isRtl ? 'إغلاق فلتر العمود' : 'Close column filter'}
-              className="rounded-md px-2 py-1 text-sm text-ui-muted hover:bg-ui-page-alt">×</button>
-          </div>
+      <details
+        data-column-filter="true"
+        className="relative"
+        onToggle={(event) => {
+          if (!event.currentTarget.open) return;
+          const table = event.currentTarget.closest('[data-testid="data-table"]');
+          table?.querySelectorAll('details[data-column-filter="true"][open]').forEach((node) => {
+            if (node !== event.currentTarget) (node as HTMLDetailsElement).open = false;
+          });
+        }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <summary
+          className={`flex cursor-pointer list-none items-center justify-center rounded-md border p-1 transition-colors ${active ? 'border-ui-primary bg-ui-primary-soft text-ui-primary' : 'border-transparent text-ui-muted hover:border-ui-border hover:bg-ui-surface'}`}
+          aria-label={isRtl ? 'خيارات فلتر العمود' : 'Column filter options'}
+          title={`${labels.filter}: ${col.header}`}
+        >
+          <svg className={compact ? 'h-4 w-4' : 'h-3.5 w-3.5'} viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+            <path fillRule="evenodd" d="M3.25 5.5a.75.75 0 01.75-.75h12a.75.75 0 01.53 1.28l-4.78 4.78v3.94a.75.75 0 01-.42.67l-2 1A.75.75 0 018.25 15v-4.19L3.47 6.03a.75.75 0 01-.22-.53z" clipRule="evenodd" />
+          </svg>
+        </summary>
+        <div data-testid="data-table-filter-menu" className="absolute start-0 z-50 mt-1 w-72 rounded-xl border border-ui-border bg-ui-surface p-2 text-start normal-case tracking-normal shadow-xl">
           <div className="grid gap-1 border-b border-ui-border pb-2">
             <button
               type="button"
@@ -500,53 +460,17 @@ export function DataTable<T extends { id?: string }>({
             </button>
           </div>
         </div>
+      </details>
     );
   };
 
   if (loading) {
-    // Keep column headers and row dimensions on screen during the first
-    // authorized fetch. Do not show the previous user's or branch's rows.
-    const loadingColumns = columns.filter((col) => !hiddenColumns.has(col.key));
     return (
-      <div data-testid="table-loading" role="status"
-        aria-label={isRtl ? 'جارٍ تحميل بيانات الجدول' : 'Loading table data'}
-        aria-busy="true" className="min-w-0" >
-        <div className="space-y-3 sm:hidden" aria-hidden="true">
-          {Array.from({ length: 5 }, (_, index) => (
-            <div key={index} className="h-20 animate-pulse rounded-xl border border-ui-border bg-ui-surface p-4">
-              <div className="mb-3 h-3 w-2/3 rounded bg-ui-page-alt" />
-              <div className="h-3 w-1/2 rounded bg-ui-page-alt" />
-            </div>
-          ))}
+      <div data-testid="table-loading" className="flex items-center justify-center py-16">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-8 w-8 border-3 border-ui-primary border-t-transparent" />
+          <p className="text-sm text-ui-subtle">Loading...</p>
         </div>
-        <div data-testid="data-table-loading-skeleton"
-          className="hidden max-w-full overflow-x-auto rounded-xl border border-ui-border bg-ui-surface sm:block">
-          <table className="w-full min-w-max border-collapse text-start">
-            <thead className="bg-ui-page-alt">
-              <tr className="border-b border-ui-border">
-                {showCheckbox && <th className="w-10 px-4 py-3" aria-label={isRtl ? 'تحديد' : 'Select'} />}
-                {loadingColumns.map((column) => (
-                  <th key={column.key} className="whitespace-nowrap px-4 py-3 text-start text-xs font-extrabold text-ui-text">
-                    {column.header}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody aria-hidden="true">
-              {Array.from({ length: 7 }, (_, index) => (
-                <tr key={index} className="h-14 border-b border-ui-border last:border-b-0">
-                  {showCheckbox && <td className="px-4 py-3"><div className="h-4 w-4 animate-pulse rounded bg-ui-page-alt" /></td>}
-                  {loadingColumns.map((column, colIndex) => (
-                    <td key={column.key} className="px-4 py-3">
-                      <div className={`h-3 animate-pulse rounded bg-ui-page-alt ${colIndex % 3 === 0 ? 'w-28' : colIndex % 3 === 1 ? 'w-16' : 'w-24'}`} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-        <p className="sr-only">{isRtl ? 'جارٍ تحميل السجلات' : 'Loading records'}</p>
       </div>
     );
   }
@@ -606,7 +530,7 @@ export function DataTable<T extends { id?: string }>({
   const hasDataTools = !!onImportFile || enableExport || enableTemplate;
 
   return (
-    <div ref={tableViewportRef} data-testid="data-table" className="relative min-w-0 max-w-full">
+    <div data-testid="data-table" className="min-w-0 max-w-full">
       {(hasDataTools || enableColumnVisibility || hasActiveFilters) && (
         <div data-testid="data-table-toolbar" className="mb-3 flex min-w-0 flex-nowrap items-center gap-2 overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:flex-wrap sm:justify-end sm:overflow-visible sm:pb-0">
           {onImportFile && (
@@ -654,12 +578,12 @@ export function DataTable<T extends { id?: string }>({
           )}
           {enableColumnVisibility && (
             <details className="relative">
-              <summary className="ui-toolbar-action cursor-pointer list-none !rounded-full">
+              <summary className="ui-toolbar-action cursor-pointer list-none">
                 {labels.columns}
               </summary>
-              <div className="premier-refresh-pop-enter absolute end-0 z-40 mt-2 min-w-52 rounded-[20px] border border-ui-border bg-ui-surface p-2 shadow-ui-xl">
+              <div className="absolute end-0 z-40 mt-2 min-w-52 rounded-xl border border-ui-border bg-ui-surface p-2 shadow-lg">
                 {columns.map((col) => (
-                  <label key={col.key} className="flex cursor-pointer items-center gap-2 rounded-[12px] px-2.5 py-1.5 text-sm text-ui-text hover:bg-ui-page-alt">
+                  <label key={col.key} className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-ui-text hover:bg-ui-page-alt">
                     <input
                       type="checkbox"
                       checked={!hiddenColumns.has(col.key)}
@@ -676,45 +600,8 @@ export function DataTable<T extends { id?: string }>({
               </div>
             </details>
           )}
-          <button
-            type="button"
-            onClick={() => setDensity((d) => (d === 'comfortable' ? 'compact' : 'comfortable'))}
-            aria-pressed={density === 'compact'}
-            title={density === 'compact' ? labels.comfortable : labels.compact}
-            className="ui-toolbar-action hidden sm:inline-flex !rounded-full"
-          >
-            <Rows3 className="h-3.5 w-3.5" />
-            <span>{density === 'compact' ? labels.compact : labels.comfortable}</span>
-          </button>
-          <div
-            data-testid="data-table-view-toggle"
-            className="hidden sm:inline-flex items-center gap-0.5 rounded-full border border-ui-border bg-ui-page-alt p-0.5"
-            role="group"
-            aria-label={isRtl ? 'طريقة عرض الجدول' : 'Table display mode'}
-          >
-            <button
-              type="button"
-              onClick={() => setDisplayMode('table')}
-              aria-pressed={displayMode === 'table'}
-              title={labels.tableMode}
-              className={`grid h-7 w-7 place-items-center rounded-full transition-all ${displayMode === 'table' ? 'bg-ui-text text-ui-surface shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
-            >
-              <Table2 className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setDisplayMode('cards')}
-              aria-pressed={displayMode === 'cards'}
-              title={labels.cardsMode}
-              className={`grid h-7 w-7 place-items-center rounded-full transition-all ${displayMode === 'cards' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
-            >
-              <LayoutGrid className="h-3.5 w-3.5" />
-            </button>
-          </div>
         </div>
       )}
-
-      {renderOpenFilterPanel()}
 
       <div className="space-y-3 sm:hidden">
         {enableColumnFilters && visibleColumns.some((col) => col.filterable !== false && col.key !== 'actions') && (
@@ -740,8 +627,6 @@ export function DataTable<T extends { id?: string }>({
           </div>
         )}
 
-        <div data-table-viewport={internalScroll ? '' : undefined}
-          className={`space-y-3 ${internalScroll ? 'overflow-y-auto overscroll-contain pe-1' : ''}`}>
         {displayData.length === 0 ? (
           <div data-testid="table-empty" className="flex flex-col items-center justify-center py-12 text-ui-muted">
             <p className="text-sm font-medium text-ui-text">{hasActiveFilters ? labels.noData : (emptyMessage || 'No data')}</p>
@@ -750,7 +635,7 @@ export function DataTable<T extends { id?: string }>({
           <div
             key={row.id || i}
             onClick={(e) => {
-              if (e.target instanceof Element && e.target.closest('button, a, input, select, textarea, summary, [role="button"]')) return;
+              if (showCheckbox && (e.target as HTMLElement).closest('input[type="checkbox"]')) return;
               onRowClick?.(row);
             }}
             className={`min-w-0 overflow-hidden rounded-xl border border-ui-border bg-ui-surface p-3 shadow-ui-sm transition-colors ${onRowClick ? 'cursor-pointer active:bg-ui-page-alt' : ''} ${selectedIds?.has(row.id || '') ? 'border-ui-primary bg-ui-primary-soft/30' : ''}`}
@@ -806,87 +691,22 @@ export function DataTable<T extends { id?: string }>({
             )}
           </div>
         ))}
-        </div>
       </div>
 
-      {displayMode === 'cards' && (
-        <div data-testid="data-table-cards" className="hidden sm:block p-4">
-          {displayData.length === 0 ? (
-            <div data-testid="table-empty" className="flex flex-col items-center justify-center py-12 text-ui-muted">
-              <p className="text-sm font-medium text-ui-text">{hasActiveFilters ? labels.noData : (emptyMessage || 'No data')}</p>
-            </div>
-          ) : (
-            <div className="premier-refresh-stagger grid items-stretch gap-3.5 sm:grid-cols-2 xl:grid-cols-3">
-              {displayData.map((row, i) => (
-                <div
-                  key={row.id || i}
-                  onClick={(e) => {
-                    if (e.target instanceof Element && e.target.closest('button, a, input, select, textarea, summary, [role="button"]')) return;
-                    onRowClick?.(row);
-                  }}
-                  className={`premier-refresh-subcard flex h-full min-w-0 flex-col justify-between overflow-hidden p-4 ${onRowClick ? 'cursor-pointer' : ''} ${selectedIds?.has(row.id || '') ? 'border-ui-primary ring-1 ring-ui-primary/30' : ''}`}
-                >
-                  {showCheckbox && (
-                    <div className="mb-2 flex items-center justify-end" onClick={(e) => e.stopPropagation()}>
-                      <input
-                        type="checkbox"
-                        aria-label="Select row"
-                        checked={!!(row.id && selectedIds?.has(row.id))}
-                        onChange={() => row.id && toggleRow(row.id)}
-                        className="h-4 w-4 rounded border-ui-border-strong text-ui-primary focus:ring-ui-ring"
-                      />
-                    </div>
-                  )}
-                  <dl className="divide-y divide-ui-border">
-                    {mobilePriorityColumns.map((col) => (
-                      <div key={col.key} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
-                        <dt className="shrink-0 text-xs font-medium text-ui-muted">{col.header}</dt>
-                        <dd className="min-w-0 text-end text-sm font-semibold text-ui-text">{renderCell(row, col)}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                  {onRowClick && (
-                    <button type="button" onClick={(event) => { event.stopPropagation(); onRowClick(row); }}
-                      className="mt-2 self-start rounded-lg px-2 py-1 text-xs font-semibold text-ui-primary hover:bg-ui-primary-soft">
-                      {isRtl ? 'فتح السجل' : 'Open record'}
-                    </button>
-                  )}
-                  {mobileSecondaryColumns.length > 0 && (
-                    <details className="mt-2.5 rounded-[14px] border border-ui-border bg-ui-surface/80" onClick={(event) => event.stopPropagation()}>
-                      <summary className="flex min-h-9 cursor-pointer list-none items-center justify-center px-3 text-xs font-semibold text-ui-primary">
-                        {labels.details} · {mobileSecondaryColumns.length}
-                      </summary>
-                      <dl className="divide-y divide-ui-border border-t border-ui-border px-3">
-                        {mobileSecondaryColumns.map((col) => (
-                          <div key={col.key} className="flex items-start justify-between gap-3 py-1.5">
-                            <dt className="shrink-0 text-[11px] font-medium text-ui-muted">{col.header}</dt>
-                            <dd className="min-w-0 text-end text-xs text-ui-text">{renderCell(row, col)}</dd>
-                          </div>
-                        ))}
-                      </dl>
-                    </details>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      <div data-testid="data-table-scroll" data-table-viewport={internalScroll ? '' : undefined} role="region" aria-label={isRtl ? 'صفوف الجدول القابلة للتمرير' : 'Scrollable table rows'} tabIndex={0} className={`ui-accent-top ui-accent-neutral max-w-full overflow-auto overscroll-contain rounded-[18px] border border-ui-border bg-ui-surface shadow-ui-sm [scrollbar-gutter:stable] ${displayMode === 'cards' ? 'hidden' : 'hidden sm:block'}`}>
-        <table className={`w-full text-sm ${fitColumns ? 'table-fixed' : 'min-w-max'}`}>
-          <thead className="sticky top-0 z-20 bg-ui-page-alt">
-            <tr className="border-b border-ui-border bg-ui-page-alt">
+      <div className="ui-accent-top ui-accent-neutral hidden max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-ui-border bg-ui-surface shadow-ui-sm touch-pan-x [scrollbar-gutter:stable] sm:block">
+        <table className="w-full min-w-max text-sm">
+          <thead className="sticky top-0 z-10 bg-ui-page-alt/95 backdrop-blur-xs">
+            <tr className="border-b border-ui-border bg-ui-page-alt/70">
               {showCheckbox && (
-                <th className={`sticky top-0 z-20 bg-ui-page-alt ${fitColumns ? 'w-9 px-2 py-2' : 'w-10 px-4 py-3'}`}>
+                <th className="w-10 px-4 py-3">
                   <input type="checkbox" checked={!!allSelected} onChange={toggleAll}
                     className="h-4 w-4 rounded border-ui-border-strong text-ui-primary focus:ring-ui-ring" />
                 </th>
               )}
-              {visibleColumns.map((col, index) => (
+              {visibleColumns.map((col) => (
                 <th
                   key={col.key}
-                  className={`sticky top-0 z-20 bg-ui-page-alt text-start text-xs font-extrabold uppercase tracking-wide text-ui-text ${fitColumns ? 'whitespace-normal px-2 py-2' : 'whitespace-nowrap px-4 py-3'} ${index === 0 && !showCheckbox ? 'start-0 z-30' : ''} ${col.className || ''}`}
+                  className={`whitespace-nowrap px-4 py-3 text-start text-xs font-bold uppercase tracking-wide text-ui-muted ${col.className || ''}`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <span>{col.header}</span>
@@ -909,36 +729,40 @@ export function DataTable<T extends { id?: string }>({
               <tr
                 key={row.id || i}
                 onClick={(e) => {
-                  if (e.target instanceof Element && e.target.closest('button, a, input, select, textarea, summary, [role="button"]')) return;
+                  if (showCheckbox && (e.target as HTMLElement).closest('input[type="checkbox"]')) return;
                   onRowClick?.(row);
                 }}
                 className={`hover:bg-ui-page-alt/60 transition-colors duration-150 ${onRowClick ? 'cursor-pointer' : ''} ${selectedIds?.has(row.id || '') ? 'bg-ui-primary-soft/50' : ''}`}
               >
                 {showCheckbox && (
-                  <td className={fitColumns ? 'px-2 py-2' : 'px-4 py-3'} onClick={(e) => e.stopPropagation()}>
+                  <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                     <input type="checkbox" checked={!!(row.id && selectedIds?.has(row.id))}
                       onChange={() => row.id && toggleRow(row.id)}
                       className="h-4 w-4 rounded border-ui-border-strong text-ui-primary focus:ring-ui-ring" />
                   </td>
                 )}
-                {visibleColumns.map((col, index) => (
-                  <td key={col.key} className={`font-medium text-ui-text ${fitColumns ? `break-words px-2 ${density === 'compact' ? 'py-1.5 text-xs' : 'py-2'}` : `px-4 ${density === 'compact' ? 'py-2 text-xs' : 'py-3'}`} ${index === 0 && !showCheckbox ? 'sticky start-0 z-[1] bg-ui-surface' : ''} ${col.className || ''}`}>
+                {visibleColumns.map((col) => (
+                  <td key={col.key} className={`px-4 py-3 font-medium text-ui-text ${col.className || ''}`}>
                     {renderCell(row, col)}
                   </td>
                 ))}
               </tr>
             ))}
           </tbody>
-          {visibleTotals.length > 0 && displayData.length > 0 && (
-            <tfoot className="sticky bottom-0 z-10 border-t-2 border-ui-border bg-ui-page-alt">
+          {footerTotals && (
+            <tfoot className="border-t-2 border-ui-border bg-ui-page-alt/90 font-black text-ui-text">
               <tr>
-                {showCheckbox && <td />}
-                {visibleColumns.map((column, index) => {
-                  const total = visibleTotals.find((entry) => entry.key === column.key);
+                {showCheckbox && <td className="px-4 py-3"></td>}
+                {visibleColumns.map((col, index) => {
+                  let content: ReactNode = null;
+                  if (isValidElement(footerTotals) || typeof footerTotals === 'string' || typeof footerTotals === 'number') {
+                    content = index === 0 ? footerTotals : null;
+                  } else if (typeof footerTotals === 'object' && footerTotals !== null) {
+                    content = (footerTotals as Record<string, ReactNode>)[col.key] || null;
+                  }
                   return (
-                    <td key={column.key} className={`font-bold tabular-nums text-ui-text ${fitColumns ? 'break-words px-2 py-2' : 'whitespace-nowrap px-4 py-2'} ${index === 0 && !showCheckbox ? 'sticky start-0 bg-ui-page-alt' : ''} ${column.className || ''}`}>
-                      {index === 0 && !total && (isRtl ? 'إجمالي الصفوف المعروضة' : 'Visible rows total')}
-                      {total && <span data-testid={`data-table-total-${total.key}`} aria-label={total.label}>{total.format(total.sum)}</span>}
+                    <td key={col.key} className={`px-4 py-3 text-xs uppercase tracking-wider ${col.className || ''}`}>
+                      {content}
                     </td>
                   );
                 })}
@@ -946,14 +770,6 @@ export function DataTable<T extends { id?: string }>({
             </tfoot>
           )}
         </table>
-      </div>
-      <div data-testid="data-table-footer" className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 border-t border-ui-border px-2 py-2 text-xs font-semibold text-ui-muted" aria-live="polite">
-        <span>{isRtl ? 'الصفوف المعروضة' : 'Visible rows'}: <strong className="tabular-nums text-ui-text">{displayData.length}</strong></span>
-        {displayData.length > 0 && visibleTotals.map((total) => (
-          <span key={total.key} className="inline-flex items-center gap-2 sm:hidden">
-            {total.label}: <strong className="tabular-nums text-ui-text">{total.format(total.sum)}</strong>
-          </span>
-        ))}
       </div>
     </div>
   );

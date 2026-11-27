@@ -1,4 +1,3 @@
-import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useState } from 'react';
 import { ScrollText } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
@@ -51,9 +50,9 @@ export function AuditLogPage() {
   return (
     <DesignSurface testId="audit-log-page">
       <DesignPageHeader title={t('auditLog')} description={t('auditLog')} />
-      <WorkspaceControls><div data-testid="audit-log-search-panel">
+      <DesignPanel testId="audit-log-search-panel">
         <DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="audit-log-search" />
-      </div></WorkspaceControls>
+      </DesignPanel>
       <DesignPanel testId="audit-log-table-panel">
         {loading ? (
           <DesignLoadingState />

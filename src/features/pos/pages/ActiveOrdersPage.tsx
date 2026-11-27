@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   Plus, Pencil, Trash2, Users, UtensilsCrossed, Clock,
   XCircle, RefreshCw, Banknote, Activity, Pause,
-  Truck, ShoppingBag,
+  Truck, ShoppingBag, CheckCircle2,
 } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
@@ -20,7 +20,6 @@ import { Modal } from '@/components/Modal';
 import { formatCurrency, formatDateTime } from '@/lib/format';
 import type { DiningArea, DiningTable, Order, OrderType, RpcResult } from '@/lib/types';
 import { useActiveOrders } from '../hooks/useActiveOrders';
-import { QrManagement } from '@/features/qr/QrManagement';
 import { TableFloorPlan } from '../components/floor/TableFloorPlan';
 import { STATUS_STYLES } from '../utils/orderTypes';
 import { orderTypeLabel } from '../utils/format';
@@ -66,7 +65,6 @@ export function ActiveOrdersPage() {
   const [mainAreaCountSaving, setMainAreaCountSaving] = useState(false);
 
   const [areaName, setAreaName] = useState('');
-  const [newAreaTableCount, setNewAreaTableCount] = useState('0');
   const [tableForm, setTableForm] = useState({
     name: '', capacity: 4, area_id: '', x: 0, y: 0, w: 120, h: 80,
   });
@@ -81,7 +79,7 @@ export function ActiveOrdersPage() {
   const canReassignCashier = can('pos.order.transfer');
   const editTargetIsDefault = !!editTarget && areas.some((area) => area.id === editTarget.area_id && area.is_default);
 
-  const { orders, tables, counts, ordersByTable, itemsByOrder, loading, error } = useActiveOrders(effectiveBranch);
+  const { orders, tables, counts, ordersByTable, itemsByOrder, kitchenSendsByOrder, loading, error } = useActiveOrders(effectiveBranch);
 
   const loadAreas = async () => {
     const branchId = effectiveBranch;
@@ -181,6 +179,67 @@ export function ActiveOrdersPage() {
     setBusy(false);
   };
 
+  const isDeliveryKitchenReady = (orderId: string): boolean => {
+    const items = itemsByOrder[orderId] || [];
+    const sends = kitchenSendsByOrder?.[orderId] || [];
+    if (items.length === 0) return false;
+    const sentIds = new Set(sends.map((s) => s.order_item_id));
+    const allSent = items.every((it) => sentIds.has(it.id));
+    if (!allSent) return false;
+    const preparing = sends.some((s) => s.status === 'sent' || s.status === 'cooking');
+    return !preparing;
+  };
+
+  const dispatchDeliveryOrder = async (order: Order) => {
+    if (!isDeliveryKitchenReady(order.id)) {
+      show(
+        isAr
+          ? 'لا يمكن إرسال الطلب للتوصيل قبل اكتمال تحضير جميع الأصناف في المطبخ'
+          : 'All items must be ready in the kitchen before dispatching for delivery',
+        'error',
+      );
+      return;
+    }
+    setBusy(true);
+    try {
+      const { error: updErr } = await supabase
+        .from('orders')
+        .update({ status: 'out_for_delivery' })
+        .eq('id', order.id);
+      if (updErr) throw updErr;
+      show(isAr ? 'تم إرسال الطلب مع الطيار بنجاح' : 'Order dispatched with driver', 'success');
+    } catch (e) {
+      show(userFacingErrorMessage(e, isAr ? 'ar' : 'en'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deliverOrder = async (order: Order) => {
+    if (!isDeliveryKitchenReady(order.id)) {
+      show(
+        isAr
+          ? 'لا يمكن تسجيل تسليم الطلب قبل اكتمال تحضير جميع الأصناف في المطبخ'
+          : 'All items must be ready in the kitchen before completing delivery',
+        'error',
+      );
+      return;
+    }
+    setBusy(true);
+    try {
+      const { error: updErr } = await supabase
+        .from('orders')
+        .update({ status: 'completed' })
+        .eq('id', order.id);
+      if (updErr) throw updErr;
+      show(isAr ? 'تم تسليم الطلب للعميل واكتمال الدورة بنجاح' : 'Order successfully delivered to customer', 'success');
+    } catch (e) {
+      show(userFacingErrorMessage(e, isAr ? 'ar' : 'en'), 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const goToPos = (opts: { orderId?: string; tableId?: string; orderType?: OrderType; branchId?: string }) => {
     if (opts.orderId) {
       navigate(`/pos/${opts.orderId}`, { state: { branchId: opts.branchId || effectiveBranch } });
@@ -221,7 +280,6 @@ export function ActiveOrdersPage() {
   const openCreateArea = () => {
     setAreaTarget(null);
     setAreaName('');
-    setNewAreaTableCount('0');
     setAreaModal(true);
   };
 
@@ -246,17 +304,12 @@ export function ActiveOrdersPage() {
       show(isAr ? 'توجد منطقة بنفس الاسم في هذا الفرع.' : 'An area with this name already exists in this branch.', 'error');
       return;
     }
-    const count = Number(newAreaTableCount);
-    if (!areaTarget && (newAreaTableCount.trim() === '' || !Number.isInteger(count) || count < 0 || count > 100)) {
-      show(isAr ? 'أدخل عدد طاولات صحيحًا من 0 إلى 100.' : 'Enter a whole table count from 0 to 100.', 'error');
-      return;
-    }
     if (areaSaving) return;
     setAreaSaving(true);
     try {
       const { data, error: saveError } = areaTarget
         ? await api.floorPlan.renameArea({ p_area_id: areaTarget.id, p_name: name })
-        : await api.floorPlan.createAreaWithTables({ p_branch_id: effectiveBranch, p_name: name, p_table_count: count });
+        : await api.floorPlan.createArea({ p_branch_id: effectiveBranch, p_name: name });
       if (saveError) {
         show(userFacingErrorMessage(saveError, isAr ? 'ar' : 'en'), 'error');
         return;
@@ -271,7 +324,7 @@ export function ActiveOrdersPage() {
         show(message, 'error');
         return;
       }
-      show(isAr ? (areaTarget ? 'تم تحديث اسم المنطقة.' : `تم إنشاء المنطقة مع ${count} طاولة.`) : (areaTarget ? 'Area renamed.' : `Area created with ${count} tables.`), 'success');
+      show(isAr ? (areaTarget ? 'تم تحديث اسم المنطقة.' : 'تم إنشاء المنطقة. أضف الطاولات إليها.') : (areaTarget ? 'Area renamed.' : 'Area created. You can now add tables.'), 'success');
       setAreaModal(false);
       setAreaTarget(null);
       setAreaName('');
@@ -415,26 +468,8 @@ export function ActiveOrdersPage() {
     { key: 'takeaway', title: t('takeawayOrders'), value: String(counts.takeaway), icon: <ShoppingBag className="w-6 h-6" />, color: 'purple' },
   ];
 
-  const tableStatePending = loading || Boolean(error);
-  const floorPlan = <fieldset disabled={tableStatePending} aria-busy={loading} className="min-w-0">
-    <TableFloorPlan
-      areas={areas}
-      tables={tables}
-      ordersByTable={ordersByTable}
-      canManage={canManage && !tableStatePending}
-      currency="EGP"
-      onSelectTable={table => { if (!tableStatePending) setTableTarget(table); }}
-      onAddArea={openCreateArea}
-      onAddTable={openAddTable}
-      onRenameArea={openRenameArea}
-      onDeleteArea={deleteArea}
-      onEditDefaultAreaCount={openMainAreaCountEditor}
-    />
-  </fieldset>;
-
   return (
     <DesignSurface testId="active-orders-page" className="space-y-6">
-      {canManage && effectiveBranch && <QrManagement key={effectiveBranch} branchId={effectiveBranch} />}
       <DesignPageHeader
         title={t('activeOrders')}
         subtitle={isAr ? 'مركز الطلبات النشطة والطاولات' : 'Active orders and table center'}
@@ -470,9 +505,8 @@ export function ActiveOrdersPage() {
           <p className="text-lg font-medium">{isAr ? 'اختر الفرع لعرض مركز الطلبات' : 'Select a branch to view the active orders'}</p>
         </DesignPanel>
       ) : loading ? (
-        <div className="space-y-4">
-          <p role="status" className="text-sm text-ui-muted">{isAr ? 'جار تأكيد حالة الطلبات قبل فتح الطاولات…' : 'Confirming order status before opening tables…'}</p>
-          {tables.length > 0 ? floorPlan : <div className="flex justify-center py-16"><div className="animate-spin rounded-full h-10 w-10 border-b-2 border-ui-primary" /></div>}
+        <div className="flex justify-center py-16">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-ui-primary" />
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
@@ -487,7 +521,19 @@ export function ActiveOrdersPage() {
                 {areasError}
               </DesignPanel>
             )}
-            {floorPlan}
+            <TableFloorPlan
+              areas={areas}
+              tables={tables}
+              ordersByTable={ordersByTable}
+              canManage={canManage}
+              currency="EGP"
+              onSelectTable={setTableTarget}
+              onAddArea={openCreateArea}
+              onAddTable={openAddTable}
+              onRenameArea={openRenameArea}
+              onDeleteArea={deleteArea}
+              onEditDefaultAreaCount={openMainAreaCountEditor}
+            />
           </div>
 
           <div className="space-y-3">
@@ -555,6 +601,32 @@ export function ActiveOrdersPage() {
                         {canPayOrder && <Button size="sm" variant="success" onClick={() => resumeOrder(order)}><Banknote className="w-3.5 h-3.5" /> {t('payOrder')}</Button>}
                         {canCancelOrder && <Button size="sm" variant="ghost" onClick={() => setOrderStatus(order, 'cancelled')} disabled={busy}><XCircle className="w-3.5 h-3.5" /> {t('cancelOrder')}</Button>}
                       </div>
+                      {order.order_type === 'delivery' && (
+                        <div className="flex items-center gap-1.5 flex-wrap pt-1.5 border-t border-ui-border">
+                          {order.status !== 'out_for_delivery' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => dispatchDeliveryOrder(order)}
+                              disabled={busy}
+                              className="text-xs font-black"
+                            >
+                              <Truck className="w-3.5 h-3.5" />
+                              {isAr ? 'إرسال مع الطيار' : 'Dispatch Driver'}
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="success"
+                            onClick={() => deliverOrder(order)}
+                            disabled={busy}
+                            className="text-xs font-black"
+                          >
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {isAr ? 'تم التسليم' : 'Mark Delivered'}
+                          </Button>
+                        </div>
+                      )}
                     </div>
                   ))
                 )}
@@ -698,11 +770,6 @@ export function ActiveOrdersPage() {
             />
             <p className="mt-1.5 text-xs text-ui-muted">{isAr ? 'تظهر المنطقة فورًا ويمكنك إضافة الطاولات إليها لاحقًا.' : 'Areas appear immediately; tables can be added later.'}</p>
           </div>
-          {!areaTarget && <div>
-            <label htmlFor="floor-area-table-count" className="block text-sm font-medium text-ui-muted mb-1.5">{isAr ? 'عدد الطاولات عند إنشاء المنطقة (0–100)' : 'Number of tables to create (0–100)'}</label>
-            <input id="floor-area-table-count" data-testid="floor-area-table-count" type="number" min={0} max={100} step={1} value={newAreaTableCount} onChange={event => setNewAreaTableCount(event.target.value)} disabled={areaSaving} className="w-full px-3 py-2.5 rounded-xl border border-ui-border bg-ui-surface-raised text-sm text-ui-text" />
-            <p className="mt-1.5 text-xs text-ui-muted">{isAr ? 'إنشاء المنطقة والطاولات في عملية واحدة. أدخل صفرًا لمنطقة فارغة.' : 'The area and its tables are created atomically. Enter zero for an empty area.'}</p>
-          </div>}
           <Button data-testid="floor-area-save" type="submit" className="w-full" disabled={areaSaving || !areaName.trim() || !effectiveBranch}>
             {areaSaving ? (isAr ? 'جارٍ الحفظ...' : 'Saving...') : (areaTarget ? (isAr ? 'حفظ التعديل' : 'Save changes') : (isAr ? 'إنشاء المنطقة' : 'Create area'))}
           </Button>

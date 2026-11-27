@@ -38,13 +38,10 @@ export type CreateProductInput = {
   p_unit_links?: { unit_id: string; quantity: number }[] | null;
 };
 
-export type OperationalCreateProductInput = CreateProductInput & { p_business_attributes?: Record<string, unknown>; p_legacy_components?: { component_product_id: string; quantity: number }[] };
-
 export type CreateProductResult = { success?: boolean; error?: string; product_id?: string; branch_id?: string | null };
 export type DirectRawComponentInput = { raw_material_id: string; quantity: number; wastage_percent?: number };
 export type ProductDirectRawComposition = {
   recipe_id: string | null;
-  recipe_version?: number | null;
   yield_quantity: number;
   items: DirectRawComponentInput[];
 };
@@ -145,14 +142,9 @@ export type KitchenCompletedHistoryResult = {
 };
 
 export const catalog = {
-  createProductOperational(p: { p_product: OperationalCreateProductInput; p_items: DirectRawComponentInput[] }): ApiResult<CreateProductResult> { return rpc('create_product_operational', p); },
-  editProductOperational(p: { p_product_id: string; p_branch_id: string; p_expected_version: number | null; p_expected_links: { unit_id: string; quantity: number }[]; p_product: object; p_units: unknown; p_items: DirectRawComponentInput[] | null; p_links: { unit_id: string; quantity: number }[] | null; p_expected_legacy: { component_product_id: string; quantity: number }[] | null; p_legacy: { component_product_id: string; quantity: number }[] | null }): ApiResult<{ success?: boolean; error?: string; detail?: string; product_id?: string }> { return rpc('edit_product_operational_composition', p); },
-  replaceProductUnits(p: { p_product_id: string; p_units: unknown }): ApiResult<{ success?: boolean; error?: string; detail?: string }> { return rpc('replace_product_units', p); },
+  replaceProductUnits(p: { p_product_id: string; p_units: unknown }): ApiResult<null> { return rpc('replace_product_units', p); },
   createRawMaterial(p: CreateRawMaterialInput): ApiResult<CreateRawMaterialResult> { return rpc('create_raw_material', p); },
   createProduct(p: CreateProductInput): ApiResult<CreateProductResult> { return rpc('create_product', p); },
-  createProductWithRawComponents(p: { p_product: CreateProductInput; p_items: DirectRawComponentInput[] }): ApiResult<CreateProductResult> {
-    return rpc('create_product_with_raw_components', p);
-  },
   getProductOperationalComposition(p: { p_product_id: string; p_branch_id?: string | null }): ApiResult<ProductOperationalComposition> {
     return rpc<ProductOperationalComposition>('get_product_operational_composition', p);
   },
@@ -228,7 +220,7 @@ export const catalog = {
   async getProductDirectRawComponents(product_id: string, branch_id: string): Promise<ProductDirectRawComposition> {
     const { data: recipe, error: recipeError } = await supabase
       .from('recipes')
-      .select('id,yield_quantity,version')
+      .select('id,yield_quantity')
       .eq('product_id', product_id)
       .eq('branch_id', branch_id)
       .eq('is_active', true)
@@ -237,7 +229,7 @@ export const catalog = {
       .limit(1)
       .maybeSingle();
     if (recipeError) throw recipeError;
-    if (!recipe?.id) return { recipe_id: null, recipe_version: null, yield_quantity: 1, items: [] };
+    if (!recipe?.id) return { recipe_id: null, yield_quantity: 1, items: [] };
 
     const { data: items, error: itemsError } = await supabase
       .from('recipe_items')
@@ -247,7 +239,6 @@ export const catalog = {
     if (itemsError) throw itemsError;
     return {
       recipe_id: recipe.id,
-      recipe_version: Number(recipe.version),
       yield_quantity: Number(recipe.yield_quantity) || 1,
       items: ((items || []) as DirectRawComponentInput[]).map((row) => ({
         raw_material_id: row.raw_material_id,
@@ -266,9 +257,9 @@ export const catalog = {
     const normalized = p.items.map((row) => ({
       raw_material_id: row.raw_material_id,
       quantity: Number(row.quantity),
-      wastage_percent: Number(row.wastage_percent ?? 0),
+      wastage_percent: Number(row.wastage_percent || 0),
     }));
-    if (normalized.some((row) => !row.raw_material_id || !Number.isFinite(row.quantity) || row.quantity <= 0 || !Number.isFinite(row.wastage_percent) || row.wastage_percent < 0)) {
+    if (normalized.some((row) => !row.raw_material_id || !Number.isFinite(row.quantity) || row.quantity <= 0 || row.wastage_percent < 0)) {
       throw new Error('INVALID_DIRECT_RAW_COMPONENT');
     }
     if (new Set(normalized.map((row) => row.raw_material_id)).size !== normalized.length) {
@@ -336,21 +327,23 @@ export const catalog = {
   },
 
   async setProductUnitLinks(product_id: string, links: { unit_id: string; quantity: number }[]) {
-    if (!product_id || links.some(row => !row.unit_id || !Number.isFinite(row.quantity) || row.quantity <= 0) || new Set(links.map(row => row.unit_id)).size !== links.length) throw new Error('INVALID_PRODUCT_UNIT_LINKS');
     const { data: existingLinks, error: existingLinksError } = await supabase
       .from('product_unit_links')
-      .select('unit_id,quantity')
+      .select('unit_id')
       .eq('product_id', product_id);
     if (existingLinksError) throw existingLinksError;
 
-    const existingRows = (existingLinks || []) as { unit_id: string; quantity: number }[];
-    const existingIds = new Set(existingRows.map(row => row.unit_id));
+    const existingIds = new Set(((existingLinks || []) as { unit_id: string }[]).map((row) => row.unit_id));
     const desiredIds = new Set(links.map((row) => row.unit_id));
     const removedIds = [...existingIds].filter((unitId) => !desiredIds.has(unitId));
 
+    if (removedIds.length > 0) {
+      const { error } = await supabase.from('product_unit_links').delete().eq('product_id', product_id).in('unit_id', removedIds);
+      if (error) throw error;
+    }
+
     for (const row of links) {
       if (existingIds.has(row.unit_id)) {
-        if (Number(existingRows.find(existing => existing.unit_id === row.unit_id)?.quantity) === row.quantity) continue;
         const { error } = await supabase
           .from('product_unit_links')
           .update({ quantity: row.quantity })
@@ -362,13 +355,6 @@ export const catalog = {
         if (error) throw error;
       }
     }
-    if (removedIds.length > 0) {
-      const { error } = await supabase.from('product_unit_links').delete().eq('product_id', product_id).in('unit_id', removedIds);
-      if (error) throw error;
-    }
-    const { data: saved, error: readError } = await supabase.from('product_unit_links').select('unit_id,quantity').eq('product_id', product_id);
-    if (readError) throw readError;
-    if ((saved || []).length !== links.length || links.some(row => !(saved || []).some(item => item.unit_id === row.unit_id && Math.abs(Number(item.quantity) - row.quantity) < 0.000001))) throw new Error('PRODUCT_UNIT_LINKS_NOT_SAVED');
   },
 
   // ─── Production ───────────────────────────────────────────

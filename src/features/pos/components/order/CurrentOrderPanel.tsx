@@ -1,10 +1,8 @@
-import { DeliveryFeeEditor } from './DeliveryFeeEditor';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ArrowRightLeft,
   Check,
   Clock,
-  Loader2,
   Minus,
   Percent,
   Plus,
@@ -14,13 +12,11 @@ import {
   X,
 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
-import { formatFinancialCurrency } from '@/lib/format';
+import { formatCurrency } from '@/lib/format';
 import type { CartItem, Customer, DiningTable, OrderItem, OrderType } from '@/lib/types';
 import type { KitchenSendItem } from '../../types';
 import { computeSentState } from '../../utils/sentState';
 import { cartLineKey, orderItemLineKey } from '../../utils/cart';
-import { transferLineIsSaved } from '../../utils/itemTransfer';
-import type { PosItemTransferResult } from '../../types';
 import { formatClockTime, timeAgo } from '../../utils/timeAgo';
 import { deriveCartStage } from '../../utils/orderStage';
 import { ORDER_TYPES } from '../../utils/orderTypes';
@@ -68,10 +64,8 @@ interface CurrentOrderPanelProps {
   onDiscountAmountChange: (v: number) => void;
   onUpdateQty: (lineKey: string, delta: number) => void;
   onSetQty: (lineKey: string, qty: number) => void;
-  onItemsTransferred?: (result: PosItemTransferResult) => void;
   onRemove: (lineKey: string) => void;
   onClear: () => void;
-  clearingOrder?: boolean;
   onSetItemDiscount: (lineKey: string, discount: number) => void;
   onHold: () => void;
   onSendKitchen: () => void;
@@ -95,12 +89,13 @@ export function CurrentOrderPanel({
   taxRate,
   taxAmount,
   total,
-  orderLoading,
   orderType,
   activeOrderNumber,
   activeOrderId,
   activeTable,
   guestCount,
+  customerId,
+  customerById = {},
   orderNotes,
   activeOrderCreatedAt,
   orderItems,
@@ -115,10 +110,8 @@ export function CurrentOrderPanel({
   onDiscountTypeChange,
   onDiscountAmountChange,
   onUpdateQty,
-  onItemsTransferred,
   onRemove,
   onClear,
-  clearingOrder = false,
   onAddItem,
   onConfigureItem,
   onOpenTableModal,
@@ -152,7 +145,7 @@ export function CurrentOrderPanel({
   const selectedItem = selectedItems.length === 1 ? selectedItems[0] : null;
   const selectedSent = selectedItem ? sentState[cartLineKey(selectedItem)] : null;
   const selectedMatches = selectedItem
-    ? orderItems.filter((row) => selectedItem.order_item_id ? row.id === selectedItem.order_item_id : orderItemLineKey(row) === cartLineKey(selectedItem))
+    ? orderItems.filter((row) => orderItemLineKey(row) === cartLineKey(selectedItem))
     : [];
   const selectedCanSplit = perms.canSplitOrder && !!activeOrderId && !!selectedItem && (selectedSent?.sentQty || 0) === 0 && selectedMatches.length === 1;
   const selectedSentQty = selectedSent?.sentQty || 0;
@@ -160,15 +153,15 @@ export function CurrentOrderPanel({
     !!selectedItem &&
     (selectedSentQty > 0
       ? !!activeOrderId && !!onVoidItem
-      : (canDeleteItem && (!activeOrderId || cart.length !== 1 || perms.canCancelOrder)));
+      : canDeleteItem);
   const selectedTransferLines = useMemo<TransferItemLine[]>(() => selectedItems.flatMap((item) => {
     const lineKey = cartLineKey(item);
-    const matches = orderItems.filter((row) => item.order_item_id ? row.id === item.order_item_id : orderItemLineKey(row) === lineKey);
-    if (matches.length !== 1 || !transferLineIsSaved(item, matches[0])) return [];
-    return [{ item, orderItemId: matches[0].id, saved: matches[0] }];
+    const matches = orderItems.filter((row) => orderItemLineKey(row) === lineKey);
+    if (matches.length !== 1) return [];
+    return [{ item, orderItemId: matches[0].id }];
   }), [selectedItems, orderItems]);
   const selectedCanTransfer =
-    perms.canTransferOrder && !!onItemsTransferred &&
+    perms.canTransferOrder &&
     orderType === 'dine_in' &&
     !!activeOrderId &&
     !!activeTable &&
@@ -176,7 +169,7 @@ export function CurrentOrderPanel({
     selectedTransferLines.length === selectedItems.length;
 
   const splitLineKey = splitItem ? cartLineKey(splitItem) : null;
-  const splitOrderItemMatches = splitItem ? orderItems.filter((row) => splitItem.order_item_id ? row.id === splitItem.order_item_id : orderItemLineKey(row) === splitLineKey) : [];
+  const splitOrderItemMatches = splitLineKey ? orderItems.filter((row) => orderItemLineKey(row) === splitLineKey) : [];
   const splitOrderItemId = splitOrderItemMatches.length === 1 ? splitOrderItemMatches[0].id : null;
 
   const applyCompletedSplit = (quantity: number) => {
@@ -198,14 +191,13 @@ export function CurrentOrderPanel({
       onVoidItem(selectedItem, sentQty);
     } else {
       if (!canDeleteItem) return;
-      if (activeOrderId && cart.length === 1) onClear();
-      else onRemove(lineKey);
+      onRemove(lineKey);
     }
 
     setSelectedLineKeys(new Set());
   };
-  const handleCompletedMultiTransfer = (result: PosItemTransferResult) => {
-    onItemsTransferred?.(result);
+  const handleCompletedMultiTransfer = () => {
+    selectedItems.forEach((item) => onRemove(cartLineKey(item)));
     setSelectedLineKeys(new Set());
     setTransferItemsOpen(false);
   };
@@ -233,25 +225,25 @@ export function CurrentOrderPanel({
               {surface.showRestaurantOrderControls && <OrderStageBadge stage={stage} />}
             </div>
             <p className="text-[11px] font-bold text-ui-muted">{cart.length} {isAr ? 'صنف' : 'items'}</p>
-            {(!empty || activeOrderId) && (
-              <button type="button" data-testid="pos-clear-cart"
-                onClick={onClear} disabled={clearingOrder || (activeOrderId ? !perms.canCancelOrder : !perms.canEditOrder)}
-                title={activeOrderId
-                  ? (isAr ? 'يلغي الطلب المحفوظ بعد إدخال السبب ويحرر الطاولة عند النجاح' : 'Cancels the saved order with a reason; releases the table on success')
-                  : (isAr ? 'تفريغ السلة غير المحفوظة' : 'Clear the unsaved cart')}
-                className="mt-1 inline-flex items-center gap-1 rounded-lg border border-ui-danger/30 px-2 py-1 text-[10px] font-bold text-ui-danger disabled:cursor-not-allowed disabled:opacity-40">
-                <Trash2 className="h-3 w-3" />
-                {clearingOrder ? (isAr ? 'جارٍ الإلغاء…' : 'Cancelling…')
-                  : activeOrderId ? (isAr ? 'إلغاء الطلب وتحرير الطاولة' : 'Cancel order and release table')
-                  : (isAr ? 'تفريغ السلة' : 'Clear cart')}
-              </button>
-            )}
           </div>
         </div>
 
         <div className="mt-2 flex flex-wrap items-center gap-1.5">
           {surface.showRestaurantOrderControls && (activeOrderNumber ? (
-            <OrderTypePill type={orderType} />
+            <div className="flex items-center gap-1.5">
+              <OrderTypePill type={orderType} />
+              {onClear && (
+                <button
+                  type="button"
+                  data-testid="pos-start-new-order-type-btn"
+                  onClick={onClear}
+                  className="rounded-lg bg-ui-page-alt px-2 py-0.5 text-[10px] font-black text-ui-muted hover:text-ui-text hover:bg-ui-page transition"
+                  title={isAr ? 'بدء طلب جديد بنوع مختلف' : 'Start new order with different type'}
+                >
+                  + {isAr ? 'طلب جديد' : 'New Order'}
+                </button>
+              )}
+            </div>
           ) : (
             <div className="flex items-center gap-1 rounded-xl bg-ui-page-alt p-1">
               {ORDER_TYPES.map((type) => (
@@ -305,22 +297,6 @@ export function CurrentOrderPanel({
           )}
         </div>
 
-        {perms.canTransferOrder && orderType === 'dine_in' && !!activeOrderId && !!activeTable && cart.some((item) =>
-          !!item.order_item_id && orderItems.some((saved) =>
-            saved.id === item.order_item_id && transferLineIsSaved(item, saved))) && (
-          <button
-            type="button"
-            data-testid="pos-select-all-saved-transfer-lines"
-            onClick={() => setSelectedLineKeys(new Set(cart.filter((item) =>
-              !!item.order_item_id && orderItems.some((saved) =>
-                saved.id === item.order_item_id && transferLineIsSaved(item, saved))
-            ).map(cartLineKey)))}
-            className="mt-2 rounded-lg border border-ui-border bg-ui-page-alt px-3 py-2 text-[11px] font-bold text-ui-text"
-          >
-            {isAr ? 'تحديد كل الأصناف المحفوظة للنقل أو دمج الطاولات' : 'Select all saved items for transfer or table merge'}
-          </button>
-        )}
-
         {selectedItems.length > 0 && (
           <div className="mt-2 flex items-center gap-2 rounded-xl border border-ui-primary/30 bg-ui-primary-soft p-2">
             <div className="min-w-0 flex-1">
@@ -347,13 +323,10 @@ export function CurrentOrderPanel({
                 type="button"
                 data-testid={`pos-selected-split-${selectedItem.product.id}`}
                 disabled={!selectedCanSplit}
-                title={selectedCanSplit ? undefined : !activeOrderId
-                  ? (isAr ? 'علّق الطلب أولًا لحفظه.' : 'Hold the order to save it first.')
-                  : (isAr ? 'يمكن فصل الصنف المحفوظ قبل إرساله للمطبخ.' : 'Only a saved item that has not been sent to the kitchen can be split here.')}
                 onClick={() => setSplitItem(selectedItem)}
                 className="flex h-9 items-center gap-1 rounded-lg border border-ui-primary/30 bg-ui-surface px-2.5 text-[10px] font-black text-ui-accent disabled:cursor-not-allowed disabled:opacity-40"
               >
-                <ArrowRightLeft className="h-3.5 w-3.5" /> {isAr ? 'فصل الصنف' : 'Split item'}
+                <ArrowRightLeft className="h-3.5 w-3.5" /> Split
               </button>
             )}
             {selectedCanRemoveOrVoid && selectedItems.length === 1 && selectedItem && (
@@ -381,7 +354,7 @@ export function CurrentOrderPanel({
             <div className="flex gap-2">
               <button data-testid="pos-discount-percent" type="button" onClick={() => onDiscountTypeChange('percent')} className={`flex-1 rounded-lg p-2 text-xs font-black ${discountType === 'percent' ? 'bg-ui-primary text-ui-primary-fg' : 'bg-ui-surface text-ui-muted'}`}>%</button>
               <button data-testid="pos-discount-amount" type="button" onClick={() => onDiscountTypeChange('amount')} className={`flex-1 rounded-lg p-2 text-xs font-black ${discountType === 'amount' ? 'bg-ui-primary text-ui-primary-fg' : 'bg-ui-surface text-ui-muted'}`}>{currency}</button>
-              <input data-testid="pos-discount-input" aria-label={isAr ? 'قيمة الخصم' : 'Discount value'} type="number" min={0} value={discountAmount || ''} onChange={(event) => onDiscountAmountChange(Math.min(discountType === 'percent' ? 100 : Math.max(0, subtotal), Math.max(0, parseFloat(event.target.value) || 0)))} className="w-24 rounded-lg border border-ui-border bg-ui-surface p-2 text-center text-xs font-black text-ui-text" />
+              <input data-testid="pos-discount-input" aria-label={isAr ? 'قيمة الخصم' : 'Discount value'} type="number" min={0} value={discountAmount || ''} onChange={(event) => onDiscountAmountChange(parseFloat(event.target.value) || 0)} className="w-24 rounded-lg border border-ui-border bg-ui-surface p-2 text-center text-xs font-black text-ui-text" />
             </div>
           </div>
         )}
@@ -390,12 +363,7 @@ export function CurrentOrderPanel({
       </div>
 
       <div className={`min-h-0 flex-1 overflow-y-auto ${empty ? 'p-3' : 'p-2.5'}`}>
-        {orderLoading ? (
-          <div role="status" className="flex items-center justify-center gap-2 rounded-2xl bg-ui-page-alt/60 px-4 py-5 text-sm font-bold text-ui-muted">
-            <Loader2 aria-hidden="true" className="h-4 w-4 animate-spin" />
-            {isAr ? 'جارٍ تحميل أصناف الطلب…' : 'Loading order items…'}
-          </div>
-        ) : empty ? (
+        {empty ? (
           <div data-testid="pos-empty-cart-state" className="rounded-2xl border border-dashed border-ui-border bg-ui-page-alt/60 px-4 py-5 text-center text-ui-subtle">
             <div className="mx-auto mb-2 flex h-11 w-11 items-center justify-center rounded-xl bg-ui-surface"><ShoppingCart className="h-5 w-5 opacity-40" /></div>
             <p className="text-sm font-black text-ui-text">{t('emptyCart')}</p>
@@ -458,7 +426,7 @@ export function CurrentOrderPanel({
                         {sent.sentQty > 0 ? (isAr ? 'مرسل' : 'Sent') : (isAr ? 'تعديل' : 'Edit')}
                       </button>
                     )}
-                    <span className="shrink-0 text-xs font-black text-ui-accent">{formatFinancialCurrency(item.quantity * item.unit_price - (item.discount_amount || 0), currency, lang)}</span>
+                    <span className="shrink-0 text-xs font-black text-ui-accent">{formatCurrency(item.quantity * item.unit_price - (item.discount_amount || 0), currency, lang)}</span>
                   </div>
 
                   <div className="mt-2 flex items-center gap-1.5 border-t border-ui-border/70 pt-2">
@@ -484,14 +452,29 @@ export function CurrentOrderPanel({
         )}
       </div>
 
-      {!orderLoading && !empty && (
+      {!empty && (
         <div className="shrink-0 border-t border-ui-border p-3">
-          {orderType === 'delivery' && activeOrderId && <DeliveryFeeEditor key={activeOrderId} orderId={activeOrderId} currency={currency} canEdit={perms.canEditOrder} itemsTotal={total} />}
+          {orderType === 'delivery' && (
+            <div data-testid="pos-delivery-fee-badge" className="mb-2.5 flex items-center justify-between rounded-xl border border-ui-info/30 bg-ui-info-soft/40 px-3 py-1.5 text-xs">
+              <span className="font-black text-ui-info flex items-center gap-1.5">
+                <span>🛵</span> {isAr ? 'رسوم التوصيل:' : 'Delivery Fee:'}
+              </span>
+              <span className="font-black text-ui-text">
+                {customerId && customerById[customerId]?.address ? (
+                  formatCurrency(20, currency, lang)
+                ) : (
+                  <span className="text-[11px] font-bold text-ui-warning bg-ui-warning-soft px-2 py-0.5 rounded-md">
+                    {isAr ? 'يلزم تحديد العنوان لاحتساب الرسوم' : 'Address required for fee'}
+                  </span>
+                )}
+              </span>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <div className="rounded-xl border border-ui-border bg-ui-page-alt p-2"><p className="text-[10px] font-bold text-ui-muted">{t('subtotal')}</p><p className="mt-0.5 truncate text-xs font-black text-ui-text">{formatFinancialCurrency(subtotal, currency, lang)}</p></div>
-            <div className="rounded-xl bg-ui-page-alt p-2"><p className="text-[9px] font-bold text-ui-subtle">{t('discount')}</p><p data-testid="pos-discount-value" className="mt-0.5 truncate text-xs font-black text-ui-text">{formatFinancialCurrency(discountValue, currency, lang)}</p></div>
-            <div className="rounded-xl border border-ui-border bg-ui-page-alt p-2"><p className="text-[10px] font-bold text-ui-muted">{lang === 'ar' ? 'الضريبة' : 'Tax'} ({Number(taxRate).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US', {maximumFractionDigits:2})}%)</p><p data-testid="pos-tax-value" className="mt-0.5 truncate text-xs font-black text-ui-text">{formatFinancialCurrency(taxAmount, currency, lang)}</p></div>
-            <div className="rounded-xl border border-ui-primary/30 bg-ui-primary-soft p-2"><p className="text-[10px] font-bold text-ui-muted">{t('total')}</p><p data-testid="pos-total-value" className="mt-0.5 truncate text-sm font-black text-ui-accent">{formatFinancialCurrency(total, currency, lang)}</p></div>
+            <div className="rounded-xl border border-ui-border bg-ui-page-alt p-2"><p className="text-[10px] font-bold text-ui-muted">{t('subtotal')}</p><p className="mt-0.5 truncate text-xs font-black text-ui-text">{formatCurrency(subtotal, currency, lang)}</p></div>
+            <div className="rounded-xl bg-ui-page-alt p-2"><p className="text-[9px] font-bold text-ui-subtle">{t('discount')}</p><p data-testid="pos-discount-value" className="mt-0.5 truncate text-xs font-black text-ui-text">{formatCurrency(discountValue, currency, lang)}</p></div>
+            <div className="rounded-xl border border-ui-border bg-ui-page-alt p-2"><p className="text-[10px] font-bold text-ui-muted">{lang === 'ar' ? 'الضريبة' : 'Tax'} ({Number(taxRate).toLocaleString(lang === 'ar' ? 'ar-EG' : 'en-US', {maximumFractionDigits:2})}%)</p><p data-testid="pos-tax-value" className="mt-0.5 truncate text-xs font-black text-ui-text">{formatCurrency(taxAmount, currency, lang)}</p></div>
+            <div className="rounded-xl border border-ui-primary/30 bg-ui-primary-soft p-2"><p className="text-[10px] font-bold text-ui-muted">{t('total')}</p><p data-testid="pos-total-value" className="mt-0.5 truncate text-sm font-black text-ui-accent">{formatCurrency(total, currency, lang)}</p></div>
           </div>
         </div>
       )}
@@ -504,8 +487,6 @@ export function CurrentOrderPanel({
           orderId={activeOrderId}
           orderItemId={splitOrderItemId}
           sourceTable={activeTable}
-          currency={currency}
-          savedLine={splitOrderItemMatches.length === 1 ? splitOrderItemMatches[0] : undefined}
           onCompleted={applyCompletedSplit}
         />
       )}

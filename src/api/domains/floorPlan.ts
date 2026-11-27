@@ -2,16 +2,11 @@ import type { ApiResult } from '../types';
 import type { RpcResult, OrderType, OrderServiceDetails } from '@/lib/types';
 import { clearPendingServiceDetails, getPendingServiceDetails } from '@/lib/posServiceDetails';
 import { rpc } from '../rpc';
-import { qr } from './qr';
 
 const isServiceOrderType = (orderType?: OrderType): orderType is 'delivery' | 'drive_thru' =>
   orderType === 'delivery' || orderType === 'drive_thru';
 
 export const floorPlan = {
-  /** Atomically create one named area and 0–100 tables, with server-side permissions. */
-  createAreaWithTables(p: { p_branch_id: string; p_name: string; p_table_count: number }): ApiResult<RpcResult & { area_id?: string; table_count?: number }> {
-    return rpc<RpcResult & { area_id?: string; table_count?: number }>('floor_plan_create_area_with_tables', p);
-  },
   createArea(p: { p_branch_id: string; p_name: string }): ApiResult<RpcResult & { area_id?: string }> {
     return rpc('floor_plan_create_area', p);
   },
@@ -66,7 +61,6 @@ export const floorPlan = {
   },
 
   async updateOrder(p: {
-    p_qr_revision?: number;
     p_order_id: string;
     p_order_type?: OrderType;
     p_table_id?: string | null;
@@ -90,18 +84,16 @@ export const floorPlan = {
     p_total?: number;
     p_status?: 'open' | 'held';
   }): ApiResult<RpcResult> {
-    const { p_qr_revision, ...payload } = p;
     if (isServiceOrderType(p.p_order_type)) {
-      if (p_qr_revision) return qr.saveServiceOrder({ p_revision: p_qr_revision, p_payload: payload, p_details: getPendingServiceDetails() });
       // A resumed order normally has no in-memory draft. Passing NULL tells the
       // server wrapper to preserve and revalidate the service_details already
       // stored on that order instead of replacing them with an empty object.
       return rpc<RpcResult>('update_service_order', {
-        ...payload,
+        ...p,
         p_service_details: getPendingServiceDetails(),
       });
     }
-    return qr.saveOrder({ p_revision: p_qr_revision ?? 0, p_payload: payload });
+    return rpc<RpcResult>('update_order', p);
   },
 
   async addTable(p: {

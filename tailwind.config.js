@@ -5,8 +5,8 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['Urbanist', 'Cairo', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        arabic: ['Cairo', 'Urbanist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'Cairo', 'system-ui', 'sans-serif'],
+        arabic: ['Cairo', 'Inter', 'system-ui', 'sans-serif'],
       },
       colors: {
         navy: {

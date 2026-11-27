@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, Banknote, CreditCard, Smartphone, FileText, Tag, UtensilsCrossed, Users, CheckCircle2, Car, Bike, SplitSquareHorizontal, Landmark, RefreshCw, Loader2, Clock3 } from 'lucide-react';
 import { useLanguage } from '@/context/LanguageContext';
 import { Button } from '@/components/Button';
-import { formatFinancialCurrency } from '@/lib/format';
+import { formatCurrency } from '@/lib/format';
 import type { PosPaymentMethod } from '@/lib/posMath';
 import type { CartItem, Customer, DiningTable, OrderType } from '@/lib/types';
 import type { SplitTenderInput } from '@/api';
@@ -19,7 +19,6 @@ import {
 import { orderTypeLabel } from '../../utils/format';
 import { parseCarNotes, parseDeliveryNotes } from '../../utils/orderLabels';
 import { CashierDiscountApprovalCard } from './CashierDiscountApprovalCard';
-import { cartToItems } from '../../utils/cart';
 
 interface PaymentPanelProps {
   branchId: string;
@@ -30,7 +29,6 @@ interface PaymentPanelProps {
   orderType: OrderType;
   activeTable: DiningTable | null;
   activeOrderNumber: string | null;
-  activeOrderId?: string | null;
   guestCount: number | null;
   onGuestCountChange: (n: number | null) => void;
   customerId: string;
@@ -47,7 +45,6 @@ interface PaymentPanelProps {
   subtotal: number;
   discountValue: number;
   taxAmount: number;
-  deliveryFee?: number;
   total: number;
   change: number;
   completing: boolean;
@@ -346,11 +343,11 @@ export function PaymentPanel(p: PaymentPanelProps) {
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xs font-bold text-ui-text">{it.product.name}</p>
                         <p className="text-[10px] text-ui-subtle">
-                          {formatFinancialCurrency(it.unit_price, p.currency, lang)}
-                          {it.discount_amount > 0 && <span className="text-ui-danger"> {' '}−{formatFinancialCurrency(it.discount_amount, p.currency, lang)}</span>}
+                          {formatCurrency(it.unit_price, p.currency, lang)}
+                          {it.discount_amount > 0 && <span className="text-ui-danger"> {' '}−{formatCurrency(it.discount_amount, p.currency, lang)}</span>}
                         </p>
                       </div>
-                      <span className="pt-0.5 text-xs font-black">{formatFinancialCurrency(lineTotal, p.currency, lang)}</span>
+                      <span className="pt-0.5 text-xs font-black">{formatCurrency(lineTotal, p.currency, lang)}</span>
                     </li>
                   );
                 })}
@@ -360,19 +357,15 @@ export function PaymentPanel(p: PaymentPanelProps) {
 
           <div data-testid="pos-payment-totals" className="rounded-3xl border border-ui-border bg-ui-surface p-5 shadow-ui-sm">
             <div className="space-y-2 text-sm">
-              <div className="flex items-center justify-between"><span className="text-ui-muted">{t('subtotal')}</span><span className="font-bold">{formatFinancialCurrency(p.subtotal, p.currency, lang)}</span></div>
-              {p.discountValue > 0 && <div className="flex items-center justify-between"><span className="text-ui-muted">{t('discount')}</span><span className="font-bold text-ui-danger">−{formatFinancialCurrency(p.discountValue, p.currency, lang)}</span></div>}
-              {p.taxAmount > 0 && <div className="flex items-center justify-between"><span className="text-ui-muted">{t('tax')}</span><span className="font-bold">{formatFinancialCurrency(p.taxAmount, p.currency, lang)}</span></div>}
-              {!!p.deliveryFee && <div className="flex items-center justify-between"><span>{isAr ? 'رسوم التوصيل' : 'Delivery fee'}</span><span className="font-bold">{formatFinancialCurrency(p.deliveryFee, p.currency, lang)}</span></div>}
-              <div className="flex items-center justify-between border-t border-ui-border pt-2 text-base"><span className="font-black">{t('total')}</span><span className="font-black text-ui-accent">{formatFinancialCurrency(p.total, p.currency, lang)}</span></div>
+              <div className="flex items-center justify-between"><span className="text-ui-muted">{t('subtotal')}</span><span className="font-bold">{formatCurrency(p.subtotal, p.currency, lang)}</span></div>
+              {p.discountValue > 0 && <div className="flex items-center justify-between"><span className="text-ui-muted">{t('discount')}</span><span className="font-bold text-ui-danger">−{formatCurrency(p.discountValue, p.currency, lang)}</span></div>}
+              {p.taxAmount > 0 && <div className="flex items-center justify-between"><span className="text-ui-muted">{t('tax')}</span><span className="font-bold">{formatCurrency(p.taxAmount, p.currency, lang)}</span></div>}
+              <div className="flex items-center justify-between border-t border-ui-border pt-2 text-base"><span className="font-black">{t('total')}</span><span className="font-black text-ui-accent">{formatCurrency(p.total, p.currency, lang)}</span></div>
             </div>
           </div>
 
           {p.canEditOrder !== false && <CashierDiscountApprovalCard
             subtotal={p.subtotal}
-            branchId={p.branchId}
-            orderId={p.activeOrderId}
-            cart={cartToItems(p.cart)}
             currentType={p.discountType}
             ar={isAr}
             canDirectDiscount={p.canDirectDiscount === true}
@@ -405,7 +398,7 @@ export function PaymentPanel(p: PaymentPanelProps) {
                   <p className="text-sm font-black text-ui-text">{isAr ? 'وزّع قيمة الفاتورة' : 'Allocate invoice total'}</p>
                   <p className="text-[10px] font-bold text-ui-subtle">{isAr ? 'يجب استخدام طريقتين دفع على الأقل' : 'Use at least two payment methods'}</p>
                 </div>
-                <span className="text-lg font-black text-ui-accent">{formatFinancialCurrency(p.total, p.currency, lang)}</span>
+                <span className="text-lg font-black text-ui-accent">{formatCurrency(p.total, p.currency, lang)}</span>
               </div>
 
               {SPLIT_METHODS.map((method) => (
@@ -433,8 +426,8 @@ export function PaymentPanel(p: PaymentPanelProps) {
                 {splitValid
                   ? (isAr ? 'التقسيم مكتمل ومتطابق مع إجمالي الفاتورة.' : 'Payment split matches the invoice total.')
                   : splitOver > 0
-                    ? `${isAr ? 'زيادة' : 'Over'}: ${formatFinancialCurrency(splitOver, p.currency, lang)}`
-                    : `${isAr ? 'المتبقي' : 'Remaining'}: ${formatFinancialCurrency(splitRemaining, p.currency, lang)}`}
+                    ? `${isAr ? 'زيادة' : 'Over'}: ${formatCurrency(splitOver, p.currency, lang)}`
+                    : `${isAr ? 'المتبقي' : 'Remaining'}: ${formatCurrency(splitRemaining, p.currency, lang)}`}
               </div>
             </div>
           ) : (
@@ -511,7 +504,7 @@ export function PaymentPanel(p: PaymentPanelProps) {
                   <div className="rounded-2xl bg-ui-page-alt p-3">
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-xs font-bold text-ui-muted">{isAr ? 'المبلغ المطلوب تحويله' : 'Amount to transfer'}</span>
-                      <span className="text-lg font-black text-ui-accent">{formatFinancialCurrency(p.total, p.currency, lang)}</span>
+                      <span className="text-lg font-black text-ui-accent">{formatCurrency(p.total, p.currency, lang)}</span>
                     </div>
                   </div>
 
@@ -609,10 +602,10 @@ export function PaymentPanel(p: PaymentPanelProps) {
                   />
                   <div className="mt-3 flex flex-wrap gap-2">
                     <button onClick={() => p.onPaidAmountChange(p.total)} className="rounded-xl bg-ui-success/10 px-4 py-2.5 text-xs font-black text-ui-success">{isAr ? 'بالضبط' : 'Exact'}</button>
-                    <button onClick={() => p.onPaidAmountChange(round)} className="rounded-xl bg-ui-page-alt px-4 py-2.5 text-xs font-black text-ui-muted">{formatFinancialCurrency(round, p.currency, lang)}</button>
+                    <button onClick={() => p.onPaidAmountChange(round)} className="rounded-xl bg-ui-page-alt px-4 py-2.5 text-xs font-black text-ui-muted">{formatCurrency(round, p.currency, lang)}</button>
                     {quick.map((v) => <button key={v} onClick={() => p.onPaidAmountChange(p.paidAmount + v)} className="rounded-xl bg-ui-page-alt px-4 py-2.5 text-xs font-black text-ui-muted">+{v}</button>)}
                   </div>
-                  {p.change > 0 && <div className="mt-3 flex justify-between rounded-2xl bg-ui-success/10 p-4 text-sm font-black text-ui-success"><span>{t('change')}</span><span>{formatFinancialCurrency(p.change, p.currency, lang)}</span></div>}
+                  {p.change > 0 && <div className="mt-3 flex justify-between rounded-2xl bg-ui-success/10 p-4 text-sm font-black text-ui-success"><span>{t('change')}</span><span>{formatCurrency(p.change, p.currency, lang)}</span></div>}
                 </div>
               )}
             </>
@@ -624,7 +617,7 @@ export function PaymentPanel(p: PaymentPanelProps) {
         <div className="mx-auto max-w-2xl">
           <div className="mb-3 flex items-end justify-between">
             <span className="text-sm font-bold text-ui-muted">{t('total')}</span>
-            <span className="text-3xl font-black text-ui-accent">{formatFinancialCurrency(p.total, p.currency, lang)}</span>
+            <span className="text-3xl font-black text-ui-accent">{formatCurrency(p.total, p.currency, lang)}</span>
           </div>
           <Button
             data-testid="pos-payment-confirm"
@@ -636,7 +629,6 @@ export function PaymentPanel(p: PaymentPanelProps) {
               || !p.canComplete
               || (splitMode && !splitValid)
               || (!splitMode && p.paymentMethod === 'credit' && !creditAllowed)
-              || (!splitMode && p.paymentMethod !== 'credit' && !isManualMethod && p.total > 0 && p.paidAmount <= 0)
               || (!splitMode && isManualMethod && (!manualConfigured || manualApprovalStatus !== 'approved' || !manualApprovalId))
             }
           >

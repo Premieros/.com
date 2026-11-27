@@ -1,6 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { createPostgrestDedupingFetch } from './postgrestDedupingFetch';
-import { websitePhotoRequestUrl } from './websitePhotoRequest';
+import { postgrestDedupingFetch } from './postgrestDedupingFetch';
 
 const supabaseUrl =
   (import.meta.env.VITE_SUPABASE_URL as string | undefined)?.trim() ||
@@ -16,11 +15,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     detectSessionInUrl: true,
   },
   global: {
-    fetch: createPostgrestDedupingFetch((input, init) => {
-      const origin = typeof window === 'undefined' ? '' : window.location.origin;
-      const photoUrl = websitePhotoRequestUrl(input, init, origin);
-      return globalThis.fetch(photoUrl ?? input, init);
-    }),
+    fetch: postgrestDedupingFetch,
   },
 });
 

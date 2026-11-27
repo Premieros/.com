@@ -1,9 +1,5 @@
-import { WorkspaceControls } from '@/components/WorkspaceToolbar';
-import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
-import type { CreateProductInput } from '@/api/domains/catalog';
-import { useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Edit2, Trash2, Download, Upload, Barcode as BarcodeIcon, QrCode, Move, SlidersHorizontal, Package, CheckCircle2, Layers, Tag, LayoutGrid, List, ArrowUpDown, Eye, X } from 'lucide-react';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { Plus, Edit2, Trash2, Download, Upload, Barcode as BarcodeIcon, QrCode, Move, SlidersHorizontal } from 'lucide-react';
 import { supabase } from '@/api';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
@@ -12,16 +8,13 @@ import { DesignSurface, DesignPageHeader } from '@/components/design/DesignSurfa
 import { DesignSearch } from '@/components/design/DesignSearch';
 import { DesignPanel } from '@/components/design/DesignPanel';
 import { DesignPagination } from '@/components/design/DesignPagination';
-import { WorkspaceMeter } from '@/components/design/WorkspaceIndicators';
 import { DataTable, type Column } from '@/components/DataTable';
-import { StatCard } from '@/components/PageHeader';
-import { Badge } from '@/components/Badge';
 import { Button } from '@/components/Button';
 import { Input, Select, Textarea } from '@/components/Input';
 import { Modal } from '@/components/Modal';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
 import { BranchBadge } from '@/components/BranchBadge';
-import { formatCurrency, formatFinancialCurrency, formatNumber } from '@/lib/format';
+import { formatCurrency, formatNumber } from '@/lib/format';
 import { exportToExcel, importFromExcel } from '@/lib/excel';
 import { renderBarcode, generateQRCodeDataURL } from '@/lib/barcode';
 import { logAudit } from '@/lib/audit';
@@ -30,7 +23,6 @@ import { useCan } from '@/lib/permissions';
 import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
 import { usePaginatedRows } from '@/hooks/usePaginatedRows';
-import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { invalidatePosCatalogCache } from '@/core/offline/invalidatePosCatalogCache';
 import { ProductImage } from '@/features/catalog/components/ProductImage';
 import { ProductImageAdjustModal, type ProductImageView } from '@/features/catalog/components/ProductImageAdjustModal';
@@ -38,8 +30,6 @@ import { BusinessAttributesFields } from '@/features/shared/BusinessAttributesFi
 import type { Product, Category, ProductUnit, ProductComponentInput } from '@/lib/types';
 import { APP_ROUTES } from '@/core/navigation/routes';
 import { useOrganizationModules } from '@/core/modules/OrganizationModulesContext';
-
-import { includePendingComponent, positiveRecipeYield, validComponentRows } from '@/features/catalog/productCompositionDraft';
 
 const UNIT_NAMES = ['piece', 'carton', 'box', 'pack', 'kg', 'liter', 'meter', 'gram'];
 
@@ -64,7 +54,6 @@ export function ProductsPage() {
   const { t, lang } = useLanguage();
   const { show } = useToast();
   const can = useCan();
-  const record = useRecordFocus();
   const branchFilter = useBranchFilter();
   const { runtime, canAccessPath } = useOrganizationModules();
   const supportsRawComposition = runtime.capabilities.has('raw_materials') || runtime.capabilities.has('recipes');
@@ -72,30 +61,18 @@ export function ProductsPage() {
   const supportsComposition = supportsRawComposition || supportsComponentGroups;
   const itemLabel = runtime.terminology.item[lang === 'ar' ? 'ar' : 'en'];
   const [search, setSearch] = useState('');
-  const debouncedSearch = useDebouncedValue(search, 250);
   const { rows: products, loading, total, hasMore, loadMore, loadingMore, refresh: reloadProducts, fetchAll: fetchAllProducts } = usePaginatedRows<Product>({
     table: 'products',
-    filters: record.id ? [{ column: 'id', value: record.id }] : undefined,
     select: '*',
     order: { column: 'created_at', ascending: false },
     branch_id: branchFilter,
-    enabled: can('products.view') && (!record.id || Boolean(branchFilter)),
-    search: { term: record.id ? '' : debouncedSearch, columns: ['name', 'name_en', 'barcode', 'sku'] },
+    search: { term: search, columns: ['name', 'name_en', 'barcode', 'sku'] },
     pageSize: 100,
   });
   const [categories, setCategories] = useState<Category[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
-  const [quickModalOpen, setQuickModalOpen] = useState(false);
-  const [ingredientsModalOpen, setIngredientsModalOpen] = useState(false);
   const [editSection, setEditSection] = useState<'basic' | 'components' | 'units'>('basic');
   const [catalogToolsOpen, setCatalogToolsOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
-  const [categoryFilter, setCategoryFilter] = useState<string>('all');
-  const [composedOnly, setComposedOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<'newest' | 'name' | 'price-desc' | 'price-asc'>('newest');
-  const [inspectProduct, setInspectProduct] = useState<Product | null>(null);
-  const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [editing, setEditing] = useState<Product | null>(null);
   const [deleteId, setDeleteId] = useState<string | null>(null);
   const [barcodeModal, setBarcodeModal] = useState<Product | null>(null);
@@ -182,83 +159,14 @@ export function ProductsPage() {
   useEffect(() => { loadMeta(); }, [loadMeta]);
   useEffect(() => { loadLiveProductCosts(); }, [loadLiveProductCosts]);
 
-  const [saving, setSaving] = useState(false);
-  const saveLock = useRef(false);
-  const openingProduct = useRef(false);
-  const initialRecipeVersion = useRef<number | null>(null);
-  const initialLinks = useRef<{ unit_id: string; quantity: number }[]>([]);
-  const initialLegacy = useRef<ProductComponentInput[]>([]);
-  const canManageRecipes = can('recipes.manage');
-
-  useEffect(() => {
-    if (!(quickModalOpen || modalOpen || ingredientsModalOpen) || editing || !supportsRawComposition || !canManageRecipes || !form.branch_id) return;
-    let active = true;
-    setRawMaterialOptions([]);
-    supabase.from('raw_materials').select('id,name,branch_id')
-      .eq('branch_id', form.branch_id).eq('is_active', true).not('unit_id', 'is', null).order('name')
-      .then(({ data, error }) => {
-        if (!active) return;
-        if (error) show(error.message, 'error');
-        else setRawMaterialOptions(data ?? []);
-      });
-    return () => { active = false; };
-  }, [quickModalOpen, modalOpen, ingredientsModalOpen, editing, supportsRawComposition, canManageRecipes, form.branch_id, show]);
-
-  useEffect(() => {
-    if (!(quickModalOpen || modalOpen || ingredientsModalOpen) || editing || !supportsComponentGroups || !form.branch_id) return;
-    let active = true;
-    setManufacturedInventoryUnits([]);
-    supabase.from('inventory_units').select('id,name,unit_type,cost_price,branch_id')
-      .eq('branch_id', form.branch_id).eq('unit_type', 'manufactured').eq('is_active', true).order('name')
-      .then(({ data, error }) => {
-        if (!active) return;
-        if (error) show(error.message, 'error');
-        else setManufacturedInventoryUnits((data || []) as ManufacturedInventoryUnit[]);
-      });
-    return () => { active = false; };
-  }, [quickModalOpen, modalOpen, ingredientsModalOpen, editing, supportsComponentGroups, form.branch_id, show]);
-
   const filtered = products;
   const availableToAdd = stockComponents.filter((s) => s.product_id !== editing?.id && !productComponents.some((c) => c.component_product_id === s.product_id));
-  const availableManufacturedToAdd = manufacturedInventoryUnits.filter((unit) => unit.branch_id === form.branch_id && !linkedInventoryUnits.some((row) => row.unit_id === unit.id));
+  const availableManufacturedToAdd = manufacturedInventoryUnits.filter((unit) => !linkedInventoryUnits.some((row) => row.unit_id === unit.id));
   const availableRawMaterialsToAdd = rawMaterialOptions.filter((material) => !recipeIngredients.some((row) => row.raw_material_id === material.id));
 
-  const openAdd = () => {
-    if (!can('products.create') || openingProduct.current || saveLock.current) return;
-    setEditing(null);
-    initialRecipeVersion.current = null;
-    initialLinks.current = [];
-    initialLegacy.current = [];
-    setRawMaterialOptions([]);
-    setRawMaterialWaste(0);
-    setComponentSel('');
-    setComponentQty(1);
-    setManufacturedInventoryUnits([]);
-    setLinkedUnitSel('');
-    setLinkedUnitQty(1);
-    setEditSection('basic');
-    setBusinessAttributes({});
-    setProductComponents([]);
-    setRecipeIngredients([]);
-    setRecipeYield(1);
-    setRawMaterialSel('');
-    setRawMaterialQty(1);
-    setLinkedInventoryUnits([]);
-    setUnits([]);
-    setForm({
-      name:'',name_en:'',barcode:'',sku:'',category_id:'',description:'',
-      cost_price:0,sale_price:0,wholesale_price:0,image_url:'',
-      image_position_x:0,image_position_y:0,image_zoom:1,is_active:true,
-      low_stock_threshold:5,min_stock:0,max_stock:0,reorder_point:0,
-      product_type:'ready',branch_id:branchFilter || branches[0]?.id || '',
-    });
-    setQuickModalOpen(true);
-  };
+  const openAdd = () => { window.location.hash = '/products/setup'; };
 
   const openEdit = async (p: Product) => {
-    if (openingProduct.current || saveLock.current) return;
-    openingProduct.current = true;
-    try {
     const stockComponentsPromise = supportsComposition ? loadStockComponents() : Promise.resolve();
     setEditing(p);
     setEditSection('basic');
@@ -270,10 +178,7 @@ export function ProductsPage() {
         ? supabase.from('product_components').select('component_product_id, quantity').eq('product_id', p.id)
         : Promise.resolve({ data: [], error: null }),
     ]);
-    if (u.error || comps.error) { show((u.error || comps.error)?.message || t('error'), 'error'); return; }
     setUnits((u.data as ProductUnit[]) || [{ id: '', product_id: p.id, unit_name: 'piece', unit_name_en: 'piece', conversion_factor: 1, sale_price: p.sale_price, cost_price: p.cost_price, barcode: p.barcode || '', is_base: true, created_at: '' }]);
-    initialLegacy.current = ((comps.data || []) as ProductComponentInput[]).map(c => ({ component_product_id: c.component_product_id, quantity: Number(c.quantity) })).sort((a,b) => a.component_product_id < b.component_product_id ? -1 : a.component_product_id > b.component_product_id ? 1 : 0);
-    initialRecipeVersion.current = null;
     setProductComponents(((comps.data as { component_product_id: string; quantity: number }[] | null) || []).map((c) => ({ component_product_id: c.component_product_id, quantity: Number(c.quantity) || 1 })));
     const effectiveProductBranch = p.branch_id || branchFilter || '';
     setLiveCompositionCost(null);
@@ -324,7 +229,6 @@ export function ProductsPage() {
         setRawMaterialOptions(options);
         const names = new Map(options.map((row) => [row.id, row.name]));
         currentYield = Number(composition.yield_quantity) || 1;
-        initialRecipeVersion.current = composition.recipe_version ?? null;
         recipeRows = composition.items.map((row) => ({
           raw_material_id: row.raw_material_id,
           quantity: Number(row.quantity) || 0,
@@ -334,19 +238,17 @@ export function ProductsPage() {
       } catch (compositionError) {
         show(compositionError instanceof Error ? compositionError.message : String(compositionError), 'error');
         setRawMaterialOptions([]);
-        return;
       }
     } else {
       setRawMaterialOptions([]);
     }
     let displayInventoryLinks: LinkedInventoryUnit[] = [];
     if (supportsComponentGroups) {
-      const { data: inventoryLinks, error: inventoryLinksError } = await supabase.from('product_unit_links').select('unit_id,quantity,unit:inventory_units(id,name,unit_type,cost_price)').eq('product_id', p.id);
-      if (inventoryLinksError) { show(inventoryLinksError.message, 'error'); return; }
+      const { data: inventoryLinks } = await supabase.from('product_unit_links').select('unit_id,quantity,unit:inventory_units(id,name,unit_type,cost_price)').eq('product_id', p.id);
       displayInventoryLinks = ((inventoryLinks || []) as unknown as LinkedInventoryUnit[]).map((row) => ({ ...row, quantity: Number(row.quantity) || 0 }));
       if (effectiveProductBranch) {
         const { data: manufacturedUnits, error: manufacturedUnitsError } = await supabase.from('inventory_units').select('id,name,unit_type,cost_price,branch_id').eq('branch_id', effectiveProductBranch).eq('unit_type', 'manufactured').eq('is_active', true).order('name');
-        if (manufacturedUnitsError) { show(manufacturedUnitsError.message, 'error'); return; }
+        if (manufacturedUnitsError) show(manufacturedUnitsError.message, 'error');
         setManufacturedInventoryUnits(((manufacturedUnits || []) as unknown as ManufacturedInventoryUnit[]));
       } else {
         setManufacturedInventoryUnits([]);
@@ -360,81 +262,35 @@ export function ProductsPage() {
     setRawMaterialSel('');
     setRawMaterialQty(1);
     setRawMaterialWaste(0);
-    initialLinks.current = displayInventoryLinks.map(({unit_id,quantity}) => ({unit_id,quantity})).sort((a,b) => a.unit_id < b.unit_id ? -1 : a.unit_id > b.unit_id ? 1 : 0);
     setLinkedInventoryUnits(displayInventoryLinks);
     setLinkedUnitSel('');
     setLinkedUnitQty(1);
     setComponentSel('');
     setComponentQty(1);
-    setQuickModalOpen(true);
-    } catch (error) {
-      show(error instanceof Error ? error.message : String(error), 'error');
-    } finally {
-      openingProduct.current = false;
-    }
+    setModalOpen(true);
   };
 
-  const saveProduct = async () => {
+  const save = async () => {
     if (editing ? !can('products.edit') : !can('products.create')) return;
-    if (!form.name.trim()) { show(t('required') + ': ' + t('name'), 'error'); return; }
+    if (!form.name) { show(t('required') + ': ' + t('name'), 'error'); return; }
     const effectiveBranch = form.branch_id || branchFilter || '';
     if (!effectiveBranch) { show(lang === 'ar' ? 'اختر الفرع أولاً' : 'Select a branch first', 'error'); return; }
-    if (editing && editing.branch_id && editing.branch_id !== effectiveBranch) { show(lang === 'ar' ? 'لا يمكن نقل المنتج بين الفروع من محرر المكونات.' : 'Cannot move a product between branches in the component editor.', 'error'); return; }
-    let rawRows = recipeIngredients;
-    let unitRows = linkedInventoryUnits;
-    let legacyRows = productComponents;
-    try {
-      if (rawMaterialSel) {
-        const material = rawMaterialOptions.find(row => row.id === rawMaterialSel && row.branch_id === effectiveBranch);
-        if (!supportsRawComposition || !canManageRecipes || !material || !Number.isFinite(rawMaterialWaste) || rawMaterialWaste < 0) throw new Error('INVALID_DIRECT_RAW_COMPONENT');
-        rawRows = includePendingComponent(rawRows, rawMaterialSel, rawMaterialQty, row => row.raw_material_id, (id, quantity) => ({ raw_material_id: id, quantity: quantity * positiveRecipeYield(recipeYield), wastage_percent: rawMaterialWaste, raw_material: { name: material.name } }));
-      }
-      if (componentSel) {
-        if (!supportsComposition || componentSel === editing?.id || !availableToAdd.some(row => row.product_id === componentSel)) throw new Error('INVALID_LEGACY_COMPONENT');
-        legacyRows = includePendingComponent(legacyRows, componentSel, componentQty, row => row.component_product_id, (id, quantity) => ({component_product_id:id,quantity}));
-      }
-      if (linkedUnitSel) {
-        const unit = manufacturedInventoryUnits.find(row => row.id === linkedUnitSel && row.branch_id === effectiveBranch);
-        if (!supportsComponentGroups || !unit) throw new Error('INVALID_MANUFACTURED_COMPONENT');
-        unitRows = includePendingComponent(unitRows, linkedUnitSel, linkedUnitQty, row => row.unit_id, (id, quantity) => ({ unit_id: id, quantity, unit }));
-      }
-    } catch {
-      show(lang === 'ar' ? 'تحقق من اختيار المكون والكمية والفرع قبل الحفظ.' : 'Check the selected component, quantity and branch before saving.', 'error');
-      return;
-    }
-    if (!validComponentRows(rawRows, row => row.raw_material_id) || !validComponentRows(unitRows, row => row.unit_id) || !validComponentRows(legacyRows, row => row.component_product_id) || rawRows.some(row => !Number.isFinite(row.wastage_percent) || row.wastage_percent < 0)) { show(lang === 'ar' ? 'تحقق من كميات المكونات وعدم تكرارها.' : 'Check component quantities and duplicates.', 'error'); return; }
-    const hasComponents = rawRows.length > 0 || unitRows.length > 0 || legacyRows.length > 0;
-    const productType = hasComponents ? 'manufactured' as const : form.product_type;
-    if (supportsComposition && productType === 'manufactured' && !hasComponents) { show(t('manufacturedRequiresComponents'), 'error'); return; }
-    if (legacyRows.length > 0 && (rawRows.length > 0 || unitRows.length > 0)) {
-      show(lang === 'ar' ? 'راجع مكونات المنتجات المخزنية القديمة قبل خلطها بالخامات والمصنّعات.' : 'Review legacy stock-product components before mixing them with raw materials and manufactured groups.', 'error'); return;
-    }
-    setRecipeIngredients(rawRows);
-    setLinkedInventoryUnits(unitRows);
-    setProductComponents(legacyRows);
-    setComponentSel('');
-    setRawMaterialSel('');
-    setLinkedUnitSel('');
-    setForm(current => ({ ...current, product_type: productType }));
-    if (supportsComponentGroups && unitRows.some((row) => row.quantity <= 0 || !manufacturedInventoryUnits.some((unit) => unit.id === row.unit_id && unit.branch_id === effectiveBranch))) { show(lang === 'ar' ? 'تحقق من مجموعات المكونات وكمياتها للفرع الحالي' : 'Check component groups and quantities for the current branch', 'error'); return; }
-    if (supportsRawComposition && canManageRecipes && rawRows.some((row) => row.quantity <= 0 || row.wastage_percent < 0 || !rawMaterialOptions.some((material) => material.id === row.raw_material_id && material.branch_id === effectiveBranch))) { show(lang === 'ar' ? 'تحقق من الخامات المباشرة وكمياتها للفرع الحالي' : 'Check direct raw materials and quantities for the current branch', 'error'); return; }
-    if (!editing && supportsRawComposition && rawRows.length > 0 && !can('recipes.manage')) { show(lang === 'ar' ? 'لا تملك صلاحية إدارة الخامات المباشرة للمنتج.' : 'You do not have permission to manage direct product raw materials.', 'error'); return; }
-    const payload = { ...form, product_type: productType, category_id: form.category_id || null, branch_id: effectiveBranch, business_attributes: businessAttributes };
+    if (supportsComposition && form.product_type === 'manufactured' && productComponents.length === 0 && recipeIngredients.length === 0 && linkedInventoryUnits.length === 0) { show(t('manufacturedRequiresComponents'), 'error'); return; }
+    if (supportsComponentGroups && linkedInventoryUnits.some((row) => row.quantity <= 0 || !manufacturedInventoryUnits.some((unit) => unit.id === row.unit_id && unit.branch_id === effectiveBranch))) { show(lang === 'ar' ? 'تحقق من مجموعات المكونات وكمياتها للفرع الحالي' : 'Check component groups and quantities for the current branch', 'error'); return; }
+    if (supportsRawComposition && recipeIngredients.some((row) => row.quantity <= 0 || row.wastage_percent < 0 || !rawMaterialOptions.some((material) => material.id === row.raw_material_id && material.branch_id === effectiveBranch))) { show(lang === 'ar' ? 'تحقق من الخامات المباشرة وكمياتها للفرع الحالي' : 'Check direct raw materials and quantities for the current branch', 'error'); return; }
+    if (supportsRawComposition && editing && recipeIngredients.length > 0 && !can('recipes.manage')) { show(lang === 'ar' ? 'لا تملك صلاحية إدارة الخامات المباشرة للمنتج.' : 'You do not have permission to manage direct product raw materials.', 'error'); return; }
+    const payload = { ...form, category_id: form.category_id || null, branch_id: effectiveBranch, business_attributes: businessAttributes };
     const unitPayload = units.filter(u => u.unit_name).map((u) => ({ unit_name: u.unit_name, unit_name_en: u.unit_name_en || u.unit_name, conversion_factor: u.conversion_factor, sale_price: u.sale_price, cost_price: u.cost_price, barcode: u.barcode || null, is_base: u.is_base }));
+    let pid: string;
     if (editing) {
-      const { data, error } = await api.catalog.editProductOperational({
-        p_product_id: editing.id, p_branch_id: effectiveBranch,
-        p_expected_version: initialRecipeVersion.current, p_expected_links: initialLinks.current,
-        p_product: payload, p_units: unitPayload.length > 0 ? unitPayload : null,
-        p_items: supportsRawComposition && canManageRecipes ? rawRows.map(({raw_material_id,quantity,wastage_percent}) => ({raw_material_id,quantity,wastage_percent})) : null,
-        p_links: supportsComponentGroups ? unitRows.map(({unit_id,quantity}) => ({unit_id,quantity})) : null,
-        p_expected_legacy: supportsComposition ? initialLegacy.current : null,
-        p_legacy: supportsComposition ? legacyRows : null,
-      });
-      if (error || !data?.success || data.product_id !== editing.id) { show(error?.message || data?.detail || data?.error || 'PRODUCT_NOT_SAVED', 'error'); return; }
+      const { error } = await supabase.from('products').update(payload).eq('id', editing.id);
+      if (error) { show(error.message, 'error'); return; }
+      pid = editing.id;
+      const { error: unitError } = await api.catalog.replaceProductUnits({ p_product_id: editing.id, p_units: unitPayload });
+      if (unitError) { show(unitError.message, 'error'); return; }
       await logAudit('update', 'products', editing.id, { name: form.name });
     } else {
-      const createInput: CreateProductInput = {
+      const { data, error } = await api.catalog.createProduct({
         p_name: payload.name,
         p_name_en: payload.name_en || null,
         p_barcode: payload.barcode || null,
@@ -453,46 +309,67 @@ export function ProductsPage() {
         p_product_type: payload.product_type,
         p_is_active: payload.is_active,
         p_units: unitPayload.length > 0 ? unitPayload : null,
-        p_unit_links: supportsComponentGroups && unitRows.length > 0 ? unitRows.map(({ unit_id, quantity }) => ({ unit_id, quantity })) : null,
-      };
-      const { data, error } = await api.catalog.createProductOperational({
-        p_product: { ...createInput, p_business_attributes: businessAttributes, p_legacy_components: legacyRows },
-        p_items: rawRows.map(({ raw_material_id, quantity, wastage_percent }) => ({ raw_material_id, quantity, wastage_percent })),
       });
-      if (error || !data?.success || !data.product_id) { show(error?.message || data?.error || 'PRODUCT_CREATE_FAILED', 'error'); return; }
+      if (error || !data || data.success === false) { show(error?.message || data?.error || 'error', 'error'); return; }
+      pid = data.product_id!;
+    }
+
+    if (editing && supportsComposition) {
+      const desiredLinks = supportsComponentGroups && form.product_type === 'manufactured'
+        ? linkedInventoryUnits.map(({ unit_id, quantity }) => ({ unit_id, quantity }))
+        : [];
+      try {
+        if (supportsComponentGroups) await api.catalog.setProductUnitLinks(pid, desiredLinks);
+        if (supportsRawComposition && can('recipes.manage')) {
+          await api.catalog.saveProductDirectRawComponents({
+            product_id: pid,
+            branch_id: effectiveBranch,
+            product_name: form.name.trim(),
+            items: form.product_type === 'manufactured'
+              ? recipeIngredients.map((row) => ({
+                  raw_material_id: row.raw_material_id,
+                  quantity: Number(row.quantity),
+                  wastage_percent: Number(row.wastage_percent) || 0,
+                }))
+              : [],
+          });
+        } else if (supportsRawComposition && form.product_type === 'ready' && recipeIngredients.length > 0) {
+          throw new Error(lang === 'ar'
+            ? 'لا يمكن تحويل المنتج إلى بدون مكونات قبل إزالة خاماته المباشرة بصلاحية مناسبة.'
+            : 'Direct raw materials must be removed with the proper permission before changing this product to no-components.');
+        }
+      } catch (compositionError) {
+        show(compositionError instanceof Error ? compositionError.message : String(compositionError), 'error');
+        return;
+      }
+    }
+
+    const usesOperationalComposition = recipeIngredients.length > 0 || linkedInventoryUnits.length > 0;
+    if (supportsComposition && !usesOperationalComposition) {
+      const { error: compDelError } = await supabase.from('product_components').delete().eq('product_id', pid);
+      if (compDelError) { show(compDelError.message, 'error'); return; }
+      if (form.product_type === 'manufactured' && productComponents.length > 0) {
+        const { error: compInsError } = await supabase.from('product_components').insert(productComponents.map((c) => ({ product_id: pid, component_product_id: c.component_product_id, quantity: c.quantity })));
+        if (compInsError) { show(compInsError.message, 'error'); return; }
+      }
     }
     show(t('saveSuccess'), 'success');
     setModalOpen(false);
-    setQuickModalOpen(false);
-    setIngredientsModalOpen(false);
     await invalidatePosCatalogCache();
     await loadLiveProductCosts();
     reloadProducts();
   };
 
-  const save = async () => {
-    if (saveLock.current) return;
-    saveLock.current = true;
-    setSaving(true);
-    try {
-      await saveProduct();
-    } finally {
-      saveLock.current = false;
-      setSaving(false);
-    }
-  };
-
-  const addComponentRow = () => { if (!componentSel || !Number.isFinite(componentQty) || componentQty <= 0 || !availableToAdd.some(row => row.product_id === componentSel)) { show(t('required'), 'error'); return; } setProductComponents(prev => [...prev, { component_product_id: componentSel, quantity: componentQty }]); setForm(prev => ({ ...prev, product_type: 'manufactured' })); setComponentSel(''); setComponentQty(1); };
-  const updateComponentQty = (i: number, qty: number) => setProductComponents(productComponents.map((c, idx) => idx === i ? { ...c, quantity: qty } : c));
-  const removeComponentRow = (i: number) => { const next = productComponents.filter((_, idx) => idx !== i); setProductComponents(next); if (!next.length && !recipeIngredients.length && !linkedInventoryUnits.length) setForm(prev => ({ ...prev, product_type: 'ready' })); };
+  const addComponentRow = () => { if (!componentSel) { show(t('required'), 'error'); return; } setProductComponents([...productComponents, { component_product_id: componentSel, quantity: componentQty > 0 ? componentQty : 1 }]); setComponentSel(''); setComponentQty(1); };
+  const updateComponentQty = (i: number, qty: number) => setProductComponents(productComponents.map((c, idx) => idx === i ? { ...c, quantity: qty > 0 ? qty : 1 } : c));
+  const removeComponentRow = (i: number) => setProductComponents(productComponents.filter((_, idx) => idx !== i));
   const addDirectRawIngredient = () => {
     if (!rawMaterialSel || !can('recipes.manage')) return;
     const material = rawMaterialOptions.find((row) => row.id === rawMaterialSel);
-    if (!material || recipeIngredients.some((row) => row.raw_material_id === rawMaterialSel) || !Number.isFinite(rawMaterialQty) || rawMaterialQty <= 0) return;
-    setForm(f => ({ ...f, product_type: 'manufactured' }));
+    if (!material || recipeIngredients.some((row) => row.raw_material_id === rawMaterialSel)) return;
     setRecipeIngredients([...recipeIngredients, {
       raw_material_id: material.id,
-      quantity: Math.max(0.0001, rawMaterialQty) * positiveRecipeYield(recipeYield),
+      quantity: Math.max(0.0001, rawMaterialQty) * Math.max(1, recipeYield),
       wastage_percent: Math.max(0, rawMaterialWaste),
       raw_material: { name: material.name },
     }]);
@@ -507,24 +384,18 @@ export function ProductsPage() {
   const removeDirectRawIngredient = (index: number) => {
     if (!can('recipes.manage')) return;
     setRecipeIngredients(recipeIngredients.filter((_, i) => i !== index));
-    if (recipeIngredients.length === 1 && !linkedInventoryUnits.length && !productComponents.length) setForm(f=>({...f,product_type:'ready'}));
   };
 
   const addLinkedInventoryUnit = () => {
     if (!linkedUnitSel) { show(t('required'), 'error'); return; }
     const unit = manufacturedInventoryUnits.find((item) => item.id === linkedUnitSel);
     if (!unit || linkedInventoryUnits.some((row) => row.unit_id === linkedUnitSel)) return;
-    if (!Number.isFinite(linkedUnitQty) || linkedUnitQty <= 0 || unit.branch_id !== form.branch_id) return;
-    setLinkedInventoryUnits([...linkedInventoryUnits, { unit_id: unit.id, quantity: linkedUnitQty, unit }]);
-    setForm(f => ({ ...f, product_type: 'manufactured' }));
+    setLinkedInventoryUnits([...linkedInventoryUnits, { unit_id: unit.id, quantity: linkedUnitQty > 0 ? linkedUnitQty : 1, unit }]);
     setLinkedUnitSel('');
     setLinkedUnitQty(1);
   };
-  const updateLinkedInventoryUnitQty = (i: number, qty: number) => setLinkedInventoryUnits(linkedInventoryUnits.map((row, idx) => idx === i ? { ...row, quantity: qty } : row));
-  const removeLinkedInventoryUnit = (i: number) => {
-    setLinkedInventoryUnits(linkedInventoryUnits.filter((_, idx) => idx !== i));
-    if (linkedInventoryUnits.length === 1 && !recipeIngredients.length && !productComponents.length) setForm(f => ({ ...f, product_type: 'ready' }));
-  };
+  const updateLinkedInventoryUnitQty = (i: number, qty: number) => setLinkedInventoryUnits(linkedInventoryUnits.map((row, idx) => idx === i ? { ...row, quantity: qty > 0 ? qty : 1 } : row));
+  const removeLinkedInventoryUnit = (i: number) => setLinkedInventoryUnits(linkedInventoryUnits.filter((_, idx) => idx !== i));
 
   const remove = async () => {
     if (!deleteId || !can('products.delete')) return;
@@ -548,14 +419,13 @@ export function ProductsPage() {
       await logAudit('delete', 'products', id);
     }
     setDeleteId(null);
-    if (inspectProduct?.id === id) setInspectProduct(null);
     await invalidatePosCatalogCache();
     reloadProducts();
   }
 
   const handleExport = async () => {
     const all = await fetchAllProducts();
-    exportToExcel(all.map(p => ({ Name: p.name, NameEn: p.name_en || '', Barcode: p.barcode || '', SKU: p.sku || '', ProductType: p.product_type || 'ready', CostPrice: liveProductCosts[p.id] ?? p.cost_price, SalePrice: p.sale_price, WholesalePrice: p.wholesale_price, Category: productCategoryName(p), Active: p.is_active, LowStockThreshold: p.low_stock_threshold, MinStock: p.min_stock ?? 0, MaxStock: p.max_stock ?? 0, ReorderPoint: p.reorder_point ?? 0 })), 'products');
+    exportToExcel(all.map(p => ({ Name: p.name, NameEn: p.name_en || '', Barcode: p.barcode || '', SKU: p.sku || '', ProductType: p.product_type || 'ready', CostPrice: p.cost_price, SalePrice: p.sale_price, WholesalePrice: p.wholesale_price, Category: productCategoryName(p), Active: p.is_active, LowStockThreshold: p.low_stock_threshold, MinStock: p.min_stock ?? 0, MaxStock: p.max_stock ?? 0, ReorderPoint: p.reorder_point ?? 0 })), 'products');
   };
 
   const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -581,8 +451,8 @@ export function ProductsPage() {
     { key: 'category', header: t('category'), render: (p) => productCategoryName(p) || '-' },
     { key: 'branch', header: t('branch'), render: (p) => <BranchBadge name={branchLabel(p.branch_id)} /> },
     { key: 'cost_price', header: t('costPrice'), render: (p) => {
-      const cost = liveProductCosts[p.id] ?? p.cost_price;
-      return <span title={p.product_type === 'manufactured' ? (lang === 'ar' ? 'تكلفة محسوبة من المكونات الحالية' : 'Calculated from current components') : undefined}>{formatFinancialCurrency(cost, currency, lang)}</span>;
+      const cost = p.product_type === 'manufactured' ? (liveProductCosts[p.id] ?? p.cost_price) : p.cost_price;
+      return <span title={p.product_type === 'manufactured' ? (lang === 'ar' ? 'تكلفة محسوبة من المكونات الحالية' : 'Calculated from current components') : undefined}>{formatCurrency(cost, currency, lang)}</span>;
     } },
     { key: 'sale_price', header: t('salePrice'), render: (p) => <span className="font-semibold text-brand-600 dark:text-brand-400">{formatCurrency(p.sale_price, currency, lang)}</span> },
     { key: 'wholesale_price', header: t('wholesalePrice'), render: (p) => formatCurrency(p.wholesale_price, currency, lang) },
@@ -590,371 +460,11 @@ export function ProductsPage() {
     { key: 'actions', header: t('actions'), render: (p) => <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}><button onClick={() => showBarcode(p)} className="p-1.5 rounded-md hover:bg-ui-page-alt text-ui-subtle" title={t('barcode')}><BarcodeIcon className="w-4 h-4" /></button><button onClick={() => showQR(p)} className="p-1.5 rounded-md hover:bg-ui-page-alt text-ui-subtle" title={t('generateQR')}><QrCode className="w-4 h-4" /></button>{can('products.edit') && <button onClick={() => openEdit(p)} className="ui-icon-action ui-icon-action-info" title={t('edit')}><Edit2 className="w-4 h-4" /></button>}{can('products.delete') && <button onClick={() => setDeleteId(p.id)} className="ui-icon-action ui-icon-action-danger" title={t('delete')}><Trash2 className="w-4 h-4" /></button>}</div> },
   ];
 
-  const directIngredientFields = <>
-          <div className="space-y-2">
-            {recipeIngredients.map((row,i)=><div key={row.raw_material_id} className="flex items-end gap-2 rounded-xl border border-ui-border p-2">
-              <div className="min-w-0 flex-1 text-sm font-semibold text-ui-text">{row.raw_material?.name || rawMaterialOptions.find(x=>x.id===row.raw_material_id)?.name}</div>
-              <Input label={lang==='ar'?'الكمية':'Qty'} type="number" min={0.0001} step={0.0001}
-                value={row.quantity / positiveRecipeYield(recipeYield)} className="w-28"
-                disabled={!can('recipes.manage')}
-                onChange={e=>updateDirectRawIngredient(i,{quantity:(Number(e.target.value)||0)*positiveRecipeYield(recipeYield)})}/>
-              {can('recipes.manage') && <button type="button" className="p-2 text-ui-danger" onClick={()=>removeDirectRawIngredient(i)} aria-label={lang==='ar'?'حذف المكون':'Remove ingredient'}><Trash2 className="h-4 w-4"/></button>}
-            </div>)}
-          </div>
-          {can('recipes.manage') && <div className="grid gap-2 sm:grid-cols-[1fr_100px_auto] sm:items-end">
-            <Select label={lang==='ar'?'إضافة خامة':'Add ingredient'} value={rawMaterialSel} onChange={e=>setRawMaterialSel(e.target.value)}>
-              <option value="">{lang==='ar'?'اختر خامة':'Choose ingredient'}</option>
-              {availableRawMaterialsToAdd.map(x=><option key={x.id} value={x.id}>{x.name}</option>)}
-            </Select>
-            <Input label={lang==='ar'?'الكمية':'Qty'} type="number" min="0.0001" step="0.0001"
-              value={rawMaterialQty} onChange={e=>setRawMaterialQty(Number(e.target.value)||0)}/>
-            <Button variant="outline" onClick={()=>{
-              if (!rawMaterialSel || rawMaterialQty<=0) return;
-              addDirectRawIngredient();
-              setForm(f=>({...f,product_type:'manufactured'}));
-            }} disabled={!rawMaterialSel || rawMaterialQty<=0}><Plus className="h-4 w-4"/>{t('add')}</Button>
-          </div>}
-          {!rawMaterialOptions.length && <p className="text-xs text-ui-muted">{lang==='ar'?'لا توجد خامات مسجلة في هذا الفرع. أضف الخامات من المخزون أولاً.':'No branch raw materials available. Register ingredients in inventory first.'}</p>}
-  </>;
-
-  const manufacturedIngredientFields = supportsComponentGroups && <div className="space-y-3" data-testid="product-manufactured-components">
-    <h3 className="font-semibold">{lang === 'ar' ? 'المصنّعات / مجموعات المكونات' : 'Manufactured component groups'}</h3>
-    {linkedInventoryUnits.map((row, i) => <div key={row.unit_id} className="flex items-end gap-2 rounded-xl border border-ui-border p-2">
-      <span className="min-w-0 flex-1 text-sm font-semibold">{row.unit?.name || manufacturedInventoryUnits.find(unit => unit.id === row.unit_id)?.name || row.unit_id}</span>
-      <Input label={lang === 'ar' ? 'الكمية' : 'Qty'} type="number" min={0.0001} step={0.0001} value={row.quantity} onChange={e => updateLinkedInventoryUnitQty(i, Number(e.target.value))} className="w-28" />
-      <button type="button" aria-label={lang === 'ar' ? 'حذف المصنّع' : 'Remove manufactured component'} onClick={() => removeLinkedInventoryUnit(i)} className="p-2 text-ui-danger"><Trash2 className="w-4 h-4" /></button>
-    </div>)}
-    <div className="grid gap-2 sm:grid-cols-[1fr_100px_auto] sm:items-end">
-      <Select label={lang === 'ar' ? 'إضافة مصنّع' : 'Add manufactured component'} value={linkedUnitSel} onChange={e => setLinkedUnitSel(e.target.value)}>
-        <option value="">{lang === 'ar' ? 'اختر مصنّعًا' : 'Choose manufactured component'}</option>
-        {availableManufacturedToAdd.map(unit => <option key={unit.id} value={unit.id}>{unit.name}</option>)}
-      </Select>
-      <Input label={lang === 'ar' ? 'الكمية' : 'Qty'} type="number" min={0.0001} step={0.0001} value={linkedUnitQty} onChange={e => setLinkedUnitQty(Number(e.target.value))} />
-      <Button type="button" variant="outline" onClick={addLinkedInventoryUnit} disabled={!linkedUnitSel || linkedUnitQty <= 0}><Plus className="w-4 h-4" />{t('add')}</Button>
-    </div>
-    {!manufacturedInventoryUnits.length && <p className="text-xs text-ui-muted">{lang === 'ar' ? 'لا توجد مصنّعات نشطة متاحة للفرع الحالي.' : 'No active manufactured groups available for this branch.'}</p>}
-  </div>;
-
-  const displayedProducts = useMemo(() => {
-    const byCat = categoryFilter === 'all' ? filtered : filtered.filter((p) => (p.category_id || 'uncategorized') === categoryFilter);
-    const byType = composedOnly ? byCat.filter((p) => p.product_type === 'manufactured') : byCat;
-    if (sortBy === 'name') return [...byType].sort((a, b) => a.name.localeCompare(b.name));
-    if (sortBy === 'price-desc') return [...byType].sort((a, b) => Number(b.sale_price || 0) - Number(a.sale_price || 0));
-    if (sortBy === 'price-asc') return [...byType].sort((a, b) => Number(a.sale_price || 0) - Number(b.sale_price || 0));
-    return byType;
-  }, [filtered, categoryFilter, composedOnly, sortBy]);
-  const activeCount = useMemo(() => filtered.filter((p) => p.is_active).length, [filtered]);
-  const manufacturedCount = useMemo(() => filtered.filter((p) => p.product_type === 'manufactured').length, [filtered]);
-
-  useEffect(() => {
-    if (!inspectProduct) return;
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setInspectProduct(null); };
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [inspectProduct]);
-
-  useEffect(() => {
-    if (searchParams.get('new') !== '1') return;
-    if (can('products.create')) openAdd();
-    const next = new URLSearchParams(searchParams);
-    next.delete('new');
-    setSearchParams(next, { replace: true });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams]);
-
-  const productToolItems = useMemo(() => ([
-    { route: APP_ROUTES.pricing, ar: 'التسعير', en: 'Pricing', allowed: can('products.view') },
-    { route: APP_ROUTES.productModifiers, ar: 'مجموعات الإضافات', en: 'Modifier groups', allowed: can('products.modifiers.manage') },
-    { route: APP_ROUTES.productModifierOptions, ar: 'خيارات الإضافات', en: 'Modifier options', allowed: can('products.modifiers.manage') },
-    { route: APP_ROUTES.categories, ar: 'التصنيفات', en: 'Categories', allowed: can('categories.view') },
-    { route: APP_ROUTES.inventoryUnits, ar: 'مجموعات المكونات', en: 'Component groups', allowed: can('raw_materials.view') },
-  ] as const).filter((item) => item.allowed && canAccessPath(item.route)), [can, canAccessPath]);
-
   return (
     <DesignSurface testId="products-page">
-      {record.id && <RecordFocus onClear={record.clear} />}
-      <DesignPageHeader
-        title={itemLabel}
-        subtitle={lang === 'ar' ? 'إدارة الأصناف والأسعار والتصنيفات والمكونات' : 'Manage finished goods, pricing, categories and compositions'}
-        actions={<>{can('products.import') && <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} data-testid="products-import" />}{can('products.import') && <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} data-testid="products-import-button"><Upload className="w-4 h-4" /> {t('importExcel')}</Button>}{can('products.export') && <Button variant="outline" size="sm" onClick={handleExport} data-testid="products-export"><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}{productToolItems.length > 0 && <Button variant="outline" size="sm" onClick={() => setCatalogToolsOpen(true)} data-testid="products-tools"><SlidersHorizontal className="w-4 h-4" /> {lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'}</Button>}{can('products.create') && <Button size="sm" onClick={openAdd} data-testid="products-add"><Plus className="w-4 h-4" /> {t('add')}</Button>}</>}
-      />
-      <section className="premier-refresh-stagger grid gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard
-          title={lang === 'ar' ? 'الأصناف المعروضة' : 'Catalog SKUs'}
-          value={formatNumber(filtered.length, 0)}
-          icon={<Package className="h-4 w-4" />}
-          color="brand"
-          trend={lang === 'ar' ? `${categories.length} تصنيف` : `${categories.length} categories`}
-        />
-        <StatCard
-          title={lang === 'ar' ? 'الأصناف النشطة' : 'Active items'}
-          value={formatNumber(activeCount, 0)}
-          icon={<CheckCircle2 className="h-4 w-4" />}
-          color="green"
-        />
-        <StatCard
-          title={lang === 'ar' ? 'أصناف بمكونات' : 'With components'}
-          value={formatNumber(manufacturedCount, 0)}
-          icon={<Layers className="h-4 w-4" />}
-          color="blue"
-        />
-        <StatCard
-          title={lang === 'ar' ? 'التصنيفات' : 'Categories'}
-          value={formatNumber(categories.length, 0)}
-          icon={<Tag className="h-4 w-4" />}
-          color="amber"
-        />
-      </section>
-      <WorkspaceControls><div data-testid="products-search-panel" className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex max-w-full flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setCategoryFilter('all')}
-              className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-all ${categoryFilter === 'all' ? 'border-ui-text bg-ui-text text-ui-surface shadow-ui-sm' : 'border-ui-border bg-ui-surface text-ui-muted hover:border-ui-border-strong hover:text-ui-text'}`}
-            >
-              <span>{lang === 'ar' ? 'الكل' : 'All'}</span>
-              <span className="text-[11px] opacity-75 tabular-nums">{filtered.length}</span>
-            </button>
-            {categories.map((cat) => {
-              const active = categoryFilter === cat.id;
-              return (
-                <button
-                  key={cat.id}
-                  type="button"
-                  onClick={() => setCategoryFilter(cat.id)}
-                  className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3.5 py-1.5 text-[13px] font-semibold transition-all ${active ? 'border-ui-text bg-ui-text text-ui-surface shadow-ui-sm' : 'border-ui-border bg-ui-surface text-ui-muted hover:border-ui-border-strong hover:text-ui-text'}`}
-                >
-                  <span>{cat.name}</span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto">
-            {supportsComposition && (
-              <button
-                type="button"
-                aria-pressed={composedOnly}
-                onClick={() => setComposedOnly((v) => !v)}
-                className={`inline-flex h-10 shrink-0 items-center gap-1.5 rounded-full border px-3.5 text-xs font-semibold transition ${
-                  composedOnly ? 'border-ui-primary bg-ui-primary-soft text-ui-primary' : 'border-ui-border bg-ui-surface text-ui-muted hover:border-ui-border-strong hover:text-ui-text'
-                }`}
-              >
-                <Layers className="h-3.5 w-3.5" />
-                <span>{lang === 'ar' ? 'بمكونات فقط' : 'Composed only'}</span>
-                <span className="tabular-nums opacity-75">{manufacturedCount}</span>
-              </button>
-            )}
-            <DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="products-search" className="w-full sm:w-60" />
-            <label className="inline-flex h-10 items-center gap-1.5 rounded-full border border-ui-border bg-ui-surface px-3 text-xs font-semibold text-ui-muted shadow-ui-sm">
-              <ArrowUpDown className="h-3.5 w-3.5 text-ui-subtle" />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as 'newest' | 'name' | 'price-desc' | 'price-asc')}
-                aria-label={lang === 'ar' ? 'ترتيب المنتجات' : 'Sort products'}
-                className="bg-transparent text-xs font-semibold text-ui-text outline-none"
-              >
-                <option value="newest">{lang === 'ar' ? 'الأحدث' : 'Newest'}</option>
-                <option value="name">{lang === 'ar' ? 'الاسم أ-ي' : 'Name A–Z'}</option>
-                <option value="price-desc">{lang === 'ar' ? 'الأعلى سعراً' : 'Price: High–Low'}</option>
-                <option value="price-asc">{lang === 'ar' ? 'الأقل سعراً' : 'Price: Low–High'}</option>
-              </select>
-            </label>
-            <div className="inline-flex items-center gap-1 rounded-full border border-ui-border bg-ui-page-alt p-1" role="group" aria-label={lang === 'ar' ? 'طريقة العرض' : 'View mode'}>
-              <button
-                type="button"
-                onClick={() => setViewMode('grid')}
-                aria-pressed={viewMode === 'grid'}
-                title={lang === 'ar' ? 'عرض الشبكة' : 'Grid view'}
-                className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'grid' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('list')}
-                aria-pressed={viewMode === 'list'}
-                title={lang === 'ar' ? 'عرض الجدول' : 'List view'}
-                className={`grid h-8 w-8 place-items-center rounded-full transition-all ${viewMode === 'list' ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'text-ui-muted hover:text-ui-text'}`}
-              >
-                <List className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div></WorkspaceControls>
-      <DesignPanel testId="products-table-panel" bodyClassName="p-4 sm:p-5">
-        {viewMode === 'grid' ? (
-          loading ? (
-            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {Array.from({ length: 6 }).map((_, idx) => (
-                <div key={idx} className="h-72 animate-pulse rounded-[20px] border border-ui-border bg-ui-page-alt" />
-              ))}
-            </div>
-          ) : displayedProducts.length === 0 ? (
-            <div className="rounded-[20px] border border-dashed border-ui-border bg-ui-page-alt/60 py-14 text-center text-sm text-ui-muted">
-              {t('noData')}
-            </div>
-          ) : (
-            <div className="premier-refresh-stagger grid items-stretch gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {displayedProducts.map((p) => {
-                const cost = liveProductCosts[p.id] ?? p.cost_price;
-                const marginPct = p.sale_price > 0 ? Math.max(0, Math.min(100, ((p.sale_price - cost) / p.sale_price) * 100)) : 0;
-                const catName = productCategoryName(p);
-                return (
-                  <article
-                    key={p.id}
-                    onClick={can('products.edit') ? () => openEdit(p) : undefined}
-                    className={`premier-refresh-subcard group flex h-full min-w-0 flex-col justify-between overflow-hidden p-4 ${can('products.edit') ? 'cursor-pointer' : ''}`}
-                  >
-                    <div>
-                      <div className="relative mb-3.5 flex h-44 w-full items-center justify-center overflow-hidden rounded-[16px] bg-[#e9ede8] dark:bg-ui-surface">
-                        {p.image_url ? (
-                          <ProductImage
-                            src={p.image_url}
-                            name={p.name}
-                            category={catName}
-                            className="h-full w-full transition-transform duration-300 ease-[var(--ui-ease)] group-hover:scale-[1.03]"
-                            imgClassName="h-full w-full object-cover"
-                            positionX={p.image_position_x}
-                            positionY={p.image_position_y}
-                            zoom={p.image_zoom}
-                          />
-                        ) : (
-                          <Package className="h-10 w-10 text-ui-subtle/60" />
-                        )}
-                        <div className="absolute start-2.5 top-2.5 flex flex-wrap gap-1.5">
-                          <Badge variant={p.is_active ? 'success' : 'default'} size="sm">
-                            {p.is_active ? t('active') : t('inactive')}
-                          </Badge>
-                          {p.product_type === 'manufactured' && (
-                            <Badge variant="primary" size="sm">
-                              {lang === 'ar' ? 'بمكونات' : 'Composed'}
-                            </Badge>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="min-w-0">
-                          <h3 className="truncate text-[15px] font-semibold text-ui-text group-hover:text-ui-primary">{p.name}</h3>
-                          <p className="mt-0.5 truncate text-xs text-ui-muted">{[p.sku || p.barcode, branchLabel(p.branch_id)].filter(Boolean).join(' · ') || '—'}</p>
-                        </div>
-                        {catName && <Badge variant="info" size="sm" className="shrink-0">{catName}</Badge>}
-                      </div>
-                    </div>
-
-                    <div className="mt-3.5">
-                      <div className="grid grid-cols-2 gap-3 border-t border-ui-border pt-3">
-                        <div className="min-w-0">
-                          <p className="truncate text-[11px] font-medium text-ui-subtle">{t('salePrice')}</p>
-                          <p className="mt-0.5 truncate text-base font-bold text-ui-primary tabular-nums">{formatCurrency(p.sale_price, currency, lang)}</p>
-                        </div>
-                        <div className="min-w-0">
-                          <p className="truncate text-[11px] font-medium text-ui-subtle">{t('costPrice')}</p>
-                          <p className="mt-0.5 truncate text-sm font-semibold text-ui-text tabular-nums">{formatFinancialCurrency(cost, currency, lang)}</p>
-                        </div>
-                      </div>
-
-                      <div className="mt-2.5 space-y-1">
-                        <div className="flex items-center justify-between text-[11px] text-ui-muted">
-                          <span>{lang === 'ar' ? 'الربحية' : 'Margin'}</span>
-                          <span className="font-semibold tabular-nums text-ui-text">{marginPct.toFixed(0)}%</span>
-                        </div>
-                        <WorkspaceMeter value={marginPct} max={100} tone={marginPct >= 30 ? 'success' : marginPct >= 10 ? 'primary' : 'warning'} height="xs" />
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-end gap-1 border-t border-ui-border pt-2.5" onClick={(e) => e.stopPropagation()}>
-                        <button type="button" onClick={() => setInspectProduct(p)} className="ui-icon-action" title={lang === 'ar' ? 'معاينة الصنف' : 'Inspect item'}><Eye className="h-4 w-4" /></button>
-                        <button type="button" onClick={() => showBarcode(p)} className="ui-icon-action" title={t('barcode')}><BarcodeIcon className="h-4 w-4" /></button>
-                        <button type="button" onClick={() => showQR(p)} className="ui-icon-action" title={t('generateQR')}><QrCode className="h-4 w-4" /></button>
-                        {can('products.edit') && <button type="button" onClick={() => openEdit(p)} className="ui-icon-action ui-icon-action-info" title={t('edit')}><Edit2 className="h-4 w-4" /></button>}
-                        {can('products.delete') && <button type="button" onClick={() => setDeleteId(p.id)} className="ui-icon-action ui-icon-action-danger" title={t('delete')}><Trash2 className="h-4 w-4" /></button>}
-                      </div>
-                    </div>
-                  </article>
-                );
-              })}
-            </div>
-          )
-        ) : (
-          <DataTable columns={columns} data={displayedProducts} loading={loading} emptyMessage={t('noData')} onRowClick={can('products.edit') ? openEdit : undefined} />
-        )}
-        <DesignPagination loaded={products.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} />
-      </DesignPanel>
-      <Modal open={quickModalOpen} onClose={() => setQuickModalOpen(false)}
-        title={editing ? (lang === 'ar' ? 'تعديل المنتج' : 'Edit product') : (lang === 'ar' ? 'منتج جديد' : 'New product')} size="md">
-        <div className="space-y-4" data-testid="product-quick-editor">
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="sm:col-span-2">
-              <Input label={lang === 'ar' ? 'اسم المنتج' : 'Product name'} required
-                value={form.name} onChange={e => setForm(f => ({...f,name:e.target.value}))}/>
-            </div>
-            <Select label={lang === 'ar' ? 'التصنيف' : 'Category'} value={form.category_id}
-              onChange={e => setForm(f=>({...f,category_id:e.target.value}))}>
-              <option value="">{lang === 'ar' ? 'بدون تصنيف' : 'Uncategorized'}</option>
-              {categories.filter(cat=>!form.branch_id || cat.branch_id===form.branch_id).map(cat=><option key={cat.id} value={cat.id}>{cat.name}</option>)}
-            </Select>
-            <Input label={lang === 'ar' ? 'سعر البيع' : 'Price'} type="number" step="0.01" min="0"
-              value={form.sale_price} onChange={e=>setForm(f=>({...f,sale_price:Number(e.target.value)||0}))}/>
-            <div className="sm:col-span-2">
-              <Textarea label={lang === 'ar' ? 'وصف يظهر للعملاء' : 'Customer-facing description'}
-                value={form.description} onChange={e=>setForm(f=>({...f,description:e.target.value}))} rows={2}/>
-            </div>
-            <div className="sm:col-span-2">
-              <Input label={lang === 'ar' ? 'رابط صورة المنتج' : 'Product image URL'}
-                value={form.image_url} onChange={e=>setForm(f=>({...f,image_url:e.target.value}))}/>
-              {form.image_url && <div className="mt-2 h-28 overflow-hidden rounded-xl bg-ui-page-alt">
-                <ProductImage src={form.image_url} name={form.name} className="h-full w-full"
-                  imgClassName="h-full w-full object-contain"/>
-              </div>}
-            </div>
-            {!branchFilter && <Select label={t('branch')} value={form.branch_id}
-              onChange={e=>{
-                setForm(f=>({...f,branch_id:e.target.value,category_id:'',product_type:'ready'}));
-                setRecipeIngredients([]);
-                setRawMaterialSel('');
-                setLinkedInventoryUnits([]);
-                setLinkedUnitSel('');
-              }}>
-              <option value="">{lang === 'ar' ? 'اختر الفرع' : 'Select branch'}</option>
-              {branches.map(b=><option key={b.id} value={b.id}>{b.name}</option>)}
-            </Select>}
-          </div>
-          {!editing && supportsRawComposition && can('recipes.manage') && (
-            <details className="rounded-xl border border-ui-border p-3" open={recipeIngredients.length > 0 || undefined}>
-              <summary className="cursor-pointer font-semibold">{lang === 'ar' ? 'بمكونات · أضف الخامات' : 'With ingredients · add raw materials'}</summary>
-              <p className="my-2 text-sm text-ui-muted">{lang === 'ar' ? 'حدد كمية الخامة لكل وحدة بيع.' : 'Set the ingredient quantity per sale unit.'}</p>
-              {directIngredientFields}
-            </details>
-          )}
-          {!editing && manufacturedIngredientFields}
-          <div className="flex flex-wrap gap-2 rounded-xl border border-ui-border bg-ui-page-alt p-3">
-            {editing && supportsComposition && <Button size="sm" variant="outline" onClick={() => {
-              setQuickModalOpen(false);setIngredientsModalOpen(true);
-            }}>{lang === 'ar' ? `المكونات (${recipeIngredients.length+linkedInventoryUnits.length+productComponents.length})` : `Ingredients (${recipeIngredients.length+linkedInventoryUnits.length+productComponents.length})`}</Button>}
-            <Button size="sm" variant="outline" onClick={()=>{
-              setQuickModalOpen(false);setEditSection('basic');setModalOpen(true);
-            }}>{lang === 'ar' ? 'تفاصيل إضافية' : 'Advanced details'}</Button>
-          </div>
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={()=>setQuickModalOpen(false)}>{t('cancel')}</Button>
-            <Button onClick={()=>void save()} disabled={saving || !form.name.trim() || !form.branch_id || form.sale_price<0}>{t('save')}</Button>
-          </div>
-        </div>
-      </Modal>
-      <Modal open={ingredientsModalOpen} onClose={() => {setIngredientsModalOpen(false);setQuickModalOpen(true);}}
-        title={lang==='ar' ? 'مكونات المنتج' : 'Product ingredients'} size="md">
-        <div className="space-y-4" data-testid="product-ingredients-quick-editor">
-          <p className="text-sm text-ui-muted">{lang==='ar' ? 'اختر الخامة والكمية المستخدمة لكل وحدة بيع. يتم تطبيق المكونات على المخزون عند إرسال الطلب للمطبخ.' : 'Choose each ingredient and quantity per item. Inventory is consumed when sent to the kitchen.'}</p>
-          {!can('recipes.manage') && <p className="rounded-lg bg-ui-warning-soft p-3 text-sm text-ui-warning">{lang==='ar'?'تحتاج صلاحية إدارة الوصفات لتعديل الخامات.':'Recipe permissions are required to edit raw ingredients.'}</p>}
-          {supportsRawComposition && directIngredientFields}
-          {manufacturedIngredientFields}
-          {productComponents.length>0 && <p className="text-xs text-ui-muted">{lang==='ar'?'يوجد مكونات أو مجموعات متقدمة محفوظة، يمكن تعديلها من التفاصيل الإضافية.':'Existing advanced component groups can be edited under Advanced details.'}</p>}
-          <div className="flex justify-end gap-2">
-            <Button variant="secondary" onClick={()=>{setIngredientsModalOpen(false);setQuickModalOpen(true);}}>{lang==='ar'?'رجوع':'Back'}</Button>
-            <Button onClick={()=>void save()} disabled={saving}>{t('save')}</Button>
-          </div>
-        </div>
-      </Modal>
+      <DesignPageHeader title={itemLabel} actions={<>{can('products.import') && <input ref={fileRef} type="file" accept=".xlsx,.xls" className="hidden" onChange={handleImport} data-testid="products-import" />}{can('products.import') && <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()} data-testid="products-import-button"><Upload className="w-4 h-4" /> {t('importExcel')}</Button>}{can('products.export') && <Button variant="outline" size="sm" onClick={handleExport} data-testid="products-export"><Download className="w-4 h-4" /> {t('exportExcel')}</Button>}<Button variant="outline" size="sm" onClick={() => setCatalogToolsOpen(true)} data-testid="products-tools"><SlidersHorizontal className="w-4 h-4" /> {lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'}</Button>{can('products.create') && <Button size="sm" onClick={openAdd} data-testid="products-add"><Plus className="w-4 h-4" /> {t('add')}</Button>}</>} />
+      <DesignPanel testId="products-search-panel"><DesignSearch value={search} onChange={setSearch} placeholder={t('search')} label={t('search')} testId="products-search" /></DesignPanel>
+      <DesignPanel testId="products-table-panel"><DataTable columns={columns} data={filtered} loading={loading} emptyMessage={t('noData')} onRowClick={can('products.edit') ? openEdit : undefined} /><DesignPagination loaded={products.length} total={total} hasMore={hasMore} loadingMore={loadingMore} onLoadMore={loadMore} /></DesignPanel>
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title={editing ? (lang === 'ar' ? `تعديل: ${editing.name}` : `Edit: ${editing.name}`) : t('add')} size="xl">
         <div className="space-y-4">
           {editing && <div data-testid="product-edit-sections" className={`grid ${supportsComposition ? 'grid-cols-3' : 'grid-cols-2'} gap-2 rounded-xl bg-ui-page-alt p-1`}><button type="button" onClick={() => setEditSection('basic')} className={`rounded-lg px-3 py-2 text-sm font-bold transition ${editSection === 'basic' ? 'bg-ui-surface text-ui-primary shadow-sm' : 'text-ui-muted'}`}>{lang === 'ar' ? 'البيانات' : 'Details'}</button>{supportsComposition && <button type="button" onClick={() => setEditSection('components')} className={`rounded-lg px-3 py-2 text-sm font-bold transition ${editSection === 'components' ? 'bg-ui-surface text-ui-primary shadow-sm' : 'text-ui-muted'}`}>{lang === 'ar' ? 'المكونات' : 'Components'}</button>}<button type="button" onClick={() => setEditSection('units')} className={`rounded-lg px-3 py-2 text-sm font-bold transition ${editSection === 'units' ? 'bg-ui-surface text-ui-primary shadow-sm' : 'text-ui-muted'}`}>{lang === 'ar' ? 'وحدات البيع' : 'Sales units'}</button></div>}
@@ -965,7 +475,7 @@ export function ProductsPage() {
             <Input label={t('sku')} value={form.sku} onChange={(e) => setForm({ ...form, sku: e.target.value })} />
             <Select label={t('category')} value={form.category_id} onChange={(e) => setForm({ ...form, category_id: e.target.value })}><option value="">--</option>{categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</Select>
             <div><label className="block text-sm font-medium text-ui-muted mb-1">{t('productType')}</label><div className={`grid ${supportsComposition ? 'grid-cols-2' : 'grid-cols-1'} gap-2`}><button type="button" onClick={() => setForm({ ...form, product_type: 'ready' })} className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors ${form.product_type === 'ready' ? 'bg-brand-600 text-white border-brand-600' : 'bg-ui-surface border-ui-border text-ui-text hover:border-brand-400'}`}>{supportsComposition ? t('withoutIngredients') : itemLabel}</button>{supportsComposition && <button type="button" onClick={() => setForm({ ...form, product_type: 'manufactured' })} className={`px-3 py-2.5 rounded-xl text-sm font-medium border transition-colors ${form.product_type === 'manufactured' ? 'bg-purple-600 text-white border-purple-600' : 'bg-ui-surface border-ui-border text-ui-text hover:border-purple-400'}`}>{t('withIngredients')}</button>}</div></div>
-            {branchFilter ? <div><label className="block text-sm font-medium text-ui-muted mb-1">{t('branch')}</label><div className="min-h-11 flex items-center"><BranchBadge name={branchLabel(form.branch_id || branchFilter)} /></div></div> : <Select label={t('branch')} value={form.branch_id} disabled={!!editing} onChange={(e) => { setForm({ ...form, branch_id: e.target.value, category_id: '', product_type: 'ready' }); setRecipeIngredients([]); setLinkedInventoryUnits([]); setProductComponents([]); setRawMaterialSel(''); setLinkedUnitSel(''); setComponentSel(''); }}><option value="">--</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select>}
+            {branchFilter ? <div><label className="block text-sm font-medium text-ui-muted mb-1">{t('branch')}</label><div className="min-h-11 flex items-center"><BranchBadge name={branchLabel(form.branch_id || branchFilter)} /></div></div> : <Select label={t('branch')} value={form.branch_id} onChange={(e) => setForm({ ...form, branch_id: e.target.value })}><option value="">--</option>{branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}</Select>}
             <div className="sm:col-span-2">
               <Input label={t('image') + ' URL'} value={form.image_url} onChange={(e) => setForm({ ...form, image_url: e.target.value, image_position_x: 0, image_position_y: 0, image_zoom: 1 })} />
               {form.image_url && (
@@ -1003,15 +513,15 @@ export function ProductsPage() {
           </div>
           <Textarea label={t('description')} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} rows={2} />
           <BusinessAttributesFields entity="product" value={businessAttributes} onChange={setBusinessAttributes} /></>}
-          {supportsComposition && editing && editSection === 'components' && <div data-testid="product-operational-composition" className="rounded-xl border border-brand-200 dark:border-brand-800/50 bg-brand-50/40 dark:bg-brand-900/10 p-4 space-y-4"><div><h3 className="font-semibold text-ui-text">{lang === 'ar' ? 'مكونات التشغيل الفعلية' : 'Operational composition'}</h3><p className="mt-1 text-xs text-ui-subtle">{lang === 'ar' ? 'هذه هي المكونات التشغيلية التي يعتمد عليها خصم الخامات عند إرسال الطلب للمطبخ.' : 'These are the operational components used for raw-material deduction when the order is sent to the kitchen.'}</p></div><div className="rounded-lg border border-brand-200 bg-ui-surface px-4 py-3 dark:border-brand-800/50"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-medium text-ui-subtle">{lang === 'ar' ? 'التكلفة الحية المحسوبة' : 'Live calculated cost'}</p><p className="text-[11px] text-ui-subtle">{lang === 'ar' ? 'الخامات المباشرة + الوحدات المجمعة بجميع مستوياتها' : 'Direct raw materials + linked component groups at every level'}</p></div><p className="text-lg font-black text-brand-600 dark:text-brand-400">{formatFinancialCurrency(liveProductCosts[editing.id] ?? liveCompositionCost ?? form.cost_price, currency, lang)}</p></div></div><div className="grid grid-cols-1 lg:grid-cols-2 gap-4"><div className="rounded-lg border border-ui-border bg-ui-surface p-3"><div className="flex items-center justify-between mb-2"><div><h4 className="text-sm font-semibold text-ui-text">{lang === 'ar' ? 'الخامات المباشرة' : 'Direct raw materials'}</h4><p className="text-[11px] text-ui-subtle">{can('recipes.manage') ? (lang === 'ar' ? 'تُخصم مع إرسال الطلب للمطبخ.' : 'Consumed when the order is sent to the kitchen.') : (lang === 'ar' ? 'عرض فقط — يلزم صلاحية إدارة الخامات المباشرة للتعديل.' : 'Read only — permission is required to edit direct raw materials.')}</p></div><span className="text-xs text-ui-subtle">{recipeIngredients.length}</span></div>{recipeIngredients.length === 0 ? <p className="text-sm text-ui-subtle">{lang === 'ar' ? 'لا توجد خامات مباشرة مرتبطة بالمنتج.' : 'No direct raw materials are linked to this product.'}</p> : <div className="space-y-2">{recipeIngredients.map((row, index) => <div key={row.raw_material_id} className="grid items-end gap-2 rounded-md bg-ui-page-alt px-3 py-2 sm:grid-cols-[1fr_120px_100px_auto]"><span className="self-center text-sm font-medium text-ui-text">{row.raw_material?.name || rawMaterialOptions.find((material) => material.id === row.raw_material_id)?.name || row.raw_material_id}</span>{can('recipes.manage') ? <><Input label={lang === 'ar' ? 'الكمية/وحدة بيع' : 'Qty / sale unit'} type="number" min={0.0001} step={0.0001} value={row.quantity / positiveRecipeYield(recipeYield) || ''} onChange={(e) => updateDirectRawIngredient(index, { quantity: (parseFloat(e.target.value) || 0) * positiveRecipeYield(recipeYield) })} /><Input label={lang === 'ar' ? 'هالك %' : 'Waste %'} type="number" min={0} step={0.01} value={row.wastage_percent || ''} onChange={(e) => updateDirectRawIngredient(index, { wastage_percent: parseFloat(e.target.value) || 0 })} /><button type="button" onClick={() => removeDirectRawIngredient(index)} className="mb-0.5 p-2 rounded-md text-ui-danger hover:bg-ui-danger-soft" title={t('delete')}><Trash2 className="w-4 h-4" /></button></> : <span className="text-xs font-semibold text-ui-muted sm:col-span-3">{formatNumber(row.quantity / positiveRecipeYield(recipeYield))} / {lang === 'ar' ? 'وحدة بيع' : 'sale unit'}</span>}</div>)}</div>}{can('recipes.manage') && <div className="mt-3 grid items-end gap-2 sm:grid-cols-[1fr_120px_100px_auto]"><Select label={lang === 'ar' ? 'إضافة خامة' : 'Add raw material'} value={rawMaterialSel} onChange={(e) => setRawMaterialSel(e.target.value)}><option value="">{lang === 'ar' ? 'اختر خامة' : 'Choose raw material'}</option>{availableRawMaterialsToAdd.map((material) => <option key={material.id} value={material.id}>{material.name}</option>)}</Select><Input label={lang === 'ar' ? 'الكمية' : 'Quantity'} type="number" min={0.0001} step={0.0001} value={rawMaterialQty || ''} onChange={(e) => setRawMaterialQty(parseFloat(e.target.value) || 0)} /><Input label={lang === 'ar' ? 'هالك %' : 'Waste %'} type="number" min={0} step={0.01} value={rawMaterialWaste || ''} onChange={(e) => setRawMaterialWaste(parseFloat(e.target.value) || 0)} /><Button type="button" size="sm" onClick={addDirectRawIngredient} disabled={!rawMaterialSel}><Plus className="w-4 h-4" />{t('add')}</Button></div>}</div><div className="rounded-lg border border-ui-border bg-ui-surface p-3"><div className="flex items-center justify-between mb-2"><h4 className="text-sm font-semibold text-ui-text">{lang === 'ar' ? 'مجموعات المكونات المرتبطة' : 'Linked component groups'}</h4><span className="text-xs text-ui-subtle">{linkedInventoryUnits.length}</span></div>{linkedInventoryUnits.length === 0 ? <p className="text-sm text-ui-subtle">{lang === 'ar' ? 'لا توجد مجموعات مكونات مرتبطة بالمنتج.' : 'No component groups are linked to this product.'}</p> : <div className="space-y-2">{linkedInventoryUnits.map((row, index) => { const liveUnit = linkedUnitLiveCosts[row.unit_id]; const expanded = expandedUnitRawMaterials.filter((item) => item.root_unit_id === row.unit_id); return <div key={row.unit_id} className="rounded-md bg-ui-page-alt px-3 py-2"><div className="flex items-end gap-2"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-ui-text">{row.unit?.name || manufacturedInventoryUnits.find((unit) => unit.id === row.unit_id)?.name || row.unit_id}</p><p className="text-xs text-ui-subtle">{liveUnit ? `${lang === 'ar' ? 'تكلفة الوحدة' : 'Unit cost'}: ${formatCurrency(liveUnit.unit_cost, currency, lang)} · ${lang === 'ar' ? 'تكلفة السطر' : 'Line cost'}: ${formatCurrency(liveUnit.line_cost, currency, lang)}` : (lang === 'ar' ? 'مجموعة مكونات مرتبطة' : 'Linked component group')}</p></div><Input label={lang === 'ar' ? 'الكمية' : 'Quantity'} type="number" min={0.0001} step="0.0001" value={row.quantity || ''} onChange={(e) => updateLinkedInventoryUnitQty(index, parseFloat(e.target.value) || 0)} className="w-28" /><button type="button" onClick={() => removeLinkedInventoryUnit(index)} className="mb-0.5 p-2 rounded-md text-ui-danger hover:bg-ui-danger-soft" title={t('delete')}><Trash2 className="w-4 h-4" /></button></div>{expanded.length > 0 && <div className="mt-2 space-y-1 border-t border-ui-border pt-2">{expanded.map((item) => <div key={`${item.unit_id}:${item.raw_material_id}:${item.depth}`} className="flex items-center justify-between gap-2 text-[11px] text-ui-subtle"><span style={{ paddingInlineStart: `${Math.min(item.depth, 6) * 12}px` }}>{item.depth > 0 ? '↳ ' : ''}{item.unit_name} → {item.raw_material_name} × {formatNumber(item.effective_quantity)}</span><span className="shrink-0 font-semibold text-ui-muted">{formatCurrency(item.line_cost, currency, lang)}</span></div>)}</div>}</div>; })}</div>}<div className="mt-3 flex flex-wrap items-end gap-2"><div className="flex-1 min-w-[180px]"><Select label={lang === 'ar' ? 'إضافة مجموعة مكونات' : 'Add component group'} value={linkedUnitSel} onChange={(e) => setLinkedUnitSel(e.target.value)}><option value="">--</option>{availableManufacturedToAdd.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</Select></div><Input label={lang === 'ar' ? 'الكمية' : 'Quantity'} type="number" min={0.0001} step="0.0001" value={linkedUnitQty || ''} onChange={(e) => setLinkedUnitQty(parseFloat(e.target.value) || 0)} className="w-28" /><Button type="button" size="sm" onClick={addLinkedInventoryUnit} disabled={!linkedUnitSel}><Plus className="w-4 h-4" />{t('add')}</Button></div></div></div></div>}
-          {supportsComposition && editSection === 'components' && (productComponents.length > 0 || (form.product_type === 'manufactured' && recipeIngredients.length === 0 && linkedInventoryUnits.length === 0)) && <div className="rounded-xl border border-purple-200 dark:border-purple-800/50 bg-purple-50/40 dark:bg-purple-900/10 p-4 space-y-3"><div className="flex items-center justify-between"><h3 className="font-semibold text-ui-muted">{t('components')}</h3></div>{productComponents.length === 0 && <p className="text-sm text-ui-subtle dark:text-ui-subtle">{t('selectComponent')}</p>}<div className="space-y-2">{productComponents.map((c, i) => { const info = stockComponents.find((s) => s.product_id === c.component_product_id); return <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-ui-surface border border-ui-border"><div className="flex-1 min-w-0"><p className="text-sm font-medium text-ui-text truncate">{info?.name || c.component_product_id}</p><p className="text-xs text-ui-subtle">{t('availableStock')}: {formatNumber(info?.total || 0)}</p></div><Input label={t('usageQuantityPerUnit')} type="number" min={1} step="0.01" value={c.quantity || ''} onChange={(e) => updateComponentQty(i, parseFloat(e.target.value) || 1)} className="w-32" /><button onClick={() => removeComponentRow(i)} className="p-2 rounded-md text-ui-danger hover:bg-ui-danger-soft"><Trash2 className="w-4 h-4" /></button></div>; })}</div>{stockComponents.length > 0 ? <div className="flex flex-wrap items-end gap-2"><div className="flex-1 min-w-[200px]"><Select label={t('addComponent')} value={componentSel} onChange={(e) => setComponentSel(e.target.value)}><option value="">--</option>{availableToAdd.map((s) => <option key={s.product_id} value={s.product_id}>{s.name} ({formatNumber(s.total)})</option>)}</Select></div><Input label={t('usageQuantityPerUnit')} type="number" min={1} step="0.01" value={componentQty || ''} onChange={(e) => setComponentQty(parseFloat(e.target.value) || 1)} className="w-32" /><Button size="sm" onClick={addComponentRow}><Plus className="w-4 h-4" /> {t('addComponent')}</Button></div> : <p className="text-sm text-ui-warning">{t('noAvailableComponents')}</p>}</div>}
+          {supportsComposition && editing && editSection === 'components' && <div data-testid="product-operational-composition" className="rounded-xl border border-brand-200 dark:border-brand-800/50 bg-brand-50/40 dark:bg-brand-900/10 p-4 space-y-4"><div><h3 className="font-semibold text-ui-text">{lang === 'ar' ? 'مكونات التشغيل الفعلية' : 'Operational composition'}</h3><p className="mt-1 text-xs text-ui-subtle">{lang === 'ar' ? 'هذه هي المكونات التشغيلية التي يعتمد عليها خصم الخامات عند إرسال الطلب للمطبخ.' : 'These are the operational components used for raw-material deduction when the order is sent to the kitchen.'}</p></div><div className="rounded-lg border border-brand-200 bg-ui-surface px-4 py-3 dark:border-brand-800/50"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-medium text-ui-subtle">{lang === 'ar' ? 'التكلفة الحية المحسوبة' : 'Live calculated cost'}</p><p className="text-[11px] text-ui-subtle">{lang === 'ar' ? 'الخامات المباشرة + الوحدات المجمعة بجميع مستوياتها' : 'Direct raw materials + linked component groups at every level'}</p></div><p className="text-lg font-black text-brand-600 dark:text-brand-400">{formatCurrency(liveCompositionCost ?? liveProductCosts[editing.id] ?? form.cost_price, currency, lang)}</p></div></div><div className="grid grid-cols-1 lg:grid-cols-2 gap-4"><div className="rounded-lg border border-ui-border bg-ui-surface p-3"><div className="flex items-center justify-between mb-2"><div><h4 className="text-sm font-semibold text-ui-text">{lang === 'ar' ? 'الخامات المباشرة' : 'Direct raw materials'}</h4><p className="text-[11px] text-ui-subtle">{can('recipes.manage') ? (lang === 'ar' ? 'تُخصم مع إرسال الطلب للمطبخ.' : 'Consumed when the order is sent to the kitchen.') : (lang === 'ar' ? 'عرض فقط — يلزم صلاحية إدارة الخامات المباشرة للتعديل.' : 'Read only — permission is required to edit direct raw materials.')}</p></div><span className="text-xs text-ui-subtle">{recipeIngredients.length}</span></div>{recipeIngredients.length === 0 ? <p className="text-sm text-ui-subtle">{lang === 'ar' ? 'لا توجد خامات مباشرة مرتبطة بالمنتج.' : 'No direct raw materials are linked to this product.'}</p> : <div className="space-y-2">{recipeIngredients.map((row, index) => <div key={row.raw_material_id} className="grid items-end gap-2 rounded-md bg-ui-page-alt px-3 py-2 sm:grid-cols-[1fr_120px_100px_auto]"><span className="self-center text-sm font-medium text-ui-text">{row.raw_material?.name || rawMaterialOptions.find((material) => material.id === row.raw_material_id)?.name || row.raw_material_id}</span>{can('recipes.manage') ? <><Input label={lang === 'ar' ? 'الكمية/وحدة بيع' : 'Qty / sale unit'} type="number" min={0.0001} step={0.0001} value={row.quantity / Math.max(1, recipeYield) || ''} onChange={(e) => updateDirectRawIngredient(index, { quantity: (parseFloat(e.target.value) || 0) * Math.max(1, recipeYield) })} /><Input label={lang === 'ar' ? 'هالك %' : 'Waste %'} type="number" min={0} step={0.01} value={row.wastage_percent || ''} onChange={(e) => updateDirectRawIngredient(index, { wastage_percent: parseFloat(e.target.value) || 0 })} /><button type="button" onClick={() => removeDirectRawIngredient(index)} className="mb-0.5 p-2 rounded-md text-ui-danger hover:bg-ui-danger-soft" title={t('delete')}><Trash2 className="w-4 h-4" /></button></> : <span className="text-xs font-semibold text-ui-muted sm:col-span-3">{formatNumber(row.quantity / Math.max(1, recipeYield))} / {lang === 'ar' ? 'وحدة بيع' : 'sale unit'}</span>}</div>)}</div>}{can('recipes.manage') && <div className="mt-3 grid items-end gap-2 sm:grid-cols-[1fr_120px_100px_auto]"><Select label={lang === 'ar' ? 'إضافة خامة' : 'Add raw material'} value={rawMaterialSel} onChange={(e) => setRawMaterialSel(e.target.value)}><option value="">{lang === 'ar' ? 'اختر خامة' : 'Choose raw material'}</option>{availableRawMaterialsToAdd.map((material) => <option key={material.id} value={material.id}>{material.name}</option>)}</Select><Input label={lang === 'ar' ? 'الكمية' : 'Quantity'} type="number" min={0.0001} step={0.0001} value={rawMaterialQty || ''} onChange={(e) => setRawMaterialQty(parseFloat(e.target.value) || 0)} /><Input label={lang === 'ar' ? 'هالك %' : 'Waste %'} type="number" min={0} step={0.01} value={rawMaterialWaste || ''} onChange={(e) => setRawMaterialWaste(parseFloat(e.target.value) || 0)} /><Button type="button" size="sm" onClick={addDirectRawIngredient} disabled={!rawMaterialSel}><Plus className="w-4 h-4" />{t('add')}</Button></div>}</div><div className="rounded-lg border border-ui-border bg-ui-surface p-3"><div className="flex items-center justify-between mb-2"><h4 className="text-sm font-semibold text-ui-text">{lang === 'ar' ? 'مجموعات المكونات المرتبطة' : 'Linked component groups'}</h4><span className="text-xs text-ui-subtle">{linkedInventoryUnits.length}</span></div>{linkedInventoryUnits.length === 0 ? <p className="text-sm text-ui-subtle">{lang === 'ar' ? 'لا توجد مجموعات مكونات مرتبطة بالمنتج.' : 'No component groups are linked to this product.'}</p> : <div className="space-y-2">{linkedInventoryUnits.map((row, index) => { const liveUnit = linkedUnitLiveCosts[row.unit_id]; const expanded = expandedUnitRawMaterials.filter((item) => item.root_unit_id === row.unit_id); return <div key={row.unit_id} className="rounded-md bg-ui-page-alt px-3 py-2"><div className="flex items-end gap-2"><div className="min-w-0 flex-1"><p className="truncate text-sm font-medium text-ui-text">{row.unit?.name || manufacturedInventoryUnits.find((unit) => unit.id === row.unit_id)?.name || row.unit_id}</p><p className="text-xs text-ui-subtle">{liveUnit ? `${lang === 'ar' ? 'تكلفة الوحدة' : 'Unit cost'}: ${formatCurrency(liveUnit.unit_cost, currency, lang)} · ${lang === 'ar' ? 'تكلفة السطر' : 'Line cost'}: ${formatCurrency(liveUnit.line_cost, currency, lang)}` : (lang === 'ar' ? 'مجموعة مكونات مرتبطة' : 'Linked component group')}</p></div><Input label={lang === 'ar' ? 'الكمية' : 'Quantity'} type="number" min={0.0001} step="0.0001" value={row.quantity || ''} onChange={(e) => updateLinkedInventoryUnitQty(index, parseFloat(e.target.value) || 1)} className="w-28" /><button type="button" onClick={() => removeLinkedInventoryUnit(index)} className="mb-0.5 p-2 rounded-md text-ui-danger hover:bg-ui-danger-soft" title={t('delete')}><Trash2 className="w-4 h-4" /></button></div>{expanded.length > 0 && <div className="mt-2 space-y-1 border-t border-ui-border pt-2">{expanded.map((item) => <div key={`${item.unit_id}:${item.raw_material_id}:${item.depth}`} className="flex items-center justify-between gap-2 text-[11px] text-ui-subtle"><span style={{ paddingInlineStart: `${Math.min(item.depth, 6) * 12}px` }}>{item.depth > 0 ? '↳ ' : ''}{item.unit_name} → {item.raw_material_name} × {formatNumber(item.effective_quantity)}</span><span className="shrink-0 font-semibold text-ui-muted">{formatCurrency(item.line_cost, currency, lang)}</span></div>)}</div>}</div>; })}</div>}<div className="mt-3 flex flex-wrap items-end gap-2"><div className="flex-1 min-w-[180px]"><Select label={lang === 'ar' ? 'إضافة مجموعة مكونات' : 'Add component group'} value={linkedUnitSel} onChange={(e) => setLinkedUnitSel(e.target.value)}><option value="">--</option>{availableManufacturedToAdd.map((unit) => <option key={unit.id} value={unit.id}>{unit.name}</option>)}</Select></div><Input label={lang === 'ar' ? 'الكمية' : 'Quantity'} type="number" min={0.0001} step="0.0001" value={linkedUnitQty || ''} onChange={(e) => setLinkedUnitQty(parseFloat(e.target.value) || 1)} className="w-28" /><Button type="button" size="sm" onClick={addLinkedInventoryUnit} disabled={!linkedUnitSel}><Plus className="w-4 h-4" />{t('add')}</Button></div></div></div></div>}
+          {supportsComposition && editSection === 'components' && form.product_type === 'manufactured' && recipeIngredients.length === 0 && linkedInventoryUnits.length === 0 && <div className="rounded-xl border border-purple-200 dark:border-purple-800/50 bg-purple-50/40 dark:bg-purple-900/10 p-4 space-y-3"><div className="flex items-center justify-between"><h3 className="font-semibold text-ui-muted">{t('components')}</h3></div>{productComponents.length === 0 && <p className="text-sm text-ui-subtle dark:text-ui-subtle">{t('selectComponent')}</p>}<div className="space-y-2">{productComponents.map((c, i) => { const info = stockComponents.find((s) => s.product_id === c.component_product_id); return <div key={i} className="flex items-center gap-2 p-2 rounded-lg bg-ui-surface border border-ui-border"><div className="flex-1 min-w-0"><p className="text-sm font-medium text-ui-text truncate">{info?.name || c.component_product_id}</p><p className="text-xs text-ui-subtle">{t('availableStock')}: {formatNumber(info?.total || 0)}</p></div><Input label={t('usageQuantityPerUnit')} type="number" min={1} step="0.01" value={c.quantity || ''} onChange={(e) => updateComponentQty(i, parseFloat(e.target.value) || 1)} className="w-32" /><button onClick={() => removeComponentRow(i)} className="p-2 rounded-md text-ui-danger hover:bg-ui-danger-soft"><Trash2 className="w-4 h-4" /></button></div>; })}</div>{stockComponents.length > 0 ? <div className="flex flex-wrap items-end gap-2"><div className="flex-1 min-w-[200px]"><Select label={t('addComponent')} value={componentSel} onChange={(e) => setComponentSel(e.target.value)}><option value="">--</option>{availableToAdd.map((s) => <option key={s.product_id} value={s.product_id}>{s.name} ({formatNumber(s.total)})</option>)}</Select></div><Input label={t('usageQuantityPerUnit')} type="number" min={1} step="0.01" value={componentQty || ''} onChange={(e) => setComponentQty(parseFloat(e.target.value) || 1)} className="w-32" /><Button size="sm" onClick={addComponentRow}><Plus className="w-4 h-4" /> {t('addComponent')}</Button></div> : <p className="text-sm text-ui-warning">{t('noAvailableComponents')}</p>}</div>}
           {editSection === 'units' && <div><div className="flex items-center justify-between mb-2"><div><h3 className="font-semibold text-ui-muted">{lang === 'ar' ? 'وحدات البيع' : 'Sales units'}</h3><p className="text-xs text-ui-subtle mt-0.5">{lang === 'ar' ? 'قطعة / كرتونة / عبوة — منفصلة عن مجموعات المكونات أعلاه.' : 'Piece / carton / pack — separate from component groups above.'}</p></div><Button size="sm" variant="outline" onClick={addUnit}><Plus className="w-4 h-4" /> {t('add')}</Button></div><div className="space-y-2">{units.map((u, i) => <div key={i} className="grid grid-cols-2 sm:grid-cols-6 gap-2 items-end p-2 rounded-lg bg-ui-page-alt"><div><label className="text-xs text-ui-subtle">{t('unitName')}</label><select value={u.unit_name} onChange={(e) => updateUnit(i, 'unit_name', e.target.value)} className="w-full rounded-md border border-ui-border bg-ui-surface px-2 py-1.5 text-sm">{UNIT_NAMES.map(n => <option key={n} value={n}>{n}</option>)}</select></div><Input label={t('conversionFactor')} type="number" step="0.0001" value={u.conversion_factor || ''} onChange={(e) => updateUnit(i, 'conversion_factor', parseFloat(e.target.value) || 1)} /><Input label={t('salePrice')} type="number" step="0.01" value={u.sale_price || ''} onChange={(e) => updateUnit(i, 'sale_price', parseFloat(e.target.value) || 0)} /><Input label={t('costPrice')} type="number" step="0.01" value={u.cost_price || ''} onChange={(e) => updateUnit(i, 'cost_price', parseFloat(e.target.value) || 0)} /><Input label={t('barcode')} value={u.barcode || ''} onChange={(e) => updateUnit(i, 'barcode', e.target.value)} /><button onClick={() => removeUnit(i)} className="p-2 rounded-md text-ui-danger hover:bg-ui-danger-soft"><Trash2 className="w-4 h-4" /></button></div>)}</div></div>}
-          <div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setModalOpen(false)}>{t('cancel')}</Button><Button onClick={save} disabled={saving}>{t('save')}</Button></div>
+          <div className="flex justify-end gap-2 pt-2"><Button variant="secondary" onClick={() => setModalOpen(false)}>{t('cancel')}</Button><Button onClick={save}>{t('save')}</Button></div>
         </div>
       </Modal>
-      <Modal open={catalogToolsOpen} onClose={() => setCatalogToolsOpen(false)} title={lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'} size="sm"><div className="grid gap-2">{productToolItems.map((item) => <button key={item.route} type="button" onClick={() => { setCatalogToolsOpen(false); navigate(item.route); }} className="flex min-h-11 items-center justify-between rounded-xl border border-ui-border bg-ui-surface px-4 text-sm font-bold text-ui-text transition hover:bg-ui-page-alt"><span>{lang === 'ar' ? item.ar : item.en}</span><span className="text-ui-subtle">›</span></button>)}</div></Modal>
-      <Modal open={!!barcodeModal} onClose={() => setBarcodeModal(null)} title={t('barcode')} size="sm">{barcodeModal && <div className="flex flex-col items-center gap-4"><p className="font-medium text-ui-text">{barcodeModal.name}</p><canvas ref={barcodeCanvasRef} className="rounded-lg bg-ui-surface p-2" />{can('products.print') && <Button variant="outline" onClick={() => window.print()}><BarcodeIcon className="w-4 h-4" /> {t('print')}</Button>}</div>}</Modal>
-      <Modal open={!!qrModal} onClose={() => setQrModal(null)} title={t('generateQR')} size="sm">{qrDataUrl && <div className="flex flex-col items-center gap-4"><img src={qrDataUrl} alt="QR Code" className="w-48 h-48 rounded-lg" />{can('products.print') && <Button variant="outline" onClick={() => window.print()}><QrCode className="w-4 h-4" /> {t('print')}</Button>}</div>}</Modal>
+      <Modal open={catalogToolsOpen} onClose={() => setCatalogToolsOpen(false)} title={lang === 'ar' ? 'إعدادات المنتجات' : 'Product settings'} size="sm"><div className="grid gap-2">{[{ route: APP_ROUTES.pricing, ar: 'التسعير', en: 'Pricing' }, { route: APP_ROUTES.productModifiers, ar: 'مجموعات الإضافات', en: 'Modifier groups' }, { route: APP_ROUTES.productModifierOptions, ar: 'خيارات الإضافات', en: 'Modifier options' }, { route: APP_ROUTES.categories, ar: 'التصنيفات', en: 'Categories' }, { route: APP_ROUTES.inventoryUnits, ar: 'مجموعات المكونات', en: 'Component groups' }].filter((item) => canAccessPath(item.route)).map((item) => <button key={item.route} type="button" onClick={() => { setCatalogToolsOpen(false); window.location.hash = item.route; }} className="flex min-h-11 items-center justify-between rounded-xl border border-ui-border bg-ui-surface px-4 text-sm font-bold text-ui-text transition hover:bg-ui-page-alt"><span>{lang === 'ar' ? item.ar : item.en}</span><span className="text-ui-subtle">›</span></button>)}</div></Modal>
+      <Modal open={!!barcodeModal} onClose={() => setBarcodeModal(null)} title={t('barcode')} size="sm">{barcodeModal && <div className="flex flex-col items-center gap-4"><p className="font-medium text-ui-text">{barcodeModal.name}</p><canvas ref={barcodeCanvasRef} className="rounded-lg bg-ui-surface p-2" /><Button variant="outline" onClick={() => window.print()}><BarcodeIcon className="w-4 h-4" /> {t('print')}</Button></div>}</Modal>
+      <Modal open={!!qrModal} onClose={() => setQrModal(null)} title={t('generateQR')} size="sm">{qrDataUrl && <div className="flex flex-col items-center gap-4"><img src={qrDataUrl} alt="QR Code" className="w-48 h-48 rounded-lg" /><Button variant="outline" onClick={() => window.print()}><QrCode className="w-4 h-4" /> {t('print')}</Button></div>}</Modal>
       <ProductImageAdjustModal
         open={imageAdjustOpen}
         src={form.image_url}
@@ -1026,71 +536,6 @@ export function ProductsPage() {
         }}
       />
       <ConfirmDialog open={!!deleteId} onClose={() => setDeleteId(null)} onConfirm={remove} title={t('delete')} message={t('confirmDelete')} confirmLabel={t('delete')} cancelLabel={t('cancel')} />
-      {inspectProduct && (() => {
-        const cost = liveProductCosts[inspectProduct.id] ?? inspectProduct.cost_price;
-        const margin = inspectProduct.sale_price > 0 ? ((inspectProduct.sale_price - cost) / inspectProduct.sale_price) * 100 : 0;
-        const catName = productCategoryName(inspectProduct);
-        return (
-          <div className="fixed inset-0 z-[75] flex justify-end p-2.5 sm:p-3.5" dir={lang === 'ar' ? 'rtl' : 'ltr'}>
-            <div className="absolute inset-0 bg-ui-text/30 backdrop-blur-sm" onClick={() => setInspectProduct(null)} aria-hidden="true" />
-            <aside role="dialog" aria-modal="true" aria-label={inspectProduct.name} className="premier-refresh-drawer relative z-10 flex h-full w-full max-w-[460px] flex-col overflow-hidden">
-              <div className="flex items-start justify-between gap-3 border-b border-ui-border px-6 py-5">
-                <div className="min-w-0">
-                  <h2 className="truncate text-lg font-bold text-ui-text">{inspectProduct.name}</h2>
-                  <p className="truncate text-xs text-ui-muted">{[inspectProduct.sku || inspectProduct.barcode, branchLabel(inspectProduct.branch_id)].filter(Boolean).join(' · ') || '—'}</p>
-                </div>
-                <button type="button" onClick={() => setInspectProduct(null)} aria-label={lang === 'ar' ? 'إغلاق' : 'Close'} className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-ui-border bg-ui-page-alt text-ui-muted hover:text-ui-text">
-                  <X className="h-4 w-4" />
-                </button>
-              </div>
-              <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-6">
-                <div className="flex h-52 w-full items-center justify-center overflow-hidden rounded-[20px] bg-[#e9ede8] dark:bg-ui-page-alt">
-                  {inspectProduct.image_url ? (
-                    <ProductImage src={inspectProduct.image_url} name={inspectProduct.name} category={catName} className="h-full w-full" imgClassName="h-full w-full object-cover" positionX={inspectProduct.image_position_x} positionY={inspectProduct.image_position_y} zoom={inspectProduct.image_zoom} />
-                  ) : (
-                    <Package className="h-12 w-12 text-ui-subtle/60" />
-                  )}
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant={inspectProduct.is_active ? 'success' : 'default'}>{inspectProduct.is_active ? t('active') : t('inactive')}</Badge>
-                  {catName && <Badge variant="info">{catName}</Badge>}
-                  {inspectProduct.product_type === 'manufactured' && <Badge variant="primary">{lang === 'ar' ? 'بمكونات' : 'Composed'}</Badge>}
-                </div>
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
-                    <p className="text-xs text-ui-muted">{t('salePrice')}</p>
-                    <p className="mt-1 text-xl font-bold text-ui-primary tabular-nums">{formatCurrency(inspectProduct.sale_price, currency, lang)}</p>
-                  </div>
-                  <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
-                    <p className="text-xs text-ui-muted">{t('costPrice')}</p>
-                    <p className="mt-1 text-xl font-bold text-ui-text tabular-nums">{formatFinancialCurrency(cost, currency, lang)}</p>
-                  </div>
-                  <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
-                    <p className="text-xs text-ui-muted">{t('wholesalePrice')}</p>
-                    <p className="mt-1 text-lg font-bold text-ui-text tabular-nums">{formatCurrency(inspectProduct.wholesale_price, currency, lang)}</p>
-                  </div>
-                  <div className="rounded-[16px] border border-ui-border bg-ui-surface p-3.5 shadow-ui-sm">
-                    <p className="text-xs text-ui-muted">{lang === 'ar' ? 'هامش الربح' : 'Gross margin'}</p>
-                    <p className="mt-1 text-lg font-bold text-ui-success tabular-nums">{margin.toFixed(1)}%</p>
-                  </div>
-                </div>
-                {inspectProduct.description && (
-                  <div className="rounded-[16px] border border-ui-border bg-ui-page-alt p-3.5 text-sm text-ui-muted">{inspectProduct.description}</div>
-                )}
-              </div>
-              <div className="flex items-center gap-2 border-t border-ui-border bg-ui-surface px-6 py-4">
-                {can('products.edit') && (
-                  <Button className="flex-1" onClick={() => { const target = inspectProduct; setInspectProduct(null); openEdit(target); }}>
-                    <Edit2 className="h-4 w-4" /><span>{t('edit')}</span>
-                  </Button>
-                )}
-                <Button variant="outline" onClick={() => showBarcode(inspectProduct)}><BarcodeIcon className="h-4 w-4" /></Button>
-                <Button variant="outline" onClick={() => showQR(inspectProduct)}><QrCode className="h-4 w-4" /></Button>
-              </div>
-            </aside>
-          </div>
-        );
-      })()}
     </DesignSurface>
   );
 }

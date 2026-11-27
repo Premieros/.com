@@ -1,23 +1,19 @@
-import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
 import { useEffect, useMemo, useState } from 'react';
 import { RefreshCw, Search } from 'lucide-react';
 import { supabase } from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
-import { useBranchScope } from '@/lib/branchScope';
 import { useBranchFilter } from '@/lib/useBranchFilter';
 import { useBranches } from '@/hooks/useBranches';
 import { DesignSurface, DesignPageHeader } from '@/components/design';
 
-type Balance = { key: string; itemId: string; kind: 'product' | 'raw' | 'manufactured'; name: string; branch: string; warehouse: string; quantity: number; unitCost: number; salePrice: number; costSource: string };
+type Balance = { key: string; kind: 'product' | 'raw' | 'manufactured'; name: string; branch: string; warehouse: string; quantity: number; unitCost: number; salePrice: number; costSource: string };
 
 
 const PAGE_SIZE = 1000;
-async function allRows(table: string, columns: string, branchIds: string[], item?: string): Promise<Record<string, unknown>[]> {
+async function allRows(table: string, columns: string, branchIds: string[]): Promise<Record<string, unknown>[]> {
   const rows: Record<string, unknown>[] = [];
   for (let start = 0; ; start += PAGE_SIZE) {
-    let query = supabase.from(table).select(columns).in('branch_id', branchIds);
-    if (item) query = query.eq('item_id', item);
-    const { data, error } = await query.range(start, start + PAGE_SIZE - 1);
+    const { data, error } = await supabase.from(table).select(columns).in('branch_id', branchIds).range(start, start + PAGE_SIZE - 1);
     if (error) throw error;
     const page = (data ?? []) as unknown as Record<string, unknown>[];
     rows.push(...page);
@@ -26,8 +22,6 @@ async function allRows(table: string, columns: string, branchIds: string[], item
 }
 export function StockBalancesPage() {
   const { lang } = useLanguage();
-  const record = useRecordFocus();
-  const { selectedBranchIds } = useBranchScope();
   const ar = lang === 'ar';
   const fixedBranch = useBranchFilter();
   const { branches, loading: branchesLoading } = useBranches();
@@ -43,14 +37,14 @@ export function StockBalancesPage() {
   const [revision, setRevision] = useState(0);
   useEffect(() => {
     if (branchesLoading) return;
-    const ids = record.id ? selectedBranchIds : fixedBranch ? [fixedBranch] : branch ? [branch] : branches.map(b => b.id);
+    const ids = fixedBranch ? [fixedBranch] : branch ? [branch] : branches.map(b => b.id);
     if (!ids.length) { setRows([]); return; }
     let cancelled = false;
     setBusy(true); setError('');
     (async () => {
       try {
         const [balanceRows, warehouseRows] = await Promise.all([
-          allRows('v_current_stock_position', 'item_type,item_id,item_name,branch_id,warehouse_id,quantity,unit_cost,sale_price,cost_source', ids, record.id),
+          allRows('v_current_stock_position', 'item_type,item_id,item_name,branch_id,warehouse_id,quantity,unit_cost,sale_price,cost_source', ids),
           allRows('warehouses', 'id,branch_id,name', ids),
         ]);
         if (cancelled) return;
@@ -58,7 +52,6 @@ export function StockBalancesPage() {
         setWarehouses(whs);
         setRows(balanceRows.map(row => ({
           key: [row.item_type,row.branch_id,row.warehouse_id,row.item_id].join(':'),
-          itemId: String(row.item_id),
           kind: row.item_type as Balance['kind'],
           name: String(row.item_name),
           branch: String(row.branch_id),
@@ -72,18 +65,17 @@ export function StockBalancesPage() {
       finally { if (!cancelled) setBusy(false); }
     })();
     return () => { cancelled = true; };
-  }, [branch, fixedBranch, branches, branchesLoading, revision, record.id, selectedBranchIds]);
-  const result = useMemo(() => rows.filter(r => record.id ? r.itemId === record.id :
+  }, [branch, fixedBranch, branches, branchesLoading, revision]);
+  const result = useMemo(() => rows.filter(r =>
     (!warehouse || r.warehouse === warehouse) &&
     (kind === 'all' || r.kind === kind) &&
     (status === 'all' || (status === 'negative' ? r.quantity < 0 : status === 'positive' ? r.quantity > 0 : r.quantity === 0)) &&
     r.name.toLowerCase().includes(search.trim().toLowerCase())
-  ).sort((a, b) => a.name.localeCompare(b.name, ar ? 'ar' : 'en')), [rows, warehouse, kind, status, search, ar, record.id]);
+  ).sort((a, b) => a.name.localeCompare(b.name, ar ? 'ar' : 'en')), [rows, warehouse, kind, status, search, ar]);
   const warehouseName = new Map(warehouses.map(w => [w.id, w.name]));
   const branchName = new Map(branches.map(b => [b.id, b.name]));
   const label = (k: Balance['kind']) => k === 'raw' ? (ar ? 'خام' : 'Raw') : k === 'manufactured' ? (ar ? 'مصنّع' : 'Manufactured') : (ar ? 'منتج' : 'Product');
   return <DesignSurface testId="stock-balances-page">
-    {record.id && <RecordFocus onClear={record.clear} />}
     <DesignPageHeader title={ar ? 'الأرصدة المتاحة' : 'Available stock balances'} subtitle={ar ? 'المنتجات والخامات والمصنّعات — بما فيها الأرصدة الموجبة والسالبة والصفرية' : 'Products, raw materials and manufactured units — including positive, negative and zero balances'} />
     <div className="rounded-2xl border border-ui-border bg-ui-surface p-4 space-y-4">
       <div className="flex flex-wrap gap-3 items-center">

@@ -49,13 +49,12 @@ describe('Premier POS recovery and terminal order safety', () => {
 
   for (const status of ['completed', 'cancelled']) {
     it(`blocks hydration of a ${status} order after permission was granted`, async () => {
-      mocks.rpc.mockResolvedValue({ data: { success: true, branch_id: 'branch-1' }, error: null });
+      mocks.rpc.mockResolvedValue({ data: { success: true }, error: null });
       const maybeSingle = vi.fn().mockResolvedValue({
         data: { id: 'order-1', branch_id: 'branch-1', status },
         error: null,
       });
-      const eq = vi.fn();
-      eq.mockReturnValue({ eq, maybeSingle });
+      const eq = vi.fn().mockReturnValue({ maybeSingle });
       const select = vi.fn().mockReturnValue({ eq });
       mocks.from.mockReturnValue({ select });
 
@@ -68,44 +67,6 @@ describe('Premier POS recovery and terminal order safety', () => {
       });
     });
   }
-
-  it('does not read the order before the server grants workspace access', async () => {
-    mocks.rpc.mockResolvedValue({ data: { success: false, error: 'PERMISSION_DENIED' }, error: null });
-
-    await expect(fetchOrderForWorkspace('order-1')).rejects.toThrow('PERMISSION_DENIED');
-    expect(mocks.from).not.toHaveBeenCalled();
-  });
-
-  it('loads a branch-scoped table and its saved cart in one read after access is granted', async () => {
-    mocks.rpc.mockResolvedValue({ data: { success: true, branch_id: 'branch-1' }, error: null });
-    const table = { id: 'table-1', branch_id: 'branch-1' };
-    const product = { id: 'product-1', branch_id: 'branch-1', sale_price: 100 };
-    const item = { id: 'line-1', product_id: product.id, quantity: 2, unit_price: 75, notes: 'saved' };
-    const maybeSingle = vi.fn().mockResolvedValue({
-      data: {
-        id: 'order-1', branch_id: 'branch-1', status: 'open', table_id: table.id,
-        items: [{ ...item, product }, { ...item, id: 'line-2', product }],
-        table,
-      },
-      error: null,
-    });
-    const eq = vi.fn();
-    eq.mockReturnValue({ eq, maybeSingle });
-    const select = vi.fn().mockReturnValue({ eq });
-    mocks.from.mockReturnValue({ select });
-
-    await expect(fetchOrderForWorkspace('order-1')).resolves.toEqual({
-      order: { id: 'order-1', branch_id: 'branch-1', status: 'open', table_id: table.id },
-      items: [item, { ...item, id: 'line-2' }],
-      products: [product],
-      table,
-    });
-    expect(mocks.from.mock.calls).toEqual([['orders']]);
-    expect(eq.mock.calls).toEqual([
-      ['id', 'order-1'], ['branch_id', 'branch-1'],
-      ['items.product.branch_id', 'branch-1'], ['table.branch_id', 'branch-1'],
-    ]);
-  });
 
   it('reconciles only current branch listeners when Realtime rejoins, without write replay', async () => {
     const first = vi.fn();

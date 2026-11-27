@@ -13,7 +13,6 @@ export interface OrderSettlementPreview {
   discount_amount: number;
   discount_type: 'amount';
   tax_amount: number;
-  delivery_fee_amount?: number;
   total: number;
   pending_quantity: number;
   unsent_quantity: number;
@@ -48,7 +47,6 @@ export async function fetchOrderSettlementPreview(
         discount_amount: Number(raw.discount_amount || 0),
         discount_type: 'amount',
         tax_amount: Number(raw.tax_amount || 0),
-        delivery_fee_amount: Number(raw.delivery_fee_amount || 0),
         total: Number(raw.total || 0),
         pending_quantity: Number(raw.pending_quantity || 0),
         unsent_quantity: Number(raw.unsent_quantity || 0),

@@ -7,7 +7,7 @@ import { DashboardDataPage } from './DashboardDataPage';
  */
 export function DashboardEnhancedPage() {
   return (
-    <div className="dashboard-compact-cleanup premier-motion-dashboard">
+    <div className="dashboard-compact-cleanup">
       <DashboardDataPage />
     </div>
   );

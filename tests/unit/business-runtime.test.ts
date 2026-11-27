@@ -40,14 +40,6 @@ describe('business runtime architecture', () => {
     expect(runtime.terminology.item.ar).toContain('طبق');
   });
 
-  it('shows stock counts with a saved restaurant profile that predates the capability', () => {
-    const runtime = resolveBusinessRuntime('restaurant', {
-      preset_key: 'restaurant',
-      capabilities: ['tables', 'raw_materials'],
-    });
-    expect(businessPathAllowed(runtime, APP_ROUTES.stockCounts)).toBe(true);
-  });
-
   it('makes pharmacy batch/expiry inventory centric without restaurant/manufacturing paths', () => {
     const runtime = resolveBusinessRuntime('pharmacy', null);
 

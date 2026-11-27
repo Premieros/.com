@@ -28,40 +28,4 @@ describe('platform super admin identity', () => {
       await db.query('ROLLBACK');
     }
   });
-  it('creates organization trial access and enables the selected modules for the new owner', async () => {
-    const admin = randomUUID();
-    const suffix = randomUUID().slice(0, 9);
-    const email = `trial-owner-${suffix}@example.invalid`;
-    await db.query('BEGIN');
-    try {
-      await db.query("INSERT INTO auth.users(id,email) VALUES($1,$2)", [admin, `trial-admin-${suffix}@example.invalid`]);
-      await db.query("SELECT set_config('app.register_branch','on',true)");
-      await db.query(`INSERT INTO public.users(id,email,full_name,role,is_active)
-        VALUES($1,$2,'CI Admin','super_admin',true)`, [admin, `trial-admin-${suffix}@example.invalid`]);
-      const setActor = (id: string) => db.query(
-        "SELECT set_config('app.user_id',$1,true),set_config('app.jwt',$2,true),set_config('app.register_branch','off',true)",
-        [id, JSON.stringify({ sub: id, role: 'authenticated' })],
-      );
-      await setActor(admin);
-      const { rows: [created] } = await db.query(`SELECT public.super_admin_create_organization_from_profile(
-        $1,'restaurant',$2,ARRAY['pos','inventory','catalog'],'{}'::jsonb,'CI Owner',$3,$4
-      ) AS result`, [`CI Trial ${suffix}`, `CI Branch ${suffix}`, email, randomUUID()]);
-      expect(created.result).toMatchObject({ success: true, trial_days: 14 });
-      const { rows: [trial] } = await db.query(
-        "SELECT status, trial_ends_at > now() AS valid FROM public.subscriptions WHERE tenant_id=$1",
-        [created.result.organization_id],
-      );
-      expect(trial).toEqual({ status: 'trialing', valid: true });
-      await setActor(created.result.owner_user_id);
-      const { rows } = await db.query(
-        "SELECT feature_key,enabled FROM public.get_organization_module_catalog($1) WHERE feature_key IN ('inventory','catalog','accounting')",
-        [created.result.organization_id],
-      );
-      expect(Object.fromEntries(rows.map(row => [row.feature_key, row.enabled])))
-        .toEqual({ inventory: true, catalog: true, accounting: false });
-    } finally {
-      await db.query('ROLLBACK');
-    }
-  });
-
 });

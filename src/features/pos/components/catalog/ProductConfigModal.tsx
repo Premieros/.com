@@ -1,8 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Minus, Plus, X, Check, Tag } from 'lucide-react';
 import * as api from '@/api';
 import { useLanguage } from '@/context/LanguageContext';
-import { useAuth } from '@/context/AuthContext';
 import { formatCurrency } from '@/lib/format';
 import { ProductImage } from '@/features/catalog/components/ProductImage';
 import type { CartItem, Product, ProductModifierGroup } from '@/lib/types';
@@ -33,11 +32,6 @@ export function ProductConfigModal({
   canDiscount = true,
 }: ProductConfigModalProps) {
   const { t, lang } = useLanguage();
-  const { user } = useAuth();
-  const modifierRequests = useRef(new Map<string, {
-    expires: number;
-    request: Promise<Awaited<ReturnType<typeof api.catalog.getProductModifiers>>>;
-  }>());
   const isAr = lang === 'ar';
   const [quantity, setQuantity] = useState(1);
   const [groups, setGroups] = useState<ProductModifierGroup[]>([]);
@@ -45,7 +39,6 @@ export function ProductConfigModal({
   const [itemNotes, setItemNotes] = useState('');
   const [itemDiscount, setItemDiscount] = useState(0);
   const [loadingModifiers, setLoadingModifiers] = useState(false);
-  const [modifiersReady, setModifiersReady] = useState(false);
   const [modifierError, setModifierError] = useState('');
 
   useEffect(() => {
@@ -57,23 +50,8 @@ export function ProductConfigModal({
     setItemDiscount(initialItem?.discount_amount || 0);
     setModifierError('');
     setLoadingModifiers(true);
-    setModifiersReady(false);
 
-    const cacheKey = user?.id ? `${user.id}:${product.branch_id}:${product.id}` : '';
-    const cached = cacheKey ? modifierRequests.current.get(cacheKey) : undefined;
-    const request = cached && cached.expires > Date.now()
-      ? cached.request : Promise.resolve(api.catalog.getProductModifiers(product.id));
-    if (cacheKey && request !== cached?.request) {
-      for (const [key, entry] of modifierRequests.current) {
-        if (entry.expires <= Date.now()) modifierRequests.current.delete(key);
-      }
-      if (modifierRequests.current.size >= 50) modifierRequests.current.clear();
-      modifierRequests.current.set(cacheKey, { expires: Date.now() + 15_000, request });
-      void request.then(result => {
-        if (result.error || !(result.data as ModifierResponse | null)?.success) modifierRequests.current.delete(cacheKey);
-      }).catch(() => modifierRequests.current.delete(cacheKey));
-    }
-    request.then(({ data, error }) => {
+    api.catalog.getProductModifiers(product.id).then(({ data, error }) => {
       if (cancelled) return;
       if (error) {
         setGroups([]);
@@ -87,7 +65,6 @@ export function ProductConfigModal({
         return;
       }
       const loaded = Array.isArray(res.groups) ? res.groups : [];
-      setModifiersReady(true);
       setGroups(loaded);
       if (!initialItem?.modifier_option_ids?.length) {
         const defaults: string[] = [];
@@ -97,17 +74,12 @@ export function ProductConfigModal({
         }
         setSelectedIds(defaults);
       }
-    }).catch(() => {
-      if (!cancelled) {
-        setGroups([]);
-        setModifierError(isAr ? 'تعذر تحميل الاختيارات. أغلق النافذة وأعد المحاولة.' : 'Could not load options. Close and retry.');
-      }
     }).finally(() => {
       if (!cancelled) setLoadingModifiers(false);
     });
 
     return () => { cancelled = true; };
-  }, [isOpen, product, initialItem, isAr, user?.id]);
+  }, [isOpen, product, initialItem, isAr]);
 
   const optionById = useMemo(() => {
     const map = new Map<string, { group: ProductModifierGroup; option: ProductModifierGroup['options'][number] }>();
@@ -135,7 +107,6 @@ export function ProductConfigModal({
   const lineTotal = Math.max(0, lineSubtotal - itemDiscount);
 
   const handleSave = () => {
-    if (loadingModifiers || !modifiersReady) return;
     for (const group of groups) {
       const ids = new Set(group.options.map((o) => o.id));
       const count = selectedIds.filter((id) => ids.has(id)).length;
@@ -257,7 +228,7 @@ export function ProductConfigModal({
           </div>
           <div className="flex shrink-0 gap-2">
             <button type="button" onClick={onClose} className="min-h-10 rounded-lg border border-ui-border bg-ui-surface px-3 text-[11px] font-black text-ui-muted">{t('cancel')}</button>
-            <button type="button" disabled={loadingModifiers || !modifiersReady} onClick={handleSave} className="min-h-10 rounded-lg bg-ui-primary px-4 text-[11px] font-black text-ui-primary-fg shadow-ui-sm disabled:opacity-50 sm:px-5 sm:text-xs">{initialItem ? (isAr ? 'تحديث' : 'Update') : (isAr ? 'إضافة' : 'Add')}</button>
+            <button type="button" disabled={loadingModifiers} onClick={handleSave} className="min-h-10 rounded-lg bg-ui-primary px-4 text-[11px] font-black text-ui-primary-fg shadow-ui-sm disabled:opacity-50 sm:px-5 sm:text-xs">{initialItem ? (isAr ? 'تحديث' : 'Update') : (isAr ? 'إضافة' : 'Add')}</button>
           </div>
         </div>
       </div>

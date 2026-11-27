@@ -1,4 +1,3 @@
-import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FileText, HandCoins, Plus, UserRound } from 'lucide-react';
 import { supabase } from '@/api';
@@ -13,12 +12,11 @@ import { useToast } from '@/components/Toast';
 import { useLanguage } from '@/context/LanguageContext';
 import { useSettings } from '@/context/SettingsContext';
 import { useBranches } from '@/hooks/useBranches';
-import { formatFinancialCurrency, formatCurrency } from '@/lib/format';
+import { formatCurrency } from '@/lib/format';
 import { useBranchFilter } from '@/lib/useBranchFilter';
 import { useCan } from '@/lib/permissions';
 import type { ArAgingRow } from '@/lib/types';
 import { EmployeeReceivableDetailPage } from './EmployeeReceivableDetailPage';
-import { EmployeeReceivablesAsOfPanel } from '../components/EmployeeReceivablesAsOfPanel';
 
 type EmployeeCustomer = {
   id: string;
@@ -62,7 +60,6 @@ export function EmployeeReceivablesPage() {
   const [rows, setRows] = useState<EmployeeReceivableRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState('');
-  const [showHistoricalBalances, setShowHistoricalBalances] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
   const [employeeModalOpen, setEmployeeModalOpen] = useState(false);
   const [form, setForm] = useState(emptyForm);
@@ -203,17 +200,6 @@ export function EmployeeReceivablesPage() {
     return <EmployeeReceivableDetailPage customerId={selectedEmployeeId} onBack={() => setSelectedEmployeeId(null)} />;
   }
 
-  const receivableTotals = ([
-    ['open', 'open_amount', ar ? 'الرصيد المستحق' : 'Open balance'],
-    ['0_30', 'bucket_0_30', '0–30'],
-    ['31_60', 'bucket_31_60', '31–60'],
-    ['61_90', 'bucket_61_90', '61–90'],
-    ['90_plus', 'bucket_90_plus', '90+'],
-  ] as const).map(([key, field, label]) => ({
-    key, label, value: (row: (typeof filtered)[number]) => Number(row[field]),
-    format: (sum: number) => formatFinancialCurrency(sum, currency, lang),
-  }));
-
   return (
     <DesignSurface testId="employee-receivables-page">
       <DesignPageHeader
@@ -222,24 +208,15 @@ export function EmployeeReceivablesPage() {
         actions={can('customers.manage') ? <Button size="sm" onClick={openAdd}><Plus className="h-4 w-4" />{ar ? 'إضافة موظف' : 'Add Employee'}</Button> : undefined}
       />
 
-      <WorkspaceControls>
+      <DesignPanel>
         <div className="grid gap-4 md:grid-cols-[minmax(220px,1fr)_minmax(220px,1fr)_auto] md:items-end">
           {!branchFilter ? <Select label={ar ? 'الفرع' : 'Branch'} value={selectedBranchId} onChange={(e) => setSelectedBranchId(e.target.value)}><option value="">{ar ? 'اختر الفرع' : 'Select branch'}</option>{branches.map((branch) => <option key={branch.id} value={branch.id}>{branch.name}</option>)}</Select> : <div />}
           <DesignSearch value={search} onChange={setSearch} placeholder={ar ? 'بحث بالاسم أو الهاتف' : 'Search name or phone'} label={ar ? 'بحث' : 'Search'} />
           <div className="rounded-xl border border-ui-border bg-ui-page-alt px-4 py-3 text-end"><p className="text-xs text-ui-muted">{ar ? 'إجمالي الذمم' : 'Total Receivables'}</p><p className="text-lg font-black text-ui-danger">{formatCurrency(totalOpen, currency, lang)}</p></div>
         </div>
-      </WorkspaceControls>
+      </DesignPanel>
 
-      {effectiveBranchId && can('accounts.view') && <>
-        <button type="button" onClick={() => setShowHistoricalBalances(value => !value)}
-          aria-expanded={showHistoricalBalances}
-          className="rounded-lg border border-ui-border bg-ui-surface px-4 py-2 text-sm font-semibold text-ui-primary">
-          {ar ? (showHistoricalBalances ? 'إخفاء أرصدة الموظفين التاريخية' : 'أرصدة الموظفين بتاريخ محدد')
-            : (showHistoricalBalances ? 'Hide historical balances' : 'Employee balances as of date')}
-        </button>
-        {showHistoricalBalances && <EmployeeReceivablesAsOfPanel key={effectiveBranchId} branchId={effectiveBranchId} />}
-      </>}
-      {!effectiveBranchId ? <DesignPanel><div className="py-8 text-center text-sm text-ui-muted">{ar ? 'اختر الفرع لعرض ذمم الموظفين.' : 'Select a branch to view employee receivables.'}</div></DesignPanel> : <DesignPanel><DataTable columns={columns} data={filtered} columnTotals={receivableTotals} loading={loading} emptyMessage={ar ? 'لا توجد حسابات موظفين' : 'No employee accounts'} /></DesignPanel>}
+      {!effectiveBranchId ? <DesignPanel><div className="py-8 text-center text-sm text-ui-muted">{ar ? 'اختر الفرع لعرض ذمم الموظفين.' : 'Select a branch to view employee receivables.'}</div></DesignPanel> : <DesignPanel><DataTable columns={columns} data={filtered} loading={loading} emptyMessage={ar ? 'لا توجد حسابات موظفين' : 'No employee accounts'} /></DesignPanel>}
 
       <Modal open={employeeModalOpen} onClose={() => setEmployeeModalOpen(false)} title={ar ? 'إضافة موظف' : 'Add Employee'}>
         <div className="space-y-4">

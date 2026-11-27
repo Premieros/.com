@@ -1,4 +1,3 @@
-import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useState, useCallback, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { APP_ROUTES } from '@/core/navigation/routes';
@@ -184,11 +183,11 @@ export function AccountsPage() {
         </section>
       )}
 
-      <WorkspaceControls><div data-testid="accounts-search-panel">
+      <DesignPanel testId="accounts-search-panel">
         <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center justify-between">
           <DesignSearch value={search} onChange={setSearch} className="flex-1 w-full" label={t('search')} placeholder={t('search')} testId="accounts-search" />
         </div>
-      </div></WorkspaceControls>
+      </DesignPanel>
 
       <DesignPanel testId="accounts-table-panel">
         <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} />

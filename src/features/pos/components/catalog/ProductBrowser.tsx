@@ -14,6 +14,7 @@ import { uploadProductImage } from '@/features/catalog/services/productImages';
 import { invalidatePosCatalogCache } from '@/core/offline/invalidatePosCatalogCache';
 import type { Category, Product } from '@/lib/types';
 import { MobileStationCategories } from './MobileStationCategories';
+import { ScrollableCardStrip } from '@/components/ScrollableCardStrip';
 
 interface ProductBrowserProps {
   branchId?: string | null;
@@ -129,17 +130,19 @@ export function ProductBrowser({ branchId = null, userId = null, enableStationNa
   };
 
   const renderCategories = (mobile = false) => (
-    <div className={`flex gap-2 overflow-x-auto scrollbar-none ${mobile ? 'pb-1' : 'mt-3 pb-0.5'}`} data-testid="pos-category-strip">
-      <button type="button" onClick={() => onSelectCategory('')} className={`${mobile ? 'min-h-11 rounded-full px-4 text-[12px]' : 'min-h-11 rounded-xl px-4 text-xs'} flex shrink-0 items-center gap-2 font-black transition ${!selectedCategory ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'border border-ui-border bg-ui-surface text-ui-muted hover:border-ui-primary hover:text-ui-text'}`}>
-        <span className="text-base">▦</span>{mobile ? (isAr ? 'الكل' : 'All') : t('allCategories')}
-      </button>
-      {categories.map((category) => (
-        <button key={category.id} type="button" onClick={() => onSelectCategory(selectedCategory === category.id ? '' : category.id)} className={`${mobile ? 'min-h-11 rounded-full px-4 text-[12px]' : 'min-h-11 rounded-xl px-4 text-xs'} shrink-0 font-black transition ${selectedCategory === category.id ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'border border-ui-border bg-ui-surface text-ui-muted hover:border-ui-primary hover:text-ui-text'}`}>
-          {isAr ? category.name : category.name_en || category.name}
-          {!mobile && <span className="ms-1 opacity-50">{counts[category.id] || 0}</span>}
+    <ScrollableCardStrip testId="pos-category-strip" className={mobile ? 'pb-1' : 'mt-3 pb-0.5'}>
+      <div className="flex gap-2">
+        <button type="button" onClick={() => onSelectCategory('')} className={`${mobile ? 'min-h-11 rounded-full px-4 text-[12px]' : 'min-h-11 rounded-xl px-4 text-xs'} flex shrink-0 items-center gap-2 font-black transition ${!selectedCategory ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'border border-ui-border bg-ui-surface text-ui-muted hover:border-ui-primary hover:text-ui-text'}`}>
+          <span className="text-base">▦</span>{mobile ? (isAr ? 'الكل' : 'All') : t('allCategories')}
         </button>
-      ))}
-    </div>
+        {categories.map((category) => (
+          <button key={category.id} type="button" onClick={() => onSelectCategory(selectedCategory === category.id ? '' : category.id)} className={`${mobile ? 'min-h-11 rounded-full px-4 text-[12px]' : 'min-h-11 rounded-xl px-4 text-xs'} shrink-0 font-black transition ${selectedCategory === category.id ? 'bg-ui-primary text-ui-primary-fg shadow-ui-sm' : 'border border-ui-border bg-ui-surface text-ui-muted hover:border-ui-primary hover:text-ui-text'}`}>
+            {isAr ? category.name : category.name_en || category.name}
+            {!mobile && <span className="ms-1 opacity-50">{counts[category.id] || 0}</span>}
+          </button>
+        ))}
+      </div>
+    </ScrollableCardStrip>
   );
 
   const renderSearch = (mobile = false) => (
@@ -209,9 +212,6 @@ export function ProductBrowser({ branchId = null, userId = null, enableStationNa
       </div>
 
       <div className="min-h-0 flex-1 touch-pan-y overflow-y-auto overscroll-y-contain p-2.5 pb-24 sm:p-3 lg:pb-3">
-        {hasBranch && !shiftChecked && <p role="status" className="mb-2 rounded-xl bg-ui-page-alt p-3 text-sm text-ui-muted">
-          {isAr ? 'جار التحقق من الوردية قبل إضافة الأصناف…' : 'Checking the shift before adding items…'}
-        </p>}
         {!hasBranch ? <div className="flex h-full flex-col items-center justify-center text-center text-ui-subtle"><ShoppingCart className="mb-3 h-10 w-10 opacity-20" /><p className="font-black">{isAr ? 'اختر الفرع أولاً' : 'Select a branch first'}</p></div> : filteredProducts.length === 0 ? <div className="flex h-full flex-col items-center justify-center text-center text-ui-subtle"><Package className="mb-3 h-10 w-10 opacity-20" /><p className="font-black">{t('noData')}</p></div> : (
           <div className="grid grid-cols-2 content-start items-start gap-2.5 sm:grid-cols-[repeat(auto-fill,minmax(175px,1fr))] xl:grid-cols-[repeat(auto-fill,minmax(190px,1fr))]" data-testid="pos-product-grid">
             {filteredProducts.map((product) => {

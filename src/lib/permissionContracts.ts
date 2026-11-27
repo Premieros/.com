@@ -142,7 +142,6 @@ const ADMIN = new Set<Permission>([
   'roles.permissions.manage',
   'audit.view',
   'settings.manage',
-  'website.edit',
   'branches.manage',
   'work.authorization.manage',
 ]);
@@ -247,12 +246,6 @@ const EFFECTS: Partial<Record<Permission, { ar: string; en: string; notesAr?: st
   'settings.manage': {
     ar: 'إدارة إعدادات الفرع والطابعات ومحطات المطبخ داخل الفروع المسموح بها.',
     en: 'Manages branch settings, printers, and kitchen stations inside accessible branches.',
-  },
-  'website.edit': {
-    ar: 'تعديل نصوص الموقع وصوره ونشرها من الصفحة نفسها داخل الفروع المسموح بها.',
-    en: 'Edits and publishes website text and photos in place within accessible branches.',
-    notesAr: 'صلاحية مستقلة؛ لا تمنح إدارة الإعدادات أو المخزون أو المبيعات.',
-    notesEn: 'Independent capability; does not grant settings, inventory, or sales administration.',
   },
   'approvals.override': {
     ar: 'يتجاوز قيد الموافقة الذاتية في المسارات التي تسمح بذلك؛ صلاحية عالية الحساسية.',

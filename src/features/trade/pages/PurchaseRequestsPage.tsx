@@ -1,5 +1,5 @@
-import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useState } from 'react';
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { Plus, Trash2, Eye, Send, Check, X, FileText } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/api';
@@ -53,18 +53,20 @@ export function PurchaseRequestsPage() {
   const can = useCan();
   const navigate = useNavigate();
   const { branches } = useBranches();
+  const [search, setSearch] = useState('');
+  const searchTerm = useDebouncedValue(search, 250);
   const { rows: items, loading, error, refresh } = usePaginatedRows<PurchaseRequestRow & { supplier?: Supplier }>({
     table: 'purchase_requests',
-    select: '*, supplier:suppliers(name)',
+    select: '*, supplier:suppliers(name), search_supplier:suppliers()',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
     or: history.minIso ? `created_at.gte.${history.minIso},status.in.(draft,submitted,approved)` : undefined,
+    search: { term: searchTerm, columns: ["request_number"], relations: {"search_supplier":["name"]} },
     pageSize: 100,
   });
   const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [products, setProducts] = useState<Product[]>([]);
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
-  const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [viewModal, setViewModal] = useState<PurchaseRequestRow | null>(null);
   const [viewItems, setViewItems] = useState<{ name: string; quantity: number; estimated_cost: number | null }[]>([]);
@@ -195,9 +197,9 @@ export function PurchaseRequestsPage() {
       <DesignPageHeader title={t('purchaseRequests')} actions={
         can('procurement.request.create') && <Button size="sm" onClick={openAdd}><Plus className="w-4 h-4" /> {t('createRequest')}</Button>
       } />
-      <WorkspaceControls><div data-testid="purchase-requests-search-panel">
+      <DesignPanel testId="purchase-requests-search-panel">
         <DesignSearch value={search} onChange={setSearch} label={t('search')} placeholder={t('search')} testId="purchase-requests-search" />
-      </div></WorkspaceControls>
+      </DesignPanel>
       <DesignPanel testId="purchase-requests-table-panel">
         <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} onRowClick={viewRequest} />
       </DesignPanel>

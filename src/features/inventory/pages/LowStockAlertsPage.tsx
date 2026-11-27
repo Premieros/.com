@@ -1,6 +1,4 @@
-import { WorkspaceControls } from '@/components/WorkspaceToolbar';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { RecordFocus, useRecordFocus } from '@/components/RecordFocus';
+﻿import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { RefreshCw, Trash2 } from 'lucide-react';
 import { supabase } from '@/api';
@@ -31,7 +29,6 @@ export function LowStockAlertsPage() {
   const isAr = lang === 'ar';
   const { show } = useToast();
   const branchFilter = useBranchFilter();
-  const record = useRecordFocus('item');
 
   const [rows, setRows] = useState<LowStockAlertRow[]>([]);
   const [summary, setSummary] = useState<{ out_count?: number; low_count?: number; ok_count?: number }>({});
@@ -52,8 +49,6 @@ export function LowStockAlertsPage() {
   const [reorderItems, setReorderItems] = useState<ReorderLine[]>([]);
   const [qtyOverride, setQtyOverride] = useState<Record<string, number>>({});
   const [loadingReorder, setLoadingReorder] = useState(false);
-  const [reorderError, setReorderError] = useState<string | null>(null);
-  const reorderRequestId = useRef(0);
   const [savingReorder, setSavingReorder] = useState(false);
   const [reorderForm, setReorderForm] = useState({
     branch_id: '',
@@ -91,25 +86,10 @@ export function LowStockAlertsPage() {
 
   useEffect(() => { load(); }, [load]);
 
-  // An operational page must follow the globally selected branch.
-  useEffect(() => {
-    // Close a pending purchase request before a global branch switch can
-    // submit it for the previously selected branch.
-    reorderRequestId.current += 1;
-    setReorderOpen(false);
-    setReorderItems([]);
-    setQtyOverride({});
-    setReorderError(null);
-    setLoadingReorder(false);
-    setBranchId(branchFilter || '');
-    setWarehouseId('');
-  }, [branchFilter]);
-
   const filtered = rows.map((r) => ({
     ...r,
     id: `${r.product_id}-${r.warehouse_id || 'n/a'}`,
   })).filter((r) => {
-    if (record.id && r.product_id !== record.id) return false;
     if (statusFilter !== 'all' && r.status !== statusFilter) return false;
     if (!search) return true;
     const q = search.toLowerCase();
@@ -131,8 +111,6 @@ export function LowStockAlertsPage() {
 
   const loadReorder = useCallback(async (branchId: string) => {
     if (!branchId) return;
-    const requestId = ++reorderRequestId.current;
-    setReorderError(null);
     setLoadingReorder(true);
     const [alerts, rawRes] = await Promise.all([
       api.inventory.getLowStockAlerts({ p_branch_id: branchId, p_warehouse_id: null }),
@@ -141,16 +119,6 @@ export function LowStockAlertsPage() {
         .select('raw_material_id, quantity, min_stock, raw_material:raw_materials(id, name, code, min_stock, default_cost, is_active, unit:units(name))')
         .eq('branch_id', branchId),
     ]);
-    // Never create a partial procurement request when either source failed.
-    // Ignore results from an earlier branch selection as well.
-    if (requestId !== reorderRequestId.current) return;
-    if (alerts.error || rawRes.error) {
-      setReorderItems([]);
-      setQtyOverride({});
-      setReorderError(alerts.error?.message || rawRes.error?.message || t('error'));
-      setLoadingReorder(false);
-      return;
-    }
     const alertRows = alerts.data || [];
     const productIds = alertRows.map((r) => r.product_id);
     const costMap: Record<string, number> = {};
@@ -176,17 +144,14 @@ export function LowStockAlertsPage() {
       default_cost: Number(r.raw_material!.default_cost) || 0,
     }));
     const rawLines = buildRawReorderLines(rawRows);
-    const lines = [...productLines, ...rawLines].filter((line) =>
-      !record.id || line.product_id === record.id || line.raw_material_id === record.id,
-    );
-    if (requestId !== reorderRequestId.current) return;
+    const lines = [...productLines, ...rawLines];
     setReorderItems(lines);
     setQtyOverride(Object.fromEntries(lines.map((l) => [l.key, l.suggested_qty])));
     setLoadingReorder(false);
-  }, [t, record.id]);
+  }, []);
 
   const openReorder = () => {
-    const effBranch = branchFilter || branchId || user?.branch_id || visibleBranches[0]?.id || '';
+    const effBranch = branchId || user?.branch_id || branches[0]?.id || '';
     if (!effBranch) { show(t('required') + ': ' + t('branch'), 'error'); return; }
     setReorderForm({ branch_id: effBranch, supplier_id: '', priority: 'normal', expected_date: '', notes: '' });
     setReorderOpen(true);
@@ -195,11 +160,8 @@ export function LowStockAlertsPage() {
 
   const changeReorderBranch = (next: string) => {
     setReorderForm((f) => ({ ...f, branch_id: next, supplier_id: '' }));
-    reorderRequestId.current += 1;
     setReorderItems([]);
     setQtyOverride({});
-    setReorderError(null);
-    setLoadingReorder(false);
     if (next) loadReorder(next);
   };
 
@@ -215,7 +177,6 @@ export function LowStockAlertsPage() {
   };
 
   const submitReorder = async () => {
-    if (loadingReorder || reorderError) { show(reorderError || t('loading'), 'error'); return; }
     if (!reorderForm.branch_id) { show(t('required') + ': ' + t('branch'), 'error'); return; }
     const items = reorderLinesToProcurementItems(reorderItems, qtyOverride);
     if (items.length === 0) { show(t('required') + ': ' + t('addItem'), 'error'); return; }
@@ -276,14 +237,13 @@ export function LowStockAlertsPage() {
     <DesignSurface testId="low-stock-alerts-page">
       <DesignPageHeader title={t('lowStockAlerts')} subtitle={isAr ? 'تنبيهات إعادة الطلب للمنتجات المنخفضة أو النافدة' : 'Reorder alerts for low or out-of-stock products'} actions={
         <>
-          {(can('purchases.manage') || can('procurement.request.create')) && (
+          {can('purchases.manage') && (
             <Button size="sm" onClick={openReorder} data-testid="low-stock-reorder"><RefreshCw className="w-4 h-4" /> {t('reorder')}</Button>
           )}
           <Button variant="outline" size="sm" onClick={handleExport}>{t('exportExcel')}</Button>
         </>
       } />
 
-      {record.id && <RecordFocus onClear={record.clear} />}
       <DesignPanel testId="alerts-summary-panel">
         <div className="grid sm:grid-cols-3 gap-3">
           <div className="rounded-ui-lg border border-ui-border bg-ui-page p-4">
@@ -301,7 +261,7 @@ export function LowStockAlertsPage() {
         </div>
       </DesignPanel>
 
-      <WorkspaceControls><div data-testid="alerts-search-panel">
+      <DesignPanel testId="alerts-search-panel">
         <div className="flex flex-col sm:flex-row gap-3">
           <DesignSearch value={search} onChange={setSearch} className="flex-1" label={t('search')} placeholder={t('search')} testId="alerts-search" />
           <Select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="sm:w-36">
@@ -318,7 +278,7 @@ export function LowStockAlertsPage() {
             {warehouses.filter((w) => !branchId || w.branch_id === branchId).map((w) => <option key={w.id} value={w.id}>{w.name}</option>)}
           </Select>
         </div>
-      </div></WorkspaceControls>
+      </DesignPanel>
 
       <DesignPanel testId="alerts-table-panel">
         <DataTable columns={columns} data={filtered} loading={loading} error={error} emptyMessage={t('noData')} />
@@ -329,7 +289,7 @@ export function LowStockAlertsPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <Select label={t('branch')} value={reorderForm.branch_id} onChange={(e) => changeReorderBranch(e.target.value)}>
               <option value="">--</option>
-              {visibleBranches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+              {branches.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
             </Select>
             <Select label={t('supplier')} value={reorderForm.supplier_id} onChange={(e) => setReorderForm({ ...reorderForm, supplier_id: e.target.value })}>
               <option value="">{t('all')}</option>
@@ -344,7 +304,6 @@ export function LowStockAlertsPage() {
             <Input label={t('expectedDate')} type="date" value={reorderForm.expected_date} onChange={(e) => setReorderForm({ ...reorderForm, expected_date: e.target.value })} />
           </div>
 
-          {reorderError && <div role="alert" data-testid="reorder-source-error" className="rounded-lg border border-ui-danger bg-ui-danger-soft px-3 py-2 text-sm text-ui-danger">{isAr ? 'تعذر تحميل بيانات إعادة الطلب كاملة. أعد المحاولة قبل إنشاء طلب شراء.' : 'Reorder data could not be fully loaded. Retry before creating a purchase request.'} {reorderError}</div>}
           <div className="rounded-xl border border-ui-border overflow-hidden">
             <div className="max-h-80 overflow-y-auto">
               <table className="w-full text-sm">
@@ -394,7 +353,7 @@ export function LowStockAlertsPage() {
 
           <div className="flex items-center justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setReorderOpen(false)}>{t('cancel')}</Button>
-            <Button size="sm" onClick={submitReorder} disabled={savingReorder || loadingReorder || !!reorderError} data-testid="low-stock-reorder-submit">
+            <Button size="sm" onClick={submitReorder} disabled={savingReorder || loadingReorder} data-testid="low-stock-reorder-submit">
               {savingReorder ? t('loading') : t('createRequest')}
             </Button>
           </div>
