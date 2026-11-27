@@ -95,9 +95,9 @@ function sha256(text) {
 // SSL on when the URL opts in (sslmode=require/verify-full) — Supabase pooler
 // needs it, a local Postgres must not use it.
 function buildSsl(connectionString) {
-  const sslMode = (connectionString.match(/sslmode=([^&\s]+)/) || [])[1];
-  if (sslMode && sslMode !== 'disable') return { rejectUnauthorized: false };
-  return false;
+  const isLocal = /localhost|127\.0\.0\.1/.test(connectionString);
+  if (isLocal) return false;
+  return { rejectUnauthorized: false };
 }
 
 async function main() {
@@ -139,7 +139,9 @@ async function main() {
     process.exit(1);
   }
 
-  const client = new pg.Client({ connectionString: dbUrl, ssl: buildSsl(dbUrl) });
+  process.env.NODE_TLS_REJECT_UNAUTHORIZED = '0';
+  const cleanDbUrl = dbUrl.replace(/[?&]sslmode=[^&]+/g, '');
+  const client = new pg.Client({ connectionString: cleanDbUrl, ssl: buildSsl(dbUrl) });
   await client.connect();
 
   const applied = [];
