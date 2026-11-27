@@ -1,3 +1,4 @@
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
@@ -34,16 +35,18 @@ export function WarehousesPage() {
   const branchFilter = useBranchFilter();
   const branchScope = useBranchScope();
   const { guidedContext, completePrerequisiteAndReturn } = useGuidedWorkflow();
+  const [search, setSearch] = useState('');
+  const searchTerm = useDebouncedValue(search, 250);
   const { rows: items, loading, total, hasMore, loadMore, loadingMore, refresh: reloadWarehouses } = usePaginatedRows<Warehouse>({
     table: 'warehouses',
-    select: '*, branch:branches(*)',
+    select: '*, branch:branches(*), search_branch:branches()',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
     enabled: can('warehouses.view'),
+    search: { term: searchTerm, columns: ["name","address"], relations: {"search_branch":["name"]} },
     pageSize: 100,
   });
   const { branches } = useBranches();
-  const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [modalOpen, setModalOpen] = useState(false);
   const [viewMode, setViewMode] = useState<'cards' | 'list'>('cards');

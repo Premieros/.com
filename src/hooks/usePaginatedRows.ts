@@ -28,7 +28,7 @@ export interface PaginatedQueryOptions {
   /** Additional equality filters: [{ column: 'status', value: 'open' }]. */
   filters?: { column: string; value: unknown }[];
   /** Optional server-side text search over one or more plain columns. */
-  search?: { term: string; columns: string[] };
+  search?: { term: string; columns: string[]; relations?: Record<string, string[]> };
   /** Values excluded from a column, scoped by the same branch and pagination. */
   exclude?: { column: string; values: string[] };
   /** Exclusive upper bound for a timestamp or other ordered column. */
@@ -102,7 +102,7 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
   const branchIdsKey = JSON.stringify([...(branch_ids || [])].sort());
   const filterKey = JSON.stringify(filters ?? []);
   const excludeKey = JSON.stringify(exclude ?? null);
-  const searchKey = JSON.stringify({ term: search?.term ?? '', columns: search?.columns ?? [] });
+  const searchKey = JSON.stringify({ term: search?.term ?? '', columns: search?.columns ?? [], relations: search?.relations ?? {} });
   const orderKey = order?.column ?? '';
   const orderAsc = order?.ascending !== false;
   const userId = user?.id ?? 'anonymous';
@@ -174,7 +174,12 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
       const term = safeSearchTerm(search?.term ?? '');
       const columns = (search?.columns ?? []).filter((column) => /^[a-zA-Z0-9_]+$/.test(column));
       if (term && columns.length > 0) {
-        const filter = columns.map((column) => `${column}.ilike.*${term}*`).join(',');
+        const clauses = columns.map((column) => `${column}.ilike.*${term}*`);
+        for (const [relation, fields] of Object.entries(search?.relations ?? {})) {
+          bq = bq.or(fields.map((field) => `${field}.ilike.*${term}*`).join(','), { referencedTable: relation });
+          clauses.push(`${relation}.not.is.null`);
+        }
+        const filter = clauses.join(',');
         bq = bq.or(filter);
       }
       return bq;
