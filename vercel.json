@@ -1,11 +1,16 @@
 {
   "framework": "vite",
-  "buildCommand": "npm run build",
+  "buildCommand": "env -u npm_config_cache_dir -u NPM_CONFIG_CACHE_DIR -u npm_config_cache-dir -u NPM_CONFIG_CACHE-DIR npm run build",
   "outputDirectory": "dist",
   "headers": [
     {
       "source": "/_website-photo/:path*",
-      "headers": [{ "key": "x-vercel-enable-rewrite-caching", "value": "0" }]
+      "headers": [
+        {
+          "key": "x-vercel-enable-rewrite-caching",
+          "value": "0"
+        }
+      ]
     }
   ],
   "rewrites": [
@@ -21,5 +26,6 @@
       "source": "/(.*)",
       "destination": "/index.html"
     }
-  ]
+  ],
+  "installCommand": "env -u npm_config_cache_dir -u NPM_CONFIG_CACHE_DIR -u npm_config_cache-dir -u NPM_CONFIG_CACHE-DIR npm ci --strict-peer-deps"
 }
