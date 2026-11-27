@@ -1,3 +1,4 @@
+import { useBranchScope } from '@/lib/branchScope';
 import { WebsitePhotosSettings } from '@/features/qr/WebsitePhotosSettings';
 import { WebsiteTextSettings } from '@/features/qr/WebsiteTextSettings';
 import { WebsiteSocialSettings } from '@/features/qr/WebsiteSocialSettings';
@@ -74,13 +75,18 @@ export function SettingsControlCenterPage() {
 
 
   const myBranchId = user?.branch_id || (branches[0]?.id ?? '');
-  const [selectedBranchId, setSelectedBranchId] = useState<string>(myBranchId);
+  const { actionBranchId } = useBranchScope();
+  const [selectedBranchId, setSelectedBranchId] = useState('');
   const [branchForm, setBranchForm] = useState<Partial<BranchSettings>>({});
 
   const [branchStaff, setBranchStaff] = useState<UserRow[]>([]);
   const [loadingStaff, setLoadingStaff] = useState(false);
 
-  const targetBranchId = selectedBranchId || myBranchId;
+  const targetBranchId = isSuperAdmin
+    ? branches.find(branch => branch.id === selectedBranchId)?.id
+      || branches.find(branch => branch.id === actionBranchId)?.id
+      || ''
+    : myBranchId;
   useEffect(() => {
     if (searchParams.get('section') !== 'website_social') return;
     const requestedBranch = searchParams.get('website_branch');
@@ -248,7 +254,7 @@ export function SettingsControlCenterPage() {
         actions={branches.length > 1 ? (
           <div className="w-52 shrink-0">
             <Select
-              value={selectedBranchId}
+              value={targetBranchId}
               onChange={(e) => setSelectedBranchId(e.target.value)}
               aria-label={isAr ? 'الفرع النشط للإعدادات' : 'Settings branch'}
             >

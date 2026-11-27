@@ -103,10 +103,16 @@ function DeliveryWorkspace({ branch }: { branch: string }) {
       if (result.error) {
         if (result.error.message.includes('DELIVERY_REFRESH_REQUIRED')) {
           setOrder(null); refresh(); setNotice('تغيّرت بيانات الطلب لدى موظف آخر. افتح الطلب مجددًا.');
+        } else if (result.error.message.includes('DELIVERY_PREPARATION_REQUIRED')) {
+          setError('أرسل جميع الأصناف إلى المطبخ وانتظر اكتمال التحضير قبل تسجيل خروج الطلب أو تسليمه.');
         } else setError('تعذّر تحديث الطلب. تأكد من اختيار طيار أو خدمة نشطة ومن حالة الطلب.');
         return;
       }
-      setOrder(null); setNotice('تم تحديث حالة التوصيل.'); refresh();
+      setOrder(null);
+      setNotice(order.dispatch_status === 'delivered' && !history
+        ? 'تم تسجيل التسليم. لعرض الطلب مجددًا، فعّل «آخر 30 يومًا».'
+        : 'تم تحديث حالة التوصيل.');
+      refresh();
     } catch {
       setError('تعذّر تأكيد التحديث. حدّث القائمة قبل إعادة المحاولة.');
     } finally {

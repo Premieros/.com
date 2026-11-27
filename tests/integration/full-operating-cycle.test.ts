@@ -133,6 +133,13 @@ describe('full ERP/POS operating cycle', () => {
       const deliveryService = (await client.query("select public.delivery_save_directory($1,'service','CI service') id", [branchId])).rows[0].id;
       const dispatch = 'select public.delivery_update_dispatch($1,$2,$3,$4,$5,$6) result';
       expect((await client.query(dispatch, [branchId, deliveryOrder, 0, 'assigned', deliveryService, deliveryDriver])).rows[0].result).toBe(1);
+      await client.query('SAVEPOINT premature_dispatch');
+      await expect(client.query(dispatch, [branchId, deliveryOrder, 1, 'on_the_way', deliveryService, deliveryDriver]))
+        .rejects.toThrow('DELIVERY_PREPARATION_REQUIRED');
+      await client.query('ROLLBACK TO SAVEPOINT premature_dispatch');
+      await client.query('RESET ROLE');
+      await client.query("update public.orders set kitchen_status='ready' where id=$1", [deliveryOrder]);
+      await client.query('SET LOCAL ROLE authenticated');
       expect((await client.query(dispatch, [branchId, deliveryOrder, 1, 'on_the_way', deliveryService, deliveryDriver])).rows[0].result).toBe(2);
       const desk = await client.query('select public.delivery_workspace($1) result', [branchId]);
       expect(desk.rows[0].result.orders).toContainEqual(expect.objectContaining({
