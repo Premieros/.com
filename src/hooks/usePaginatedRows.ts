@@ -179,7 +179,8 @@ export function usePaginatedRows<T>(opts: PaginatedQueryOptions): UsePaginatedRo
           bq = bq.or(fields.map((field) => `${field}.ilike.*${term}*`).join(','), { referencedTable: relation });
           clauses.push(`${relation}.not.is.null`);
         }
-        bq = bq.or(clauses.join(','));
+        const filter = clauses.join(',');
+        bq = bq.or(filter);
       }
       return bq;
     },
