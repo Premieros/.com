@@ -1,3 +1,4 @@
+import { useDebouncedValue } from '@/hooks/useDebouncedValue';
 import { WorkspaceControls } from '@/components/WorkspaceToolbar';
 import { useEffect, useState, useMemo } from 'react';
 import { Plus, Trash2, Eye, Download, Send, Check, X, PackageOpen, RotateCcw, Edit2 } from 'lucide-react';
@@ -51,12 +52,15 @@ export function PurchasesPage() {
   const { show } = useToast();
   const can = useCan();
   const navigate = useNavigate();
+  const [search, setSearch] = useState('');
+  const searchTerm = useDebouncedValue(search, 250);
   const { rows: items, loading, error, total, hasMore, loadMore, loadingMore, refresh: reloadPurchases, fetchAll: fetchAllPurchases } = usePaginatedRows<Purchase>({
     table: 'purchases',
-    select: '*, supplier:suppliers(*)',
+    select: '*, supplier:suppliers(*), search_supplier:suppliers()',
     order: { column: 'created_at', ascending: false },
     branch_ids: branchScope.selectedBranchIds,
     or: history.minIso ? `created_at.gte.${history.minIso},status.in.(draft,submitted,approved,partial)` : undefined,
+    search: { term: searchTerm, columns: ["invoice_number"], relations: {"search_supplier":["name"]} },
     pageSize: 100,
   });
   const { effectiveSettings } = useSettings();
@@ -73,7 +77,6 @@ export function PurchasesPage() {
   const [rawMaterials, setRawMaterials] = useState<RawMaterial[]>([]);
   const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
   const [rawUnits, setRawUnits] = useState<InlineRawUnit[]>([]);
-  const [search, setSearch] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingPurchase, setEditingPurchase] = useState<Purchase | null>(null);
   const [viewModal, setViewModal] = useState<Purchase | null>(null);
